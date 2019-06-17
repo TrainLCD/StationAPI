@@ -5,7 +5,13 @@ defmodule StationApiWeb.Router do
     plug :accepts, ["json"]
   end
 
-  scope "/api", StationApiWeb do
+  scope "/" do
     pipe_through :api
+
+    forward "/graphiql", Absinthe.Plug.GraphiQL,
+      schema: StationApiWeb.Schema
+
+    forward "/", Absinthe.Plug,
+      schema: StationApiWeb.Schema
   end
 end
