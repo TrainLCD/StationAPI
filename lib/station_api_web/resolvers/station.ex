@@ -21,6 +21,30 @@ defmodule StationApiWeb.Resolvers.Station do
     {:ok, api_result}
   end
 
+  def station_by_id(_parent, %{id: id}, _resolution) do
+    {:ok, stations} = StationApi.Station.station_by_group_id(id)
+    station = List.first(stations)
+
+    case station do
+      nil -> {:error, "Station not found."}
+      station ->
+        station_map = to_atomic_map(station)
+
+        lines =
+          Enum.map(stations, fn s ->
+            s_map = to_atomic_map(s)
+            {:ok, lines} = StationApi.Line.line_by_id(s_map[:line_cd])
+            line = List.first(lines)
+            line_map = to_atomic_map(line)
+            transform_line_result(line_map)
+          end)
+
+        api_result = transform_station_result(station_map, lines)
+
+        {:ok, api_result}
+    end
+  end
+
   defp transform_station_result(map, lines) do
     %{
       id: map[:station_cd],
