@@ -51,20 +51,23 @@ defmodule StationApiWeb.Resolvers.Station do
     case stations do
       [] -> {:error, "Not matched."}
       stations ->
-        lines =
+        stations_lines =
           Enum.map(stations, fn s ->
             s_map = to_atomic_map(s)
-            {:ok, lines} = StationApi.Line.line_by_id(s_map[:line_cd])
-            line = List.first(lines)
-            line_map = to_atomic_map(line)
-            transform_line_result(line_map)
+            {:ok, group_stations} = StationApi.Station.station_by_group_id(s_map[:station_g_cd])
+            Enum.map(group_stations, fn gs ->
+              gs_map = to_atomic_map(gs)
+              {:ok, lines} = StationApi.Line.line_by_id(gs_map[:line_cd])
+              line = List.first(lines)
+              line_map = to_atomic_map(line)
+              transform_line_result(line_map)
+            end)
           end)
 
-        station_maps = Enum.map(stations, fn s ->
-          to_atomic_map(s)
-        end)
-        api_result = Enum.map(station_maps, fn s ->
-          transform_station_result(s, lines)
+        stations_with_index = stations |> Enum.with_index
+        api_result = Enum.map(stations_with_index, fn {s, i} ->
+          s_map = to_atomic_map(s)
+          transform_station_result(s_map, Enum.at(stations_lines, i))
         end)
 
         {:ok, api_result}
