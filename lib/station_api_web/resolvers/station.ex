@@ -45,6 +45,32 @@ defmodule StationApiWeb.Resolvers.Station do
     end
   end
 
+  def stations_by_line_id(_parent, %{line_id: line_id}, _resolution) do
+    {:ok, stations} = StationApi.Station.stations_by_line_id(line_id)
+
+    case stations do
+      [] -> {:error, "Not matched."}
+      stations ->
+        lines =
+          Enum.map(stations, fn s ->
+            s_map = to_atomic_map(s)
+            {:ok, lines} = StationApi.Line.line_by_id(s_map[:line_cd])
+            line = List.first(lines)
+            line_map = to_atomic_map(line)
+            transform_line_result(line_map)
+          end)
+
+        station_maps = Enum.map(stations, fn s ->
+          to_atomic_map(s)
+        end)
+        api_result = Enum.map(station_maps, fn s ->
+          transform_station_result(s, lines)
+        end)
+
+        {:ok, api_result}
+    end
+  end
+
   defp transform_station_result(map, lines) do
     %{
       id: map[:station_cd],

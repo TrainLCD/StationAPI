@@ -38,4 +38,13 @@ defmodule StationApi.Station do
 
     {:ok, Common.to_column_map(result.columns, result.rows)}
   end
+
+  def stations_by_line_id(line_id) do
+    {:ok, result} =
+      Ecto.Adapters.SQL.query(StationApi.Repo, "SELECT * FROM stations WHERE line_cd = ?", [
+        line_id
+      ])
+
+    {:ok, Common.to_column_map(result.columns, result.rows)}
+  end
 end
