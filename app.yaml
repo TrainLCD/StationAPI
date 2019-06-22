@@ -1,0 +1,6 @@
+env: flex
+runtime: gs://elixir-runtime/elixir.yaml
+runtime_config:
+    release_app: station_api
+includes:
+    - secrets.yaml
