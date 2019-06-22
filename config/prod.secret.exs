@@ -5,17 +5,38 @@
 # file to your .gitignore.
 use Mix.Config
 
-database_url =
-  System.get_env("DATABASE_URL") ||
+database_user =
+  System.get_env("DATABASE_USER") ||
     raise """
-    environment variable DATABASE_URL is missing.
-    For example: ecto://USER:PASS@HOST/DATABASE
+    environment variable DATABASE_USER is missing.
+    """
+
+database_password =
+  System.get_env("DATABASE_PASSWORD") ||
+    raise """
+    environment variable DATABASE_PASSWORD is missing.
+    """
+
+database_name =
+  System.get_env("DATABASE_NAME") ||
+    raise """
+    environment variable DATABASE_NAME is missing.
+    """
+
+database_socket =
+  System.get_env("DATABASE_SOCKET") ||
+    raise """
+    environment variable DATABASE_SOCKET is missing.
     """
 
 config :station_api, StationApi.Repo,
-  # ssl: true,
-  url: database_url,
-  pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
+  username: database_user,
+  password: database_password,
+  database: database_name,
+  sync_connect: true,
+  socket: database_socket,
+  backoff_type: :stop,
+  pool_size: String.to_integer(System.get_env("POOL_SIZE") || "20")
 
 secret_key_base =
   System.get_env("SECRET_KEY_BASE") ||
