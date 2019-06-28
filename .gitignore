@@ -30,3 +30,5 @@ station_api-*.tar
 /.elixir_ls/
 
 secrets.yaml
+
+.DS_Store
