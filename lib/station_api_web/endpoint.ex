@@ -40,5 +40,6 @@ defmodule StationApiWeb.Endpoint do
     key: "_station_api_key",
     signing_salt: "Pd2TVFRb"
 
+  plug CORSPlug
   plug StationApiWeb.Router
 end
