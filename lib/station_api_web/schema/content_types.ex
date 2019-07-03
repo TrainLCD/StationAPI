@@ -4,7 +4,7 @@ defmodule StationApiWeb.Schema.ContentTypes do
   object :station do
     field :id, :id
     field :address, :string
-    field :distance, :string
+    field :distance, :float
     field :latitude, :float
     field :longitude, :float
     field :lines, list_of(:line)
