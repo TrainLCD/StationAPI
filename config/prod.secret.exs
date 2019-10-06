@@ -5,6 +5,12 @@
 # file to your .gitignore.
 use Mix.Config
 
+database_hostname =
+  System.get_env("DATABASE_HOST") ||
+    raise """
+    environment variable DATABASE_HOST is missing.
+    """
+
 database_user =
   System.get_env("DATABASE_USER") ||
     raise """
@@ -23,18 +29,12 @@ database_name =
     environment variable DATABASE_NAME is missing.
     """
 
-database_socket =
-  System.get_env("DATABASE_SOCKET") ||
-    raise """
-    environment variable DATABASE_SOCKET is missing.
-    """
-
 config :station_api, StationApi.Repo,
   username: database_user,
   password: database_password,
   database: database_name,
   sync_connect: true,
-  socket: database_socket,
+  hostname: database_hostname,
   backoff_type: :stop,
   pool_size: String.to_integer(System.get_env("POOL_SIZE") || "20")
 
