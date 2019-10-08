@@ -4,7 +4,6 @@ volumes:
 services:
   api:
     build: .
-    command: mix phx.server
     ports:
       - 4000:4000
     restart: always

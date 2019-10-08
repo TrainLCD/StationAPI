@@ -13,6 +13,7 @@ defmodule StationApiWeb.Schema.ContentTypes do
     field :pref_id, :integer
     field :group_id, :integer
     field :name, :string
+    field :name_k, :string
   end
 
   object :line do

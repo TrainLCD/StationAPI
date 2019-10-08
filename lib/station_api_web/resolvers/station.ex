@@ -81,6 +81,7 @@ defmodule StationApiWeb.Resolvers.Station do
       id: map[:station_cd],
       group_id: map[:station_g_cd],
       name: map[:station_name],
+      name_k: map[:station_name_k],
       postal_code: map[:post],
       open_ymd: map[:open_ymd],
       latitude: map[:lat],
