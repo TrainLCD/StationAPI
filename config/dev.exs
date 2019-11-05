@@ -2,11 +2,10 @@ use Mix.Config
 
 # Configure your database
 config :station_api, StationApi.Repo,
-  username: "root",
-  password: "",
+  username: "station_api_dev",
+  password: "station_api_dev",
   database: "station_api_dev",
   hostname: "db",
-  show_sensitive_data_on_connection_error: true,
   pool_size: 10
 
 # For development, we disable any cache and enable
