@@ -44,7 +44,8 @@ defmodule StationApi.MixProject do
       {:absinthe, "~> 1.4.0"},
       {:absinthe_plug, "~> 1.4.0"},
       {:distillery, "~> 2.0"},
-      {:cors_plug, "~> 2.0"}
+      {:cors_plug, "~> 2.0"},
+      {:myxql, "~> 0.2.0"}
     ]
   end
 

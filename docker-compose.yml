@@ -14,6 +14,8 @@ services:
     command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_DATABASE: station_api_dev
+      MYSQL_USER: station_api_dev
+      MYSQL_PASSWORD: station_api_dev
       MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
     volumes:
         - db:/var/lib/mysql
