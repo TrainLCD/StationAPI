@@ -56,10 +56,11 @@ defmodule StationApiWeb.Resolvers.Station do
         stations_lines =
           Enum.map(stations, fn s ->
             s_map = to_atomic_map(s)
-            {:ok, lines} = StationApi.Line.line_by_id(s_map[:line_cd])
-            line = List.first(lines)
-            line_map = to_atomic_map(line)
-            transform_line_result(line_map)
+            {:ok, lines} = StationApi.Line.lines_by_group_id(s_map[:station_g_cd])
+            Enum.map(lines, fn line ->
+              line_map = to_atomic_map(line)
+              transform_line_result(line_map)
+            end)
           end)
 
         stations_with_index = stations |> Enum.with_index
@@ -78,7 +79,7 @@ defmodule StationApiWeb.Resolvers.Station do
       group_id: map[:station_g_cd],
       name: map[:station_name],
       name_k: map[:station_name_k],
-      name_r: map[:station_name_r],
+      name_r: String.capitalize(map[:station_name_r]),
       postal_code: map[:post],
       open_ymd: map[:open_ymd],
       latitude: map[:lat],
