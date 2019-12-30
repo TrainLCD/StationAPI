@@ -10,7 +10,7 @@ services:
     links:
       - db
   db:
-    image: mysql:5.7.25
+    image: mysql:8
     command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_DATABASE: station_api_dev
