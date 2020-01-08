@@ -7,6 +7,9 @@ COPY . /app
 
 RUN yes | mix local.hex
 RUN yes | mix archive.install https://github.com/phoenixframework/archives/raw/master/phx_new.ez
-RUN mix deps.get 
+RUN mix deps.get
 RUN mix local.rebar --force
+
+EXPOSE 4000
+
 CMD ["mix", "phx.server"]
