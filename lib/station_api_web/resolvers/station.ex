@@ -81,6 +81,7 @@ defmodule StationApiWeb.Resolvers.Station do
       name_k: map[:station_name_k],
       name_r: String.capitalize(map[:station_name_r]),
       postal_code: map[:post],
+      pref_id: map[:pref_cd],
       open_ymd: map[:open_ymd],
       latitude: map[:lat],
       longitude: map[:lon],
