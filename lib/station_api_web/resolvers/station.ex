@@ -86,7 +86,7 @@ defmodule StationApiWeb.Resolvers.Station do
       latitude: map[:lat],
       longitude: map[:lon],
       distance: map[:distance],
-      address: map[:add],
+      address: map[:address],
       lines: lines
     }
   end
