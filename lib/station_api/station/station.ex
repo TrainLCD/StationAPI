@@ -21,6 +21,8 @@ defmodule StationApi.Station do
     ) AS distance
     FROM
     stations
+    WHERE
+    e_status = 0
     ORDER BY
     distance
     LIMIT 1",
@@ -32,7 +34,7 @@ defmodule StationApi.Station do
 
   def station_by_group_id(group_id) do
     {:ok, result} =
-      Ecto.Adapters.SQL.query(StationApi.Repo, "SELECT * FROM stations WHERE station_g_cd = ?", [
+      Ecto.Adapters.SQL.query(StationApi.Repo, "SELECT * FROM stations WHERE station_g_cd = ? AND e_status = 0", [
         group_id
       ])
 
@@ -43,7 +45,7 @@ defmodule StationApi.Station do
     {:ok, result} =
       Ecto.Adapters.SQL.query(
         StationApi.Repo,
-        "SELECT * FROM stations WHERE line_cd = ? ORDER BY e_sort, line_cd",
+        "SELECT * FROM stations WHERE line_cd = ? AND e_status = 0 ORDER BY e_sort, station_cd",
         [
           line_id
         ]
