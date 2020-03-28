@@ -26,7 +26,7 @@ defmodule StationApiWeb.Schema.ContentTypes do
     field :name, :string
     field :name_h, :string
     field :name_k, :string
-    field :line_type, :string
+    field :line_type, :integer
     field :longitude, :float
     field :zoom, :integer
   end
