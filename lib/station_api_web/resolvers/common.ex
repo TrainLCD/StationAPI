@@ -7,14 +7,14 @@ defmodule StationApiWeb.Resolvers.Common do
     %{
       id: map[:line_cd],
       company_id: map[:company_cd],
-      latitude: map[:lat],
+      latitude: Decimal.to_float(map[:lat]),
       line_color_c: map[:line_color_c],
       line_color_t: map[:line_color_t],
       name: map[:line_name],
       name_h: map[:line_name_h],
       name_k: map[:line_name_k],
       line_type: map[:line_type],
-      longitude: map[:longitude],
+      longitude: Decimal.to_float(map[:lon]),
       zoom: map[:zoom]
     }
   end

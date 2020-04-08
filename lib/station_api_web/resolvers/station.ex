@@ -83,8 +83,8 @@ defmodule StationApiWeb.Resolvers.Station do
       postal_code: map[:post],
       pref_id: map[:pref_cd],
       open_ymd: map[:open_ymd],
-      latitude: map[:lat],
-      longitude: map[:lon],
+      latitude: Decimal.to_float(map[:lat]),
+      longitude: Decimal.to_float(map[:lon]),
       distance: map[:distance],
       address: map[:address],
       lines: lines

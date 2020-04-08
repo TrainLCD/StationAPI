@@ -20,7 +20,7 @@ defmodule StationApiWeb.Schema.ContentTypes do
   object :line do
     field :id, :id
     field :company_id, :integer
-    field :latitutde, :float
+    field :latitude, :float
     field :line_color_c, :string
     field :line_color_t, :string
     field :name, :string
