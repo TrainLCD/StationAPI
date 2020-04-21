@@ -13,6 +13,7 @@ defmodule StationApiWeb.Resolvers.Common do
       name: map[:line_name],
       name_h: map[:line_name_h],
       name_k: map[:line_name_k],
+      name_r: map[:line_name_r],
       line_type: map[:line_type],
       longitude: Decimal.to_float(map[:lon]),
       zoom: map[:zoom]
