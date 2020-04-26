@@ -1,6 +1,4 @@
 version: '2'
-volumes:
-  db:
 services:
   api:
     build: .
@@ -10,7 +8,7 @@ services:
     links:
       - db
   db:
-    image: mysql:8
+    image: mariadb:10.4
     command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_DATABASE: station_api_dev
@@ -18,5 +16,4 @@ services:
       MYSQL_PASSWORD: station_api_dev
       MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
     volumes:
-        - db:/var/lib/mysql
         - ./migrations:/docker-entrypoint-initdb.d
