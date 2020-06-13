@@ -26,5 +26,10 @@ defmodule StationApiWeb.Schema do
       arg :line_id, non_null(:id)
       resolve &Resolvers.Station.stations_by_line_id/3
     end
+    @desc "Fetch stations by name"
+    field :stations_by_name, list_of(:station) do
+      arg :name, non_null(:string)
+      resolve &Resolvers.Station.stations_by_name/3
+    end
   end
 end

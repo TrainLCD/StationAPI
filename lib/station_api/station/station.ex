@@ -53,4 +53,14 @@ defmodule StationApi.Station do
 
     {:ok, Common.to_column_map(result.columns, result.rows)}
   end
+
+  def stations_by_name(name) do
+    {:ok, result} =
+      Ecto.Adapters.SQL.query(
+        StationApi.Repo,
+        "SELECT * FROM stations WHERE station_name LIKE '%" <> name <>"%' AND e_status = 0 ORDER BY e_sort, station_cd"
+      )
+
+    {:ok, Common.to_column_map(result.columns, result.rows)}
+  end
 end
