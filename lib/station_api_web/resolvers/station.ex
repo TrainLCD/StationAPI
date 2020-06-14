@@ -68,9 +68,7 @@ defmodule StationApiWeb.Resolvers.Station do
           transform_station_result(s_map, Enum.at(stations_lines, i))
         end)
 
-        dedupped_stations = Enum.uniq_by(api_result, fn station -> station.name end)
-
-        {:ok, dedupped_stations}
+        {:ok, api_result}
       end
     end
 
