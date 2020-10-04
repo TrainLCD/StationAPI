@@ -13,6 +13,8 @@ services:
     restart: always
     links:
       - db
+    environment:
+      SECRET_KEY_BASE: $SECRET_KEY_BASE
   db:
     image: mariadb:10.4
     command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
