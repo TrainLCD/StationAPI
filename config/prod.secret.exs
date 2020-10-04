@@ -5,35 +5,39 @@
 # file to your .gitignore.
 use Mix.Config
 
-database_socket =
-  System.get_env("DATABASE_SOCKET") ||
-    raise """
-    environment variable DATABASE_SOCKET is missing.
-    """
+# database_socket =
+#   System.get_env("DATABASE_SOCKET") ||
+#     raise """
+#     environment variable DATABASE_SOCKET is missing.
+#     """
 
-database_user =
-  System.get_env("DATABASE_USER") ||
-    raise """
-    environment variable DATABASE_USER is missing.
-    """
+# database_user =
+#   System.get_env("DATABASE_USER") ||
+#     raise """
+#     environment variable DATABASE_USER is missing.
+#     """
 
-database_password =
-  System.get_env("DATABASE_PASSWORD") ||
-    raise """
-    environment variable DATABASE_PASSWORD is missing.
-    """
+# database_password =
+#   System.get_env("DATABASE_PASSWORD") ||
+#     raise """
+#     environment variable DATABASE_PASSWORD is missing.
+#     """
 
-database_name =
-  System.get_env("DATABASE_NAME") ||
-    raise """
-    environment variable DATABASE_NAME is missing.
-    """
+# database_name =
+#   System.get_env("DATABASE_NAME") ||
+#     raise """
+#     environment variable DATABASE_NAME is missing.
+#     """
 
 config :station_api, StationApi.Repo,
-  username: database_user,
-  password: database_password,
-  database: database_name,
-  socket: database_socket,
+  # username: database_user,
+  # password: database_password,
+  # database: database_name,
+  # socket: database_socket,
+  username: "station_api",
+  password: "station_api",
+  database: "station_api",
+  hostname: "db",
   backoff_type: :stop,
   pool_size: String.to_integer(System.get_env("POOL_SIZE") || "20")
 

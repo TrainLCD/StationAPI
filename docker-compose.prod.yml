@@ -1,7 +1,13 @@
 version: "2"
 services:
   api:
-    build: .
+    env_file:
+      - .env.prod
+    build:
+      context: .
+      args:
+        SECRET_KEY_BASE: $SECRET_KEY_BASE
+      dockerfile: ./Dockerfile.prod
     ports:
       - 4000:4000
     restart: always
@@ -11,9 +17,9 @@ services:
     image: mariadb:10.4
     command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
-      MYSQL_DATABASE: station_api_dev
-      MYSQL_USER: station_api_dev
-      MYSQL_PASSWORD: station_api_dev
+      MYSQL_DATABASE: station_api
+      MYSQL_USER: station_api
+      MYSQL_PASSWORD: station_api
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
     volumes:
       - ./migrations:/docker-entrypoint-initdb.d
