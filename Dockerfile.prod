@@ -1,0 +1,18 @@
+FROM elixir:1.8.2-otp-22
+
+RUN mkdir /app
+WORKDIR /app
+
+COPY . /app
+
+RUN yes | mix local.hex
+RUN yes | mix archive.install https://github.com/phoenixframework/archives/raw/master/phx_new.ez
+RUN mix deps.get
+RUN mix local.rebar --force
+
+ARG SECRET_KEY_BASE
+RUN MIX_ENV=prod SECRET_KEY_BASE=$SECRET_KEY_BASE mix release
+
+EXPOSE 4000
+
+CMD ["./_build/prod/rel/station_api/bin/station_api", "foreground"]
