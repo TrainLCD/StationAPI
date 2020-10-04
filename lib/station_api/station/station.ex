@@ -34,11 +34,61 @@ defmodule StationApi.Station do
 
   def station_by_group_id(group_id) do
     {:ok, result} =
-      Ecto.Adapters.SQL.query(StationApi.Repo, "SELECT * FROM stations WHERE station_g_cd = ? AND e_status = 0", [
-        group_id
-      ])
+      Ecto.Adapters.SQL.query(
+        StationApi.Repo,
+        "SELECT * FROM stations WHERE station_g_cd = ? AND e_status = 0",
+        [
+          group_id
+        ]
+      )
 
     {:ok, Common.to_column_map(result.columns, result.rows)}
+  end
+
+  def station_by_criteria(criteria) do
+    cond do
+      Map.has_key?(criteria, :id) and Map.has_key?(criteria, :group_id) ->
+        {:ok, result} =
+          Ecto.Adapters.SQL.query(StationApi.Repo, "SELECT *
+          FROM stations
+          WHERE
+          station_cd = ?
+          AND
+          station_g_cd = ?
+          AND
+          e_status = 0", [
+            criteria[:id],
+            criteria[:group_id]
+          ])
+
+        {:ok, Common.to_column_map(result.columns, result.rows)}
+
+      Map.has_key?(criteria, :id) ->
+        {:ok, result} =
+          Ecto.Adapters.SQL.query(StationApi.Repo, "SELECT *
+              FROM stations
+              WHERE
+              station_cd = ?
+              AND
+              e_status = 0", [
+            criteria[:id]
+          ])
+
+        {:ok, Common.to_column_map(result.columns, result.rows)}
+
+      Map.has_key?(criteria, :group_id) ->
+        {:ok, result} =
+          Ecto.Adapters.SQL.query(StationApi.Repo, "SELECT *
+                  FROM stations
+                  WHERE
+                  station_g_cd = ?
+                  AND
+                  e_status = 0", [
+            criteria[:group_id]
+          ])
+
+        {:ok, Common.to_column_map(result.columns, result.rows)}
+    end
   end
 
   def stations_by_line_id(line_id) do
@@ -56,10 +106,16 @@ defmodule StationApi.Station do
 
   def stations_by_name(name) do
     katakana = StringHelper.hiragana2katakana(name)
+
     {:ok, result} =
       Ecto.Adapters.SQL.query(
         StationApi.Repo,
-        "SELECT * FROM stations WHERE (station_name LIKE '%" <> name <>"%' OR station_name_r LIKE '%"<> name <> "%' OR station_name_k LIKE '%"<> katakana <> "%') AND e_status = 0 ORDER BY e_sort, station_cd"
+        "SELECT * FROM stations WHERE (station_name LIKE '%" <>
+          name <>
+          "%' OR station_name_r LIKE '%" <>
+          name <>
+          "%' OR station_name_k LIKE '%" <>
+          katakana <> "%') AND e_status = 0 ORDER BY e_sort, station_cd"
       )
 
     {:ok, Common.to_column_map(result.columns, result.rows)}

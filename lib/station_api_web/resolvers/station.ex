@@ -23,8 +23,8 @@ defmodule StationApiWeb.Resolvers.Station do
     {:ok, api_result}
   end
 
-  def station_by_id(_parent, %{id: id}, _resolution) do
-    {:ok, stations} = StationApi.Station.station_by_group_id(id)
+  def station_by_criteria(_parent, args, _resolution) do
+    {:ok, stations} = StationApi.Station.station_by_criteria(args)
     station = List.first(stations)
 
     case station do
@@ -48,7 +48,7 @@ defmodule StationApiWeb.Resolvers.Station do
   end
   def stations_by_name(_parent, %{name: name}, _resolution) do
     {:ok, stations} = StationApi.Station.stations_by_name(name)
-    
+
     case stations do
       [] -> {:error, "Not matched."}
       stations ->

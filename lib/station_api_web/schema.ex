@@ -11,10 +11,11 @@ defmodule StationApiWeb.Schema do
       arg :longitude, non_null(:float)
       resolve &Resolvers.Station.station_by_coords/3
     end
-    @desc "Fetch station by ID"
-    field :station, :station do
-      arg :id, non_null(:id)
-      resolve &Resolvers.Station.station_by_id/3
+    @desc "Fetch station by criteria"
+    field :search_station, :station do
+      arg :id, :id
+      arg :group_id, :id
+      resolve &Resolvers.Station.station_by_criteria/3
     end
     @desc "Fetch line by ID"
     field :line, :line do
