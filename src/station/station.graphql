@@ -1,0 +1,38 @@
+type Query {
+  station(id: ID!): Station
+  stationByGroupId(groupId: ID!): Station
+  stationsByCoords(latitude: Float!, longitude: Float!): [Station]
+  stationsByLineId(lineId: ID!): [Station]
+  line(id: ID!): Line
+}
+
+type Station {
+  id: Int
+  address: String
+  distance: Float
+  latitude: Float
+  longitude: Float
+  lines: [Line]
+  openYmd: String
+  postal_code: String
+  prefId: String
+  groupId: Int
+  name: String
+  nameK: String
+  nameR: String
+}
+type Line {
+  id: Int
+  companyId: String
+  distance: Int
+  latitude: Float
+  longitude: Float
+  lineColorC: String
+  lineColorT: String
+  name: String
+  nameH: String
+  nameK: String
+  nameR: String
+  lineType: Int
+  zoom: Int
+}
