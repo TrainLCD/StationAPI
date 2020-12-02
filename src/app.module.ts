@@ -3,6 +3,8 @@ import { GraphQLModule } from '@nestjs/graphql';
 import { join } from 'path';
 import { StationService } from './station/station.service';
 import { StationModule } from './station/station.module';
+import { MysqlService } from './mysql/mysql.service';
+import { StationRepository } from './station/station.repository';
 
 @Module({
   imports: [
@@ -16,6 +18,6 @@ import { StationModule } from './station/station.module';
     StationModule,
   ],
   controllers: [],
-  providers: [StationService],
+  providers: [StationService, MysqlService, StationRepository],
 })
 export class AppModule {}

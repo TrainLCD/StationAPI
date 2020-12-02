@@ -1,8 +1,9 @@
 type Query {
   station(id: ID!): Station
   stationByGroupId(groupId: ID!): Station
-  stationsByCoords(latitude: Float!, longitude: Float!): [Station]
+  stationByCoords(latitude: Float!, longitude: Float!): Station
   stationsByLineId(lineId: ID!): [Station]
+  stationsByName(name: String!): [Station]
   line(id: ID!): Line
 }
 
@@ -15,7 +16,7 @@ type Station {
   lines: [Line]
   openYmd: String
   postal_code: String
-  prefId: String
+  prefId: Int
   groupId: Int
   name: String
   nameK: String
@@ -23,8 +24,7 @@ type Station {
 }
 type Line {
   id: Int
-  companyId: String
-  distance: Int
+  companyId: Int
   latitude: Float
   longitude: Float
   lineColorC: String

@@ -1,37 +1,37 @@
 import { ParseIntPipe } from '@nestjs/common';
 import { Args, Query, Resolver } from '@nestjs/graphql';
-import { Line, Station } from 'src/graphql';
+import { Station } from 'src/graphql';
 import { StationService } from './station.service';
 
-@Resolver()
+@Resolver((of) => Station)
 export class StationResolver {
   constructor(private readonly stationService: StationService) {}
 
-  @Query('station')
-  async findOneById(@Args('id', ParseIntPipe) id: number): Promise<Station> {
+  @Query((returns) => Station)
+  async station(@Args('id', ParseIntPipe) id: number): Promise<Station> {
     return this.stationService.findOneById(id);
   }
 
-  @Query('stationByGroupId')
-  async findOneByGroupId(@Args('groupId') groupId: number): Promise<Station> {
+  @Query((returns) => Station)
+  async stationByGroupId(@Args('groupId') groupId: number): Promise<Station> {
     return this.stationService.findOneByGroupId(groupId);
   }
 
-  @Query('stationsByCoords')
-  async getByCoords(
+  @Query((returns) => Station)
+  async stationByCoords(
     @Args('latitude') latitude: number,
     @Args('longitude') longitude: number,
-  ): Promise<Station[]> {
-    return this.stationService.getByCoords(latitude, longitude);
+  ): Promise<Station> {
+    return this.stationService.findOneByCoords(latitude, longitude);
   }
 
-  @Query('stationsByLineId')
-  async findOneByLineId(@Args('id') id: number): Promise<Station[]> {
-    return this.stationService.getByLineId(id);
+  @Query((returns) => Station)
+  async stationsByLineId(@Args('lineId') lineId: number): Promise<Station[]> {
+    return this.stationService.getByLineId(lineId);
   }
 
-  @Query('line')
-  async findOneLineById(@Args('id') id: number): Promise<Line> {
-    return this.stationService.findOneLineById(id);
+  @Query((returns) => Station)
+  async stationsByName(@Args('name') name: string): Promise<Station[]> {
+    return this.stationService.getByName(name);
   }
 }

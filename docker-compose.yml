@@ -4,11 +4,16 @@ services:
     build: .
     ports:
       - 3000:3000
+    environment:
+      MYSQL_DATABASE: station_api_dev
+      MYSQL_USER: station_api_dev
+      MYSQL_PASSWORD: station_api_dev
+      MYSQL_HOST: db
     restart: always
     links:
       - db
   db:
-    image: mysql:8
+    image: mysql:5
     command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_DATABASE: station_api_dev

@@ -11,9 +11,11 @@ export abstract class IQuery {
 
     abstract stationByGroupId(groupId: string): Station | Promise<Station>;
 
-    abstract stationsByCoords(latitude: number, longitude: number): Station[] | Promise<Station[]>;
+    abstract stationByCoords(latitude: number, longitude: number): Station | Promise<Station>;
 
     abstract stationsByLineId(lineId: string): Station[] | Promise<Station[]>;
+
+    abstract stationsByName(name: string): Station[] | Promise<Station[]>;
 
     abstract line(id: string): Line | Promise<Line>;
 }
@@ -27,7 +29,7 @@ export class Station {
     lines?: Line[];
     openYmd?: string;
     postal_code?: string;
-    prefId?: string;
+    prefId?: number;
     groupId?: number;
     name?: string;
     nameK?: string;
@@ -36,8 +38,7 @@ export class Station {
 
 export class Line {
     id?: number;
-    companyId?: string;
-    distance?: number;
+    companyId?: number;
     latitude?: number;
     longitude?: number;
     lineColorC?: string;
