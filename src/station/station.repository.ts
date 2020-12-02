@@ -137,9 +137,7 @@ export class StationRepository {
 
           const map = await Promise.all<StationRaw>(
             results.map(async (r) => {
-              const lines = await this.getLinesByGroupId(
-                results[0].station_g_cd,
-              );
+              const lines = await this.getLinesByGroupId(r.station_g_cd);
               return {
                 ...r,
                 lines,
@@ -180,9 +178,7 @@ export class StationRepository {
 
           const map = await Promise.all<StationRaw>(
             results.map(async (r) => {
-              const lines = await this.getLinesByGroupId(
-                results[0].station_g_cd,
-              );
+              const lines = await this.getLinesByGroupId(r.station_g_cd);
               return {
                 ...r,
                 lines,
