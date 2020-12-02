@@ -23,6 +23,10 @@ export class StationRepository {
           if (err) {
             return reject(err);
           }
+          if (!results.length) {
+            return resolve(null);
+          }
+
           const lines = await this.getLinesByGroupId(results[0].station_g_cd);
           return resolve({
             ...results[0],
@@ -48,6 +52,9 @@ export class StationRepository {
         async (err, results) => {
           if (err) {
             return reject(err);
+          }
+          if (!results.length) {
+            return resolve(null);
           }
           const lines = await this.getLinesByGroupId(results[0].station_g_cd);
           return resolve({
@@ -91,6 +98,9 @@ export class StationRepository {
           if (err) {
             return reject(err);
           }
+          if (!results.length) {
+            return resolve(null);
+          }
           const lines = await this.getLinesByGroupId(results[0].station_g_cd);
           return resolve({
             ...results[0],
@@ -121,6 +131,10 @@ export class StationRepository {
           if (err) {
             return reject(err);
           }
+          if (!results.length) {
+            return resolve(null);
+          }
+
           const map = await Promise.all<StationRaw>(
             results.map(async (r) => {
               const lines = await this.getLinesByGroupId(
@@ -160,6 +174,9 @@ export class StationRepository {
           if (err) {
             return reject(err);
           }
+          if (!results.length) {
+            return resolve([]);
+          }
 
           const map = await Promise.all<StationRaw>(
             results.map(async (r) => {
@@ -190,6 +207,9 @@ export class StationRepository {
           if (err) {
             return reject(err);
           }
+          if (!results.length) {
+            return resolve(null);
+          }
           return resolve(results[0]);
         },
       );
@@ -210,6 +230,10 @@ export class StationRepository {
           if (err) {
             return reject(err);
           }
+          if (!results.length) {
+            return resolve([]);
+          }
+
           return resolve(results);
         },
       );

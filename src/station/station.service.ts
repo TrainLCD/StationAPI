@@ -47,6 +47,10 @@ export class StationService {
   }
 
   convertLine(raw: LineRaw): Line {
+    if (!raw) {
+      return;
+    }
+
     return {
       id: raw.line_cd,
       companyId: raw.company_cd,
@@ -64,6 +68,9 @@ export class StationService {
   }
 
   convertStation(raw: StationRaw): Station {
+    if (!raw) {
+      return;
+    }
     return {
       id: raw.station_cd,
       address: raw.address,
