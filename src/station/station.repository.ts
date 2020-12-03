@@ -18,6 +18,7 @@ export class StationRepository {
           FROM stations
           WHERE station_cd = ?
           AND e_status = 0
+          AND NOT line_cd = ${this.NEX_ID}
         `,
         [id],
         async (err, results) => {
@@ -48,6 +49,7 @@ export class StationRepository {
           FROM stations
           WHERE station_g_cd = ?
           AND e_status = 0
+          AND NOT line_cd = ${this.NEX_ID}
         `,
         [groupId],
         async (err, results) => {
@@ -125,6 +127,7 @@ export class StationRepository {
           FROM stations
           WHERE line_cd = ?
           AND e_status = 0
+          AND NOT line_cd = ${this.NEX_ID}
           ORDER BY e_sort, station_cd
         `,
         [lineId],
@@ -166,6 +169,7 @@ export class StationRepository {
           OR station_name_r LIKE "%${name}%"
           OR station_name_k LIKE "%${name}%")
           AND e_status = 0
+          AND NOT line_cd = ${this.NEX_ID}
           ORDER BY e_sort, station_cd
         `,
         [],
@@ -179,10 +183,10 @@ export class StationRepository {
 
           const map = await Promise.all<StationRaw>(
             results.map(async (r) => {
-              const lines = await this.getLinesByGroupId(r.station_g_cd);
+              const line = await this.findOneLine(r.line_cd);
               return {
                 ...r,
-                lines,
+                lines: [line],
               };
             }),
           );
