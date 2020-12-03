@@ -6,6 +6,7 @@ import { StationRaw } from './models/StationRaw';
 @Injectable()
 export class StationRepository {
   constructor(private readonly mysqlService: MysqlService) {}
+  private readonly NEX_ID = 11328;
 
   async findOneById(id: number): Promise<StationRaw> {
     const { connection } = this.mysqlService;
@@ -197,7 +198,7 @@ export class StationRepository {
 
     return new Promise<LineRaw>((resolve, reject) => {
       connection.query(
-        'SELECT * FROM `lines` WHERE line_cd = ?',
+        `SELECT * FROM \`lines\` WHERE line_cd = ? AND NOT line_cd = ${this.NEX_ID}`,
         [id],
         (err, results) => {
           if (err) {
@@ -220,7 +221,7 @@ export class StationRepository {
 
     return new Promise<LineRaw[]>((resolve, reject) => {
       connection.query(
-        'SELECT * FROM `lines` WHERE line_cd IN (SELECT line_cd FROM stations WHERE station_g_cd = ?)',
+        `SELECT * FROM \`lines\` WHERE line_cd IN (SELECT line_cd FROM stations WHERE station_g_cd = ?) AND NOT line_cd = ${this.NEX_ID}`,
         [groupId],
         (err, results) => {
           if (err) {
