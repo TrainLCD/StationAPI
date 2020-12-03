@@ -10,6 +10,7 @@ import { StationRepository } from './station/station.repository';
   imports: [
     GraphQLModule.forRoot({
       typePaths: ['./**/*.graphql'],
+      playground: true,
       definitions: {
         path: join(process.cwd(), 'src/graphql.ts'),
         outputAs: 'class',
