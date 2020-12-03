@@ -1,12 +1,15 @@
 import { Injectable } from '@nestjs/common';
+import { NEX_ID } from 'src/constants/ignore';
+import { LineRepository } from 'src/line/line.repository';
 import { MysqlService } from 'src/mysql/mysql.service';
-import { LineRaw } from './models/LineRaw';
 import { StationRaw } from './models/StationRaw';
 
 @Injectable()
 export class StationRepository {
-  constructor(private readonly mysqlService: MysqlService) {}
-  private readonly NEX_ID = 11328;
+  constructor(
+    private readonly mysqlService: MysqlService,
+    private readonly lineRepo: LineRepository,
+  ) {}
 
   async findOneById(id: number): Promise<StationRaw> {
     const { connection } = this.mysqlService;
@@ -18,7 +21,7 @@ export class StationRepository {
           FROM stations
           WHERE station_cd = ?
           AND e_status = 0
-          AND NOT line_cd = ${this.NEX_ID}
+          AND NOT line_cd = ${NEX_ID}
         `,
         [id],
         async (err, results) => {
@@ -29,7 +32,9 @@ export class StationRepository {
             return resolve(null);
           }
 
-          const lines = await this.getLinesByGroupId(results[0].station_g_cd);
+          const lines = await this.lineRepo.getByGroupId(
+            results[0].station_g_cd,
+          );
           return resolve({
             ...results[0],
             lines,
@@ -49,7 +54,7 @@ export class StationRepository {
           FROM stations
           WHERE station_g_cd = ?
           AND e_status = 0
-          AND NOT line_cd = ${this.NEX_ID}
+          AND NOT line_cd = ${NEX_ID}
         `,
         [groupId],
         async (err, results) => {
@@ -59,7 +64,9 @@ export class StationRepository {
           if (!results.length) {
             return resolve(null);
           }
-          const lines = await this.getLinesByGroupId(results[0].station_g_cd);
+          const lines = await this.lineRepo.getByGroupId(
+            results[0].station_g_cd,
+          );
           return resolve({
             ...results[0],
             lines,
@@ -104,7 +111,9 @@ export class StationRepository {
           if (!results.length) {
             return resolve(null);
           }
-          const lines = await this.getLinesByGroupId(results[0].station_g_cd);
+          const lines = await this.lineRepo.getByGroupId(
+            results[0].station_g_cd,
+          );
           return resolve({
             ...results[0],
             lines,
@@ -127,7 +136,7 @@ export class StationRepository {
           FROM stations
           WHERE line_cd = ?
           AND e_status = 0
-          AND NOT line_cd = ${this.NEX_ID}
+          AND NOT line_cd = ${NEX_ID}
           ORDER BY e_sort, station_cd
         `,
         [lineId],
@@ -141,7 +150,7 @@ export class StationRepository {
 
           const map = await Promise.all<StationRaw>(
             results.map(async (r) => {
-              const lines = await this.getLinesByGroupId(r.station_g_cd);
+              const lines = await this.lineRepo.getByGroupId(r.station_g_cd);
               return {
                 ...r,
                 lines,
@@ -169,7 +178,7 @@ export class StationRepository {
           OR station_name_r LIKE "%${name}%"
           OR station_name_k LIKE "%${name}%")
           AND e_status = 0
-          AND NOT line_cd = ${this.NEX_ID}
+          AND NOT line_cd = ${NEX_ID}
           ORDER BY e_sort, station_cd
         `,
         [],
@@ -183,7 +192,7 @@ export class StationRepository {
 
           const map = await Promise.all<StationRaw>(
             results.map(async (r) => {
-              const line = await this.findOneLine(r.line_cd);
+              const line = await this.lineRepo.findOne(r.line_cd);
               return {
                 ...r,
                 lines: [line],
@@ -192,50 +201,6 @@ export class StationRepository {
           );
 
           return resolve(map);
-        },
-      );
-    });
-  }
-
-  async findOneLine(id: number): Promise<LineRaw> {
-    const { connection } = this.mysqlService;
-
-    return new Promise<LineRaw>((resolve, reject) => {
-      connection.query(
-        `SELECT * FROM \`lines\` WHERE line_cd = ? AND NOT line_cd = ${this.NEX_ID}`,
-        [id],
-        (err, results) => {
-          if (err) {
-            return reject(err);
-          }
-          if (!results.length) {
-            return resolve(null);
-          }
-          return resolve(results[0]);
-        },
-      );
-    });
-  }
-
-  async getLinesByGroupId(groupId: number): Promise<LineRaw[]> {
-    const { connection } = this.mysqlService;
-    if (!connection) {
-      return [];
-    }
-
-    return new Promise<LineRaw[]>((resolve, reject) => {
-      connection.query(
-        `SELECT * FROM \`lines\` WHERE line_cd IN (SELECT line_cd FROM stations WHERE station_g_cd = ?) AND NOT line_cd = ${this.NEX_ID}`,
-        [groupId],
-        (err, results) => {
-          if (err) {
-            return reject(err);
-          }
-          if (!results.length) {
-            return resolve([]);
-          }
-
-          return resolve(results);
         },
       );
     });

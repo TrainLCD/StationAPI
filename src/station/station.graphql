@@ -4,7 +4,6 @@ type Query {
   stationByCoords(latitude: Float!, longitude: Float!): Station
   stationsByLineId(lineId: ID!): [Station]
   stationsByName(name: String!): [Station]
-  line(id: ID!): Line
 }
 
 type Station {
@@ -21,18 +20,4 @@ type Station {
   name: String
   nameK: String
   nameR: String
-}
-type Line {
-  id: Int
-  companyId: Int
-  latitude: Float
-  longitude: Float
-  lineColorC: String
-  lineColorT: String
-  name: String
-  nameH: String
-  nameK: String
-  nameR: String
-  lineType: Int
-  zoom: Int
 }

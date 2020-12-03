@@ -1,5 +1,4 @@
-import { Line } from 'src/graphql';
-import { LineRaw } from './LineRaw';
+import { LineRaw } from 'src/line/models/LineRaw';
 
 export class StationRaw {
   station_cd: number;

@@ -7,6 +7,8 @@
 /* tslint:disable */
 /* eslint-disable */
 export abstract class IQuery {
+    abstract line(id: string): Line | Promise<Line>;
+
     abstract station(id: string): Station | Promise<Station>;
 
     abstract stationByGroupId(groupId: string): Station | Promise<Station>;
@@ -16,8 +18,21 @@ export abstract class IQuery {
     abstract stationsByLineId(lineId: string): Station[] | Promise<Station[]>;
 
     abstract stationsByName(name: string): Station[] | Promise<Station[]>;
+}
 
-    abstract line(id: string): Line | Promise<Line>;
+export class Line {
+    id?: number;
+    companyId?: number;
+    latitude?: number;
+    longitude?: number;
+    lineColorC?: string;
+    lineColorT?: string;
+    name?: string;
+    nameH?: string;
+    nameK?: string;
+    nameR?: string;
+    lineType?: number;
+    zoom?: number;
 }
 
 export class Station {
@@ -34,19 +49,4 @@ export class Station {
     name?: string;
     nameK?: string;
     nameR?: string;
-}
-
-export class Line {
-    id?: number;
-    companyId?: number;
-    latitude?: number;
-    longitude?: number;
-    lineColorC?: string;
-    lineColorT?: string;
-    name?: string;
-    nameH?: string;
-    nameK?: string;
-    nameR?: string;
-    lineType?: number;
-    zoom?: number;
 }

@@ -1,10 +1,8 @@
 import { Module } from '@nestjs/common';
 import { GraphQLModule } from '@nestjs/graphql';
 import { join } from 'path';
-import { StationService } from './station/station.service';
 import { StationModule } from './station/station.module';
-import { MysqlService } from './mysql/mysql.service';
-import { StationRepository } from './station/station.repository';
+import { LineModule } from './line/line.module';
 
 @Module({
   imports: [
@@ -17,8 +15,9 @@ import { StationRepository } from './station/station.repository';
       },
     }),
     StationModule,
+    LineModule,
   ],
   controllers: [],
-  providers: [StationService, MysqlService, StationRepository],
+  providers: [],
 })
 export class AppModule {}

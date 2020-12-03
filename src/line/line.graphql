@@ -1,0 +1,18 @@
+type Query {
+  line(id: ID!): Line
+}
+
+type Line {
+  id: Int
+  companyId: Int
+  latitude: Float
+  longitude: Float
+  lineColorC: String
+  lineColorT: String
+  name: String
+  nameH: String
+  nameK: String
+  nameR: String
+  lineType: Int
+  zoom: Int
+}
