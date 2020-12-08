@@ -145,7 +145,7 @@ export class StationRepository {
             return reject(err);
           }
           if (!results.length) {
-            return resolve(null);
+            return resolve([]);
           }
 
           const map = await Promise.all<StationRaw>(

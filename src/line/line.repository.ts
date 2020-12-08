@@ -12,7 +12,11 @@ export class LineRepository {
 
     return new Promise<LineRaw>((resolve, reject) => {
       connection.query(
-        `SELECT * FROM \`lines\` WHERE line_cd = ? AND NOT line_cd = ${NEX_ID}`,
+        `SELECT *
+        FROM \`lines\`
+        WHERE line_cd = ?
+        AND NOT line_cd = ${NEX_ID}
+        AND e_status = 0`,
         [id],
         (err, results) => {
           if (err) {
@@ -35,7 +39,12 @@ export class LineRepository {
 
     return new Promise<LineRaw[]>((resolve, reject) => {
       connection.query(
-        `SELECT * FROM \`lines\` WHERE line_cd IN (SELECT line_cd FROM stations WHERE station_g_cd = ?) AND NOT line_cd = ${NEX_ID}`,
+        `SELECT *
+        FROM \`lines\`
+        WHERE line_cd
+        IN (SELECT line_cd FROM stations WHERE station_g_cd = ?)
+        AND NOT line_cd = ${NEX_ID}
+        AND e_status = 0`,
         [groupId],
         (err, results) => {
           if (err) {
