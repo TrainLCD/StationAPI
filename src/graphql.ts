@@ -43,7 +43,7 @@ export class Station {
     longitude?: number;
     lines?: Line[];
     openYmd?: string;
-    postal_code?: string;
+    postalCode?: string;
     prefId?: number;
     groupId?: number;
     name?: string;
