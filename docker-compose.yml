@@ -13,7 +13,7 @@ services:
     links:
       - db
   db:
-    image: mysql:5
+    image: mysql@sha256:1c224b6270c6a02f9e7eb9e4ca6486d3466f12be7390c0c0b6e6f908ea1a0346
     command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_DATABASE: station_api_dev
