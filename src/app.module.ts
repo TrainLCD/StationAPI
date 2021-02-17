@@ -3,6 +3,7 @@ import { GraphQLModule } from '@nestjs/graphql';
 import { join } from 'path';
 import { StationModule } from './station/station.module';
 import { LineModule } from './line/line.module';
+import { TrainTypeModule } from './trainType/trainType.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { LineModule } from './line/line.module';
     }),
     StationModule,
     LineModule,
+    TrainTypeModule,
   ],
   controllers: [],
   providers: [],

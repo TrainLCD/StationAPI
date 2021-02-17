@@ -20,4 +20,6 @@ type Station {
   name: String
   nameK: String
   nameR: String
+  trainTypes: [TrainType]
+  pass: Boolean
 }

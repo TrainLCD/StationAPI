@@ -1,0 +1,12 @@
+type Query {
+  trainType(id: ID!, excludePass: Boolean): TrainType
+}
+
+type TrainType {
+  id: Int
+  groupId: Int
+  name: String
+  nameK: String
+  nameR: String
+  stations: [Station]
+}
