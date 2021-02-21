@@ -8,5 +8,6 @@ type TrainType {
   name: String
   nameK: String
   nameR: String
+  color: String
   stations: [Station]
 }

@@ -61,6 +61,7 @@ export class RawService {
       name: raw.type_name,
       nameK: raw.type_name_k,
       nameR: raw.type_name_r,
+      color: raw.color,
       stations,
     };
   }
