@@ -56,7 +56,8 @@ export class StationRepository {
             sst.line_group_cd,
             t.type_name,
             t.type_name_k,
-            t.type_name_r
+            t.type_name_r,
+            t.color
           FROM station_station_types as sst, types as t
           WHERE sst.station_cd = ?
             AND sst.type_cd = t.type_cd
@@ -77,6 +78,7 @@ export class StationRepository {
               name: r.type_name,
               nameK: r.type_name_k,
               nameR: r.type_name_r,
+              color: r.color,
             })),
           );
         },
