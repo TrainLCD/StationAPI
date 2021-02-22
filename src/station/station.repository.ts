@@ -3,6 +3,8 @@ import { NEX_ID } from 'src/constants/ignore';
 import { TrainType } from 'src/graphql';
 import { LineRepository } from 'src/line/line.repository';
 import { MysqlService } from 'src/mysql/mysql.service';
+import { TrainTypeRaw } from 'src/trainType/models/TrainTypeRaw';
+import { TrainTypeRepository } from 'src/trainType/trainType.repository';
 import { StationRaw } from './models/StationRaw';
 
 @Injectable()
@@ -10,6 +12,7 @@ export class StationRepository {
   constructor(
     private readonly mysqlService: MysqlService,
     private readonly lineRepo: LineRepository,
+    private readonly trainTypeRepo: TrainTypeRepository,
   ) {}
 
   async findOneById(id: number): Promise<StationRaw> {
@@ -45,10 +48,10 @@ export class StationRepository {
     });
   }
 
-  async findTrainTypesById(id: number): Promise<TrainType[]> {
+  async findTrainTypesById(id: number): Promise<TrainTypeRaw[]> {
     const { connection } = this.mysqlService;
 
-    return new Promise<TrainType[]>((resolve, reject) => {
+    return new Promise<TrainTypeRaw[]>((resolve, reject) => {
       connection.query(
         `
           SELECT sst.type_cd,
@@ -72,14 +75,19 @@ export class StationRepository {
             return resolve([]);
           }
           return resolve(
-            results.map((r) => ({
-              id: r.station_station_cd,
-              groupId: r.line_group_cd,
-              name: r.type_name,
-              nameK: r.type_name_k,
-              nameR: r.type_name_r,
-              color: r.color,
-            })),
+            Promise.all(
+              await results.map(async (r) => ({
+                id: r.station_station_cd,
+                groupId: r.line_group_cd,
+                name: r.type_name,
+                nameK: r.type_name_k,
+                nameR: r.type_name_r,
+                color: r.color,
+                lines: await this.trainTypeRepo.getBelongingLines(
+                  r.line_group_cd,
+                ),
+              })),
+            ),
           );
         },
       );

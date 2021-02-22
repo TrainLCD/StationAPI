@@ -63,4 +63,5 @@ export class TrainType {
     nameR?: string;
     color?: string;
     stations?: Station[];
+    lines?: Line[];
 }

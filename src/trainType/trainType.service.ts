@@ -16,10 +16,16 @@ export class TrainTypeService {
       lineGroupId,
       excludePass,
     );
+    const belongingLines = await this.trainTypeRepo.getBelongingLines(
+      lineGroupId,
+    );
     return this.rawService.convertTrainType(
       trainType,
       await Promise.all(
         belongingStations.map((bs) => this.rawService.convertStation(bs)),
+      ),
+      await Promise.all(
+        belongingLines.map((bl) => this.rawService.convertLine(bl)),
       ),
     );
   }

@@ -36,12 +36,19 @@ export class StationService {
 
   async getByLineId(lineId: number): Promise<Station[]> {
     return await Promise.all(
-      (await this.stationRepo.getByLineId(lineId)).map(async (s) =>
-        this.rawService.convertStation(
-          s,
-          await this.stationRepo.findTrainTypesById(s?.station_cd),
-        ),
-      ),
+      (await this.stationRepo.getByLineId(lineId)).map(async (s) => {
+        const trainTypes = (
+          await this.stationRepo.findTrainTypesById(s?.station_cd)
+        ).map((tt) => {
+          const lines = tt.lines.map((l) => this.rawService.convertLine(l));
+          return {
+            ...tt,
+            lines,
+          };
+        });
+
+        return this.rawService.convertStation(s, trainTypes);
+      }),
     );
   }
 

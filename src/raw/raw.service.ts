@@ -25,7 +25,7 @@ export class RawService {
       nameK: raw.station_name_k,
       nameR: raw.station_name_r,
       pass: raw.pass,
-      trainTypes,
+      trainTypes: trainTypes,
     };
   }
 
@@ -50,7 +50,11 @@ export class RawService {
     };
   }
 
-  convertTrainType(raw: TrainTypeRaw, stations: Station[]): TrainType {
+  convertTrainType(
+    raw: TrainTypeRaw,
+    stations: Station[],
+    lines: Line[],
+  ): TrainType {
     if (!raw) {
       return;
     }
@@ -63,6 +67,7 @@ export class RawService {
       nameR: raw.type_name_r,
       color: raw.color,
       stations,
+      lines,
     };
   }
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { LineRepository } from 'src/line/line.repository';
+import { LineRaw } from 'src/line/models/LineRaw';
 import { MysqlService } from 'src/mysql/mysql.service';
 import { StationRaw } from 'src/station/models/StationRaw';
 import { TrainTypeRaw } from './models/TrainTypeRaw';
@@ -67,6 +68,31 @@ export class TrainTypeRepository {
               })),
             ),
           );
+        },
+      );
+    });
+  }
+
+  async getBelongingLines(lineGroupId: number): Promise<LineRaw[]> {
+    const { connection } = this.mysqlService;
+
+    return new Promise<LineRaw[]>((resolve, reject) => {
+      connection.query(
+        `SELECT DISTINCT l.*
+        FROM \`lines\` as l, stations as s, station_station_types as sst
+        WHERE sst.line_group_cd = ?
+          AND s.station_cd = sst.station_cd
+          AND l.line_cd = s.line_cd
+          AND s.e_status = 0`,
+        [lineGroupId],
+        (err, results) => {
+          if (err) {
+            return reject(err);
+          }
+          if (!results.length) {
+            return resolve([]);
+          }
+          return resolve(results);
         },
       );
     });

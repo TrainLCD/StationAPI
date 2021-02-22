@@ -10,4 +10,5 @@ type TrainType {
   nameR: String
   color: String
   stations: [Station]
+  lines: [Line]
 }
