@@ -77,7 +77,7 @@ export class StationRepository {
           return resolve(
             Promise.all(
               await results.map(async (r) => ({
-                id: r.station_station_cd,
+                id: r.type_cd,
                 groupId: r.line_group_cd,
                 name: r.type_name,
                 nameK: r.type_name_k,

@@ -60,7 +60,7 @@ export class RawService {
     }
 
     return {
-      id: raw.station_station_cd,
+      id: raw.type_cd,
       groupId: raw.line_group_cd,
       name: raw.type_name,
       nameK: raw.type_name_k,
