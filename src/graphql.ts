@@ -18,6 +18,8 @@ export abstract class IQuery {
     abstract stationsByLineId(lineId: string): Station[] | Promise<Station[]>;
 
     abstract stationsByName(name: string): Station[] | Promise<Station[]>;
+
+    abstract trainType(id: string, excludePass?: boolean): TrainType | Promise<TrainType>;
 }
 
 export class Line {
@@ -49,4 +51,17 @@ export class Station {
     name?: string;
     nameK?: string;
     nameR?: string;
+    trainTypes?: TrainType[];
+    pass?: boolean;
+}
+
+export class TrainType {
+    id?: number;
+    groupId?: number;
+    name?: string;
+    nameK?: string;
+    nameR?: string;
+    color?: string;
+    stations?: Station[];
+    lines?: Line[];
 }

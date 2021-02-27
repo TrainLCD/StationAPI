@@ -5,6 +5,7 @@ import { MysqlService } from 'src/mysql/mysql.service';
 import { StationRepository } from './station.repository';
 import { RawService } from 'src/raw/raw.service';
 import { LineRepository } from 'src/line/line.repository';
+import { TrainTypeRepository } from 'src/trainType/trainType.repository';
 
 @Module({
   providers: [
@@ -14,6 +15,7 @@ import { LineRepository } from 'src/line/line.repository';
     StationRepository,
     RawService,
     LineRepository,
+    TrainTypeRepository,
   ],
 })
 export class StationModule {}

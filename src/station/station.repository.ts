@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { NEX_ID } from 'src/constants/ignore';
+import { TrainType } from 'src/graphql';
 import { LineRepository } from 'src/line/line.repository';
 import { MysqlService } from 'src/mysql/mysql.service';
+import { TrainTypeRaw } from 'src/trainType/models/TrainTypeRaw';
+import { TrainTypeRepository } from 'src/trainType/trainType.repository';
 import { StationRaw } from './models/StationRaw';
 
 @Injectable()
@@ -9,6 +12,7 @@ export class StationRepository {
   constructor(
     private readonly mysqlService: MysqlService,
     private readonly lineRepo: LineRepository,
+    private readonly trainTypeRepo: TrainTypeRepository,
   ) {}
 
   async findOneById(id: number): Promise<StationRaw> {
@@ -39,6 +43,52 @@ export class StationRepository {
             ...results[0],
             lines,
           });
+        },
+      );
+    });
+  }
+
+  async findTrainTypesById(id: number): Promise<TrainTypeRaw[]> {
+    const { connection } = this.mysqlService;
+
+    return new Promise<TrainTypeRaw[]>((resolve, reject) => {
+      connection.query(
+        `
+          SELECT sst.type_cd,
+            sst.station_station_cd,
+            sst.line_group_cd,
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.color
+          FROM station_station_types as sst, types as t
+          WHERE sst.station_cd = ?
+            AND sst.type_cd = t.type_cd
+            AND sst.pass != 1
+        `,
+        [id],
+        async (err, results) => {
+          if (err) {
+            return reject(err);
+          }
+          if (!results.length) {
+            return resolve([]);
+          }
+          return resolve(
+            Promise.all(
+              await results.map(async (r) => ({
+                id: r.type_cd,
+                groupId: r.line_group_cd,
+                name: r.type_name,
+                nameK: r.type_name_k,
+                nameR: r.type_name_r,
+                color: r.color,
+                lines: await this.trainTypeRepo.getBelongingLines(
+                  r.line_group_cd,
+                ),
+              })),
+            ),
+          );
         },
       );
     });
