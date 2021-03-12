@@ -62,9 +62,12 @@ export class TrainTypeRepository {
           }
           return resolve(
             Promise.all(
-              results.map(async (r) => ({
+              results.map(async (r: StationRaw) => ({
                 ...r,
-                lines: await this.lineRepo.getByGroupId(r.station_g_cd),
+                lines: [
+                  ...(r.lines || []),
+                  await this.lineRepo.findOne(r.line_cd),
+                ],
               })),
             ),
           );
