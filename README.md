@@ -29,7 +29,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 
 This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
 
-## Join our community
+## Join our community(Japanese only)
 
 Do you like this project? Join our Discord community!
 [https://discord.gg/7sQhQhnvvw](https://discord.gg/7sQhQhnvvw)
