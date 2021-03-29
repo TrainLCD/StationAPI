@@ -7,10 +7,11 @@ WORKDIR /app
 
 COPY . /app
 COPY ./scripts/migration.sh /app
+COPY ./scripts/start.prod.sh /app
 
 RUN npm install
 RUN npm run build
 
 EXPOSE 3000
 
-CMD ["npm", "run", "start:prod"]
+CMD ["sh", "./scripts/start.prod.sh"]
