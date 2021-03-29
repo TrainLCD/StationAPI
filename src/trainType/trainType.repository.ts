@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { RowDataPacket } from 'mysql2';
 import { LineRepository } from 'src/line/line.repository';
 import { LineRaw } from 'src/line/models/LineRaw';
 import { MysqlService } from 'src/mysql/mysql.service';
@@ -23,14 +24,14 @@ export class TrainTypeRepository {
           AND t.type_cd = sst.type_cd
         LIMIT 1`,
         [lineGroupId],
-        (err, results) => {
+        (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
           if (!results.length) {
             return resolve(null);
           }
-          return resolve(results[0]);
+          return resolve(results[0] as TrainTypeRaw);
         },
       );
     });
@@ -53,7 +54,7 @@ export class TrainTypeRepository {
           ORDER BY station_station_cd
           `,
         [lineGroupId],
-        async (err, results) => {
+        async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
@@ -62,10 +63,12 @@ export class TrainTypeRepository {
           }
           return resolve(
             Promise.all(
-              results.map(async (r: StationRaw) => ({
-                ...r,
-                lines: await this.lineRepo.getByGroupId(r.station_g_cd),
-              })),
+              results.map(
+                async (r): Promise<StationRaw> => ({
+                  ...(r as StationRaw),
+                  lines: await this.lineRepo.getByGroupId(r.station_g_cd),
+                }),
+              ),
             ),
           );
         },
@@ -85,14 +88,14 @@ export class TrainTypeRepository {
           AND l.line_cd = s.line_cd
           AND s.e_status = 0`,
         [lineGroupId],
-        (err, results) => {
+        (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
           if (!results.length) {
             return resolve([]);
           }
-          return resolve(results);
+          return resolve(results as LineRaw[]);
         },
       );
     });

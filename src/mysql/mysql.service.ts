@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Connection } from 'mysql';
+import { Connection } from 'mysql2';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const mysql = require('mysql');
+const mysql = require('mysql2');
 
 @Injectable()
 export class MysqlService {

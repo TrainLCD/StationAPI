@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { RowDataPacket } from 'mysql2';
 import { NEX_ID } from 'src/constants/ignore';
 import { TrainType } from 'src/graphql';
 import { LineRepository } from 'src/line/line.repository';
 import { MysqlService } from 'src/mysql/mysql.service';
-import { TrainTypeRaw } from 'src/trainType/models/TrainTypeRaw';
 import { TrainTypeRepository } from 'src/trainType/trainType.repository';
 import { StationRaw } from './models/StationRaw';
 
@@ -28,7 +28,7 @@ export class StationRepository {
           AND NOT line_cd = ${NEX_ID}
         `,
         [id],
-        async (err, results) => {
+        async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
@@ -40,7 +40,7 @@ export class StationRepository {
             results[0].station_g_cd,
           );
           return resolve({
-            ...results[0],
+            ...(results[0] as StationRaw),
             lines,
           });
         },
@@ -48,10 +48,10 @@ export class StationRepository {
     });
   }
 
-  async findTrainTypesById(id: number): Promise<TrainTypeRaw[]> {
+  async findTrainTypesById(id: number): Promise<TrainType[]> {
     const { connection } = this.mysqlService;
 
-    return new Promise<TrainTypeRaw[]>((resolve, reject) => {
+    return new Promise<TrainType[]>((resolve, reject) => {
       connection.query(
         `
           SELECT sst.type_cd,
@@ -67,7 +67,7 @@ export class StationRepository {
             AND sst.pass != 1
         `,
         [id],
-        async (err, results) => {
+        async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
@@ -76,17 +76,19 @@ export class StationRepository {
           }
           return resolve(
             Promise.all(
-              await results.map(async (r) => ({
-                id: r.type_cd,
-                groupId: r.line_group_cd,
-                name: r.type_name,
-                nameK: r.type_name_k,
-                nameR: r.type_name_r,
-                color: r.color,
-                lines: await this.trainTypeRepo.getBelongingLines(
-                  r.line_group_cd,
-                ),
-              })),
+              await results.map(
+                async (r): Promise<TrainType> => ({
+                  id: r.type_cd,
+                  groupId: r.line_group_cd,
+                  name: r.type_name,
+                  nameK: r.type_name_k,
+                  nameR: r.type_name_r,
+                  color: r.color,
+                  lines: await this.trainTypeRepo.getBelongingLines(
+                    r.line_group_cd,
+                  ),
+                }),
+              ),
             ),
           );
         },
@@ -107,7 +109,7 @@ export class StationRepository {
           AND NOT line_cd = ${NEX_ID}
         `,
         [groupId],
-        async (err, results) => {
+        async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
@@ -118,7 +120,7 @@ export class StationRepository {
             results[0].station_g_cd,
           );
           return resolve({
-            ...results[0],
+            ...(results[0] as StationRaw),
             lines,
           });
         },
@@ -154,7 +156,7 @@ export class StationRepository {
         LIMIT 1
         `,
         [latitude, longitude, latitude],
-        async (err, results) => {
+        async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
@@ -165,7 +167,7 @@ export class StationRepository {
             results[0].station_g_cd,
           );
           return resolve({
-            ...results[0],
+            ...(results[0] as StationRaw),
             lines,
           });
         },
@@ -190,7 +192,7 @@ export class StationRepository {
           ORDER BY e_sort, station_cd
         `,
         [lineId],
-        async (err, results) => {
+        async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
@@ -204,7 +206,7 @@ export class StationRepository {
               return {
                 ...r,
                 lines,
-              };
+              } as StationRaw;
             }),
           );
 
@@ -232,7 +234,7 @@ export class StationRepository {
           ORDER BY e_sort, station_cd
         `,
         [],
-        async (err, results) => {
+        async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
@@ -246,7 +248,7 @@ export class StationRepository {
               return {
                 ...r,
                 lines: [line],
-              };
+              } as StationRaw;
             }),
           );
 
