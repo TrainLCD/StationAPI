@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { RowDataPacket } from 'mysql2';
 import { NEX_ID } from 'src/constants/ignore';
 import { MysqlService } from 'src/mysql/mysql.service';
 import { LineRaw } from './models/LineRaw';
@@ -18,14 +19,14 @@ export class LineRepository {
         AND NOT line_cd = ${NEX_ID}
         AND e_status = 0`,
         [id],
-        (err, results) => {
+        (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
           if (!results.length) {
             return resolve(null);
           }
-          return resolve(results[0]);
+          return resolve(results[0] as LineRaw);
         },
       );
     });
@@ -46,7 +47,7 @@ export class LineRepository {
         AND NOT line_cd = ${NEX_ID}
         AND e_status = 0`,
         [groupId],
-        (err, results) => {
+        (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
@@ -54,7 +55,7 @@ export class LineRepository {
             return resolve([]);
           }
 
-          return resolve(results);
+          return resolve(results as LineRaw[]);
         },
       );
     });

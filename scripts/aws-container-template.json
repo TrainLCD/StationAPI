@@ -1,0 +1,35 @@
+{
+  "serviceName": $SERVICE_NAME,
+  "containers": {
+    "api": {
+      "image": $IMAGE,
+      "command": ["sh", "./scripts/start.prod.sh"],
+      "environment": {
+        "MYSQL_DATABASE": $MYSQL_DATABASE,
+        "MYSQL_PASSWORD": $MYSQL_PASSWORD,
+        "MYSQL_USER": $MYSQL_USER,
+        "MYSQL_HOST": $MYSQL_HOST
+      },
+      "ports": { "3000": "HTTP" }
+    },
+    "mackerel-container-agent": {
+      "image": "mackerel/mackerel-container-agent:latest",
+      "environment": {
+        "MACKEREL_CONTAINER_PLATFORM": "ecs_v3",
+        "MACKEREL_APIKEY": $MACKEREL_APIKEY
+      }
+    }
+  },
+  "publicEndpoint": {
+    "containerName": "api",
+    "containerPort": 3000,
+    "healthCheck": {
+      "healthyThreshold": 2,
+      "unhealthyThreshold": 2,
+      "timeoutSeconds": 3,
+      "intervalSeconds": 5,
+      "path": "/graphql",
+      "successCodes": "200-499"
+    }
+  }
+}
