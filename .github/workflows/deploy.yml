@@ -36,6 +36,7 @@ jobs:
           MYSQL_USER: ${{ secrets.MYSQL_USER }}
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
           MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MACKEREL_APIKEY: ${{ secrets.MACKEREL_APIKEY }}
         run: |
           JSON_TEMPLATE=$(cat $(pwd)/scripts/aws-container-template.json)
 
@@ -51,6 +52,7 @@ jobs:
                             --arg MYSQL_USER "$MYSQL_USER" \
                             --arg MYSQL_PASSWORD "$MYSQL_PASSWORD" \
                             --arg MYSQL_HOST "$MYSQL_HOST" \
+                            --arg MACKEREL_APIKEY "$MACKEREL_APIKEY" \
                             "$JSON_TEMPLATE"
                       )
           echo $JSON_STRING > aws-container.json
