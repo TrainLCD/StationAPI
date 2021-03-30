@@ -1,10 +1,10 @@
 {
   "name": "stationapi",
   "version": "0.0.1",
-  "description": "",
-  "author": "",
+  "description": "The GraphQL Web API for provides nearest station.",
+  "author": "TinyKitten <ts@tinykitten.me> (https://tinykitten.me)",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nest build",
