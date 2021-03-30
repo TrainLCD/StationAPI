@@ -2,12 +2,12 @@ name: deploy
 
 on:
   workflow_run:
-    workflows: ["Test"]
-    types:
-      - completed
-  push:
+    workflows:
+      - Test
     branches:
       - master
+    types:
+      - completed
 
 jobs:
   deploy:
