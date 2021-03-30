@@ -1,9 +1,9 @@
-name: ESLint
+name: Test
 
 on:
   push:
     branches:
-      - '**'
+      - "**"
 
 env:
   cache-version: v1
@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
-          node-version: '12.18.2'
+          node-version: "12.18.2"
       - name: Cache npm
         uses: actions/cache@v1
         with:
