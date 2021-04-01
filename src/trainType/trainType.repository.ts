@@ -51,7 +51,7 @@ export class TrainTypeRepository {
           ${excludePass ? 'AND sst.pass = 0' : ''}
           AND s.station_cd = sst.station_cd
           AND s.e_status = 0
-          ORDER BY station_station_cd
+          ORDER BY sst.id
           `,
         [lineGroupId],
         async (err, results: RowDataPacket[]) => {

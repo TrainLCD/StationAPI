@@ -55,7 +55,7 @@ export class StationRepository {
       connection.query(
         `
           SELECT sst.type_cd,
-            sst.station_station_cd,
+            sst.id,
             sst.line_group_cd,
             t.type_name,
             t.type_name_k,
