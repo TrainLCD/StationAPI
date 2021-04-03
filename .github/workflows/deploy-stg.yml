@@ -1,16 +1,16 @@
-name: Deploy
+name: Deploy staging
 
 on:
   workflow_run:
     workflows:
       - Test
     branches:
-      - master
+      - dev
     types:
       - completed
 
 jobs:
-  deploy:
+  deploy-staging:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -33,11 +33,11 @@ jobs:
           docker build -t stationapi:latest .
       - name: Push and Deploy
         env:
-          SERVICE_NAME: ${{ secrets.SERVICE_NAME }}
-          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
-          MYSQL_USER: ${{ secrets.MYSQL_USER }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          SERVICE_NAME: ${{ secrets.SERVICE_NAME_STG }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE_STG }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER_STG }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD_STG }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST_STG }}
           MACKEREL_APIKEY: ${{ secrets.MACKEREL_APIKEY }}
         run: |
           JSON_TEMPLATE=$(cat $(pwd)/scripts/aws-container-template.json)
