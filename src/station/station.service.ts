@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Station } from 'src/graphql';
+import { Station, StationOnly } from 'src/graphql';
 import { LineRaw } from 'src/line/models/LineRaw';
 import { RawService } from 'src/raw/raw.service';
 import { StationRepository } from './station.repository';
@@ -62,6 +62,14 @@ export class StationService {
           s,
           await this.stationRepo.findTrainTypesById(s?.station_cd),
         ),
+      ),
+    );
+  }
+
+  async getAllStations(): Promise<StationOnly[]> {
+    return await Promise.all(
+      (await this.stationRepo.getAll()).map(async (s) =>
+        this.rawService.convertStation(s),
       ),
     );
   }

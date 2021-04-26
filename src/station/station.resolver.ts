@@ -1,6 +1,6 @@
 import { ParseIntPipe } from '@nestjs/common';
 import { Args, Query, Resolver } from '@nestjs/graphql';
-import { Station } from 'src/graphql';
+import { Station, StationOnly } from 'src/graphql';
 import { StationService } from './station.service';
 
 @Resolver((of) => Station)
@@ -33,5 +33,10 @@ export class StationResolver {
   @Query((returns) => Station)
   async stationsByName(@Args('name') name: string): Promise<Station[]> {
     return this.stationService.getByName(name);
+  }
+
+  @Query((returns) => StationOnly)
+  async allStations(): Promise<StationOnly[]> {
+    return this.stationService.getAllStations();
   }
 }
