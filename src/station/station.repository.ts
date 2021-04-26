@@ -6,6 +6,7 @@ import { LineRepository } from 'src/line/line.repository';
 import { MysqlService } from 'src/mysql/mysql.service';
 import { TrainTypeRepository } from 'src/trainType/trainType.repository';
 import { StationRaw } from './models/StationRaw';
+import { uniqBy } from 'lodash';
 
 @Injectable()
 export class StationRepository {
@@ -76,7 +77,7 @@ export class StationRepository {
           }
           return resolve(
             Promise.all(
-              await results.map(
+              results.map(
                 async (r): Promise<TrainType> => ({
                   id: r.type_cd,
                   groupId: r.line_group_cd,
@@ -253,6 +254,36 @@ export class StationRepository {
           );
 
           return resolve(map);
+        },
+      );
+    });
+  }
+
+  async getAll(): Promise<StationRaw[]> {
+    const { connection } = this.mysqlService;
+
+    return new Promise<StationRaw[]>((resolve, reject) => {
+      connection.query(
+        `
+          SELECT *
+          FROM stations
+          WHERE e_status = 0
+          AND NOT line_cd = ${NEX_ID}
+          AND station_g_cd IN (
+            SELECT DISTINCT station_g_cd
+            FROM stations
+          )
+        `,
+        [],
+        async (err, results: RowDataPacket[]) => {
+          if (err) {
+            return reject(err);
+          }
+          if (!results.length) {
+            return resolve([]);
+          }
+          const filtered = uniqBy(results, 'station_g_cd');
+          return resolve(filtered as StationRaw[]);
         },
       );
     });

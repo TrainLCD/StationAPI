@@ -16,7 +16,7 @@ export class RawService {
       distance: raw.distance,
       latitude: raw.lat,
       longitude: raw.lon,
-      lines: raw.lines.map((l) => this.convertLine(l)),
+      lines: raw.lines?.map((l) => this.convertLine(l)),
       openYmd: raw.open_ymd,
       postalCode: raw.post,
       prefId: raw.pref_cd,
