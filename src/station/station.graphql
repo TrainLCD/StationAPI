@@ -4,6 +4,7 @@ type Query {
   stationByCoords(latitude: Float!, longitude: Float!): Station
   stationsByLineId(lineId: ID!): [Station]
   stationsByName(name: String!): [Station]
+  allStations: [StationOnly]
 }
 
 type Station {
@@ -22,4 +23,19 @@ type Station {
   nameR: String
   trainTypes: [TrainType]
   pass: Boolean
+}
+
+type StationOnly {
+  id: Int
+  address: String
+  distance: Float
+  latitude: Float
+  longitude: Float
+  openYmd: String
+  postalCode: String
+  prefId: Int
+  groupId: Int
+  name: String
+  nameK: String
+  nameR: String
 }
