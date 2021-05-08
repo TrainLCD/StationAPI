@@ -35,6 +35,8 @@ export class Line {
     nameH?: string;
     nameK?: string;
     nameR?: string;
+    nameZh?: string;
+    nameKo?: string;
     lineType?: number;
     zoom?: number;
 }
@@ -53,6 +55,8 @@ export class Station {
     name?: string;
     nameK?: string;
     nameR?: string;
+    nameZh?: string;
+    nameKo?: string;
     trainTypes?: TrainType[];
     pass?: boolean;
 }
@@ -70,6 +74,8 @@ export class StationOnly {
     name?: string;
     nameK?: string;
     nameR?: string;
+    nameZh?: string;
+    nameKo?: string;
 }
 
 export class TrainType {
@@ -78,6 +84,8 @@ export class TrainType {
     name?: string;
     nameK?: string;
     nameR?: string;
+    nameZh?: string;
+    nameKo?: string;
     color?: string;
     stations?: Station[];
     lines?: Line[];

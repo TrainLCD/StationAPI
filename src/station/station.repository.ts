@@ -61,6 +61,8 @@ export class StationRepository {
             t.type_name,
             t.type_name_k,
             t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
             t.color
           FROM station_station_types as sst, types as t
           WHERE sst.station_cd = ?
@@ -84,6 +86,8 @@ export class StationRepository {
                   name: r.type_name,
                   nameK: r.type_name_k,
                   nameR: r.type_name_r,
+                  nameZh: r.type_name_zh,
+                  nameKo: r.type_name_ko,
                   color: r.color,
                   lines: await this.trainTypeRepo.getBelongingLines(
                     r.line_group_cd,
@@ -229,7 +233,9 @@ export class StationRepository {
           SELECT * FROM stations
           WHERE (station_name LIKE "%${name}%"
           OR station_name_r LIKE "%${name}%"
-          OR station_name_k LIKE "%${name}%")
+          OR station_name_k LIKE "%${name}%"
+          OR station_name_zh LIKE "%${name}%"
+          OR station_name_ko LIKE "%${name}%")
           AND e_status = 0
           AND NOT line_cd = ${NEX_ID}
           ORDER BY e_sort, station_cd
