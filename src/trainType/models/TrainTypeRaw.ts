@@ -7,6 +7,8 @@ export class TrainTypeRaw {
   type_name: string;
   type_name_k: string;
   type_name_r: string;
+  type_name_zh: string;
+  type_name_ko: string;
   line_group_cd: number;
   color: string;
   lines: LineRaw[];

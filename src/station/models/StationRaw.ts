@@ -6,6 +6,8 @@ export class StationRaw {
   station_name: string;
   station_name_k: string;
   station_name_r: string;
+  station_name_zh: string;
+  station_name_ko: string;
   line_cd: number;
   pref_cd: number;
   post: string;

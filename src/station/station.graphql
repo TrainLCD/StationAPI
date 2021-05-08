@@ -21,6 +21,8 @@ type Station {
   name: String
   nameK: String
   nameR: String
+  nameZh: String
+  nameKo: String
   trainTypes: [TrainType]
   pass: Boolean
 }
@@ -38,4 +40,6 @@ type StationOnly {
   name: String
   nameK: String
   nameR: String
+  nameZh: String
+  nameKo: String
 }

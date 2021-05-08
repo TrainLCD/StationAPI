@@ -24,6 +24,8 @@ export class RawService {
       name: raw.station_name,
       nameK: raw.station_name_k,
       nameR: raw.station_name_r,
+      nameZh: raw.station_name_zh,
+      nameKo: raw.station_name_ko,
       pass: raw.pass,
       trainTypes: trainTypes,
     };
@@ -45,6 +47,8 @@ export class RawService {
       nameH: raw.line_name_h,
       nameK: raw.line_name_k,
       nameR: raw.line_name_r,
+      nameZh: raw.line_name_zh,
+      nameKo: raw.line_name_ko,
       lineType: raw.line_type,
       zoom: raw.zoom,
     };
@@ -65,6 +69,8 @@ export class RawService {
       name: raw.type_name,
       nameK: raw.type_name_k,
       nameR: raw.type_name_r,
+      nameZh: raw.type_name_zh,
+      nameKo: raw.type_name_ko,
       color: raw.color,
       stations,
       lines,
