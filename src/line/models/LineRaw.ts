@@ -5,7 +5,9 @@ export class LineRaw {
   line_name_k: string;
   line_name_h: string;
   line_name_r: string;
-  line_color_c?: string;
+  line_name_zh: string;
+  line_name_ko: string;
+  line_color_c: string;
   line_color_t: string;
   line_type: number;
   lon: number;
