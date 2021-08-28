@@ -77,6 +77,9 @@ export class StationRepository {
           if (!results.length) {
             return resolve([]);
           }
+
+          const parenthesisRegexp = /\([^()]*\)/g;
+
           return resolve(
             Promise.all(
               results.map(
@@ -94,13 +97,25 @@ export class StationRepository {
                     name: !filteredAllTrainTypes.length
                       ? r.type_name
                       : `${r.type_name}(${filteredAllTrainTypes
-                          .map((tt) => `${tt.line_name}内${tt.type_name}`)
+                          .map(
+                            (tt) =>
+                              `${tt.line_name.replace(
+                                parenthesisRegexp,
+                                '',
+                              )}内${tt.type_name}`,
+                          )
                           .join('/')})`,
                     nameK: r.type_name_k,
                     nameR: !filteredAllTrainTypes.length
                       ? r.type_name_r
                       : `${r.type_name_r}(${filteredAllTrainTypes
-                          .map((tt) => `${tt.line_name_r} ${tt.type_name_r}`)
+                          .map(
+                            (tt) =>
+                              `${tt.line_name_r.replace(
+                                parenthesisRegexp,
+                                '',
+                              )} ${tt.type_name_r}`,
+                          )
                           .join('/')})`,
                     nameZh: r.type_name_zh,
                     nameKo: r.type_name_ko,
