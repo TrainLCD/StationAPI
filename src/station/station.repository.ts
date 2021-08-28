@@ -63,11 +63,17 @@ export class StationRepository {
             t.type_name_r,
             t.type_name_zh,
             t.type_name_ko,
-            t.color
-          FROM station_station_types as sst, types as t
+            t.color,
+            l.line_cd
+          FROM station_station_types as sst,
+            types as t,
+            stations as s,
+            \`lines\` as l
           WHERE sst.station_cd = ?
             AND sst.type_cd = t.type_cd
-            AND sst.pass != 1
+            AND sst.station_cd = s.station_cd
+            AND l.line_cd = s.line_cd
+            AND sst.pass = 0
         `,
         [id],
         async (err, results: RowDataPacket[]) => {
@@ -88,11 +94,11 @@ export class StationRepository {
                     r.line_group_cd,
                   );
                   const filteredAllTrainTypes = allTrainTypes.filter(
-                    (tt) => tt.type_cd !== r.type_cd,
+                    (tt) => tt.line_cd !== r.line_cd,
                   );
                   return {
                     // キャッシュが重複しないようにするため。もっとうまい方法あると思う
-                    id: r.type_cd + r.line_group_cd,
+                    id: r.id + r.type_cd + r.line_group_cd,
                     groupId: r.line_group_cd,
                     name: !filteredAllTrainTypes.length
                       ? r.type_name
@@ -102,7 +108,10 @@ export class StationRepository {
                               `${tt.line_name.replace(
                                 parenthesisRegexp,
                                 '',
-                              )}内${tt.type_name}`,
+                              )}内${tt.type_name.replace(
+                                parenthesisRegexp,
+                                '',
+                              )}`,
                           )
                           .join('/')})`,
                     nameK: r.type_name_k,
@@ -114,7 +123,10 @@ export class StationRepository {
                               `${tt.line_name_r.replace(
                                 parenthesisRegexp,
                                 '',
-                              )} ${tt.type_name_r}`,
+                              )} ${tt.type_name_r.replace(
+                                parenthesisRegexp,
+                                '',
+                              )}`,
                           )
                           .join('/')})`,
                     nameZh: r.type_name_zh,
