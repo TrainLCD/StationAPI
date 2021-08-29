@@ -80,6 +80,7 @@ export class StationOnly {
 
 export class TrainTypeMinimum {
     id?: number;
+    typeId?: number;
     groupId?: number;
     name?: string;
     nameK?: string;
@@ -92,6 +93,7 @@ export class TrainTypeMinimum {
 
 export class TrainType {
     id?: number;
+    typeId?: number;
     groupId?: number;
     name?: string;
     nameK?: string;

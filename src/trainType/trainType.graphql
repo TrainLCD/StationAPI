@@ -4,6 +4,7 @@ type Query {
 
 type TrainTypeMinimum {
   id: Int
+  typeId: Int
   groupId: Int
   name: String
   nameK: String
@@ -16,6 +17,7 @@ type TrainTypeMinimum {
 
 type TrainType {
   id: Int
+  typeId: Int
   groupId: Int
   name: String
   nameK: String
