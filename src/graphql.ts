@@ -78,6 +78,18 @@ export class StationOnly {
     nameKo?: string;
 }
 
+export class TrainTypeMinimum {
+    id?: number;
+    groupId?: number;
+    name?: string;
+    nameK?: string;
+    nameR?: string;
+    nameZh?: string;
+    nameKo?: string;
+    color?: string;
+    line?: Line;
+}
+
 export class TrainType {
     id?: number;
     groupId?: number;
@@ -89,4 +101,5 @@ export class TrainType {
     color?: string;
     stations?: Station[];
     lines?: Line[];
+    allTrainTypes?: TrainTypeMinimum[];
 }
