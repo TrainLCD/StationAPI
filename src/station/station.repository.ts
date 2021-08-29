@@ -63,11 +63,17 @@ export class StationRepository {
             t.type_name_r,
             t.type_name_zh,
             t.type_name_ko,
-            t.color
-          FROM station_station_types as sst, types as t
+            t.color,
+            l.line_cd
+          FROM station_station_types as sst,
+            types as t,
+            stations as s,
+            \`lines\` as l
           WHERE sst.station_cd = ?
             AND sst.type_cd = t.type_cd
-            AND sst.pass != 1
+            AND sst.station_cd = s.station_cd
+            AND l.line_cd = s.line_cd
+            AND sst.pass = 0
         `,
         [id],
         async (err, results: RowDataPacket[]) => {
@@ -77,22 +83,86 @@ export class StationRepository {
           if (!results.length) {
             return resolve([]);
           }
+
+          const parenthesisRegexp = /\([^()]*\)/g;
+
           return resolve(
             Promise.all(
               results.map(
-                async (r): Promise<TrainType> => ({
-                  id: r.type_cd,
-                  groupId: r.line_group_cd,
-                  name: r.type_name,
-                  nameK: r.type_name_k,
-                  nameR: r.type_name_r,
-                  nameZh: r.type_name_zh,
-                  nameKo: r.type_name_ko,
-                  color: r.color,
-                  lines: await this.trainTypeRepo.getBelongingLines(
+                async (r): Promise<TrainType> => {
+                  const allTrainTypes = await this.trainTypeRepo.getAllLinesTrainTypes(
                     r.line_group_cd,
-                  ),
-                }),
+                  );
+                  const filteredAllTrainTypes = allTrainTypes.filter(
+                    (tt) => tt.line_cd !== r.line_cd,
+                  );
+                  return {
+                    // キャッシュが重複しないようにするため。もっとうまい方法あると思う
+                    id: r.id + r.type_cd + r.line_group_cd,
+                    groupId: r.line_group_cd,
+                    name: !filteredAllTrainTypes.length
+                      ? r.type_name
+                      : `${r.type_name}(${filteredAllTrainTypes
+                          .map(
+                            (tt) =>
+                              `${tt.line_name.replace(
+                                parenthesisRegexp,
+                                '',
+                              )}内${tt.type_name.replace(
+                                parenthesisRegexp,
+                                '',
+                              )}`,
+                          )
+                          .join('/')})`,
+                    nameK: r.type_name_k,
+                    nameR: !filteredAllTrainTypes.length
+                      ? r.type_name_r
+                      : `${r.type_name_r}(${filteredAllTrainTypes
+                          .map(
+                            (tt) =>
+                              `${tt.line_name_r.replace(
+                                parenthesisRegexp,
+                                '',
+                              )} ${tt.type_name_r.replace(
+                                parenthesisRegexp,
+                                '',
+                              )}`,
+                          )
+                          .join('/')})`,
+                    nameZh: r.type_name_zh,
+                    nameKo: r.type_name_ko,
+                    color: r.color,
+                    allTrainTypes: allTrainTypes.map((tt) => ({
+                      id: tt.type_cd + tt.line_cd,
+                      groupId: r.line_group_cd,
+                      name: tt.type_name,
+                      nameK: tt.type_name_k,
+                      nameR: tt.type_name_r,
+                      nameZh: tt.type_name_zh,
+                      nameKo: tt.type_name_ko,
+                      color: tt.color,
+                      line: {
+                        id: tt.line_cd,
+                        companyId: tt.company_cd,
+                        latitude: tt.lat,
+                        longitude: tt.lon,
+                        lineColorC: tt.line_color_c,
+                        lineColorT: tt.line_color_t,
+                        name: tt.line_name,
+                        nameH: tt.line_name_h,
+                        nameK: tt.line_name_k,
+                        nameR: tt.type_name_r,
+                        nameZh: tt.line_name_zh,
+                        nameKo: tt.line_name_ko,
+                        lineType: tt.line_type,
+                        zoom: tt.zoom,
+                      },
+                    })),
+                    lines: await this.trainTypeRepo.getBelongingLines(
+                      r.line_group_cd,
+                    ),
+                  };
+                },
               ),
             ),
           );

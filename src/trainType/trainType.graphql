@@ -2,6 +2,18 @@ type Query {
   trainType(id: ID!, excludePass: Boolean): TrainType
 }
 
+type TrainTypeMinimum {
+  id: Int
+  groupId: Int
+  name: String
+  nameK: String
+  nameR: String
+  nameZh: String
+  nameKo: String
+  color: String
+  line: Line
+}
+
 type TrainType {
   id: Int
   groupId: Int
@@ -13,4 +25,5 @@ type TrainType {
   color: String
   stations: [Station]
   lines: [Line]
+  allTrainTypes: [TrainTypeMinimum]
 }

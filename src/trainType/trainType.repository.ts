@@ -4,7 +4,7 @@ import { LineRepository } from 'src/line/line.repository';
 import { LineRaw } from 'src/line/models/LineRaw';
 import { MysqlService } from 'src/mysql/mysql.service';
 import { StationRaw } from 'src/station/models/StationRaw';
-import { TrainTypeRaw } from './models/TrainTypeRaw';
+import { TrainTypeRaw, TrainTypeWithLineRaw } from './models/TrainTypeRaw';
 
 @Injectable()
 export class TrainTypeRepository {
@@ -96,6 +96,34 @@ export class TrainTypeRepository {
             return resolve([]);
           }
           return resolve(results as LineRaw[]);
+        },
+      );
+    });
+  }
+
+  async getAllLinesTrainTypes(
+    lineGroupId: number,
+  ): Promise<TrainTypeWithLineRaw[]> {
+    const { connection } = this.mysqlService;
+
+    return new Promise<TrainTypeWithLineRaw[]>((resolve, reject) => {
+      connection.query(
+        `SELECT DISTINCT t.*, l.*
+        FROM \`lines\` as l, \`types\` as t, stations as s, station_station_types as sst
+        WHERE sst.line_group_cd = ?
+          AND s.station_cd = sst.station_cd
+          AND sst.type_cd = t.type_cd
+          AND s.e_status = 0
+          AND l.line_cd = s.line_cd`,
+        [lineGroupId],
+        (err, results: RowDataPacket[]) => {
+          if (err) {
+            return reject(err);
+          }
+          if (!results.length) {
+            return resolve([]);
+          }
+          return resolve(results as TrainTypeWithLineRaw[]);
         },
       );
     });
