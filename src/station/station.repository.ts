@@ -99,6 +99,7 @@ export class StationRepository {
                   return {
                     // キャッシュが重複しないようにするため。もっとうまい方法あると思う
                     id: r.id + r.type_cd + r.line_group_cd,
+                    typeId: r.type_cd,
                     groupId: r.line_group_cd,
                     name: !filteredAllTrainTypes.length
                       ? r.type_name
@@ -134,6 +135,7 @@ export class StationRepository {
                     color: r.color,
                     allTrainTypes: allTrainTypes.map((tt) => ({
                       id: tt.type_cd + tt.line_cd,
+                      typeId: tt.type_cd,
                       groupId: r.line_group_cd,
                       name: tt.type_name,
                       nameK: tt.type_name_k,
