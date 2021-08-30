@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { RowDataPacket } from 'mysql2';
 import { NEX_ID } from 'src/constants/ignore';
 import { MysqlService } from 'src/mysql/mysql.service';
-import { LineRaw } from './models/LineRaw';
+import { CompanyRaw, LineRaw } from './models/LineRaw';
 
 @Injectable()
 export class LineRepository {
@@ -27,6 +27,30 @@ export class LineRepository {
             return resolve(null);
           }
           return resolve(results[0] as LineRaw);
+        },
+      );
+    });
+  }
+
+  async findOneCompany(lineId: number): Promise<CompanyRaw> {
+    const { connection } = this.mysqlService;
+
+    return new Promise<CompanyRaw>((resolve, reject) => {
+      connection.query(
+        `SELECT c.*
+        FROM \`lines\` as l, \`companies\` as c
+        WHERE l.line_cd = ?
+        AND l.e_status = 0
+        AND c.company_cd = l.company_cd`,
+        [lineId],
+        (err, results: RowDataPacket[]) => {
+          if (err) {
+            return reject(err);
+          }
+          if (!results.length) {
+            return resolve(null);
+          }
+          return resolve(results[0] as CompanyRaw);
         },
       );
     });

@@ -11,12 +11,20 @@ export class LineService {
   ) {}
 
   async findOne(id: number): Promise<Line> {
-    return this.rawService.convertLine(await this.lineRepo.findOne(id));
+    return this.rawService.convertLine(
+      await this.lineRepo.findOne(id),
+      await this.lineRepo.findOneCompany(id),
+    );
   }
 
   async getLinesByGroupId(groupId: number): Promise<Line[]> {
-    return (await this.lineRepo.getByGroupId(groupId)).map((l) =>
-      this.rawService.convertLine(l),
+    return await Promise.all(
+      (await this.lineRepo.getByGroupId(groupId)).map(async (l) =>
+        this.rawService.convertLine(
+          l,
+          await this.lineRepo.findOneCompany(l.line_cd),
+        ),
+      ),
     );
   }
 }

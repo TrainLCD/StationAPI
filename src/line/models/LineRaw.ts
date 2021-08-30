@@ -1,3 +1,17 @@
+export class CompanyRaw {
+  company_cd: number;
+  rr_cd: number;
+  company_name: string;
+  company_name_k: string;
+  company_name_h: string;
+  company_name_r: string;
+  company_name_en: string;
+  company_url: string;
+  company_type: number;
+  e_status: number;
+  e_sort: number;
+}
+
 export class LineRaw {
   line_cd: number;
   company_cd: number;
