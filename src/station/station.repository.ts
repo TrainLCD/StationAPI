@@ -94,12 +94,28 @@ export class StationRepository {
                     r.line_group_cd,
                   );
 
-                  const duplicatedTrainTypes = allTrainTypes.filter(
-                    (tt, i, arr) =>
-                      arr.findIndex(
-                        (item) => item.company_cd === tt.company_cd,
-                      ) !== i,
+                  const filteredAllTrainTypes = allTrainTypes.filter(
+                    (tt) => tt.line_cd !== r.line_cd,
                   );
+
+                  const duplicatedTrainTypes = filteredAllTrainTypes
+                    .filter(
+                      (tt, i, arr) =>
+                        arr.findIndex(
+                          (item) => item.company_cd === tt.company_cd,
+                        ) !== i,
+                    )
+                    .reduce((acc, cur) => {
+                      if (
+                        !acc.length ||
+                        acc.some((tt) => tt.company_cd !== cur.company_cd)
+                      ) {
+                        acc.push(cur);
+                      }
+                      return acc;
+                    }, []);
+
+                  console.log(duplicatedTrainTypes);
 
                   const duplicatedCompanies = duplicatedTrainTypes.length
                     ? await Promise.all(
@@ -110,9 +126,7 @@ export class StationRepository {
                       )
                     : [];
 
-                  const filteredAllTrainTypes = allTrainTypes.filter(
-                    (tt) => tt.line_cd !== r.line_cd,
-                  );
+                  console.log(duplicatedCompanies);
 
                   const notDuplicatedTypes = filteredAllTrainTypes.filter(
                     (tt) => {
@@ -127,7 +141,6 @@ export class StationRepository {
 
                   const joinedName = (() => {
                     if (duplicatedCompanies.length) {
-                      // return [...notDuplicatedTypes, ...duplicatedTrainTypes];
                       return `${r.type_name}(${notDuplicatedTypes
                         .map(
                           (tt) =>
@@ -136,7 +149,9 @@ export class StationRepository {
                               '',
                             )}内${tt.type_name.replace(parenthesisRegexp, '')}`,
                         )
-                        .join('/')}/${duplicatedCompanies
+                        .join('/')}${
+                        notDuplicatedTypes.length ? '/' : ''
+                      }${duplicatedCompanies
                         .map(
                           (dc, i) =>
                             `${dc.company_name_r}線内${duplicatedTrainTypes[i].type_name}`,
@@ -155,7 +170,6 @@ export class StationRepository {
                   })();
                   const joinedNameR = (() => {
                     if (duplicatedCompanies.length) {
-                      // return [...notDuplicatedTypes, ...duplicatedTrainTypes];
                       return `${r.type_name_r}(${notDuplicatedTypes
                         .map(
                           (tt) =>
@@ -167,7 +181,9 @@ export class StationRepository {
                               '',
                             )}`,
                         )
-                        .join('/')}/${duplicatedCompanies
+                        .join('/')}${
+                        notDuplicatedTypes.length ? '/' : ''
+                      }${duplicatedCompanies
                         .map(
                           (dc, i) =>
                             `${dc.company_name_en} Line ${duplicatedTrainTypes[i].type_name_r}`,
