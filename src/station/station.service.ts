@@ -25,7 +25,7 @@ export class StationService {
     const station = await this.stationRepo.findOneByGroupId(groupId);
     return this.rawService.convertStation(
       station,
-      await this.lineRepo.findOneCompany(station?.station_cd),
+      await this.lineRepo.findOneCompany(station?.line_cd),
       await this.stationRepo.findTrainTypesById(station?.station_cd),
     );
   }
@@ -35,7 +35,7 @@ export class StationService {
 
     return this.rawService.convertStation(
       station,
-      await this.lineRepo.findOneCompany(station?.station_cd),
+      await this.lineRepo.findOneCompany(station?.line_cd),
       await this.stationRepo.findTrainTypesById(station?.station_cd),
     );
   }
@@ -76,7 +76,7 @@ export class StationService {
       (await this.stationRepo.getByName(name)).map(async (s) =>
         this.rawService.convertStation(
           s,
-          await this.lineRepo.findOneCompany(s?.station_cd),
+          await this.lineRepo.findOneCompany(s?.line_cd),
           await this.stationRepo.findTrainTypesById(s?.station_cd),
         ),
       ),
@@ -88,7 +88,7 @@ export class StationService {
       (await this.stationRepo.getAll()).map(async (s) =>
         this.rawService.convertStation(
           s,
-          await this.lineRepo.findOneCompany(s?.station_cd),
+          await this.lineRepo.findOneCompany(s?.line_cd),
         ),
       ),
     );

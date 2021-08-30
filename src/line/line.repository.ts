@@ -64,13 +64,12 @@ export class LineRepository {
 
     return new Promise<LineRaw[]>((resolve, reject) => {
       connection.query(
-        `SELECT l.*
-        FROM \`lines\` as l, companies as c
-        WHERE l.line_cd
+        `SELECT *
+        FROM \`lines\`
+        WHERE line_cd
         IN (SELECT line_cd FROM stations WHERE station_g_cd = ?)
-        AND NOT l.line_cd = ${NEX_ID}
-        AND l.e_status = 0
-        AND l.company_cd = c.company_cd`,
+        AND NOT line_cd = ${NEX_ID}
+        AND e_status = 0`,
         [groupId],
         (err, results: RowDataPacket[]) => {
           if (err) {
