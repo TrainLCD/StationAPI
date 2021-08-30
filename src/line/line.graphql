@@ -17,4 +17,16 @@ type Line {
   nameKo: String
   lineType: Int
   zoom: Int
+  company: Company
+}
+
+type Company {
+  id: Int
+  railroadId: Int
+  name: String
+  nameK: String
+  nameH: String
+  nameR: String
+  url: String
+  companyType: Int
 }

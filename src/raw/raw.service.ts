@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { Line, Station, TrainType } from 'src/graphql';
-import { LineRaw } from 'src/line/models/LineRaw';
+import { CompanyRaw, LineRaw } from 'src/line/models/LineRaw';
 import { StationRaw } from 'src/station/models/StationRaw';
 import { TrainTypeRaw } from 'src/trainType/models/TrainTypeRaw';
 
 @Injectable()
 export class RawService {
-  convertStation(raw: StationRaw, trainTypes?: TrainType[]): Station {
+  convertStation(
+    raw: StationRaw,
+    companyRaw: CompanyRaw,
+    trainTypes?: TrainType[],
+  ): Station {
     if (!raw) {
       return;
     }
@@ -16,7 +20,7 @@ export class RawService {
       distance: raw.distance,
       latitude: raw.lat,
       longitude: raw.lon,
-      lines: raw.lines?.map((l) => this.convertLine(l)),
+      lines: raw.lines?.map((l) => this.convertLine(l, companyRaw)),
       openYmd: raw.open_ymd,
       postalCode: raw.post,
       prefId: raw.pref_cd,
@@ -31,26 +35,36 @@ export class RawService {
     };
   }
 
-  convertLine(raw: LineRaw): Line {
-    if (!raw) {
+  convertLine(lineRaw: LineRaw, companyRaw: CompanyRaw): Line {
+    if (!lineRaw || !companyRaw) {
       return;
     }
 
     return {
-      id: raw.line_cd,
-      companyId: raw.company_cd,
-      latitude: raw.lat,
-      longitude: raw.lon,
-      lineColorC: raw.line_color_c,
-      lineColorT: raw.line_color_t,
-      name: raw.line_name,
-      nameH: raw.line_name_h,
-      nameK: raw.line_name_k,
-      nameR: raw.line_name_r,
-      nameZh: raw.line_name_zh,
-      nameKo: raw.line_name_ko,
-      lineType: raw.line_type,
-      zoom: raw.zoom,
+      id: lineRaw.line_cd,
+      companyId: lineRaw.company_cd,
+      latitude: lineRaw.lat,
+      longitude: lineRaw.lon,
+      lineColorC: lineRaw.line_color_c,
+      lineColorT: lineRaw.line_color_t,
+      name: lineRaw.line_name,
+      nameH: lineRaw.line_name_h,
+      nameK: lineRaw.line_name_k,
+      nameR: lineRaw.line_name_r,
+      nameZh: lineRaw.line_name_zh,
+      nameKo: lineRaw.line_name_ko,
+      lineType: lineRaw.line_type,
+      zoom: lineRaw.zoom,
+      company: {
+        id: companyRaw.company_cd,
+        railroadId: companyRaw.rr_cd,
+        name: companyRaw.company_name,
+        nameK: companyRaw.company_name_k,
+        nameH: companyRaw.company_name_h,
+        nameR: companyRaw.company_name_r,
+        url: companyRaw.company_url,
+        companyType: companyRaw.company_type,
+      },
     };
   }
 
