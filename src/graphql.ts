@@ -39,6 +39,18 @@ export class Line {
     nameKo?: string;
     lineType?: number;
     zoom?: number;
+    company?: Company;
+}
+
+export class Company {
+    id?: number;
+    railroadId?: number;
+    name?: string;
+    nameK?: string;
+    nameH?: string;
+    nameR?: string;
+    url?: string;
+    companyType?: number;
 }
 
 export class Station {

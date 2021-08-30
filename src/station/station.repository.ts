@@ -6,7 +6,8 @@ import { LineRepository } from 'src/line/line.repository';
 import { MysqlService } from 'src/mysql/mysql.service';
 import { TrainTypeRepository } from 'src/trainType/trainType.repository';
 import { StationRaw } from './models/StationRaw';
-import { uniqBy } from 'lodash';
+import { curry, uniqBy } from 'lodash';
+import { TrainTypeWithLineRaw } from 'src/trainType/models/TrainTypeRaw';
 
 @Injectable()
 export class StationRepository {
@@ -93,9 +94,105 @@ export class StationRepository {
                   const allTrainTypes = await this.trainTypeRepo.getAllLinesTrainTypes(
                     r.line_group_cd,
                   );
+
+                  const duplicatedTrainTypes = allTrainTypes.filter(
+                    (tt, i, arr) =>
+                      arr.findIndex(
+                        (item) => item.company_cd === tt.company_cd,
+                      ) !== i,
+                  );
+
+                  const duplicatedCompanies = duplicatedTrainTypes.length
+                    ? await Promise.all(
+                        duplicatedTrainTypes.map(
+                          async (tt) =>
+                            await this.lineRepo.findOneCompany(tt.line_cd),
+                        ),
+                      )
+                    : [];
+
                   const filteredAllTrainTypes = allTrainTypes.filter(
                     (tt) => tt.line_cd !== r.line_cd,
                   );
+
+                  const notDuplicatedTypes = filteredAllTrainTypes.filter(
+                    (tt) => {
+                      if (!duplicatedCompanies.length) {
+                        return tt;
+                      }
+                      return duplicatedCompanies.find(
+                        (dc) => dc.company_cd !== tt.company_cd,
+                      );
+                    },
+                  );
+
+                  // const types = (() => {
+                  //   if (duplicatedCompanies.length) {
+                  //     return [...notDuplicatedTypes, ...duplicatedTrainTypes];
+                  //   }
+                  //   return notDuplicatedTypes;
+                  // })();
+
+                  const joinedName = (() => {
+                    if (duplicatedCompanies.length) {
+                      // return [...notDuplicatedTypes, ...duplicatedTrainTypes];
+                      return `${r.type_name}(${notDuplicatedTypes
+                        .map(
+                          (tt) =>
+                            `${tt.line_name.replace(
+                              parenthesisRegexp,
+                              '',
+                            )}内${tt.type_name.replace(parenthesisRegexp, '')}`,
+                        )
+                        .join('/')}/${duplicatedCompanies
+                        .map(
+                          (dc, i) =>
+                            `${dc.company_name_r}線内${duplicatedTrainTypes[i].type_name}`,
+                        )
+                        .join('/')})`;
+                    }
+                    return `${r.type_name}(${filteredAllTrainTypes
+                      .map(
+                        (tt) =>
+                          `${tt.line_name.replace(
+                            parenthesisRegexp,
+                            '',
+                          )}内${tt.type_name.replace(parenthesisRegexp, '')}`,
+                      )
+                      .join('/')})`;
+                  })();
+                  const joinedNameR = (() => {
+                    if (duplicatedCompanies.length) {
+                      // return [...notDuplicatedTypes, ...duplicatedTrainTypes];
+                      return `${r.type_name_r}(${notDuplicatedTypes
+                        .map(
+                          (tt) =>
+                            `${tt.line_name_r.replace(
+                              parenthesisRegexp,
+                              '',
+                            )} ${tt.type_name_r.replace(
+                              parenthesisRegexp,
+                              '',
+                            )}`,
+                        )
+                        .join('/')}/${duplicatedCompanies
+                        .map(
+                          (dc, i) =>
+                            `${dc.company_name_en} Line ${duplicatedTrainTypes[i].type_name_r}`,
+                        )
+                        .join('/')})`;
+                    }
+                    return `${r.type_name_r}(${filteredAllTrainTypes
+                      .map(
+                        (tt) =>
+                          `${tt.line_name_r.replace(
+                            parenthesisRegexp,
+                            '',
+                          )} ${tt.type_name_r.replace(parenthesisRegexp, '')}`,
+                      )
+                      .join('/')})`;
+                  })();
+
                   return {
                     // キャッシュが重複しないようにするため。もっとうまい方法あると思う
                     id: r.id + r.type_cd + r.line_group_cd,
@@ -103,33 +200,11 @@ export class StationRepository {
                     groupId: r.line_group_cd,
                     name: !filteredAllTrainTypes.length
                       ? r.type_name
-                      : `${r.type_name}(${filteredAllTrainTypes
-                          .map(
-                            (tt) =>
-                              `${tt.line_name.replace(
-                                parenthesisRegexp,
-                                '',
-                              )}内${tt.type_name.replace(
-                                parenthesisRegexp,
-                                '',
-                              )}`,
-                          )
-                          .join('/')})`,
+                      : joinedName,
                     nameK: r.type_name_k,
                     nameR: !filteredAllTrainTypes.length
                       ? r.type_name_r
-                      : `${r.type_name_r}(${filteredAllTrainTypes
-                          .map(
-                            (tt) =>
-                              `${tt.line_name_r.replace(
-                                parenthesisRegexp,
-                                '',
-                              )} ${tt.type_name_r.replace(
-                                parenthesisRegexp,
-                                '',
-                              )}`,
-                          )
-                          .join('/')})`,
+                      : joinedNameR,
                     nameZh: r.type_name_zh,
                     nameKo: r.type_name_ko,
                     color: r.color,
