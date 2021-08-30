@@ -6,8 +6,7 @@ import { LineRepository } from 'src/line/line.repository';
 import { MysqlService } from 'src/mysql/mysql.service';
 import { TrainTypeRepository } from 'src/trainType/trainType.repository';
 import { StationRaw } from './models/StationRaw';
-import { curry, uniqBy } from 'lodash';
-import { TrainTypeWithLineRaw } from 'src/trainType/models/TrainTypeRaw';
+import { uniqBy } from 'lodash';
 
 @Injectable()
 export class StationRepository {
@@ -125,13 +124,6 @@ export class StationRepository {
                       );
                     },
                   );
-
-                  // const types = (() => {
-                  //   if (duplicatedCompanies.length) {
-                  //     return [...notDuplicatedTypes, ...duplicatedTrainTypes];
-                  //   }
-                  //   return notDuplicatedTypes;
-                  // })();
 
                   const joinedName = (() => {
                     if (duplicatedCompanies.length) {
