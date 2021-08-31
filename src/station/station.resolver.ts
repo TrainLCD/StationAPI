@@ -26,6 +26,15 @@ export class StationResolver {
   }
 
   @Query((returns) => Station)
+  async nearbyStations(
+    @Args('latitude') latitude: number,
+    @Args('longitude') longitude: number,
+    @Args('limit') limit = 1,
+  ): Promise<Station[]> {
+    return this.stationService.getByCoords(latitude, longitude, limit);
+  }
+
+  @Query((returns) => Station)
   async stationsByLineId(@Args('lineId') lineId: number): Promise<Station[]> {
     return this.stationService.getByLineId(lineId);
   }
