@@ -30,6 +30,9 @@ export class StationService {
     );
   }
 
+  /**
+   * @deprecated New API is using `getByCoords` instead.
+   */
   async findOneByCoords(latitude: number, longitude: number): Promise<Station> {
     const station = await this.stationRepo.findOneByCoords(latitude, longitude);
 
@@ -37,6 +40,28 @@ export class StationService {
       station,
       await this.lineRepo.findOneCompany(station?.line_cd),
       await this.stationRepo.findTrainTypesById(station?.station_cd),
+    );
+  }
+
+  async getByCoords(
+    latitude: number,
+    longitude: number,
+    limit?: number,
+  ): Promise<Station[]> {
+    const stations = await this.stationRepo.getByCoords(
+      latitude,
+      longitude,
+      limit,
+    );
+
+    return Promise.all(
+      stations.map(async (s) =>
+        this.rawService.convertStation(
+          s,
+          await this.lineRepo.findOneCompany(s.line_cd),
+          await this.stationRepo.findTrainTypesById(s.station_cd),
+        ),
+      ),
     );
   }
 

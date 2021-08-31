@@ -284,6 +284,9 @@ export class StationRepository {
     });
   }
 
+  /**
+   * @deprecated Use `getByCoords` instead.
+   */
   async findOneByCoords(
     latitude: number,
     longitude: number,
@@ -326,6 +329,67 @@ export class StationRepository {
             ...(results[0] as StationRaw),
             lines,
           });
+        },
+      );
+    });
+  }
+
+  async getByCoords(
+    latitude: number,
+    longitude: number,
+    limit?: number,
+  ): Promise<StationRaw[]> {
+    const { connection } = this.mysqlService;
+
+    // if (limit > 10) {
+    //   throw new Error('Invalid limit');
+    // }
+
+    return new Promise<StationRaw[]>((resolve, reject) => {
+      connection.query(
+        `
+        SELECT *,
+        (
+          6371 * acos(
+          cos(radians(?))
+          * cos(radians(lat))
+          * cos(radians(lon) - radians(?))
+          + sin(radians(?))
+          * sin(radians(lat))
+          )
+        ) AS distance
+        FROM
+        stations as s1
+        WHERE
+        e_status = 0
+        AND
+        station_cd = (
+          SELECT station_cd 
+          FROM stations as s2
+          WHERE s1.station_g_cd = s2.station_g_cd
+          LIMIT 1
+        )
+        ORDER BY
+        distance
+        LIMIT ?
+        `,
+        [latitude, longitude, latitude, limit],
+        async (err, results: RowDataPacket[]) => {
+          if (err) {
+            return reject(err);
+          }
+          if (!results.length) {
+            return resolve(null);
+          }
+
+          return resolve(
+            Promise.all(
+              results.map(async (r) => ({
+                ...(r as StationRaw),
+                lines: await this.lineRepo.getByGroupId(r.station_g_cd),
+              })),
+            ),
+          );
         },
       );
     });
