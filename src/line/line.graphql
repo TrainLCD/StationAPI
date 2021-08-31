@@ -27,6 +27,7 @@ type Company {
   nameK: String
   nameH: String
   nameR: String
+  nameEn: String
   url: String
   companyType: Int
 }

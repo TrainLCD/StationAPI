@@ -51,6 +51,7 @@ export class Company {
     nameK?: string;
     nameH?: string;
     nameR?: string;
+    nameEn?: string;
     url?: string;
     companyType?: number;
 }
