@@ -115,8 +115,6 @@ export class StationRepository {
                       return acc;
                     }, []);
 
-                  console.log(duplicatedTrainTypes);
-
                   const duplicatedCompanies = duplicatedTrainTypes.length
                     ? await Promise.all(
                         duplicatedTrainTypes.map(
@@ -125,8 +123,6 @@ export class StationRepository {
                         ),
                       )
                     : [];
-
-                  console.log(duplicatedCompanies);
 
                   const notDuplicatedTypes = filteredAllTrainTypes.filter(
                     (tt) => {
