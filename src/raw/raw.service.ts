@@ -62,6 +62,7 @@ export class RawService {
         nameK: companyRaw.company_name_k,
         nameH: companyRaw.company_name_h,
         nameR: companyRaw.company_name_r,
+        nameEn: companyRaw.company_name_en,
         url: companyRaw.company_url,
         companyType: companyRaw.company_type,
       },
