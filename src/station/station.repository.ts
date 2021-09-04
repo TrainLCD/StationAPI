@@ -232,7 +232,7 @@ export class StationRepository {
                         name: tt.line_name,
                         nameH: tt.line_name_h,
                         nameK: tt.line_name_k,
-                        nameR: tt.type_name_r,
+                        nameR: tt.line_name_r,
                         nameZh: tt.line_name_zh,
                         nameKo: tt.line_name_ko,
                         lineType: tt.line_type,
