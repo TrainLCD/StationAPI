@@ -98,94 +98,18 @@ export class StationRepository {
                     (tt) => tt.line_cd !== r.line_cd,
                   );
 
-                  const duplicatedTrainTypes = filteredAllTrainTypes
-                    .filter(
-                      (tt, i, arr) =>
-                        arr.findIndex(
-                          (item) => item.company_cd === tt.company_cd,
-                        ) !== i,
-                    )
-                    .reduce((acc, cur) => {
-                      if (
-                        !acc.length ||
-                        acc.some((tt) => tt.company_cd !== cur.company_cd)
-                      ) {
-                        acc.push(cur);
-                      }
-                      return acc;
-                    }, []);
-
-                  const duplicatedCompanies = duplicatedTrainTypes.length
-                    ? await Promise.all(
-                        duplicatedTrainTypes.map(
-                          async (tt) =>
-                            await this.lineRepo.findOneCompany(tt.line_cd),
-                        ),
-                      )
-                    : [];
-
-                  const notDuplicatedTypes = filteredAllTrainTypes.filter(
-                    (tt) => {
-                      if (!duplicatedCompanies.length) {
-                        return tt;
-                      }
-                      return duplicatedCompanies.find(
-                        (dc) => dc.company_cd !== tt.company_cd,
-                      );
-                    },
-                  );
-
                   const joinedName = (() => {
-                    if (duplicatedCompanies.length) {
-                      return `${r.type_name}(${notDuplicatedTypes
-                        .map(
-                          (tt) =>
-                            `${tt.line_name.replace(
-                              parenthesisRegexp,
-                              '',
-                            )}内${tt.type_name.replace(parenthesisRegexp, '')}`,
-                        )
-                        .join('/')}${
-                        notDuplicatedTypes.length ? '/' : ''
-                      }${duplicatedCompanies
-                        .map(
-                          (dc, i) =>
-                            `${dc.company_name_r}線内${duplicatedTrainTypes[i].type_name}`,
-                        )
-                        .join('/')})`;
-                    }
                     return `${r.type_name}(${filteredAllTrainTypes
                       .map(
                         (tt) =>
                           `${tt.line_name.replace(
                             parenthesisRegexp,
                             '',
-                          )}内${tt.type_name.replace(parenthesisRegexp, '')}`,
+                          )}${tt.type_name.replace(parenthesisRegexp, '')}`,
                       )
                       .join('/')})`;
                   })();
                   const joinedNameR = (() => {
-                    if (duplicatedCompanies.length) {
-                      return `${r.type_name_r}(${notDuplicatedTypes
-                        .map(
-                          (tt) =>
-                            `${tt.line_name_r.replace(
-                              parenthesisRegexp,
-                              '',
-                            )} ${tt.type_name_r.replace(
-                              parenthesisRegexp,
-                              '',
-                            )}`,
-                        )
-                        .join('/')}${
-                        notDuplicatedTypes.length ? '/' : ''
-                      }${duplicatedCompanies
-                        .map(
-                          (dc, i) =>
-                            `${dc.company_name_en} Line ${duplicatedTrainTypes[i].type_name_r}`,
-                        )
-                        .join('/')})`;
-                    }
                     return `${r.type_name_r}(${filteredAllTrainTypes
                       .map(
                         (tt) =>
