@@ -23,6 +23,8 @@ export abstract class IQuery {
 
     abstract allStations(): StationOnly[] | Promise<StationOnly[]>;
 
+    abstract random(): Station | Promise<Station>;
+
     abstract trainType(id: string, excludePass?: boolean): TrainType | Promise<TrainType>;
 }
 
