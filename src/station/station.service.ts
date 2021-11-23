@@ -118,4 +118,13 @@ export class StationService {
       ),
     );
   }
+
+  async getRandomStation(): Promise<Station> {
+    const station = await this.stationRepo.getRandomly();
+    return this.rawService.convertStation(
+      station,
+      await this.lineRepo.findOneCompany(station?.line_cd),
+      await this.stationRepo.findTrainTypesById(station?.station_cd),
+    );
+  }
 }

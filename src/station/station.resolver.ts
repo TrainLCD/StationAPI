@@ -48,4 +48,9 @@ export class StationResolver {
   async allStations(): Promise<StationOnly[]> {
     return this.stationService.getAllStations();
   }
+
+  @Query((returns) => Station)
+  async random(): Promise<Station> {
+    return this.stationService.getRandomStation();
+  }
 }
