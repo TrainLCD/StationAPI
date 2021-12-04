@@ -20,6 +20,7 @@ export class RawService {
       distance: raw.distance,
       latitude: raw.lat,
       longitude: raw.lon,
+      currentLine: this.convertLine(raw.currentLine, companyRaw),
       lines: raw.lines?.map((l) => this.convertLine(l, companyRaw)),
       openYmd: raw.open_ymd,
       postalCode: raw.post,
@@ -77,7 +78,6 @@ export class RawService {
     if (!raw) {
       return;
     }
-
     return {
       id: raw.type_cd,
       groupId: raw.line_group_cd,

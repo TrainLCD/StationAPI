@@ -66,7 +66,10 @@ export class TrainTypeRepository {
               results.map(
                 async (r): Promise<StationRaw> => ({
                   ...(r as StationRaw),
-                  lines: await this.lineRepo.getByStationId(r.station_cd),
+                  currentLine: await this.lineRepo.findOneStationId(
+                    r.station_cd,
+                  ),
+                  lines: await this.lineRepo.getByGroupId(r.station_g_cd),
                 }),
               ),
             ),

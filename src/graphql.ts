@@ -65,6 +65,7 @@ export class Station {
     latitude?: number;
     longitude?: number;
     lines?: Line[];
+    currentLine?: Line;
     openYmd?: string;
     postalCode?: string;
     prefId?: number;

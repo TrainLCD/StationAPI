@@ -20,5 +20,6 @@ export class StationRaw {
   e_sort: number;
   distance?: number;
   lines: LineRaw[];
+  currentLine: LineRaw;
   pass?: boolean;
 }
