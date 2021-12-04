@@ -84,4 +84,33 @@ export class LineRepository {
       );
     });
   }
+
+  async getByStationId(stationId: number): Promise<LineRaw[]> {
+    const { connection } = this.mysqlService;
+    if (!connection) {
+      return [];
+    }
+
+    return new Promise<LineRaw[]>((resolve, reject) => {
+      connection.query(
+        `SELECT *
+        FROM \`lines\`
+        WHERE line_cd
+        IN (SELECT line_cd FROM stations WHERE station_cd = ?)
+        AND NOT line_cd = ${NEX_ID}
+        AND e_status = 0`,
+        [stationId],
+        (err, results: RowDataPacket[]) => {
+          if (err) {
+            return reject(err);
+          }
+          if (!results.length) {
+            return resolve([]);
+          }
+
+          return resolve(results as LineRaw[]);
+        },
+      );
+    });
+  }
 }
