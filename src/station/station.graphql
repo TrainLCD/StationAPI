@@ -17,6 +17,7 @@ type Station {
   latitude: Float
   longitude: Float
   lines: [Line]
+  currentLine: Line
   openYmd: String
   postalCode: String
   prefId: Int
