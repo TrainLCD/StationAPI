@@ -1,4 +1,4 @@
-import { Args, Resolver, Query } from '@nestjs/graphql';
+import { Args, Query, Resolver } from '@nestjs/graphql';
 import { TrainType } from 'src/graphql';
 import { TrainTypeService } from './trainType.service';
 
