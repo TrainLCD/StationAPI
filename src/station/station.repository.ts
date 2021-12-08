@@ -64,6 +64,7 @@ export class StationRepository {
             t.type_name_zh,
             t.type_name_ko,
             t.color,
+            t.direction,
             l.line_cd
           FROM station_station_types as sst,
             types as t,
@@ -166,6 +167,7 @@ export class StationRepository {
                     lines: await this.trainTypeRepo.getBelongingLines(
                       r.line_group_cd,
                     ),
+                    direction: r.direction,
                   };
                 },
               ),

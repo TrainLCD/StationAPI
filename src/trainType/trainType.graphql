@@ -15,6 +15,12 @@ type TrainTypeMinimum {
   line: Line
 }
 
+enum TrainDirection {
+  BOTH
+  INBOUND
+  OUTBOUND
+}
+
 type TrainType {
   id: Int
   typeId: Int
@@ -28,4 +34,5 @@ type TrainType {
   stations: [Station]
   lines: [Line]
   allTrainTypes: [TrainTypeMinimum]
+  direction: TrainDirection
 }

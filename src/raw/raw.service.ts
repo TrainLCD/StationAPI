@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { Line, Station, TrainType } from 'src/graphql';
+import {
+  Line,
+  PassCondition,
+  Station,
+  TrainDirection,
+  TrainType,
+} from 'src/graphql';
 import { CompanyRaw, LineRaw } from 'src/line/models/LineRaw';
 import { StationRaw } from 'src/station/models/StationRaw';
 import { TrainTypeRaw } from 'src/trainType/models/TrainTypeRaw';
@@ -14,6 +20,24 @@ export class RawService {
     if (!raw) {
       return;
     }
+
+    const enumPassCondition = (() => {
+      switch (raw.pass) {
+        case 0:
+          return PassCondition.STOP;
+        case 1:
+          return PassCondition.PASS;
+        case 2:
+          return PassCondition.PARTIAL;
+        case 3:
+          return PassCondition.WEEKDAY;
+        case 4:
+          return PassCondition.HOLIDAY;
+        default:
+          return PassCondition.STOP;
+      }
+    })() as PassCondition;
+
     return {
       id: raw.station_cd,
       address: raw.address,
@@ -31,7 +55,8 @@ export class RawService {
       nameR: raw.station_name_r,
       nameZh: raw.station_name_zh,
       nameKo: raw.station_name_ko,
-      pass: raw.pass,
+      pass: raw.pass === 1 ? true : false,
+      passCondition: enumPassCondition,
       trainTypes: trainTypes,
     };
   }
@@ -78,6 +103,20 @@ export class RawService {
     if (!raw) {
       return;
     }
+
+    const enumDirection = (() => {
+      switch (raw.direction) {
+        case 0:
+          return TrainDirection.BOTH;
+        case 1:
+          return TrainDirection.INBOUND;
+        case 2:
+          return TrainDirection.OUTBOUND;
+        default:
+          return TrainDirection.BOTH;
+      }
+    })() as TrainDirection;
+
     return {
       id: raw.type_cd,
       groupId: raw.line_group_cd,
@@ -87,6 +126,7 @@ export class RawService {
       nameZh: raw.type_name_zh,
       nameKo: raw.type_name_ko,
       color: raw.color,
+      direction: enumDirection,
       stations,
       lines,
     };

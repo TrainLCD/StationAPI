@@ -6,6 +6,20 @@
 
 /* tslint:disable */
 /* eslint-disable */
+export enum PassCondition {
+    STOP = "STOP",
+    PASS = "PASS",
+    PARTIAL = "PARTIAL",
+    WEEKDAY = "WEEKDAY",
+    HOLIDAY = "HOLIDAY"
+}
+
+export enum TrainDirection {
+    BOTH = "BOTH",
+    INBOUND = "INBOUND",
+    OUTBOUND = "OUTBOUND"
+}
+
 export abstract class IQuery {
     abstract line(id: string): Line | Promise<Line>;
 
@@ -77,6 +91,7 @@ export class Station {
     nameKo?: string;
     trainTypes?: TrainType[];
     pass?: boolean;
+    passCondition?: PassCondition;
 }
 
 export class StationOnly {
@@ -122,4 +137,5 @@ export class TrainType {
     stations?: Station[];
     lines?: Line[];
     allTrainTypes?: TrainTypeMinimum[];
+    direction?: TrainDirection;
 }

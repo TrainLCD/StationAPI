@@ -10,6 +10,14 @@ type Query {
   random: Station
 }
 
+enum PassCondition {
+  STOP
+  PASS
+  PARTIAL
+  WEEKDAY
+  HOLIDAY
+}
+
 type Station {
   id: Int
   address: String
@@ -29,6 +37,7 @@ type Station {
   nameKo: String
   trainTypes: [TrainType]
   pass: Boolean
+  passCondition: PassCondition
 }
 
 type StationOnly {
