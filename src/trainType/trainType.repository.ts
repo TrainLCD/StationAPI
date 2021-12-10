@@ -45,14 +45,15 @@ export class TrainTypeRepository {
 
     return new Promise<StationRaw[]>((resolve, reject) => {
       connection.query(
-        `SELECT *
-        FROM station_station_types as sst, stations as s
-        WHERE sst.line_group_cd = ?
+        `
+          SELECT *
+          FROM station_station_types as sst, stations as s
+          WHERE sst.line_group_cd = ?
           ${excludePass ? 'AND sst.pass = 0' : ''}
           AND s.station_cd = sst.station_cd
           AND s.e_status = 0
           ORDER BY sst.id
-          `,
+        `,
         [lineGroupId],
         async (err, results: RowDataPacket[]) => {
           if (err) {
