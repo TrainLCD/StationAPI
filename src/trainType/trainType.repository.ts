@@ -49,7 +49,7 @@ export class TrainTypeRepository {
           SELECT *
           FROM station_station_types as sst, stations as s
           WHERE sst.line_group_cd = ?
-          ${excludePass ? 'AND sst.pass = 0' : ''}
+          ${excludePass ? 'AND sst.pass IN (0, 2, 3, 4)' : ''}
           AND s.station_cd = sst.station_cd
           AND s.e_status = 0
           ORDER BY sst.id
