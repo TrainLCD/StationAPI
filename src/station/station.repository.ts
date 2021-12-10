@@ -74,7 +74,7 @@ export class StationRepository {
             AND sst.type_cd = t.type_cd
             AND sst.station_cd = s.station_cd
             AND l.line_cd = s.line_cd
-            AND sst.pass = 0
+            AND sst.pass IN (0, 2, 3, 4)
         `,
         [id],
         async (err, results: RowDataPacket[]) => {
