@@ -12,6 +12,7 @@ export class TrainTypeRaw {
   line_group_cd: number;
   color: string;
   lines: LineRaw[];
+  direction: number;
 }
 
 export class TrainTypeWithLineRaw {

@@ -21,5 +21,6 @@ export class StationRaw {
   distance?: number;
   lines: LineRaw[];
   currentLine: LineRaw;
-  pass?: boolean;
+  pass?: number;
+  direction: number;
 }
