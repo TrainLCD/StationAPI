@@ -6,9 +6,9 @@
 
 /* tslint:disable */
 /* eslint-disable */
-export enum PassCondition {
-    STOP = "STOP",
-    PASS = "PASS",
+export enum StopCondition {
+    ALL = "ALL",
+    NOT = "NOT",
     PARTIAL = "PARTIAL",
     WEEKDAY = "WEEKDAY",
     HOLIDAY = "HOLIDAY"
@@ -91,7 +91,7 @@ export class Station {
     nameKo?: string;
     trainTypes?: TrainType[];
     pass?: boolean;
-    passCondition?: PassCondition;
+    stopCondition?: StopCondition;
 }
 
 export class StationOnly {

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import {
   Line,
-  PassCondition,
   Station,
+  StopCondition,
   TrainDirection,
   TrainType,
 } from 'src/graphql';
@@ -21,22 +21,22 @@ export class RawService {
       return;
     }
 
-    const enumPassCondition = (() => {
+    const enumStopCondition = (() => {
       switch (raw.pass) {
         case 0:
-          return PassCondition.STOP;
+          return StopCondition.ALL;
         case 1:
-          return PassCondition.PASS;
+          return StopCondition.NOT;
         case 2:
-          return PassCondition.PARTIAL;
+          return StopCondition.PARTIAL;
         case 3:
-          return PassCondition.WEEKDAY;
+          return StopCondition.WEEKDAY;
         case 4:
-          return PassCondition.HOLIDAY;
+          return StopCondition.HOLIDAY;
         default:
-          return PassCondition.STOP;
+          return StopCondition.ALL;
       }
-    })() as PassCondition;
+    })() as StopCondition;
 
     return {
       id: raw.station_cd,
@@ -56,7 +56,7 @@ export class RawService {
       nameZh: raw.station_name_zh,
       nameKo: raw.station_name_ko,
       pass: raw.pass === 1 ? true : false,
-      passCondition: enumPassCondition,
+      stopCondition: enumStopCondition,
       trainTypes: trainTypes,
     };
   }
