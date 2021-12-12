@@ -64,12 +64,12 @@ CREATE TABLE `lines` (
   `line_name_r` varchar(52) NOT NULL,
   `line_color_c` varchar(9) DEFAULT NULL,
   `line_color_t` varchar(10) NOT NULL,
-  `line_type` int NOT NULL,
-  `lon` decimal(18,14) NOT NULL,
-  `lat` decimal(18,15) NOT NULL,
-  `zoom` int NOT NULL,
-  `e_status` int NOT NULL,
-  `e_sort` int NOT NULL,
+  `line_type` int unsigned NOT NULL,
+  `lon` decimal(18,14) unsigned NOT NULL,
+  `lat` decimal(18,15) unsigned NOT NULL,
+  `zoom` int unsigned NOT NULL,
+  `e_status` int unsigned NOT NULL,
+  `e_sort` int unsigned NOT NULL,
   PRIMARY KEY (`line_cd`),
   KEY `company_cd` (`company_cd`),
   CONSTRAINT `lines_ibfk_1` FOREIGN KEY (`company_cd`) REFERENCES `companies` (`company_cd`)
@@ -103,8 +103,8 @@ CREATE TABLE `station_station_types` (
   KEY `type_cd` (`type_cd`),
   KEY `id` (`id`),
   KEY `station_cd` (`station_cd`),
-  CONSTRAINT `station_station_types_ibfk_2` FOREIGN KEY (`type_cd`) REFERENCES `types` (`type_cd`),
-  CONSTRAINT `station_station_types_ibfk_3` FOREIGN KEY (`station_cd`) REFERENCES `stations` (`station_cd`)
+  CONSTRAINT `station_station_types_ibfk_1` FOREIGN KEY (`station_cd`) REFERENCES `stations` (`station_cd`),
+  CONSTRAINT `station_station_types_ibfk_2` FOREIGN KEY (`type_cd`) REFERENCES `types` (`type_cd`)
 ) ENGINE=InnoDB AUTO_INCREMENT=9401 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -137,8 +137,8 @@ CREATE TABLE `stations` (
   `pref_cd` int unsigned NOT NULL,
   `post` varchar(8) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `address` varchar(26) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `lon` decimal(11,7) NOT NULL,
-  `lat` decimal(11,8) NOT NULL,
+  `lon` decimal(11,7) unsigned NOT NULL,
+  `lat` decimal(11,8) unsigned NOT NULL,
   `open_ymd` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `close_ymd` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `e_status` int unsigned NOT NULL,
@@ -178,7 +178,7 @@ CREATE TABLE `types` (
   `type_name_zh` varchar(19) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
   `type_name_ko` varchar(25) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
   `color` varchar(7) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
-  `direction` int NOT NULL DEFAULT '0',
+  `direction` int unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`type_cd`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1001 DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -202,4 +202,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2021-12-12 17:07:16
+-- Dump completed on 2021-12-12 20:58:57
