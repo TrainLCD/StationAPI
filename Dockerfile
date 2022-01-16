@@ -1,6 +1,6 @@
-FROM node:14.15.1-alpine
+FROM node:16.13.2-alpine
 
-RUN apk add alpine-sdk python mysql-client
+RUN apk add alpine-sdk python3 mysql-client
 
 RUN mkdir /app
 WORKDIR /app
