@@ -5,6 +5,7 @@ import { NEX_ID } from 'src/constants/ignore';
 import { TrainType } from 'src/graphql';
 import { LineRepository } from 'src/line/line.repository';
 import { MysqlService } from 'src/mysql/mysql.service';
+import { TrainTypeWithLineRaw } from 'src/trainType/models/TrainTypeRaw';
 import { TrainTypeRepository } from 'src/trainType/trainType.repository';
 import { StationRaw } from './models/StationRaw';
 
@@ -87,40 +88,96 @@ export class StationRepository {
 
           const parenthesisRegexp = /\([^()]*\)/g;
 
+          const getReplacedTrainTypeName = async (
+            r: RowDataPacket,
+          ): Promise<{
+            typesName: string;
+            typesNameR: string;
+            filteredAllTrainTypes: TrainTypeWithLineRaw[];
+            allTrainTypes: TrainTypeWithLineRaw[];
+          }> => {
+            const allTrainTypes = await this.trainTypeRepo.getAllLinesTrainTypes(
+              r.line_group_cd,
+            );
+
+            const filteredAllTrainTypes = allTrainTypes.filter(
+              (tt) => tt.line_cd !== r.line_cd,
+            );
+
+            // 上り下り共用種別
+            if (r.direction == 0) {
+              const typesName = (() => {
+                return `${r.type_name}(${filteredAllTrainTypes
+                  .map(
+                    (tt) =>
+                      `${tt.line_name.replace(
+                        parenthesisRegexp,
+                        '',
+                      )}${tt.type_name.replace(parenthesisRegexp, '')}`,
+                  )
+                  .join('/')})`;
+              })();
+              const typesNameR = (() => {
+                return `${r.type_name_r}(${filteredAllTrainTypes
+                  .map(
+                    (tt) =>
+                      `${tt.line_name_r.replace(
+                        parenthesisRegexp,
+                        '',
+                      )} ${tt.type_name_r.replace(parenthesisRegexp, '')}`,
+                  )
+                  .join('/')})`;
+              })();
+
+              return {
+                typesName,
+                typesNameR,
+                filteredAllTrainTypes,
+                allTrainTypes,
+              };
+            }
+
+            const typesName = (() => {
+              switch (r.direction) {
+                case 1:
+                  return `${r.type_name}(上り)`;
+                case 2:
+                  return `${r.type_name}(下り)`;
+                default:
+                  return r.type_name;
+              }
+            })();
+
+            const typesNameR = (() => {
+              switch (r.direction) {
+                case 1:
+                  return `${r.type_name_r}(Inbound)`;
+                case 2:
+                  return `${r.type_name_r}(Outbound)`;
+
+                default:
+                  return r.type_name_r;
+              }
+            })();
+
+            return {
+              typesName,
+              typesNameR,
+              filteredAllTrainTypes,
+              allTrainTypes,
+            };
+          };
+
           return resolve(
             Promise.all(
               results.map(
                 async (r): Promise<TrainType> => {
-                  const allTrainTypes = await this.trainTypeRepo.getAllLinesTrainTypes(
-                    r.line_group_cd,
-                  );
-
-                  const filteredAllTrainTypes = allTrainTypes.filter(
-                    (tt) => tt.line_cd !== r.line_cd,
-                  );
-
-                  const joinedName = (() => {
-                    return `${r.type_name}(${filteredAllTrainTypes
-                      .map(
-                        (tt) =>
-                          `${tt.line_name.replace(
-                            parenthesisRegexp,
-                            '',
-                          )}${tt.type_name.replace(parenthesisRegexp, '')}`,
-                      )
-                      .join('/')})`;
-                  })();
-                  const joinedNameR = (() => {
-                    return `${r.type_name_r}(${filteredAllTrainTypes
-                      .map(
-                        (tt) =>
-                          `${tt.line_name_r.replace(
-                            parenthesisRegexp,
-                            '',
-                          )} ${tt.type_name_r.replace(parenthesisRegexp, '')}`,
-                      )
-                      .join('/')})`;
-                  })();
+                  const {
+                    typesName,
+                    typesNameR,
+                    filteredAllTrainTypes,
+                    allTrainTypes,
+                  } = await getReplacedTrainTypeName(r);
 
                   return {
                     // キャッシュが重複しないようにするため。もっとうまい方法あると思う
@@ -129,11 +186,11 @@ export class StationRepository {
                     groupId: r.line_group_cd,
                     name: !filteredAllTrainTypes.length
                       ? r.type_name
-                      : joinedName,
+                      : typesName,
                     nameK: r.type_name_k,
                     nameR: !filteredAllTrainTypes.length
                       ? r.type_name_r
-                      : joinedNameR,
+                      : typesNameR,
                     nameZh: r.type_name_zh,
                     nameKo: r.type_name_ko,
                     color: r.color,
