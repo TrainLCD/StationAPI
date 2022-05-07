@@ -31,7 +31,7 @@ CREATE TABLE `companies` (
   `company_name_r` varchar(11) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
   `company_name_en` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT '',
   `company_url` varchar(47) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
-  `company_type` varchar(1) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
+  `company_type` int NOT NULL,
   `e_status` int unsigned NOT NULL,
   `e_sort` int unsigned NOT NULL,
   PRIMARY KEY (`company_cd`)
@@ -57,12 +57,14 @@ DROP TABLE IF EXISTS `lines`;
 CREATE TABLE `lines` (
   `line_cd` int unsigned NOT NULL,
   `company_cd` int unsigned NOT NULL,
-  `line_name` varchar(19) NOT NULL,
-  `line_name_k` varchar(21) NOT NULL,
-  `line_name_h` varchar(19) NOT NULL,
-  `line_name_r` varchar(52) NOT NULL,
-  `line_color_c` varchar(9) DEFAULT NULL,
-  `line_color_t` varchar(10) NOT NULL,
+  `line_name` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `line_name_k` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `line_name_h` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `line_name_r` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `line_name_zh` text CHARACTER SET utf8 COLLATE utf8_general_ci,
+  `line_name_ko` text CHARACTER SET utf8 COLLATE utf8_general_ci,
+  `line_color_c` text CHARACTER SET utf8 COLLATE utf8_general_ci,
+  `line_color_t` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
   `line_type` int unsigned NOT NULL,
   `lon` decimal(18,14) unsigned NOT NULL,
   `lat` decimal(18,15) unsigned NOT NULL,
@@ -195,4 +197,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-05-06 19:12:08
+-- Dump completed on 2022-05-07 14:39:49
