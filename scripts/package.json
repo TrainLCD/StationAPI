@@ -3,9 +3,6 @@
   "version": "1.0.0",
   "description": "",
   "main": "sqlgen.js",
-  "scripts": {
-    "gen": "node sqlgen.js"
-  },
   "keywords": [],
   "author": "",
   "license": "MIT",

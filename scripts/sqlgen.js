@@ -35,9 +35,6 @@ fs.readdir('./migrations', (err, files) => {
               if (csvData[index][0][idx]?.startsWith('#')) {
                 return null;
               }
-              if (/^([0-9]*[.])?[0-9]+$/.test(col)) {
-                return col;
-              }
               return `'${col.replace(`'`, `\\'`)}'`;
             })
             .filter((col) => col !== null);
