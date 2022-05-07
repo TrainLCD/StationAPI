@@ -16,7 +16,7 @@ fs.readdir('./migrations', (err, files) => {
     }
     const index = parseInt(fileName.split('!')[0], 10) - 1;
 
-    fs.createReadStream(path.join(__dirname, './migrations/', fileName))
+    fs.createReadStream(path.join(__dirname, '../migrations/', fileName))
       .pipe(parse())
       .on('data', (csvrow) => {
         if (!csvData[index]) {
