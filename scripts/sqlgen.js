@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { parse } = require('csv-parse');
 
-fs.readdir('./migrations', (err, files) => {
+fs.readdir('../migrations', (err, files) => {
   if (err) throw err;
   const fileList = files
     .filter((file) => /.*\.csv$/.test(file))
