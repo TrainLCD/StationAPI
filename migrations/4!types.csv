@@ -1,0 +1,152 @@
+type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direction,#メモ,#着手済
+1,のぞみ,ノゾミ,Nozomi,希望,노조미,#FFD400,0,,OK
+2,ひかり,ヒカリ,Hikari,光,히카리,#FF0000,0,,OK
+3,こだま,コダマ,Kodama,回声,고다마,#3050FF,0,,OK
+4,みずほ,ミズホ,Mizuho,瑞穗,미즈호,#FFA500,0,,OK
+5,さくら,サクラ,Sakura,樱,사쿠라,#FF69B4,0,,OK
+6,つばめ,ツバメ,Tsubame,燕,쓰바메,#40E0D0,0,,OK
+7,はやぶさ,ハヤブサ,Hayabusa,隼,하야부사,#008000,0,,OK
+8,はやて,ハヤテ,Hayate,疾风,하야테,#008000,0,,OK
+9,やまびこ,ヤマビコ,Yamabiko,山彦,야마비코,#008001,0,,OK
+10,なすの,ナスノ,Nasuno,那须野,나스노,#008002,0,,OK
+11,こまち,コマチ,Komachi,小町,고마치,#FF0080,0,,OK
+12,つばさ,ツバサ,Tsubasa,翼,쓰바사,#FF8000,0,,OK
+13,とき,トキ,Toki,朱鹭,도키,#008000,0,,OK
+14,たにがわ,タニガワ,Tanigawa,谷川,다니가와,#0000FF,0,,OK
+15,かがやき,カガヤキ,Kagayaki,光辉,가가야키,#FFD400,0,,OK
+16,はくたか,ハクタカ,Hakutaka,白鹰,하쿠타카,#FF0000,0,,OK
+17,あさま,アサマ,Asama,浅间,아사마,#0000FF,0,,OK
+18,つるぎ,ツルギ,Tsurugi,剑,쓰루기,#3050FF,0,,OK
+100,普通,フツウ,Local,慢车,보통,#1f63c6,0,,PARTIAL
+101,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1f63c7,0,,PARTIAL
+102,快速,カイソク,Rapid,快车,쾌속,#dc143c,0,,PARTIAL
+103,特別快速,トクベツカイソク,Special Rapid,特别快车,특별쾌속,#dc143c,0,,OK
+104,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#dc143c,0,,OK
+105,快速(赤),カイソク(アカ),Rapid(Red),快车（红色）,쾌속 (빨간색),#ff0000,0,,YET
+106,快速(緑),カイソク(ミドリ),Rapid(Green),快车（绿色）,쾌속 (녹색),#00ff00,0,,YET
+107,ホームライナー,ホームライナー,Home Liner,家用班轮,홈 라이너,#dc143c,0,,YET
+108,区間快速,クカンカイソク,Regional Rapid,区域快车,구간쾌속,#dc143c,0,,YET
+109,快速みえ,カイソクミエ,Rapid Mie,快速三重,쾌속미에,#dc143c,0,,OK
+110,新快速,シンカイソク,Special Rapid,新快速,새쾌속,#0071be,0,,OK
+111,直通快速,チョクツウカイソク,Direct Rapid,直接快速,직통쾌속,#f5a200,0,,OK
+112,B快速,Bカイソク,B Rapid,B快速,B쾌속,#0071be,0,,OK
+113,"ホリデー快速
+おくたま号",ホリデーカイソオクタマ,Okutama Holiday Rapid,"假期快速
+奧多摩号","홀리데이 쾌속
+오쿠타마호",#f15a22,0,,OK
+114,大和路快速,ヤマトジカイソク,Yamatoji Rapid,大和路快速,야마토지 쾌속,#02ad73,0,,OK
+115,丹波路快速,タンバジカイソク,Tambaji Rapid,坦巴路快速,단바로 쾌속,#fec210,0,,OK
+116,みやこ路快速,ミヤコジカイソク,Miyakoji Rapid,都路快速,미야코지 쾌속,#fec210,0,,OK
+117,関空快速,カンクウカイソク,Kansai Airport Rapid,关空快速,간쿠 쾌속,#007ac2,0,,OK
+118,紀州路快速,キシュウジカイソク,Kishūji Rapid,紀州路快速,기슈로 쾌속,#fd7e00,0,,OK
+119,青梅特快,オウメトッカイ,Ōme Special Rapid,青梅特快,오메특쾌,#F15A22,0,,OK
+120,中央特快,チュウオウトッカイ,Chūō Special Rapid,中央特快,중앙특쾌,#F15A23,0,,OK
+121,通勤特快,ツウキントッカイ,Commuter Special Rapid,通勤特快,통근특쾌,#F15A24,0,,OK
+122,サンライナー,サンライナー,Sun Liner,Sun Liner,산 라이너,#dc143c,0,,OK
+123,マリンライナー,マリンライナー,Marine Liner,Marine Liner,마린라이나,#dc143c,0,,YET
+124,快速ことぶき,カイソクコトブキ,Rapid Kotobuki,快速寿,쾌속 축수,#dc143c,0,,YET
+125,シティライナー,シティライナー,City Liner,City Liner,시티 라이너,#dc143c,0,,YET
+126,通勤ライナー,ツウキンライナー,Commuter Liner,通勤Liner,통근 라이너,#dc143c,0,,YET
+127,安芸路ライナー,アキジライナー,Akiji Liner,安藝路Liner,아키로 라이너,#dc143c,0,,YET
+128,みよしライナー,ミヨシライナー,Miyoshi Liner,三吉Liner,미요시 라이너,#dc143c,0,,YET
+129,とっとりライナー,トットリライナー,Tottori Liner,鳥取Liner,돗토리 라이너,#dc143c,0,,YET
+130,アクアライナー,アクアライナー,Aqua Liner,Aqua Liner,아쿠아 라이너,#dc143c,0,,YET
+131,快速(青),カイソク（アオ）,Rapid(Blue),快车（蓝色）,쾌속 (파랑),#0000ff,0,,YET
+132,南武支線,ナンブシセン,Nambu Branch Line,南埠支线,난부 지선,#FFD400,0,,OK
+133,空港支線,クウコウシセン,Airport Branch Line,机场支线,공항 지선,#00b261,0,,OK
+134,区間快速(加茂方面),クカンカイソク,Regional Rapid(for Kamo),区域快速(开往加茂),구간쾌속 (가모 방면),#02ad73,0,,OK
+135,区間快速(和歌山方面),クカンカイソク,Regional Rapid(for Wakayama),区域快速(开往和歌山),구간쾌속 (와카야마 방면),#f89c1c,0,,OK
+136,直通快速(和歌山方面),チョクツウカイソク,Direct Rapid(for Wakayama),直接快速(开往和歌山),직통쾌속 (와카야마 방면),#f89c1c,0,,OK
+137,直通快速(関西空港方面),チョクツウカイソク,Direct Rapid(for Kansai Airport),直接快速(开往关西机场),직통쾌속 (간사이 공항 방면),#007ac2,0,,OK
+138,新快速,シンカイソク,New Rapid,新快速,신쾌속,#ff4500,0,,OK
+139,辰野支線,タツノシセン,Tatsuno Branch Line,辰野支线,다쓰노 지선,#0074be,0,,OK
+140,我孫子支線,アビコシセン,Abiko Branch Line,我孫子支线,아비코 지선,#00B261,0,,OK
+141,利府支線,リフシセン,Rifu Branch Line,利府线,리후선,#3CB371,0,,OK
+142,長与支線,ナガヨシセン,Nagayo Branch Line,长与支线,나가요 경로,#faaf18,0,,OK
+143,支線,シセン,Branch Line,支線,경로,#00b2eb,0,,OK
+144,砂原線,サワラセン,Sawara Branch Line,砂原支线,사와라 지선,#0072bc,0,,OK
+145,支線,シセン,Branch Line,支線,경로,#2cb431,0,,OK
+146,シーサイドライナー,シーサイドライナー,Sea Side Liner,滨海快线,바다 사이드 라이너,#0095d9,0,,OK
+147,エアポート,エアポート,Airport,机场号,에어포트,#ff0080,0,,OK
+148,ニセコライナー,ニセコライナー,Niseko Liner,二世谷快车,니세코라이너,#0098e1,0,,OK
+149,美濃赤坂線,ミノアカサカセン,Mino-Akasaka Line,美浓赤坂线,미노아카사카 지선,#F68b1e,0,,OK
+150,本山支線,モトヤマシセン,Motoyama Branch Line,本山支线,모토야마 지선,#695faa,0,,YET
+151,"ホリデー快速
+あきがわ号",ホリデーカイソクアキガワゴウ,Akigawa Holiday Rapid,"假期快速
+秋川号","홀리데이 쾌속
+아키가와호",#f15a22,0,,OK
+152,普通,フツウ,Local,慢车,보통,#1f63c6,1,上り系統,PARTIAL
+153,普通,フツウ,Local,慢车,보통,#1f63c6,2,下り系統,PARTIAL
+200,踊り子(池袋〜伊豆急下田),オドリコ,Odoriko(Ikebukuro to Izukyū-shimoda),踊子(开往伊豆急下田),무희 (이즈 큐 시모다 방면),#035d67,0,,OK
+201,踊り子(東京〜伊豆急下田),オドリコ,Odoriko(Tokyo to Izukyū-shimoda),踊子(开往伊豆急下田),무희 (이즈 큐 시모다 방면),#035d67,0,,OK
+202,踊り子(池袋〜修善寺),オドリコ,Odoriko(Ikebukuro to Shuzenji),踊子(开往修善寺),무희 (슈 젠지 방면),#035d67,0,,OK
+203,踊り子(東京〜修善寺),オドリコ,Odoriko(Tokyo to Shuzenji),踊子(开往修善寺),무희 (슈 젠지 방면),#035d67,0,,OK
+204,ひたち,ヒタチ,Hitachi,常陆,히타치,#035d67,0,,OK
+205,ときわ,トキワ,Tokiwa,常轮,토키와,#035d67,0,,OK
+206,北斗,ホクト,Hokuto,北斗,북두,#0072bc,0,,OK
+207,すずらん,スズラン,Suzuran,铃兰,은방울꽃,#0072bc,0,,OK
+208,ソニック,ソニック,Sonic,索尼克,소닉,#0095d9,0,,OK
+209,かいじ,カイジ,Kaiji,甲斐路,가이지,#0074be,0,,OK
+210,あずさ,アズサ,Azusa,梓,아즈사,#0074be,0,,OK
+211,サンライズ瀬戸,サンライズセト,Sunrise Seto,日出濑户,선라이즈 세토,#aa8d01,0,,OK
+212,サンライズ出雲,サンライズイズモ,Sunrise Izumo,日出出云,선라이즈 이즈모,#aa8d01,0,,OK
+213,サロベツ,サロベツ,Sarobetsu,佐呂別,살로베츠,#2cb431,0,,OK
+214,ライラック,ライラック,Lilac,丁香,라일락,#2cb431,0,,OK
+215,カムイ,カムイ,Kamui,神威,카무이,#2cb431,0,,OK
+216,宗谷,ソウヤ,Sōya,宗谷,소야,#2cb432,1,上り,OK
+217,宗谷,ソウヤ,Sōya,宗谷,소야,#2cb432,2,下り,OK
+218,オホーツク,オホーツク,Okhotsk,鄂霍次克,오호츠크,#2cb431,0,,OK
+219,大雪,タイセツ,Taisetsu,大雪,타이세츠,#2cb431,0,,OK
+300,普通,フツウ,Local,慢车,慢车,#1f63c6,0,,PARTIAL
+301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1f63c7,0,,PARTIAL
+302,快速,カイソク,Rapid,快车,쾌속,#dc143c,0,,PARTIAL
+303,区間急行,クカンキュウコウ,Semi Express,区域特快,구간급행,#d8ca00,0,,PARTIAL
+304,急行,キュウコウ,Express,特快,급행,#dc143c,0,,PARTIAL
+306,特急,トッキュウ,Limited Express,特快,특급,#dc143c,0,,OK
+307,エアポート快特,エアポートカイトク,Airport Limited Express,机场特快,공항쾌특,#fa9715,0,,OK
+308,快特(泉岳寺〜三崎口),カイトク,Limited Express(Sengakuji to Misakiguchi),特快(开往三崎口),쾌특 (미사키 구치 방면),#379412,0,,OK
+309,快特(泉岳寺〜羽田空港),カイトク,Limited Express(Sengakuji to Haneda Airport),特快(开往羽田机场),쾌특 (하네다 공항 방면),#379412,0,,OK
+310,エアポート急行(泉岳寺〜羽田空港),エアポートキュウコウ,Airport Express(Haneda Airport to Sengakuji),机场特快(开往泉岳寺),공항급행 (센 가쿠 방면),#0d83c3,0,,OK
+311,エアポート急行(逗子・葉山〜羽田空港),エアポートキュウコウ,Airport Express(Haneda Airport to Zushi･Hayama),机场特快(开往逗子·叶山),공항급행 (즈시 하야마 방면),#0d83c3,0,,OK
+312,特急(泉岳寺〜三崎口),トッキュウ,Limited Express(Sengakuji to Misakiguchi),特快(开往三崎口),특급 (미사키 구치 방면),#ea0104,0,,OK
+313,特急(泉岳寺〜浦賀),トッキュウ,Limited Express(Sengakuji to Uraga),特快(开往浦贺),특급 (우라 방면),#ea0104,0,,PARTIAL
+314,通勤急行,ツウキンキュウコウ,Commuter Express,通勤快车,통근급행,#eeaa66,0,,PARTIAL
+315,準急,ジュンキュウ,Semi Express,准急,준급,#2eab8d,0,,PARTIAL
+316,S-TRAIN,エストレイン,S-TRAIN,S-TRAIN,S-TRAIN,#8EC21F,0,,PARTIAL
+317,通勤特急,ツウキントッキュウ,Commuter Express,通勤特快,통근특급,#dc143c,0,,PARTIAL
+318,区間準急,クカンジュンキュウ,Section Semi Express,区间准急,구간준급,#00ff00,0,,PARTIAL
+319,区間急行,クカンキュウコウ,Section Express,区间快速,구간급행,#ff99ff,0,,PARTIAL
+320,空港快速,クウコウカイソク,Haneda Express,机场快速,공항쾌속,#dc143c,0,,OK
+321,区間快速,クカンカイソク,Rapid,区间快速,구간쾌속,#ffae00,0,,OK
+322,快速急行(小田原〜新宿),カイソクキュウコウ,Rapid Express(Odawara to Shinjuku),快速急行,쾌속급행,#f7931d,0,,OK
+323,通勤準急,ツウキンジュンキュウ,Commuter Semi Express,通勤准急,통근준급,#00b66b,0,,OK
+324,快速急行(唐木田〜新宿),カイソクキュウコウ,Rapid Express(Karakida to Shinjuku),快速急行,쾌속급행,#f7931d,0,,OK
+325,快速急行(片瀬江ノ島〜新宿),カイソクキュウコウ,Rapid Express(Katase-Enoshima to Shinjuku),快速急行,쾌속급행,#f7931d,0,,OK
+326,急行(小田原〜新宿),キュウコウ,Express(Odawara to Shinjuku),特快,급행,#dc143c,0,,OK
+327,急行(唐木田〜新宿),キュウコウ,Express(Karakida to Shinjuku),特快,급행,#dc143c,0,,OK
+328,急行(片瀬江ノ島〜新宿),キュウコウ,Express(Katase-Enoshima to Shinjuku),特快,급행,#dc143c,0,,OK
+330,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#f7931d,0,,OK
+331,快速特急,カイソクトッキュウ,Limited Express,快速特快,쾌속특쾌,#049c5e,0,,OK
+332,アクセス特急,アクセストッキュウ,Access Express,访问特快,액세스 특급,#ed7d00,0,,
+333,堺筋準急,サカイスジジュンキュウ,Sakaisuji Semi Rapid,堺筋准急,사카이스지 준급,#2a9b50,0,,
+400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner(开往京王八王子),게이오 라이너 (게이오 하치 오지 방면),#dd0077,0,,OK
+401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner(开往桥本),게이오 라이너 (하시모토 방면),#dd0078,0,,OK
+402,"モーニング
+ウィング号",モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing(开往泉岳寺),모닝윙호 (위),#379412,1,,OK
+403,"イブニング
+ウィング号",イブニングウィングゴウ,Evening Wing(Shinagawa to Misakiguchi),Evening Wing(开往三崎口),이브닝윙호 (하행),#379412,2,,OK
+404,方南町支線,ホウナンチョウシセン,Honancho Branch Line,方南町支线,호난초 지선,#e60012,0,,OK
+405,拝島ライナー,ハイジマライナー,Haijima Liner,拜岛Liner,하이지마 라이너,#b4c300,0,,OK
+406,TJライナー(下り),TJライナー,TJ Liner(Ikebukuro to Ogawamachi),TJ Liner(开往小川町),TJ Liner(하행),#ff710a,2,,OK
+407,TJライナー(上り),TJライナー,TJ Liner(Ogawamachi to Ikebukuro),TJ Liner(开往池袋),TJ Liner(위),#008cd6,1,,OK
+500,りょうもう(浅草〜伊勢崎),リョウモウ,Ryomo(Asakusa to Isesaki),Ryomo(开往伊势崎),료이제 (이세 사키 방면),#ff0000,0,,OK
+501,りょうもう(浅草〜葛生),リョウモウ,Ryomo(Asakusa to Kuzū),Ryomo(开往葛生),료이제 (葛生 방면),#ff0000,0,,OK
+502,りょうもう(浅草〜赤城),リョウモウ,Ryomo(Asakusa to Akagi),Ryomo(开往赤城),료이제 (아카기 방면),#ff0000,0,,OK
+503,スカイライナー,スカイライナー,Skyliner,Skyliner,Skyliner,#0a3788,0,,OK
+504,小江戸号,コエドゴウ,Koedo,小江户,고에도,#e73042,0,,OK
+505,川越特急,カワゴエトッキュウ,Kawagoe Limited Express,川越特快,가와고에 특급,#e73799,0,,OK
+506,サザン,サザン,Southern,南方,남부,#3366cc,0,,OK
+507,ラピートα,ラピートアルファ,rapi:tα,rapi:tα,라피트α,#0065af,0,,OK
+508,ラピートβ,ラピートベータ,rapi:tβ,rapi:tβ,라피트β,#0065af,0,,OK
+509,ちちぶ,チチブ,Chichibu,秩父,지치부,#ff6600,0,,OK
+510,Mt.TAKAO,マウントタカオ,Mt.TAKAO,Mt.TAKAO,Mt.TAKAO,#57a100,0,,YET
