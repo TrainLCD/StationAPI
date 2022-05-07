@@ -1,0 +1,15 @@
+{
+  "name": "scripts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "sqlgen.js",
+  "scripts": {
+    "gen": "node sqlgen.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "csv-parse": "^5.0.4"
+  }
+}
