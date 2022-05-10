@@ -6,11 +6,11 @@ RUN mkdir /app
 WORKDIR /app
 
 COPY . /app
-COPY ./scripts/migration.sh /app
-COPY ./scripts/start.prod.sh /app
 
 RUN npm install
 RUN npm run build
+
+RUN cd ./scripts && npm install
 
 EXPOSE 3000
 
