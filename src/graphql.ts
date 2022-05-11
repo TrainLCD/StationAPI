@@ -49,6 +49,7 @@ export class Line {
     longitude?: number;
     lineColorC?: string;
     lineColorT?: string;
+    lineSymbol?: string;
     name?: string;
     nameH?: string;
     nameK?: string;
@@ -92,6 +93,8 @@ export class Station {
     trainTypes?: TrainType[];
     pass?: boolean;
     stopCondition?: StopCondition;
+    stationNumber?: number;
+    fullStationNumber?: string;
 }
 
 export class StationOnly {
