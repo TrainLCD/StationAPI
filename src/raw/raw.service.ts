@@ -62,8 +62,7 @@ export class RawService {
       trainTypes: trainTypes,
       stationNumber: `${raw.station_number}`.length ? raw.station_number : null,
       fullStationNumber: raw.station_number
-        ? // TXなどのシンボルがないとき用
-          `${rawCurrentLine.line_symbol}-${raw.station_number}`
+        ? `${rawCurrentLine.line_symbol}-${raw.station_number}`
         : null,
     };
   }
