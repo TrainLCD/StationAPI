@@ -93,7 +93,7 @@ export class Station {
     trainTypes?: TrainType[];
     pass?: boolean;
     stopCondition?: StopCondition;
-    stationNumber?: number;
+    stationNumber?: string;
     fullStationNumber?: string;
 }
 
