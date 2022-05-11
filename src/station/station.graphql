@@ -38,6 +38,8 @@ type Station {
   trainTypes: [TrainType]
   pass: Boolean
   stopCondition: StopCondition
+  stationNumber: Int
+  fullStationNumber: String
 }
 
 type StationOnly {
