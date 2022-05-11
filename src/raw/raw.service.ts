@@ -60,9 +60,13 @@ export class RawService {
       pass: raw.pass === 1 ? true : false,
       stopCondition: enumStopCondition,
       trainTypes: trainTypes,
-      stationNumber: `${raw.station_number}`.length ? raw.station_number : null,
+      stationNumber: raw.station_number.length ? raw.station_number : null,
       fullStationNumber: raw.station_number
-        ? `${rawCurrentLine.line_symbol}-${raw.station_number}`
+        ? `${
+            raw.line_symbol_index === 1
+              ? rawCurrentLine.line_symbol_secondary
+              : rawCurrentLine.line_symbol_primary
+          }-${raw.station_number}`
         : null,
     };
   }
@@ -79,7 +83,12 @@ export class RawService {
       longitude: lineRaw.lon,
       lineColorC: lineRaw.line_color_c,
       lineColorT: lineRaw.line_color_t,
-      lineSymbol: lineRaw.line_symbol.length ? lineRaw.line_symbol : null,
+      lineSymbolPrimary: lineRaw.line_symbol_primary.length
+        ? lineRaw.line_symbol_primary
+        : null,
+      lineSymbolSecondary: lineRaw.line_symbol_secondary.length
+        ? lineRaw.line_symbol_secondary
+        : null,
       name: lineRaw.line_name,
       nameH: lineRaw.line_name_h,
       nameK: lineRaw.line_name_k,
