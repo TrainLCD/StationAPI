@@ -9,7 +9,8 @@ type Line {
   longitude: Float
   lineColorC: String
   lineColorT: String
-  lineSymbol: String
+  lineSymbolPrimary: String
+  lineSymbolSecondary: String
   name: String
   nameH: String
   nameK: String

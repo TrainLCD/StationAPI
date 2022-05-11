@@ -23,7 +23,8 @@ export class LineRaw {
   line_name_ko: string;
   line_color_c: string;
   line_color_t: string;
-  line_symbol: string;
+  line_symbol_primary: string;
+  line_symbol_secondary: string;
   line_type: number;
   lon: number;
   lat: number;
