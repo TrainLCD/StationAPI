@@ -81,12 +81,14 @@ export class RawService {
       trainTypes: trainTypes,
       stationNumber,
       fullStationNumber,
-      secondaryFullStationNumber: raw.secondary_station_number.length
-        ? raw.secondary_station_number
-        : null,
-      secondaryStationNumber: raw.secondary_station_number
-        ? `${rawCurrentLine.line_symbol_secondary}-${raw.secondary_station_number}`
-        : null,
+      secondaryFullStationNumber:
+        raw.secondary_station_number.length && raw.primary_station_number.length
+          ? raw.secondary_station_number
+          : null,
+      secondaryStationNumber:
+        raw.secondary_station_number.length && raw.primary_station_number.length
+          ? `${rawCurrentLine.line_symbol_secondary}-${raw.secondary_station_number}`
+          : null,
     };
   }
 
