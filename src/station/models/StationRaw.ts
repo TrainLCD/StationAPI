@@ -8,8 +8,8 @@ export class StationRaw {
   station_name_r: string;
   station_name_zh: string;
   station_name_ko: string;
-  station_number: string;
-  line_symbol_index: number;
+  primary_station_number: string;
+  secondary_station_number: string;
   line_cd: number;
   pref_cd: number;
   post: string;
