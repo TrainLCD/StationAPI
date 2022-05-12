@@ -96,6 +96,8 @@ export class Station {
     stopCondition?: StopCondition;
     stationNumber?: string;
     fullStationNumber?: string;
+    secondaryStationNumber?: string;
+    secondaryFullStationNumber?: string;
 }
 
 export class StationOnly {

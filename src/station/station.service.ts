@@ -24,7 +24,11 @@ export class StationService {
   async findOneByGroupId(groupId: number): Promise<Station> {
     const station = await this.stationRepo.findOneByGroupId(groupId);
     return this.rawService.convertStation(
-      { ...station, station_number: null },
+      {
+        ...station,
+        primary_station_number: null,
+        secondary_station_number: null,
+      },
       await this.lineRepo.findOneCompany(station?.line_cd),
       await this.stationRepo.findTrainTypesById(station?.station_cd),
     );
