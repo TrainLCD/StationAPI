@@ -40,6 +40,8 @@ type Station {
   stopCondition: StopCondition
   stationNumber: String
   fullStationNumber: String
+  secondaryStationNumber: String
+  secondaryFullStationNumber: String
 }
 
 type StationOnly {

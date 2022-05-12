@@ -134,8 +134,8 @@ CREATE TABLE `stations` (
   `station_name_r` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `station_name_zh` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `station_name_ko` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `station_number` text COLLATE utf8mb4_unicode_ci,
-  `line_symbol_index` int DEFAULT '0',
+  `primary_station_number` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `secondary_station_number` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `line_cd` int unsigned NOT NULL,
   `pref_cd` int unsigned NOT NULL,
   `post` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -201,4 +201,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-05-11 20:40:47
+-- Dump completed on 2022-05-12 13:04:25

@@ -40,6 +40,25 @@ export class RawService {
 
     const rawCurrentLine = raw.lines.find((l) => l.line_cd === raw.line_cd);
 
+    const stationNumber = (() => {
+      if (raw.primary_station_number.length) {
+        return raw.primary_station_number;
+      }
+      if (raw.secondary_station_number.length) {
+        return raw.secondary_station_number;
+      }
+      return null;
+    })();
+    const fullStationNumber = (() => {
+      if (raw.primary_station_number) {
+        return `${rawCurrentLine.line_symbol_primary}-${raw.primary_station_number}`;
+      }
+      if (raw.secondary_station_number) {
+        return `${rawCurrentLine.line_symbol_secondary}-${raw.secondary_station_number}`;
+      }
+      return null;
+    })();
+
     return {
       id: raw.station_cd,
       address: raw.address,
@@ -60,13 +79,13 @@ export class RawService {
       pass: raw.pass === 1 ? true : false,
       stopCondition: enumStopCondition,
       trainTypes: trainTypes,
-      stationNumber: raw.station_number.length ? raw.station_number : null,
-      fullStationNumber: raw.station_number
-        ? `${
-            raw.line_symbol_index === 1
-              ? rawCurrentLine.line_symbol_secondary
-              : rawCurrentLine.line_symbol_primary
-          }-${raw.station_number}`
+      stationNumber,
+      fullStationNumber,
+      secondaryFullStationNumber: raw.secondary_station_number.length
+        ? raw.secondary_station_number
+        : null,
+      secondaryStationNumber: raw.secondary_station_number
+        ? `${rawCurrentLine.line_symbol_secondary}-${raw.secondary_station_number}`
         : null,
     };
   }
