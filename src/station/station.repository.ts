@@ -211,7 +211,7 @@ export class StationRepository {
                         return `${tt.company_name_en} Line`;
                       }
 
-                      return `${tt.line_name.replace(parenthesisRegexp, '')}`;
+                      return `${tt.line_name_r.replace(parenthesisRegexp, '')}`;
                     })
                     .filter((tt) => !!tt)
                     .join('/')})`;
