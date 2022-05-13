@@ -112,13 +112,18 @@ export class TrainTypeRepository {
 
     return new Promise<TrainTypeWithLineRaw[]>((resolve, reject) => {
       connection.query(
-        `SELECT DISTINCT t.*, l.*
-        FROM \`lines\` as l, \`types\` as t, stations as s, station_station_types as sst
+        `SELECT DISTINCT t.*, l.*, c.company_name, c.company_name_en
+        FROM \`lines\` as l,
+        \`types\` as t,
+        stations as s,
+        station_station_types as sst,
+        companies as c
         WHERE sst.line_group_cd = ?
           AND s.station_cd = sst.station_cd
           AND sst.type_cd = t.type_cd
           AND s.e_status = 0
-          AND l.line_cd = s.line_cd`,
+          AND l.line_cd = s.line_cd
+          AND l.company_cd = c.company_cd`,
         [lineGroupId],
         (err, results: RowDataPacket[]) => {
           if (err) {

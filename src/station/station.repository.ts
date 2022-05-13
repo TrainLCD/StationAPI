@@ -7,6 +7,7 @@ import { LineRepository } from 'src/line/line.repository';
 import { MysqlService } from 'src/mysql/mysql.service';
 import { TrainTypeWithLineRaw } from 'src/trainType/models/TrainTypeRaw';
 import { TrainTypeRepository } from 'src/trainType/trainType.repository';
+import { isJRLine } from 'src/utils/jr';
 import { StationRaw } from './models/StationRaw';
 
 @Injectable()
@@ -104,31 +105,151 @@ export class StationRepository {
               (tt) => tt.line_cd !== r.line_cd,
             );
 
+            const typeCds = filteredAllTrainTypes.map((tt) => tt.type_cd);
+            const isEveryTrainTypeSame = typeCds.includes(r.type_cd);
+
+            const isAllLinesOperatedSameCompany = filteredAllTrainTypes.every(
+              (tt, idx, arr) => tt.company_cd === arr[idx + 1]?.company_cd,
+            );
+            // JR東日本線直通と出さないようにしたいため(湘南新宿ラインと上野東京ラインは違う)
+            const isAllLinesOperatedJR = filteredAllTrainTypes.every((tt) =>
+              isJRLine(tt.company_cd),
+            );
+
+            const getIsPrevStationOperatedSameCompany = (
+              arr: TrainTypeWithLineRaw[],
+              trainType: TrainTypeWithLineRaw,
+              index: number,
+            ) => arr[index - 1]?.company_cd === trainType.company_cd;
+            const getIsNextStationOperatedSameCompany = (
+              arr: TrainTypeWithLineRaw[],
+              trainType: TrainTypeWithLineRaw,
+              index: number,
+            ) => arr[index + 1]?.company_cd === trainType.company_cd;
+
             // 上り下り共用種別
             if (r.direction == 0) {
               const typesName = (() => {
+                if (isEveryTrainTypeSame && !isAllLinesOperatedJR) {
+                  return `${r.type_name}(${filteredAllTrainTypes
+                    .map((tt, idx, arr) => {
+                      const isPrevStationOperatedSameCompany = getIsPrevStationOperatedSameCompany(
+                        arr,
+                        tt,
+                        idx,
+                      );
+                      const isNextStationOperatedSameCompany = getIsNextStationOperatedSameCompany(
+                        arr,
+                        tt,
+                        idx,
+                      );
+                      if (isPrevStationOperatedSameCompany) {
+                        return null;
+                      }
+                      if (isNextStationOperatedSameCompany) {
+                        return `${tt.company_name}線`;
+                      }
+
+                      return `${tt.line_name.replace(parenthesisRegexp, '')}`;
+                    })
+                    .filter((tt) => !!tt)
+                    .join('/')}直通)`;
+                }
+
                 return `${r.type_name}(${filteredAllTrainTypes
-                  .map(
-                    (tt) =>
-                      `${tt.line_name.replace(
+                  .map((tt, idx, arr) => {
+                    const isPrevStationOperatedSameCompany = getIsPrevStationOperatedSameCompany(
+                      arr,
+                      tt,
+                      idx,
+                    );
+                    const isNextStationOperatedSameCompany = getIsNextStationOperatedSameCompany(
+                      arr,
+                      tt,
+                      idx,
+                    );
+                    if (isPrevStationOperatedSameCompany) {
+                      return null;
+                    }
+                    if (
+                      isNextStationOperatedSameCompany &&
+                      !isAllLinesOperatedSameCompany &&
+                      !isAllLinesOperatedJR
+                    ) {
+                      return `${tt.company_name}線${tt.type_name.replace(
                         parenthesisRegexp,
                         '',
-                      )}${tt.type_name.replace(parenthesisRegexp, '')}`,
-                  )
+                      )}`;
+                    }
+
+                    return `${tt.line_name.replace(
+                      parenthesisRegexp,
+                      '',
+                    )}${tt.type_name.replace(parenthesisRegexp, '')}`;
+                  })
+                  .filter((tt) => !!tt)
                   .join('/')})`;
               })();
               const typesNameR = (() => {
+                if (isEveryTrainTypeSame && !isAllLinesOperatedJR) {
+                  return `${r.type_name_r}(${filteredAllTrainTypes
+                    .map((tt, idx, arr) => {
+                      const isPrevStationOperatedSameCompany = getIsPrevStationOperatedSameCompany(
+                        arr,
+                        tt,
+                        idx,
+                      );
+                      const isNextStationOperatedSameCompany = getIsNextStationOperatedSameCompany(
+                        arr,
+                        tt,
+                        idx,
+                      );
+                      if (isPrevStationOperatedSameCompany) {
+                        return null;
+                      }
+                      if (isNextStationOperatedSameCompany) {
+                        return `${tt.company_name_en} Line`;
+                      }
+
+                      return `${tt.line_name.replace(parenthesisRegexp, '')}`;
+                    })
+                    .filter((tt) => !!tt)
+                    .join('/')})`;
+                }
+
                 return `${r.type_name_r}(${filteredAllTrainTypes
-                  .map(
-                    (tt) =>
-                      `${tt.line_name_r.replace(
-                        parenthesisRegexp,
-                        '',
-                      )} ${tt.type_name_r.replace(parenthesisRegexp, '')}`,
-                  )
+                  .map((tt, idx, arr) => {
+                    const isPrevStationOperatedSameCompany = getIsPrevStationOperatedSameCompany(
+                      arr,
+                      tt,
+                      idx,
+                    );
+                    const isNextStationOperatedSameCompany = getIsNextStationOperatedSameCompany(
+                      arr,
+                      tt,
+                      idx,
+                    );
+                    if (isPrevStationOperatedSameCompany) {
+                      return null;
+                    }
+                    if (
+                      isNextStationOperatedSameCompany &&
+                      !isAllLinesOperatedSameCompany &&
+                      !isAllLinesOperatedJR
+                    ) {
+                      return `${
+                        tt.company_name_en
+                      } Line ${tt.type_name_r.replace(parenthesisRegexp, '')}`;
+                    }
+
+                    return `${tt.line_name_r.replace(
+                      parenthesisRegexp,
+                      '',
+                    )}${tt.type_name_r.replace(parenthesisRegexp, '')}`;
+                  })
+                  .filter((tt) => !!tt)
                   .join('/')})`;
               })();
-
               return {
                 typesName,
                 typesNameR,
