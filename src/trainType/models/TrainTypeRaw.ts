@@ -44,4 +44,7 @@ export class TrainTypeWithLineRaw {
   zoom: number;
   e_status: number;
   e_sort: number;
+  // Company
+  company_name: string;
+  company_name_en: string;
 }
