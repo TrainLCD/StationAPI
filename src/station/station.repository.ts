@@ -134,26 +134,9 @@ export class StationRepository {
               const typesName = (() => {
                 if (isEveryTrainTypeSame && !isAllLinesOperatedJR) {
                   return `${r.type_name}(${filteredAllTrainTypes
-                    .map((tt, idx, arr) => {
-                      const isPrevStationOperatedSameCompany = getIsPrevStationOperatedSameCompany(
-                        arr,
-                        tt,
-                        idx,
-                      );
-                      const isNextStationOperatedSameCompany = getIsNextStationOperatedSameCompany(
-                        arr,
-                        tt,
-                        idx,
-                      );
-                      if (isPrevStationOperatedSameCompany) {
-                        return null;
-                      }
-                      if (isNextStationOperatedSameCompany) {
-                        return `${tt.company_name}線`;
-                      }
-
-                      return `${tt.line_name.replace(parenthesisRegexp, '')}`;
-                    })
+                    .map(
+                      (tt) => `${tt.line_name.replace(parenthesisRegexp, '')}`,
+                    )
                     .filter((tt) => !!tt)
                     .join('/')}直通)`;
                 }
@@ -195,26 +178,10 @@ export class StationRepository {
               const typesNameR = (() => {
                 if (isEveryTrainTypeSame && !isAllLinesOperatedJR) {
                   return `${r.type_name_r}(${filteredAllTrainTypes
-                    .map((tt, idx, arr) => {
-                      const isPrevStationOperatedSameCompany = getIsPrevStationOperatedSameCompany(
-                        arr,
-                        tt,
-                        idx,
-                      );
-                      const isNextStationOperatedSameCompany = getIsNextStationOperatedSameCompany(
-                        arr,
-                        tt,
-                        idx,
-                      );
-                      if (isPrevStationOperatedSameCompany) {
-                        return null;
-                      }
-                      if (isNextStationOperatedSameCompany) {
-                        return `${tt.company_name_en} Line`;
-                      }
-
-                      return `${tt.line_name_r.replace(parenthesisRegexp, '')}`;
-                    })
+                    .map(
+                      (tt) =>
+                        `${tt.line_name_r.replace(parenthesisRegexp, '')}`,
+                    )
                     .filter((tt) => !!tt)
                     .join('/')})`;
                 }
