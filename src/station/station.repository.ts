@@ -106,7 +106,9 @@ export class StationRepository {
             );
 
             const typeCds = filteredAllTrainTypes.map((tt) => tt.type_cd);
-            const isEveryTrainTypeSame = typeCds.includes(r.type_cd);
+            const isEveryTrainTypeSame = typeCds.every((typeCd, idx, arr) =>
+              arr[idx + 1] ? arr[idx + 1] === typeCd : true,
+            );
 
             const isAllLinesOperatedSameCompany = filteredAllTrainTypes.every(
               (tt, idx, arr) => tt.company_cd === arr[idx + 1]?.company_cd,
