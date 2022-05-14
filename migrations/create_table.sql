@@ -25,12 +25,13 @@ DROP TABLE IF EXISTS `companies`;
 CREATE TABLE `companies` (
   `company_cd` int unsigned NOT NULL,
   `rr_cd` int unsigned NOT NULL,
-  `company_name` varchar(14) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
-  `company_name_k` varchar(17) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
-  `company_name_h` varchar(17) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
-  `company_name_r` varchar(11) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
-  `company_name_en` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT '',
-  `company_url` varchar(47) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
+  `company_name` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `company_name_k` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `company_name_h` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `company_name_r` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `company_name_en` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `company_name_full_en` text NOT NULL,
+  `company_url` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
   `company_type` int NOT NULL,
   `e_status` int unsigned NOT NULL,
   `e_sort` int unsigned NOT NULL,
@@ -135,7 +136,7 @@ CREATE TABLE `stations` (
   `station_name_zh` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `station_name_ko` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `primary_station_number` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `secondary_station_number` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `secondary_station_number` text COLLATE utf8mb4_unicode_ci,
   `line_cd` int unsigned NOT NULL,
   `pref_cd` int unsigned NOT NULL,
   `post` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -201,4 +202,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-05-12 13:04:25
+-- Dump completed on 2022-05-14 20:04:15
