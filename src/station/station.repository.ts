@@ -7,7 +7,6 @@ import { LineRepository } from 'src/line/line.repository';
 import { MysqlService } from 'src/mysql/mysql.service';
 import { TrainTypeWithLineRaw } from 'src/trainType/models/TrainTypeRaw';
 import { TrainTypeRepository } from 'src/trainType/trainType.repository';
-import { isJRLine } from 'src/utils/jr';
 import { StationRaw } from './models/StationRaw';
 
 @Injectable()
@@ -113,10 +112,6 @@ export class StationRepository {
             const isAllLinesOperatedSameCompany = filteredAllTrainTypes.every(
               (tt, idx, arr) => tt.company_cd === arr[idx + 1]?.company_cd,
             );
-            // JR東日本線直通と出さないようにしたいため(湘南新宿ラインと上野東京ラインは違う)
-            const isAllLinesOperatedJR = filteredAllTrainTypes.every((tt) =>
-              isJRLine(tt.company_cd),
-            );
 
             const getIsPrevStationOperatedSameCompany = (
               arr: TrainTypeWithLineRaw[],
@@ -132,12 +127,15 @@ export class StationRepository {
             // 上り下り共用種別
             if (r.direction == 0) {
               const typesName = (() => {
-                if (isEveryTrainTypeSame && !isAllLinesOperatedJR) {
+                if (isEveryTrainTypeSame) {
                   return `${r.type_name}(${filteredAllTrainTypes
                     .map(
                       (tt) => `${tt.line_name.replace(parenthesisRegexp, '')}`,
                     )
                     .filter((tt) => !!tt)
+                    .filter((tt, idx, arr) =>
+                      arr[idx + 1] ? tt !== arr[idx + 1] : true,
+                    )
                     .join('/')}直通)`;
                 }
 
@@ -158,8 +156,7 @@ export class StationRepository {
                     }
                     if (
                       isNextStationOperatedSameCompany &&
-                      !isAllLinesOperatedSameCompany &&
-                      !isAllLinesOperatedJR
+                      !isAllLinesOperatedSameCompany
                     ) {
                       return `${tt.company_name}線${tt.type_name.replace(
                         parenthesisRegexp,
@@ -176,13 +173,16 @@ export class StationRepository {
                   .join('/')})`;
               })();
               const typesNameR = (() => {
-                if (isEveryTrainTypeSame && !isAllLinesOperatedJR) {
+                if (isEveryTrainTypeSame) {
                   return `${r.type_name_r}(${filteredAllTrainTypes
                     .map(
                       (tt) =>
                         `${tt.line_name_r.replace(parenthesisRegexp, '')}`,
                     )
                     .filter((tt) => !!tt)
+                    .filter((tt, idx, arr) =>
+                      arr[idx + 1] ? tt !== arr[idx + 1] : true,
+                    )
                     .join('/')})`;
                 }
 
@@ -203,8 +203,7 @@ export class StationRepository {
                     }
                     if (
                       isNextStationOperatedSameCompany &&
-                      !isAllLinesOperatedSameCompany &&
-                      !isAllLinesOperatedJR
+                      !isAllLinesOperatedSameCompany
                     ) {
                       return `${
                         tt.company_name_en
