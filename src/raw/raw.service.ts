@@ -47,6 +47,9 @@ export class RawService {
       if (raw.secondary_station_number.length) {
         return raw.secondary_station_number;
       }
+      if (raw.extra_station_number.length) {
+        return raw.extra_station_number;
+      }
       return null;
     })();
     const fullStationNumber = (() => {
@@ -55,6 +58,9 @@ export class RawService {
       }
       if (raw.secondary_station_number) {
         return `${rawCurrentLine.line_symbol_secondary}-${raw.secondary_station_number}`;
+      }
+      if (raw.extra_station_number) {
+        return `${rawCurrentLine.line_symbol_secondary}-${raw.extra_station_number}`;
       }
       return null;
     })();
@@ -88,6 +94,18 @@ export class RawService {
       secondaryFullStationNumber:
         raw.secondary_station_number.length && raw.primary_station_number.length
           ? `${rawCurrentLine.line_symbol_secondary}-${raw.secondary_station_number}`
+          : null,
+      extraStationNumber:
+        raw.extra_station_number.length &&
+        raw.secondary_station_number.length &&
+        raw.primary_station_number.length
+          ? raw.extra_station_number
+          : null,
+      extraFullStationNumber:
+        raw.extra_station_number.length &&
+        raw.secondary_station_number.length &&
+        raw.primary_station_number.length
+          ? `${rawCurrentLine.line_symbol_extra}-${raw.extra_station_number}`
           : null,
     };
   }
