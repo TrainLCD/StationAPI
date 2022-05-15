@@ -60,10 +60,12 @@ export class RawService {
         return `${rawCurrentLine.line_symbol_secondary}-${raw.secondary_station_number}`;
       }
       if (raw.extra_station_number) {
-        return `${rawCurrentLine.line_symbol_secondary}-${raw.extra_station_number}`;
+        return `${rawCurrentLine.line_symbol_extra}-${raw.extra_station_number}`;
       }
       return null;
     })();
+
+    const isSapporoStation = fullStationNumber === '0-1';
 
     return {
       id: raw.station_cd,
@@ -85,8 +87,8 @@ export class RawService {
       pass: raw.pass === 1 ? true : false,
       stopCondition: enumStopCondition,
       trainTypes: trainTypes,
-      stationNumber,
-      fullStationNumber,
+      stationNumber: isSapporoStation ? '01' : stationNumber,
+      fullStationNumber: isSapporoStation ? '01' : fullStationNumber,
       secondaryStationNumber:
         raw.secondary_station_number.length && raw.primary_station_number.length
           ? raw.secondary_station_number
