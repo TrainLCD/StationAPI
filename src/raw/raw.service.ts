@@ -60,7 +60,7 @@ export class RawService {
         return `${rawCurrentLine.line_symbol_secondary}-${raw.secondary_station_number}`;
       }
       if (raw.extra_station_number) {
-        return `${rawCurrentLine.line_symbol_secondary}-${raw.extra_station_number}`;
+        return `${rawCurrentLine.line_symbol_extra}-${raw.extra_station_number}`;
       }
       return null;
     })();
