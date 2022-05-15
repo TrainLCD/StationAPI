@@ -65,6 +65,8 @@ export class RawService {
       return null;
     })();
 
+    const isSapporoStation = fullStationNumber === '0-1';
+
     return {
       id: raw.station_cd,
       address: raw.address,
@@ -85,8 +87,8 @@ export class RawService {
       pass: raw.pass === 1 ? true : false,
       stopCondition: enumStopCondition,
       trainTypes: trainTypes,
-      stationNumber,
-      fullStationNumber,
+      stationNumber: isSapporoStation ? '01' : stationNumber,
+      fullStationNumber: isSapporoStation ? '01' : fullStationNumber,
       secondaryStationNumber:
         raw.secondary_station_number.length && raw.primary_station_number.length
           ? raw.secondary_station_number
