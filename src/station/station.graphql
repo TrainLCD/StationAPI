@@ -42,6 +42,8 @@ type Station {
   fullStationNumber: String
   secondaryStationNumber: String
   secondaryFullStationNumber: String
+  extraStationNumber: String
+  extraFullStationNumber: String
 }
 
 type StationOnly {

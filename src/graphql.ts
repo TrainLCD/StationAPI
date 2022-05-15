@@ -98,6 +98,8 @@ export class Station {
     fullStationNumber?: string;
     secondaryStationNumber?: string;
     secondaryFullStationNumber?: string;
+    extraStationNumber?: string;
+    extraFullStationNumber?: string;
 }
 
 export class StationOnly {
