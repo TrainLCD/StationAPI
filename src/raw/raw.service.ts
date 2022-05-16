@@ -96,6 +96,7 @@ export class RawService {
       stopCondition: enumStopCondition,
       trainTypes: trainTypes,
       stationNumbers: fullStationNumbers,
+      threeLetterCode: raw.three_letter_code,
     };
   }
 

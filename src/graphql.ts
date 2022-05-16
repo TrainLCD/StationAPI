@@ -105,6 +105,7 @@ export class Station {
     pass?: boolean;
     stopCondition?: StopCondition;
     stationNumbers?: StationNumber[];
+    threeLetterCode?: string;
 }
 
 export class StationOnly {
