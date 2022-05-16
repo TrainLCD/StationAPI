@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   Line,
   Station,
+  StationNumber,
   StopCondition,
   TrainDirection,
   TrainType,
@@ -40,32 +41,38 @@ export class RawService {
 
     const rawCurrentLine = raw.lines.find((l) => l.line_cd === raw.line_cd);
 
-    const stationNumber = (() => {
-      if (raw.primary_station_number.length) {
-        return raw.primary_station_number;
-      }
-      if (raw.secondary_station_number.length) {
-        return raw.secondary_station_number;
-      }
-      if (raw.extra_station_number.length) {
-        return raw.extra_station_number;
-      }
-      return null;
-    })();
-    const fullStationNumber = (() => {
-      if (raw.primary_station_number) {
-        return `${rawCurrentLine.line_symbol_primary}-${raw.primary_station_number}`;
-      }
-      if (raw.secondary_station_number) {
-        return `${rawCurrentLine.line_symbol_secondary}-${raw.secondary_station_number}`;
-      }
-      if (raw.extra_station_number) {
-        return `${rawCurrentLine.line_symbol_extra}-${raw.extra_station_number}`;
-      }
-      return null;
-    })();
+    const lineSymbolsRaw = [
+      rawCurrentLine.line_symbol_primary,
+      rawCurrentLine.line_symbol_secondary,
+      rawCurrentLine.line_symbol_extra,
+    ];
+    const lineSymbolColorsRaw = [
+      rawCurrentLine.line_symbol_primary_color,
+      rawCurrentLine.line_symbol_secondary_color,
+      rawCurrentLine.line_symbol_extra_color,
+    ];
+    const stationNumbersRaw = [
+      raw.primary_station_number,
+      raw.secondary_station_number,
+      raw.extra_station_number,
+    ];
 
-    const isSapporoStation = fullStationNumber === '0-1';
+    const fullStationNumbers: StationNumber[] = stationNumbersRaw
+      .map(
+        (num, idx) =>
+          num &&
+          lineSymbolsRaw[idx] && {
+            lineSymbol: lineSymbolsRaw[idx],
+            lineSymbolColor: lineSymbolColorsRaw[idx] || null,
+            stationNumber: `${lineSymbolsRaw[idx]}-${stationNumbersRaw[idx]}`,
+          },
+      )
+      .filter((num) => num)
+      .map((num) => ({
+        ...num,
+        // 01: 札幌駅
+        stationNumber: num.stationNumber === '0-1' ? '01' : num.stationNumber,
+      }));
 
     return {
       id: raw.station_cd,
@@ -87,28 +94,7 @@ export class RawService {
       pass: raw.pass === 1 ? true : false,
       stopCondition: enumStopCondition,
       trainTypes: trainTypes,
-      stationNumber: isSapporoStation ? '01' : stationNumber,
-      fullStationNumber: isSapporoStation ? '01' : fullStationNumber,
-      secondaryStationNumber:
-        raw.secondary_station_number.length && raw.primary_station_number.length
-          ? raw.secondary_station_number
-          : null,
-      secondaryFullStationNumber:
-        raw.secondary_station_number.length && raw.primary_station_number.length
-          ? `${rawCurrentLine.line_symbol_secondary}-${raw.secondary_station_number}`
-          : null,
-      extraStationNumber:
-        raw.extra_station_number.length &&
-        raw.secondary_station_number.length &&
-        raw.primary_station_number.length
-          ? raw.extra_station_number
-          : null,
-      extraFullStationNumber:
-        raw.extra_station_number.length &&
-        raw.secondary_station_number.length &&
-        raw.primary_station_number.length
-          ? `${rawCurrentLine.line_symbol_extra}-${raw.extra_station_number}`
-          : null,
+      stationNumbers: fullStationNumbers,
     };
   }
 
@@ -124,15 +110,7 @@ export class RawService {
       longitude: lineRaw.lon,
       lineColorC: lineRaw.line_color_c,
       lineColorT: lineRaw.line_color_t,
-      lineSymbolPrimary: lineRaw.line_symbol_primary.length
-        ? lineRaw.line_symbol_primary
-        : null,
-      lineSymbolSecondary: lineRaw.line_symbol_secondary.length
-        ? lineRaw.line_symbol_secondary
-        : null,
-      lineSymbolExtra: lineRaw.line_symbol_extra.length
-        ? lineRaw.line_symbol_extra
-        : null,
+      lineSymbols: [], // TODO: 実装
       name: lineRaw.line_name,
       nameH: lineRaw.line_name_h,
       nameK: lineRaw.line_name_k,

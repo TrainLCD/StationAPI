@@ -2,6 +2,11 @@ type Query {
   line(id: ID!): Line
 }
 
+type LineSymbol {
+  lineSymbol: String
+  lineSymbolColor: String
+}
+
 type Line {
   id: Int
   companyId: Int
@@ -9,9 +14,7 @@ type Line {
   longitude: Float
   lineColorC: String
   lineColorT: String
-  lineSymbolPrimary: String
-  lineSymbolSecondary: String
-  lineSymbolExtra: String
+  lineSymbols: [LineSymbol]
   name: String
   nameH: String
   nameK: String

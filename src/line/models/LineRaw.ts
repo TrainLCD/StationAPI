@@ -26,6 +26,9 @@ export class LineRaw {
   line_symbol_primary: string;
   line_symbol_secondary: string;
   line_symbol_extra: string;
+  line_symbol_primary_color: string;
+  line_symbol_secondary_color: string;
+  line_symbol_extra_color: string;
   line_type: number;
   lon: number;
   lat: number;
