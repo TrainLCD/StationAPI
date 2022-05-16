@@ -42,6 +42,11 @@ export abstract class IQuery {
     abstract trainType(id: string, excludePass?: boolean): TrainType | Promise<TrainType>;
 }
 
+export class LineSymbol {
+    lineSymbol?: string;
+    lineSymbolColor?: string;
+}
+
 export class Line {
     id?: number;
     companyId?: number;
@@ -49,9 +54,7 @@ export class Line {
     longitude?: number;
     lineColorC?: string;
     lineColorT?: string;
-    lineSymbolPrimary?: string;
-    lineSymbolSecondary?: string;
-    lineSymbolExtra?: string;
+    lineSymbols?: LineSymbol[];
     name?: string;
     nameH?: string;
     nameK?: string;
@@ -75,6 +78,12 @@ export class Company {
     companyType?: number;
 }
 
+export class StationNumber {
+    lineSymbol?: string;
+    lineSymbolColor?: string;
+    stationNumber?: string;
+}
+
 export class Station {
     id?: number;
     address?: string;
@@ -95,12 +104,7 @@ export class Station {
     trainTypes?: TrainType[];
     pass?: boolean;
     stopCondition?: StopCondition;
-    stationNumber?: string;
-    fullStationNumber?: string;
-    secondaryStationNumber?: string;
-    secondaryFullStationNumber?: string;
-    extraStationNumber?: string;
-    extraFullStationNumber?: string;
+    stationNumbers?: StationNumber[];
 }
 
 export class StationOnly {
