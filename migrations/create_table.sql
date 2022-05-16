@@ -70,6 +70,9 @@ CREATE TABLE `lines` (
   `line_symbol_primary` text CHARACTER SET utf8 COLLATE utf8_general_ci,
   `line_symbol_secondary` text,
   `line_symbol_extra` text,
+  `line_symbol_primary_color` text,
+  `line_symbol_secondary_color` text,
+  `line_symbol_extra_color` text,
   `lon` decimal(18,14) unsigned NOT NULL,
   `lat` decimal(18,15) unsigned NOT NULL,
   `zoom` int unsigned NOT NULL,
@@ -204,4 +207,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-05-15 12:30:21
+-- Dump completed on 2022-05-16 14:26:19

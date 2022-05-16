@@ -10,6 +10,12 @@ type Query {
   random: Station
 }
 
+type StationNumber {
+  lineSymbol: String
+  lineSymbolColor: String
+  stationNumber: String
+}
+
 enum StopCondition {
   ALL
   NOT
@@ -38,12 +44,7 @@ type Station {
   trainTypes: [TrainType]
   pass: Boolean
   stopCondition: StopCondition
-  stationNumber: String
-  fullStationNumber: String
-  secondaryStationNumber: String
-  secondaryFullStationNumber: String
-  extraStationNumber: String
-  extraFullStationNumber: String
+  stationNumbers: [StationNumber]
 }
 
 type StationOnly {
