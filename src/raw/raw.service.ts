@@ -130,6 +130,9 @@ export class RawService {
       lineSymbolSecondary: lineRaw.line_symbol_secondary.length
         ? lineRaw.line_symbol_secondary
         : null,
+      lineSymbolExtra: lineRaw.line_symbol_extra.length
+        ? lineRaw.line_symbol_extra
+        : null,
       name: lineRaw.line_name,
       nameH: lineRaw.line_name_h,
       nameK: lineRaw.line_name_k,

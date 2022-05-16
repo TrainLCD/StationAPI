@@ -11,6 +11,7 @@ type Line {
   lineColorT: String
   lineSymbolPrimary: String
   lineSymbolSecondary: String
+  lineSymbolExtra: String
   name: String
   nameH: String
   nameK: String

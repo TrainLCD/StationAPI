@@ -51,6 +51,7 @@ export class Line {
     lineColorT?: string;
     lineSymbolPrimary?: string;
     lineSymbolSecondary?: string;
+    lineSymbolExtra?: string;
     name?: string;
     nameH?: string;
     nameK?: string;
