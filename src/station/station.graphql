@@ -45,6 +45,7 @@ type Station {
   pass: Boolean
   stopCondition: StopCondition
   stationNumbers: [StationNumber]
+  threeLetterCode: String
 }
 
 type StationOnly {
