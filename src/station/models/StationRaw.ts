@@ -11,6 +11,7 @@ export class StationRaw {
   primary_station_number: string;
   secondary_station_number: string;
   extra_station_number: string;
+  three_letter_code: string;
   line_cd: number;
   pref_cd: number;
   post: string;
