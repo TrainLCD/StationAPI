@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   Line,
+  LineSymbol,
   Station,
   StationNumber,
   StopCondition,
@@ -103,6 +104,21 @@ export class RawService {
       return;
     }
 
+    const lineSymbols: LineSymbol[] = [
+      lineRaw.line_symbol_primary && {
+        lineSymbol: lineRaw.line_symbol_primary || null,
+        lineSymbolColor: lineRaw.line_symbol_primary_color || null,
+      },
+      lineRaw.line_symbol_secondary && {
+        lineSymbol: lineRaw.line_symbol_secondary || null,
+        lineSymbolColor: lineRaw.line_symbol_secondary_color || null,
+      },
+      lineRaw.line_symbol_extra && {
+        lineSymbol: lineRaw.line_symbol_extra_color || null,
+        lineSymbolColor: lineRaw.line_symbol_extra_color || null,
+      },
+    ].filter((sym) => sym);
+
     return {
       id: lineRaw.line_cd,
       companyId: lineRaw.company_cd,
@@ -110,7 +126,7 @@ export class RawService {
       longitude: lineRaw.lon,
       lineColorC: lineRaw.line_color_c,
       lineColorT: lineRaw.line_color_t,
-      lineSymbols: [], // TODO: 実装
+      lineSymbols,
       name: lineRaw.line_name,
       nameH: lineRaw.line_name_h,
       nameK: lineRaw.line_name_k,
