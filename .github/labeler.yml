@@ -1,0 +1,10 @@
+ci/cd:
+  - .github/*
+  - .github/**/*
+  - scripts/*
+  - scripts/**/*
+nestjs:
+  - src/*
+  - src/**/*
+data:
+  - migrations/*
