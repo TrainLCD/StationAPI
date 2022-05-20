@@ -14,9 +14,10 @@ export class StationService {
   ) {}
 
   async findOneById(id: number): Promise<Station> {
+    const station = await this.stationRepo.findOneById(id);
     return this.rawService.convertStation(
-      await this.stationRepo.findOneById(id),
-      await this.lineRepo.findOneCompany(id),
+      station,
+      await this.lineRepo.findOneCompany(station.line_cd),
       await this.stationRepo.findTrainTypesById(id),
     );
   }
