@@ -44,8 +44,8 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 120,99,秩父鉄道,チチブテツドウ,秩父鉄道株式会社,秩鉄,Chichibu Railway,Chichibu Railway,http://www.chichibu-railway.co.jp/,0,0,120
 121,99,埼玉高速鉄道,サイタマコウソクテツドウ,埼玉高速鉄道株式会社,埼玉高速鉄道,Saitama Railway,Saitama Railway,http://www.s-rail.co.jp/,0,0,121
 122,99,いすみ鉄道,イスミテツドウ,いすみ鉄道株式会社,いすみ鉄道,Isumi Railway,Isumi Railway,http://www.isumirail.co.jp/,0,0,122
-123,99,首都圏新都市鉄道,シュトケンシントシテツドウ,首都圏新都市鉄道株式会社,首都圏新都市鉄道,Tsukuba Express,Metropolitan Intercity Railway Company,http://www.mir.co.jp/,0,0,123
-124,99,横浜高速鉄道,ヨコハマコウソクテツドウ,横浜高速鉄道株式会社,横浜高速鉄道,Minatomirai,Yokohama Minatomirai Railway,http://www.mm21railway.co.jp/,0,0,124
+123,99,首都圏新都市鉄道,シュトケンシントシテツドウ,首都圏新都市鉄道株式会社,つくばエクスプレス,Tsukuba Express,Metropolitan Intercity Railway Company,http://www.mir.co.jp/,0,0,123
+124,99,横浜高速鉄道,ヨコハマコウソクテツドウ,横浜高速鉄道株式会社,みなとみらい,Minatomirai,Yokohama Minatomirai Railway,http://www.mm21railway.co.jp/,0,0,124
 125,99,ゆりかもめ,ユリカモメ,株式会社ゆりかもめ,ゆりかもめ,Yurikamome,Yurikamome,http://www.yurikamome.co.jp/,0,0,125
 126,99,わたらせ渓谷鐵道,ワタラセケイコクテツドウ,わたらせ渓谷鐵道株式会社,わたらせ渓谷鐵道,Watarase Keikoku Railway,Watarase Keikoku Railway,http://www.watetsu.com/,0,0,126
 127,99,山万,ヤママン,山万株式会社,山万,Yamaman,Yamaman,http://www.yamaman.co.jp/,0,0,127
@@ -70,7 +70,7 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 146,99,多摩都市モノレール,タマトシモノレール,多摩都市モノレール株式会社,多摩モノレール,Tama Toshi Monorail,Tama Toshi Monorail,http://www.tama-monorail.co.jp/,0,0,146
 147,99,銚子電気鉄道,チョウシデンキテツドウ,銚子電気鉄道株式会社,銚子電鉄,Chōshi Electric Railway,Chōshi Electric Railway,http://www.choshi-dentetsu.jp/,0,0,147
 148,99,東京モノレール,トウキョウモノレール,東京モノレール株式会社,東京モノレール,Tokyo Monorail,Tokyo Monorail,http://www.tokyo-monorail.co.jp/,0,0,148
-149,99,東京臨海高速鉄道,トウキョウリンカイコウソクテツドウ,東京臨海高速鉄道株式会社,東京臨海高速鉄道,Tokyo Waterfront Area Rapid Transit,Tokyo Waterfront Area Rapid Transit,http://www.twr.co.jp/,0,0,149
+149,99,東京臨海高速鉄道,トウキョウリンカイコウソクテツドウ,東京臨海高速鉄道株式会社,りんかい,Rinkai,Tokyo Waterfront Area Rapid Transit,http://www.twr.co.jp/,0,0,149
 150,99,東葉高速鉄道,トウヨウコウソクテツドウ,東葉高速鉄道株式会社,東葉高速鉄道,Keiyo Railway,Keiyo Railway,http://www.toyokosoku.co.jp/,0,0,150
 151,99,箱根登山鉄道,ハコネトザンテツドウ,箱根登山鉄道株式会社,箱根登山鉄道,Hakone Tozan Railway,Hakone Tozan Railway,http://www.hakone-tozan.co.jp/,0,0,151
 152,99,北総鉄道,ホクソウテツドウ,北総鉄道株式会社,北総鉄道,Hokuso Railway,Hokuso Railway,http://www.hokuso-railway.co.jp/,0,0,152
