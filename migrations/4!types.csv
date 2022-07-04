@@ -139,6 +139,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 405,拝島ライナー,ハイジマライナー,Haijima Liner,拜岛Liner,하이지마 라이너,#b4c300,0,,OK
 406,TJライナー(下り),TJライナー,TJ Liner(Ikebukuro to Ogawamachi),TJ Liner(开往小川町),TJ Liner(하행),#ff710a,2,,OK
 407,TJライナー(上り),TJライナー,TJ Liner(Ogawamachi to Ikebukuro),TJ Liner(开往池袋),TJ Liner(위),#008cd6,1,,OK
+408,支線,シセン,Branch Line,支線,경로,#9686BD,0,ポートアイランド線用,YET
 500,りょうもう(浅草〜伊勢崎),リョウモウ,Ryomo(Asakusa to Isesaki),Ryomo(开往伊势崎),료이제 (이세 사키 방면),#ff0000,0,,OK
 501,りょうもう(浅草〜葛生),リョウモウ,Ryomo(Asakusa to Kuzū),Ryomo(开往葛生),료이제 (葛生 방면),#ff0000,0,,OK
 502,りょうもう(浅草〜赤城),リョウモウ,Ryomo(Asakusa to Akagi),Ryomo(开往赤城),료이제 (아카기 방면),#ff0000,0,,OK
@@ -149,4 +150,5 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 507,ラピートα,ラピートアルファ,rapi:tα,rapi:tα,라피트α,#0065af,0,,OK
 508,ラピートβ,ラピートベータ,rapi:tβ,rapi:tβ,라피트β,#0065af,0,,OK
 509,ちちぶ,チチブ,Chichibu,秩父,지치부,#ff6600,0,,OK
-510,Mt.TAKAO,マウントタカオ,Mt.TAKAO,Mt.TAKAO,Mt.TAKAO,#57a100,0,,YET
+510,Mt.TAKAO,マウントタカオ,Mt.TAKAO,Mt.TAKAO,Mt.TAKAO,#57a100,0,,OK
+511,ミュースカイ,ミュースカイ,μ-SKY,μ-SKY,μ-SKY,#00a496,0,,OK
