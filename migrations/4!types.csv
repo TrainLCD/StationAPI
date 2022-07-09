@@ -140,6 +140,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 406,TJライナー(下り),TJライナー,TJ Liner(Ikebukuro to Ogawamachi),TJ Liner(开往小川町),TJ Liner(하행),#ff710a,2,,OK
 407,TJライナー(上り),TJライナー,TJ Liner(Ogawamachi to Ikebukuro),TJ Liner(开往池袋),TJ Liner(위),#008cd6,1,,OK
 408,支線,シセン,Branch Line,支線,경로,#9686BD,0,ポートアイランド線用,YET
+409,各駅停車(田園都市線経由),カクエキテイシャ,Local,每站停车,각역정차,#1f63c7,0,大井町線用,OK
 500,りょうもう(浅草〜伊勢崎),リョウモウ,Ryomo(Asakusa to Isesaki),Ryomo(开往伊势崎),료이제 (이세 사키 방면),#ff0000,0,,OK
 501,りょうもう(浅草〜葛生),リョウモウ,Ryomo(Asakusa to Kuzū),Ryomo(开往葛生),료이제 (葛生 방면),#ff0000,0,,OK
 502,りょうもう(浅草〜赤城),リョウモウ,Ryomo(Asakusa to Akagi),Ryomo(开往赤城),료이제 (아카기 방면),#ff0000,0,,OK
