@@ -43,14 +43,14 @@ export class RawService {
     const rawCurrentLine = raw.lines.find((l) => l.line_cd === raw.line_cd);
 
     const lineSymbolsRaw = [
-      rawCurrentLine.line_symbol_primary,
-      rawCurrentLine.line_symbol_secondary,
-      rawCurrentLine.line_symbol_extra,
+      rawCurrentLine?.line_symbol_primary,
+      rawCurrentLine?.line_symbol_secondary,
+      rawCurrentLine?.line_symbol_extra,
     ];
     const lineSymbolColorsRaw = [
-      rawCurrentLine.line_symbol_primary_color,
-      rawCurrentLine.line_symbol_secondary_color,
-      rawCurrentLine.line_symbol_extra_color,
+      rawCurrentLine?.line_symbol_primary_color,
+      rawCurrentLine?.line_symbol_secondary_color,
+      rawCurrentLine?.line_symbol_extra_color,
     ];
     const stationNumbersRaw = [
       raw.primary_station_number,
