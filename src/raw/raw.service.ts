@@ -63,7 +63,7 @@ export class RawService {
         (num, idx) =>
           num && {
             lineSymbol: lineSymbolsRaw[idx] ?? null,
-            lineSymbolColor: lineSymbolColorsRaw[idx] || null,
+            lineSymbolColor: lineSymbolColorsRaw[idx] ?? null,
             stationNumber: `${lineSymbolsRaw[idx] ?? ''}-${
               stationNumbersRaw[idx]
             }`,
