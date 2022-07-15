@@ -61,11 +61,12 @@ export class RawService {
     const fullStationNumbers: StationNumber[] = stationNumbersRaw
       .map(
         (num, idx) =>
-          num &&
-          lineSymbolsRaw[idx] && {
-            lineSymbol: lineSymbolsRaw[idx],
-            lineSymbolColor: lineSymbolColorsRaw[idx] || null,
-            stationNumber: `${lineSymbolsRaw[idx]}-${stationNumbersRaw[idx]}`,
+          num && {
+            lineSymbol: lineSymbolsRaw[idx] ?? null,
+            lineSymbolColor: lineSymbolColorsRaw[idx] ?? null,
+            stationNumber: `${lineSymbolsRaw[idx] ?? ''}-${
+              stationNumbersRaw[idx]
+            }`,
           },
       )
       .filter((num) => num)
