@@ -27,8 +27,6 @@ export abstract class IQuery {
 
     abstract stationByGroupId(groupId: string): Station | Promise<Station>;
 
-    abstract stationByCoords(latitude: number, longitude: number): Station | Promise<Station>;
-
     abstract nearbyStations(latitude: number, longitude: number, limit?: number): Station[] | Promise<Station[]>;
 
     abstract stationsByLineId(lineId: string): Station[] | Promise<Station[]>;

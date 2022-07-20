@@ -356,56 +356,6 @@ export class StationRepository {
     });
   }
 
-  /**
-   * @deprecated Use `getByCoords` instead.
-   */
-  async findOneByCoords(
-    latitude: number,
-    longitude: number,
-  ): Promise<StationRaw> {
-    const { connection } = this.mysqlService;
-
-    return new Promise<StationRaw>((resolve, reject) => {
-      connection.query(
-        `
-        SELECT *,
-        (
-          6371 * acos(
-          cos(radians(?))
-          * cos(radians(lat))
-          * cos(radians(lon) - radians(?))
-          + sin(radians(?))
-          * sin(radians(lat))
-          )
-        ) AS distance
-        FROM
-        stations
-        WHERE
-        e_status = 0
-        ORDER BY
-        distance
-        LIMIT 1
-        `,
-        [latitude, longitude, latitude],
-        async (err, results: RowDataPacket[]) => {
-          if (err) {
-            return reject(err);
-          }
-          if (!results.length) {
-            return resolve(null);
-          }
-          const lines = await this.lineRepo.getByGroupId(
-            results[0].station_g_cd,
-          );
-          return resolve({
-            ...(results[0] as StationRaw),
-            lines,
-          });
-        },
-      );
-    });
-  }
-
   async getByCoords(
     latitude: number,
     longitude: number,

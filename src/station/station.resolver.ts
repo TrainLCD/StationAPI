@@ -18,14 +18,6 @@ export class StationResolver {
   }
 
   @Query((returns) => Station)
-  async stationByCoords(
-    @Args('latitude') latitude: number,
-    @Args('longitude') longitude: number,
-  ): Promise<Station> {
-    return this.stationService.findOneByCoords(latitude, longitude);
-  }
-
-  @Query((returns) => Station)
   async nearbyStations(
     @Args('latitude') latitude: number,
     @Args('longitude') longitude: number,

@@ -1,8 +1,6 @@
 type Query {
   station(id: ID!): Station
   stationByGroupId(groupId: ID!): Station
-  stationByCoords(latitude: Float!, longitude: Float!): Station
-    @deprecated(reason: "Use `nearbyStations`.")
   nearbyStations(latitude: Float!, longitude: Float!, limit: Int = 1): [Station]
   stationsByLineId(lineId: ID!): [Station]
   stationsByName(name: String!): [Station]

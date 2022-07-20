@@ -36,19 +36,6 @@ export class StationService {
     );
   }
 
-  /**
-   * @deprecated New API is using `getByCoords` instead.
-   */
-  async findOneByCoords(latitude: number, longitude: number): Promise<Station> {
-    const station = await this.stationRepo.findOneByCoords(latitude, longitude);
-
-    return this.rawService.convertStation(
-      station,
-      await this.lineRepo.findOneCompany(station?.line_cd),
-      await this.stationRepo.findTrainTypesById(station?.station_cd),
-    );
-  }
-
   async getByCoords(
     latitude: number,
     longitude: number,
