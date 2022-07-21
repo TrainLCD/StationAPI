@@ -1,4 +1,5 @@
 export class CompanyRaw {
+  line_cd: number;
   company_cd: number;
   rr_cd: number;
   company_name: string;

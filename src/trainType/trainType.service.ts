@@ -20,28 +20,31 @@ export class TrainTypeService {
     const belongingLines = await this.trainTypeRepo.getBelongingLines(
       lineGroupIds,
     );
-    return Promise.all(
-      trainTypes.map(async (tt) =>
-        this.rawService.convertTrainType(
-          tt,
-          await Promise.all(
-            belongingStations.map(async (bs) =>
-              this.rawService.convertStation(
-                bs,
-                await this.lineRepo.findOneCompany(bs.line_cd),
-              ),
-            ),
-          ),
-          await Promise.all(
-            belongingLines.map(async (bl) =>
-              this.rawService.convertLine(
-                bl,
-                await this.lineRepo.findOneCompany(bl.line_cd),
-              ),
-            ),
-          ),
-        ),
+
+    const belongingStationsLineIds = belongingStations.map((s) =>
+      s.lines.map((l) => l.line_cd),
+    );
+    const belongingStationsCompanies = await Promise.all(
+      belongingStationsLineIds.map(
+        async (lids) => await this.lineRepo.getCompaniesByLineIds(lids),
       ),
+    );
+
+    const trainTypeStations = belongingStations.map((bs, i) =>
+      this.rawService.convertStation(bs, belongingStationsCompanies[i]),
+    );
+    const trainTypeLines = belongingLines.map((bl) =>
+      this.rawService.convertLine(bl),
+    );
+
+    return Promise.all(
+      trainTypes.map((tt) => {
+        return this.rawService.convertTrainType(
+          tt,
+          trainTypeStations,
+          trainTypeLines,
+        );
+      }),
     );
   }
 }

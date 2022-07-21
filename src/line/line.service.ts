@@ -10,22 +10,10 @@ export class LineService {
     private readonly rawService: RawService,
   ) {}
 
-  async findOne(id: number): Promise<Line> {
-    return this.rawService.convertLine(
-      await this.lineRepo.findOne(id),
-      await this.lineRepo.findOneCompany(id),
-    );
-  }
-
   async getByIds(ids: number[]): Promise<Line[]> {
-    return Promise.all(
-      ids.map(async (id) =>
-        this.rawService.convertLine(
-          await this.lineRepo.findOne(id),
-          await this.lineRepo.findOneCompany(id),
-        ),
-      ),
-    );
+    const lines = await this.lineRepo.getByIds(ids);
+    const companies = await this.lineRepo.getCompaniesByLineIds(ids);
+    return lines.map((l, i) => this.rawService.convertLine(l, companies[i]));
   }
 
   async getLinesByGroupId(groupId: number): Promise<Line[]> {
