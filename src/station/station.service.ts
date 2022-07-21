@@ -150,31 +150,13 @@ export class StationService {
     );
   }
 
-  async getByName(name: string): Promise<Station[]> {
-    return await Promise.all(
-      (await this.stationRepo.getByName(name)).map(async (s) =>
-        this.rawService.convertStation(
-          s,
-          await this.lineRepo.findOneCompany(s?.line_cd),
-          await this.stationRepo.findTrainTypesById(s?.station_cd),
-        ),
-      ),
-    );
-  }
-
   async getByNames(names: string[]): Promise<Station[][]> {
     return Promise.all(
-      names.map(async (name) =>
-        Promise.all(
-          (await this.stationRepo.getByName(name)).map(async (s) =>
-            this.rawService.convertStation(
-              s,
-              await this.lineRepo.findOneCompany(s?.line_cd),
-              await this.stationRepo.findTrainTypesById(s?.station_cd),
-            ),
-          ),
-        ),
-      ),
+      names.map(async (name) => {
+        const stations = await this.stationRepo.getByName(name);
+
+        return stations.map((s) => this.rawService.convertStation(s, null, []));
+      }),
     );
   }
 
