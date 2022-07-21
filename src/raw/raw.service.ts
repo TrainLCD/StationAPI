@@ -16,7 +16,7 @@ import { TrainTypeRaw } from 'src/trainType/models/TrainTypeRaw';
 export class RawService {
   convertStation(
     raw: StationRaw,
-    companyRaw: CompanyRaw,
+    companyRaw?: CompanyRaw,
     trainTypes?: TrainType[],
   ): Station {
     if (!raw) {
@@ -101,8 +101,8 @@ export class RawService {
     };
   }
 
-  convertLine(lineRaw: LineRaw, companyRaw: CompanyRaw): Line {
-    if (!lineRaw || !companyRaw) {
+  convertLine(lineRaw: LineRaw, companyRaw?: CompanyRaw): Line {
+    if (!lineRaw) {
       return;
     }
 
@@ -137,7 +137,7 @@ export class RawService {
       nameKo: lineRaw.line_name_ko,
       lineType: lineRaw.line_type,
       zoom: lineRaw.zoom,
-      company: {
+      company: companyRaw && {
         id: companyRaw.company_cd,
         railroadId: companyRaw.rr_cd,
         name: companyRaw.company_name,

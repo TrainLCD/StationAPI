@@ -33,6 +33,30 @@ export class LineRepository {
     });
   }
 
+  async getByIds(ids: number[]): Promise<LineRaw[]> {
+    const { connection } = this.mysqlService;
+
+    return new Promise<LineRaw[]>((resolve, reject) => {
+      connection.query(
+        `SELECT *
+        FROM \`lines\`
+        WHERE line_cd in (?)
+        AND NOT line_cd = ${NEX_ID}
+        AND e_status = 0`,
+        [ids],
+        (err, results: RowDataPacket[]) => {
+          if (err) {
+            return reject(err);
+          }
+          if (!results.length) {
+            return resolve(null);
+          }
+          return resolve(results as LineRaw[]);
+        },
+      );
+    });
+  }
+
   async findOneCompany(lineId: number): Promise<CompanyRaw> {
     const { connection } = this.mysqlService;
 
@@ -53,6 +77,30 @@ export class LineRepository {
             return resolve(null);
           }
           return resolve(results[0] as CompanyRaw);
+        },
+      );
+    });
+  }
+
+  async getCompaniesByLineIds(lineIds: number[]): Promise<CompanyRaw[]> {
+    const { connection } = this.mysqlService;
+
+    return new Promise<CompanyRaw[]>((resolve, reject) => {
+      connection.query(
+        `SELECT c.*
+        FROM \`lines\` as l, \`companies\` as c
+        WHERE l.line_cd in (?)
+        AND l.e_status = 0
+        AND c.company_cd = l.company_cd`,
+        [lineIds],
+        (err, results: RowDataPacket[]) => {
+          if (err) {
+            return reject(err);
+          }
+          if (!results.length) {
+            return resolve([]);
+          }
+          return resolve(results as CompanyRaw[]);
         },
       );
     });

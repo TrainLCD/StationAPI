@@ -863,16 +863,16 @@ export class StationRepository {
       connection.query(
         `
           SELECT * FROM stations
-          WHERE (station_name LIKE "%${name}%"
-          OR station_name_r LIKE "%${name}%"
-          OR station_name_k LIKE "%${name}%"
-          OR station_name_zh LIKE "%${name}%"
-          OR station_name_ko LIKE "%${name}%")
+          WHERE (station_name LIKE "%"?"%"
+          OR station_name_r LIKE "%"?"%"
+          OR station_name_k LIKE "%"?"%"
+          OR station_name_zh LIKE "%"?"%"
+          OR station_name_ko LIKE "%"?"%")
           AND e_status = 0
           AND NOT line_cd = ${NEX_ID}
           ORDER BY e_sort, station_cd
         `,
-        [],
+        [name, name, name, name, name],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -881,67 +881,23 @@ export class StationRepository {
             return resolve([]);
           }
 
-          const map = await Promise.all<StationRaw>(
-            results.map(async (r) => {
-              const line = await this.lineRepo.findOne(r.line_cd);
-              return {
-                ...r,
-                lines: [line],
-              } as StationRaw;
-            }),
-          );
+          const lineIds = results.map((r) => r.line_cd);
+          const lines = await this.lineRepo.getByIds(lineIds);
 
-          return resolve(map);
+          return resolve(
+            results.map(
+              (r) =>
+                ({
+                  ...r,
+                  lines: lines.filter((l) => l.line_cd === r.line_cd),
+                } as StationRaw),
+            ),
+          );
         },
       );
     });
   }
 
-  async getByNames(names: string[]): Promise<StationRaw[]> {
-    const { connection } = this.mysqlService;
-    if (!connection) {
-      return [];
-    }
-
-    return new Promise<StationRaw[]>((resolve, reject) => {
-      names.map((name) =>
-        connection.query(
-          `
-          SELECT * FROM stations
-          WHERE (station_name LIKE "%${name}%"
-          OR station_name_r LIKE "%${name}%"
-          OR station_name_k LIKE "%${name}%"
-          OR station_name_zh LIKE "%${name}%"
-          OR station_name_ko LIKE "%${name}%")
-          AND e_status = 0
-          AND NOT line_cd = ${NEX_ID}
-          ORDER BY e_sort, station_cd
-        `,
-          [],
-          async (err, results: RowDataPacket[]) => {
-            if (err) {
-              return reject(err);
-            }
-            if (!results.length) {
-              return resolve([]);
-            }
-
-            const map = await Promise.all<StationRaw>(
-              results.map(async (r) => {
-                const line = await this.lineRepo.findOne(r.line_cd);
-                return {
-                  ...r,
-                  lines: [line],
-                } as StationRaw;
-              }),
-            );
-
-            return resolve(map);
-          },
-        ),
-      );
-    });
-  }
   async getAll(): Promise<StationRaw[]> {
     const { connection } = this.mysqlService;
 

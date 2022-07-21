@@ -126,7 +126,7 @@ export class TrainTypeRepository {
   }
 
   async getAllLinesTrainTypes(
-    lineGroupId: number,
+    lineGroupIds: number[],
   ): Promise<TrainTypeWithLineRaw[]> {
     const { connection } = this.mysqlService;
 
@@ -138,13 +138,13 @@ export class TrainTypeRepository {
         stations as s,
         station_station_types as sst,
         companies as c
-        WHERE sst.line_group_cd = ?
+        WHERE sst.line_group_cd in (?)
           AND s.station_cd = sst.station_cd
           AND sst.type_cd = t.type_cd
           AND s.e_status = 0
           AND l.line_cd = s.line_cd
           AND l.company_cd = c.company_cd`,
-        [lineGroupId],
+        [lineGroupIds],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
