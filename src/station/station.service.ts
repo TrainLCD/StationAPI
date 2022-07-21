@@ -22,6 +22,32 @@ export class StationService {
     );
   }
 
+  async getStationsByIds(ids: number[]): Promise<Station[]> {
+    const stations = await this.stationRepo.getByIds(ids);
+    return Promise.all(
+      stations.map(async (s) =>
+        this.rawService.convertStation(
+          s,
+          await this.lineRepo.findOneCompany(s.line_cd),
+          await this.stationRepo.findTrainTypesById(s.station_cd),
+        ),
+      ),
+    );
+  }
+
+  async getStationsByGroupIds(ids: number[]): Promise<Station[]> {
+    const stations = await this.stationRepo.getByIds(ids);
+    return Promise.all(
+      stations.map(async (s) =>
+        this.rawService.convertStation(
+          s,
+          await this.lineRepo.findOneCompany(s.line_cd),
+          await this.stationRepo.findTrainTypesById(s.station_cd),
+        ),
+      ),
+    );
+  }
+
   async findOneByGroupId(groupId: number): Promise<Station> {
     const station = await this.stationRepo.findOneByGroupId(groupId);
     return this.rawService.convertStation(
@@ -89,6 +115,41 @@ export class StationService {
     );
   }
 
+  async getByLineIds(lineIds: number[]): Promise<Station[]> {
+    const stations = await this.stationRepo.getByLineIds(lineIds);
+    const stationIds = stations.map((s) => s.station_cd);
+    const trainTypesGroupedByStations = await this.stationRepo.getTrainTypesByIds(
+      stationIds,
+    );
+
+    return Promise.all(
+      stations.map(async (s, i) => {
+        const trainTypes = trainTypesGroupedByStations.length
+          ? await Promise.all(
+              trainTypesGroupedByStations[i].map(async (tt) => ({
+                ...tt,
+                lines: await Promise.all(
+                  tt.lines.map(async (l) =>
+                    this.rawService.convertLine(
+                      l as LineRaw,
+                      await this.lineRepo.findOneCompany(
+                        (l as LineRaw).line_cd,
+                      ),
+                    ),
+                  ),
+                ),
+              })),
+            )
+          : [];
+        return this.rawService.convertStation(
+          s,
+          await this.lineRepo.findOneCompany(s.line_cd),
+          trainTypes,
+        );
+      }),
+    );
+  }
+
   async getByName(name: string): Promise<Station[]> {
     return await Promise.all(
       (await this.stationRepo.getByName(name)).map(async (s) =>
@@ -96,6 +157,22 @@ export class StationService {
           s,
           await this.lineRepo.findOneCompany(s?.line_cd),
           await this.stationRepo.findTrainTypesById(s?.station_cd),
+        ),
+      ),
+    );
+  }
+
+  async getByNames(names: string[]): Promise<Station[][]> {
+    return Promise.all(
+      names.map(async (name) =>
+        Promise.all(
+          (await this.stationRepo.getByName(name)).map(async (s) =>
+            this.rawService.convertStation(
+              s,
+              await this.lineRepo.findOneCompany(s?.line_cd),
+              await this.stationRepo.findTrainTypesById(s?.station_cd),
+            ),
+          ),
         ),
       ),
     );

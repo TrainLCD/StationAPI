@@ -1,47 +1,54 @@
 import { ParseIntPipe } from '@nestjs/common';
 import { Args, Query, Resolver } from '@nestjs/graphql';
-import { Station, StationOnly } from 'src/graphql';
+import { Station } from 'src/graphql';
+import StationCoordsDataLoader from './station.coords.loader';
+import StatioGroupDataLoader from './station.group.loader';
+import StationLineDataLoader from './station.line.loader';
+import StationDataLoader from './station.loader';
+import StationNameDataLoader from './station.name.loader';
 import { StationService } from './station.service';
 
-@Resolver((of) => Station)
+@Resolver(Station)
 export class StationResolver {
-  constructor(private readonly stationService: StationService) {}
+  constructor(
+    private readonly stationService: StationService,
+    private readonly stationDataLoader: StationDataLoader,
+    private readonly stationGroupDataLoader: StatioGroupDataLoader,
+    private readonly stationLineDataLoader: StationLineDataLoader,
+    private readonly stationNameDataLoader: StationNameDataLoader,
+    private readonly stationCoordsDataLoader: StationCoordsDataLoader,
+  ) {}
 
-  @Query((returns) => Station)
+  @Query(() => Station)
   async station(@Args('id', ParseIntPipe) id: number): Promise<Station> {
-    return this.stationService.findOneById(id);
+    return this.stationDataLoader.load(id);
   }
 
-  @Query((returns) => Station)
+  @Query(() => Station)
   async stationByGroupId(@Args('groupId') groupId: number): Promise<Station> {
-    return this.stationService.findOneByGroupId(groupId);
+    return this.stationGroupDataLoader.load(groupId);
   }
 
-  @Query((returns) => Station)
+  @Query(() => [Station])
   async nearbyStations(
     @Args('latitude') latitude: number,
     @Args('longitude') longitude: number,
     @Args('limit') limit = 1,
   ): Promise<Station[]> {
-    return this.stationService.getByCoords(latitude, longitude, limit);
+    return this.stationCoordsDataLoader.load([latitude, longitude, limit]);
   }
 
-  @Query((returns) => Station)
+  @Query(() => [Station])
   async stationsByLineId(@Args('lineId') lineId: number): Promise<Station[]> {
-    return this.stationService.getByLineId(lineId);
+    return this.stationLineDataLoader.load(lineId);
   }
 
-  @Query((returns) => Station)
+  @Query(() => [Station])
   async stationsByName(@Args('name') name: string): Promise<Station[]> {
-    return this.stationService.getByName(name);
+    return this.stationNameDataLoader.load(name);
   }
 
-  @Query((returns) => StationOnly)
-  async allStations(): Promise<StationOnly[]> {
-    return this.stationService.getAllStations();
-  }
-
-  @Query((returns) => Station)
+  @Query(() => Station)
   async random(): Promise<Station> {
     return this.stationService.getRandomStation();
   }

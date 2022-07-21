@@ -26,6 +26,7 @@
     "@nestjs/graphql": "^7.9.1",
     "@nestjs/platform-fastify": "^7.5.5",
     "apollo-server-fastify": "^3.0.0-alpha.3",
+    "dataloader": "^2.1.0",
     "graphql": "^15.4.0",
     "graphql-tools": "^7.0.2",
     "lodash": "^4.17.21",

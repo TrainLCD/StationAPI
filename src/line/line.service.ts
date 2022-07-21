@@ -17,6 +17,17 @@ export class LineService {
     );
   }
 
+  async getByIds(ids: number[]): Promise<Line[]> {
+    return Promise.all(
+      ids.map(async (id) =>
+        this.rawService.convertLine(
+          await this.lineRepo.findOne(id),
+          await this.lineRepo.findOneCompany(id),
+        ),
+      ),
+    );
+  }
+
   async getLinesByGroupId(groupId: number): Promise<Line[]> {
     return await Promise.all(
       (await this.lineRepo.getByGroupId(groupId)).map(async (l) =>

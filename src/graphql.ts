@@ -33,11 +33,9 @@ export abstract class IQuery {
 
     abstract stationsByName(name: string): Station[] | Promise<Station[]>;
 
-    abstract allStations(): StationOnly[] | Promise<StationOnly[]>;
-
     abstract random(): Station | Promise<Station>;
 
-    abstract trainType(id: string, excludePass?: boolean): TrainType | Promise<TrainType>;
+    abstract trainType(id: string): TrainType | Promise<TrainType>;
 }
 
 export class LineSymbol {
