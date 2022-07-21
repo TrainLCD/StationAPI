@@ -1,16 +1,13 @@
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import { TrainType } from 'src/graphql';
-import { TrainTypeService } from './trainType.service';
+import TrainTypeDataLoader from './trainType.loader';
 
-@Resolver((of) => TrainType)
+@Resolver(TrainType)
 export class TrainTypeResolver {
-  constructor(private readonly trainTypeService: TrainTypeService) {}
+  constructor(private readonly trainTypeDataLoader: TrainTypeDataLoader) {}
 
-  @Query((returns) => TrainType)
-  async trainType(
-    @Args('id') id: number,
-    @Args('excludePass') excludePass: boolean,
-  ): Promise<TrainType> {
-    return this.trainTypeService.findOne(id, excludePass);
+  @Query(() => TrainType)
+  async trainType(@Args('id') id: number): Promise<TrainType> {
+    return this.trainTypeDataLoader.load(id);
   }
 }

@@ -27,19 +27,15 @@ export abstract class IQuery {
 
     abstract stationByGroupId(groupId: string): Station | Promise<Station>;
 
-    abstract stationByCoords(latitude: number, longitude: number): Station | Promise<Station>;
-
     abstract nearbyStations(latitude: number, longitude: number, limit?: number): Station[] | Promise<Station[]>;
 
     abstract stationsByLineId(lineId: string): Station[] | Promise<Station[]>;
 
     abstract stationsByName(name: string): Station[] | Promise<Station[]>;
 
-    abstract allStations(): StationOnly[] | Promise<StationOnly[]>;
-
     abstract random(): Station | Promise<Station>;
 
-    abstract trainType(id: string, excludePass?: boolean): TrainType | Promise<TrainType>;
+    abstract trainType(id: string): TrainType | Promise<TrainType>;
 }
 
 export class LineSymbol {

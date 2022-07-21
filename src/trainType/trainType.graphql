@@ -1,5 +1,5 @@
 type Query {
-  trainType(id: ID!, excludePass: Boolean): TrainType
+  trainType(id: ID!): TrainType
 }
 
 type TrainTypeMinimum {
