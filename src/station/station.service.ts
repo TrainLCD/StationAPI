@@ -80,7 +80,7 @@ export class StationService {
       names.map(async (name) => {
         const stations = await this.stationRepo.getByName(name);
 
-        return stations.map((s) => this.rawService.convertStation(s, null, []));
+        return stations.map((s) => this.rawService.convertStation(s, [], []));
       }),
     );
   }
