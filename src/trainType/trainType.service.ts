@@ -12,33 +12,39 @@ export class TrainTypeService {
     private readonly rawService: RawService,
   ) {}
 
-  async findOne(lineGroupId: number, excludePass = false): Promise<TrainType> {
-    const trainType = await this.trainTypeRepo.findOne(lineGroupId);
+  async getByIds(lineGroupIds: number[]): Promise<TrainType[]> {
+    const trainTypes = await this.trainTypeRepo.getByIds(lineGroupIds);
     const belongingStations = await this.trainTypeRepo.getBelongingStations(
-      lineGroupId,
-      excludePass,
+      lineGroupIds,
     );
     const belongingLines = await this.trainTypeRepo.getBelongingLines(
-      lineGroupId,
+      lineGroupIds,
     );
-    return this.rawService.convertTrainType(
-      trainType,
-      await Promise.all(
-        belongingStations.map(async (bs) =>
-          this.rawService.convertStation(
-            bs,
-            await this.lineRepo.findOneCompany(bs.line_cd),
-          ),
-        ),
+
+    const belongingStationsLineIds = belongingStations.map((s) =>
+      s.lines.map((l) => l.line_cd),
+    );
+    const belongingStationsCompanies = await Promise.all(
+      belongingStationsLineIds.map(
+        async (lids) => await this.lineRepo.getCompaniesByLineIds(lids),
       ),
-      await Promise.all(
-        belongingLines.map(async (bl) =>
-          this.rawService.convertLine(
-            bl,
-            await this.lineRepo.findOneCompany(bl.line_cd),
-          ),
-        ),
-      ),
+    );
+
+    const trainTypeStations = belongingStations.map((bs, i) =>
+      this.rawService.convertStation(bs, belongingStationsCompanies[i]),
+    );
+    const trainTypeLines = belongingLines.map((bl) =>
+      this.rawService.convertLine(bl),
+    );
+
+    return Promise.all(
+      trainTypes.map((tt) => {
+        return this.rawService.convertTrainType(
+          tt,
+          trainTypeStations,
+          trainTypeLines,
+        );
+      }),
     );
   }
 }

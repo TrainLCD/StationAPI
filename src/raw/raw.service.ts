@@ -16,7 +16,7 @@ import { TrainTypeRaw } from 'src/trainType/models/TrainTypeRaw';
 export class RawService {
   convertStation(
     raw: StationRaw,
-    companyRaw: CompanyRaw,
+    companies?: CompanyRaw[],
     trainTypes?: TrainType[],
   ): Station {
     if (!raw) {
@@ -82,8 +82,16 @@ export class RawService {
       distance: raw.distance,
       latitude: raw.lat,
       longitude: raw.lon,
-      currentLine: this.convertLine(raw.currentLine, companyRaw),
-      lines: raw.lines?.map((l) => this.convertLine(l, companyRaw)),
+      currentLine: this.convertLine(
+        raw.currentLine,
+        companies.find((c) => c.company_cd === raw.currentLine.company_cd),
+      ),
+      lines: raw.lines?.map((l) =>
+        this.convertLine(
+          l,
+          companies.find((c) => c.company_cd === l.company_cd),
+        ),
+      ),
       openYmd: raw.open_ymd,
       postalCode: raw.post,
       prefId: raw.pref_cd,
@@ -101,8 +109,8 @@ export class RawService {
     };
   }
 
-  convertLine(lineRaw: LineRaw, companyRaw: CompanyRaw): Line {
-    if (!lineRaw || !companyRaw) {
+  convertLine(lineRaw: LineRaw, companyRaw?: CompanyRaw): Line {
+    if (!lineRaw) {
       return;
     }
 
@@ -137,7 +145,7 @@ export class RawService {
       nameKo: lineRaw.line_name_ko,
       lineType: lineRaw.line_type,
       zoom: lineRaw.zoom,
-      company: {
+      company: companyRaw && {
         id: companyRaw.company_cd,
         railroadId: companyRaw.rr_cd,
         name: companyRaw.company_name,

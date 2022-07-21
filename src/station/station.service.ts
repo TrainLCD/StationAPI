@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Station, StationOnly } from 'src/graphql';
+import { Station } from 'src/graphql';
 import { LineRepository } from 'src/line/line.repository';
-import { LineRaw } from 'src/line/models/LineRaw';
 import { RawService } from 'src/raw/raw.service';
 import { StationRepository } from './station.repository';
 
@@ -13,39 +12,29 @@ export class StationService {
     private readonly rawService: RawService,
   ) {}
 
-  async findOneById(id: number): Promise<Station> {
-    const station = await this.stationRepo.findOneById(id);
-    return this.rawService.convertStation(
-      station,
-      await this.lineRepo.findOneCompany(station.line_cd),
-      await this.stationRepo.findTrainTypesById(id),
+  async getStationsByIds(ids: number[]): Promise<Station[]> {
+    const stations = await this.stationRepo.getByIds(ids);
+    const lineIds = stations.map((s) => s.lines.map((l) => l.line_cd)).flat();
+    const stationIds = stations.map((s) => s.station_cd);
+    const companies = await this.lineRepo.getCompaniesByLineIds(lineIds);
+    const trainTypes = await this.stationRepo.getTrainTypesByIds(stationIds);
+
+    return stations.map((s, i) =>
+      this.rawService.convertStation(s, companies, trainTypes[i]),
     );
   }
 
-  async findOneByGroupId(groupId: number): Promise<Station> {
-    const station = await this.stationRepo.findOneByGroupId(groupId);
-    return this.rawService.convertStation(
-      {
-        ...station,
-        primary_station_number: null,
-        secondary_station_number: null,
-        extra_station_number: null,
-      },
-      await this.lineRepo.findOneCompany(station?.line_cd),
-      await this.stationRepo.findTrainTypesById(station?.station_cd),
-    );
-  }
+  async getStationsByGroupIds(ids: number[]): Promise<Station[]> {
+    const stations = await this.stationRepo.getByIds(ids);
+    const lineIds = stations.map((s) => s.lines.map((l) => l.line_cd)).flat();
+    const stationIds = stations.map((s) => s.station_cd);
+    const companies = await this.lineRepo.getCompaniesByLineIds(lineIds);
+    const trainTypes = await this.stationRepo.getTrainTypesByIds(stationIds);
 
-  /**
-   * @deprecated New API is using `getByCoords` instead.
-   */
-  async findOneByCoords(latitude: number, longitude: number): Promise<Station> {
-    const station = await this.stationRepo.findOneByCoords(latitude, longitude);
-
-    return this.rawService.convertStation(
-      station,
-      await this.lineRepo.findOneCompany(station?.line_cd),
-      await this.stationRepo.findTrainTypesById(station?.station_cd),
+    return Promise.all(
+      stations.map((s, i) =>
+        this.rawService.convertStation(s, companies, trainTypes[i]),
+      ),
     );
   }
 
@@ -59,78 +48,48 @@ export class StationService {
       longitude,
       limit,
     );
+    const lineIds = stations.map((s) => s.lines.map((l) => l.line_cd)).flat();
+    const stationIds = stations.map((s) => s.station_cd);
+    const companies = await this.lineRepo.getCompaniesByLineIds(lineIds);
+    const trainTypes = await this.stationRepo.getTrainTypesByIds(stationIds);
 
     return Promise.all(
-      stations.map(async (s) =>
-        this.rawService.convertStation(
-          s,
-          await this.lineRepo.findOneCompany(s.line_cd),
-          await this.stationRepo.findTrainTypesById(s.station_cd),
-        ),
+      stations.map((s, i) =>
+        this.rawService.convertStation(s, companies, trainTypes[i]),
       ),
     );
   }
 
-  async getByLineId(lineId: number): Promise<Station[]> {
-    return await Promise.all(
-      (await this.stationRepo.getByLineId(lineId)).map(async (s) => {
-        const trainTypes = await Promise.all(
-          (await this.stationRepo.findTrainTypesById(s?.station_cd)).map(
-            async (tt) => {
-              const lines = await Promise.all(
-                tt.lines.map(async (l) =>
-                  this.rawService.convertLine(
-                    l as LineRaw,
-                    await this.lineRepo.findOneCompany((l as LineRaw).line_cd),
-                  ),
-                ),
-              );
-              return {
-                ...tt,
-                lines,
-              };
-            },
-          ),
-        );
+  async getByLineIds(lineIds: number[]): Promise<Station[]> {
+    const stations = await this.stationRepo.getByLineIds(lineIds);
+    const stationIds = stations.map((s) => s.station_cd);
+    const stationLineIds = stations
+      .map((s) => s.lines.map((l) => l.line_cd))
+      .flat();
+    const companies = await this.lineRepo.getCompaniesByLineIds(stationLineIds);
+    const trainTypes = await this.stationRepo.getTrainTypesByIds(stationIds);
+    return Promise.all(
+      stations.map((s, i) =>
+        this.rawService.convertStation(s, companies, trainTypes[i]),
+      ),
+    );
+  }
 
-        return this.rawService.convertStation(
-          s,
-          await this.lineRepo.findOneCompany(s.line_cd),
-          trainTypes,
-        );
+  async getByNames(names: string[]): Promise<Station[][]> {
+    return Promise.all(
+      names.map(async (name) => {
+        const stations = await this.stationRepo.getByName(name);
+
+        return stations.map((s) => this.rawService.convertStation(s, [], []));
       }),
-    );
-  }
-
-  async getByName(name: string): Promise<Station[]> {
-    return await Promise.all(
-      (await this.stationRepo.getByName(name)).map(async (s) =>
-        this.rawService.convertStation(
-          s,
-          await this.lineRepo.findOneCompany(s?.line_cd),
-          await this.stationRepo.findTrainTypesById(s?.station_cd),
-        ),
-      ),
-    );
-  }
-
-  async getAllStations(): Promise<StationOnly[]> {
-    return await Promise.all(
-      (await this.stationRepo.getAll()).map(async (s) =>
-        this.rawService.convertStation(
-          s,
-          await this.lineRepo.findOneCompany(s?.line_cd),
-        ),
-      ),
     );
   }
 
   async getRandomStation(): Promise<Station> {
     const station = await this.stationRepo.getRandomly();
-    return this.rawService.convertStation(
-      station,
-      await this.lineRepo.findOneCompany(station?.line_cd),
-      await this.stationRepo.findTrainTypesById(station?.station_cd),
+    const companies = await this.lineRepo.getCompaniesByLineIds(
+      station.lines.map((l) => l.line_cd),
     );
+    return this.rawService.convertStation(station, companies, []);
   }
 }

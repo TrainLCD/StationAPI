@@ -13,34 +13,31 @@ export class TrainTypeRepository {
     private lineRepo: LineRepository,
   ) {}
 
-  async findOne(lineGroupId: number): Promise<TrainTypeRaw> {
+  async getByIds(lineGroupIds: number[]): Promise<TrainTypeRaw[]> {
     const { connection } = this.mysqlService;
 
-    return new Promise<TrainTypeRaw>((resolve, reject) => {
+    return new Promise<TrainTypeRaw[]>((resolve, reject) => {
       connection.query(
         `SELECT *
         FROM types as t, station_station_types as sst
-        WHERE sst.line_group_cd = ?
+        WHERE sst.line_group_cd in (?)
           AND t.type_cd = sst.type_cd
         LIMIT 1`,
-        [lineGroupId],
+        [lineGroupIds],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
           if (!results.length) {
-            return resolve(null);
+            return resolve([]);
           }
-          return resolve(results[0] as TrainTypeRaw);
+          return resolve(results as TrainTypeRaw[]);
         },
       );
     });
   }
 
-  async getBelongingStations(
-    lineGroupId: number,
-    excludePass?: boolean,
-  ): Promise<StationRaw[]> {
+  async getBelongingStations(lineGroupIds: number[]): Promise<StationRaw[]> {
     const { connection } = this.mysqlService;
 
     return new Promise<StationRaw[]>((resolve, reject) => {
@@ -48,13 +45,12 @@ export class TrainTypeRepository {
         `
           SELECT *
           FROM station_station_types as sst, stations as s
-          WHERE sst.line_group_cd = ?
-          ${excludePass ? 'AND sst.pass IN (0, 2, 3, 4)' : ''}
+          WHERE sst.line_group_cd in (?)
           AND s.station_cd = sst.station_cd
           AND s.e_status = 0
           ORDER BY sst.id
         `,
-        [lineGroupId],
+        [lineGroupIds],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -80,18 +76,18 @@ export class TrainTypeRepository {
     });
   }
 
-  async getBelongingLines(lineGroupId: number): Promise<LineRaw[]> {
+  async getBelongingLines(lineGroupIds: number[]): Promise<LineRaw[]> {
     const { connection } = this.mysqlService;
 
     return new Promise<LineRaw[]>((resolve, reject) => {
       connection.query(
         `SELECT DISTINCT l.*
         FROM \`lines\` as l, stations as s, station_station_types as sst
-        WHERE sst.line_group_cd = ?
+        WHERE sst.line_group_cd in (?)
           AND s.station_cd = sst.station_cd
           AND l.line_cd = s.line_cd
           AND s.e_status = 0`,
-        [lineGroupId],
+        [lineGroupIds],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -106,25 +102,25 @@ export class TrainTypeRepository {
   }
 
   async getAllLinesTrainTypes(
-    lineGroupId: number,
+    lineGroupIds: number[],
   ): Promise<TrainTypeWithLineRaw[]> {
     const { connection } = this.mysqlService;
 
     return new Promise<TrainTypeWithLineRaw[]>((resolve, reject) => {
       connection.query(
-        `SELECT DISTINCT t.*, l.*, c.company_name, c.company_name_en
+        `SELECT DISTINCT t.*, l.*, c.company_name, c.company_name_en, sst.line_group_cd
         FROM \`lines\` as l,
         \`types\` as t,
         stations as s,
         station_station_types as sst,
         companies as c
-        WHERE sst.line_group_cd = ?
+        WHERE sst.line_group_cd in (?)
           AND s.station_cd = sst.station_cd
           AND sst.type_cd = t.type_cd
           AND s.e_status = 0
           AND l.line_cd = s.line_cd
           AND l.company_cd = c.company_cd`,
-        [lineGroupId],
+        [lineGroupIds],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
