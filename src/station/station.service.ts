@@ -68,10 +68,8 @@ export class StationService {
       .flat();
     const companies = await this.lineRepo.getCompaniesByLineIds(stationLineIds);
     const trainTypes = await this.stationRepo.getTrainTypesByIds(stationIds);
-    return Promise.all(
-      stations.map((s, i) =>
-        this.rawService.convertStation(s, companies, trainTypes[i]),
-      ),
+    return stations.map((s, i) =>
+      this.rawService.convertStation(s, companies, trainTypes[i]),
     );
   }
 

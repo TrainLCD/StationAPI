@@ -83,11 +83,11 @@ export class TrainTypeRepository {
       connection.query(
         `SELECT DISTINCT l.*
         FROM \`lines\` as l, stations as s, station_station_types as sst
-        WHERE sst.line_group_cd in (?)
+        WHERE sst.line_group_cd = ?
           AND s.station_cd = sst.station_cd
           AND l.line_cd = s.line_cd
           AND s.e_status = 0`,
-        [lineGroupIds],
+        [lineGroupIds[0]],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
