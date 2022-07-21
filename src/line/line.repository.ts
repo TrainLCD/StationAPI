@@ -87,7 +87,7 @@ export class LineRepository {
 
     return new Promise<CompanyRaw[]>((resolve, reject) => {
       connection.query(
-        `SELECT c.*
+        `SELECT c.*, l.line_cd
         FROM \`lines\` as l, \`companies\` as c
         WHERE l.line_cd in (?)
         AND l.e_status = 0

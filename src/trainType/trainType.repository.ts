@@ -13,30 +13,6 @@ export class TrainTypeRepository {
     private lineRepo: LineRepository,
   ) {}
 
-  async findOne(lineGroupId: number): Promise<TrainTypeRaw> {
-    const { connection } = this.mysqlService;
-
-    return new Promise<TrainTypeRaw>((resolve, reject) => {
-      connection.query(
-        `SELECT *
-        FROM types as t, station_station_types as sst
-        WHERE sst.line_group_cd = ?
-          AND t.type_cd = sst.type_cd
-        LIMIT 1`,
-        [lineGroupId],
-        (err, results: RowDataPacket[]) => {
-          if (err) {
-            return reject(err);
-          }
-          if (!results.length) {
-            return resolve(null);
-          }
-          return resolve(results[0] as TrainTypeRaw);
-        },
-      );
-    });
-  }
-
   async getByIds(lineGroupIds: number[]): Promise<TrainTypeRaw[]> {
     const { connection } = this.mysqlService;
 
@@ -132,7 +108,7 @@ export class TrainTypeRepository {
 
     return new Promise<TrainTypeWithLineRaw[]>((resolve, reject) => {
       connection.query(
-        `SELECT DISTINCT t.*, l.*, c.company_name, c.company_name_en
+        `SELECT DISTINCT t.*, l.*, c.company_name, c.company_name_en, sst.line_group_cd
         FROM \`lines\` as l,
         \`types\` as t,
         stations as s,
