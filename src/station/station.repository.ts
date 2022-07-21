@@ -636,8 +636,13 @@ export class StationRepository {
                               zoom: tt.zoom,
                             },
                           })),
-                          lines: linesRaw.map((l, i) =>
-                            this.rawService.convertLine(l, companies[i]),
+                          lines: linesRaw.map((l) =>
+                            this.rawService.convertLine(
+                              l,
+                              companies.find(
+                                (c) => c.company_cd === l.company_cd,
+                              ),
+                            ),
                           ),
                           direction: r.direction,
                         };
