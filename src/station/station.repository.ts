@@ -321,8 +321,7 @@ export class StationRepository {
                         );
 
                         return {
-                          // キャッシュが重複しないようにするため。もっとうまい方法あると思う
-                          id: r.id + r.type_cd + r.line_group_cd,
+                          id: r.line_group_cd,
                           typeId: r.type_cd,
                           groupId: r.line_group_cd,
                           name: !filteredAllTrainTypes.length
