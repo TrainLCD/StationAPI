@@ -97,6 +97,10 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 217,宗谷,ソウヤ,Sōya,宗谷,소야,#2cb432,2,下り,OK
 218,オホーツク,オホーツク,Okhotsk,鄂霍次克,오호츠크,#2cb431,0,,OK
 219,大雪,タイセツ,Taisetsu,大雪,타이세츠,#2cb431,0,,OK
+220,南風,ナンプウ,Nanpū,南风,남풍,#e25885,0,,OK
+221,うずしお,ウズシオ,Uzushio,涡潮,우즈시오,#1cadca,0,,OK
+222,こうのとり,コウノトリ,Kounotori,东方白鹳,고노토리,#ffcc00,0,,OK
+223,サンダーバード,サンダーバード,Thunderbird,雷鸟,선더버드,#0072BA,0,,OK
 300,普通,フツウ,Local,慢车,慢车,#1f63c6,0,,PARTIAL
 301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1f63c7,0,,PARTIAL
 302,快速,カイソク,Rapid,快车,쾌속,#dc143c,0,,PARTIAL
@@ -153,7 +157,3 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 509,ちちぶ,チチブ,Chichibu,秩父,지치부,#ff6600,0,,OK
 510,Mt.TAKAO,マウントタカオ,Mt.TAKAO,Mt.TAKAO,Mt.TAKAO,#57a100,0,,OK
 511,ミュースカイ,ミュースカイ,μ-SKY,μ-SKY,μ-SKY,#00a496,0,,OK
-512,南風,ナンプウ,Nanpū,南风,남풍,#e25885,0,,OK
-513,うずしお,ウズシオ,Uzushio,涡潮,우즈시오,#1cadca,0,,OK
-514,こうのとり,コウノトリ,Kounotori,东方白鹳,고노토리,#ffcc00,0,,OK
-515,サンダーバード,サンダーバード,Thunderbird,雷鸟,선더버드,#0072BA,0,,OK
