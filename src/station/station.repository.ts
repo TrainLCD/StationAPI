@@ -184,8 +184,6 @@ export class StationRepository {
                 }
 
                 return `${r.type_name}(${filteredAllTrainTypes
-                  // 現路線と同じ種別の場合無視する
-                  .filter((tt) => r.type_cd !== tt.type_cd)
                   .map((tt, idx, arr) => {
                     const isPrevStationOperatedSameCompany = getIsPrevStationOperatedSameCompany(
                       arr,
@@ -243,8 +241,6 @@ export class StationRepository {
                 }
 
                 return `${r.type_name_r}(${filteredAllTrainTypes
-                  // 現路線と同じ種別の場合無視する
-                  .filter((tt) => r.type_cd !== tt.type_cd)
                   .map((tt, idx, arr) => {
                     const isPrevStationOperatedSameCompany = getIsPrevStationOperatedSameCompany(
                       arr,
