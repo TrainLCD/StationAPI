@@ -189,9 +189,11 @@ export class StationRepository {
                       tt,
                       idx,
                     );
+
                     if (isPrevStationOperatedSameCompany) {
                       return null;
                     }
+
                     if (
                       isNextStationOperatedSameCompany &&
                       !isAllLinesOperatedSameCompany
@@ -236,9 +238,11 @@ export class StationRepository {
                       tt,
                       idx,
                     );
+
                     if (isPrevStationOperatedSameCompany) {
                       return null;
                     }
+
                     if (
                       isNextStationOperatedSameCompany &&
                       !isAllLinesOperatedSameCompany
@@ -251,7 +255,7 @@ export class StationRepository {
                     return `${tt.line_name_r.replace(
                       parenthesisRegexp,
                       '',
-                    )}${tt.type_name_r.replace(parenthesisRegexp, '')}`;
+                    )} ${tt.type_name_r.replace(parenthesisRegexp, '')}`;
                   })
                   .filter((tt) => !!tt)
                   .join('/')})`;
