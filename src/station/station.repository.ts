@@ -162,12 +162,6 @@ export class StationRepository {
               index: number,
             ) => arr[index + 1]?.company_cd === trainType.company_cd;
 
-            const getIsNextLineSameTrainType = (
-              arr: TrainTypeWithLineRaw[],
-              trainType: TrainTypeWithLineRaw,
-              index: number,
-            ) => arr[index + 1]?.type_cd === trainType.type_cd;
-
             // 上り下り共用種別
             if (r.direction == 0) {
               const typesName = (() => {
@@ -195,17 +189,9 @@ export class StationRepository {
                       tt,
                       idx,
                     );
-                    const isNextLineSameTrainType = getIsNextLineSameTrainType(
-                      arr,
-                      tt,
-                      idx,
-                    );
 
                     if (isPrevStationOperatedSameCompany) {
                       return null;
-                    }
-                    if (isNextLineSameTrainType) {
-                      return tt.line_name.replace(parenthesisRegexp, '');
                     }
 
                     if (
@@ -252,17 +238,9 @@ export class StationRepository {
                       tt,
                       idx,
                     );
-                    const isNextLineSameTrainType = getIsNextLineSameTrainType(
-                      arr,
-                      tt,
-                      idx,
-                    );
 
                     if (isPrevStationOperatedSameCompany) {
                       return null;
-                    }
-                    if (isNextLineSameTrainType) {
-                      return tt.line_name_r.replace(parenthesisRegexp, '');
                     }
 
                     if (
