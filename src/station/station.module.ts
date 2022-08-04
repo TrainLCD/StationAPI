@@ -8,6 +8,7 @@ import StationGroupDataLoader from './station.group.loader';
 import StationLineDataLoader from './station.line.loader';
 import StationDataLoader from './station.loader';
 import StationNameDataLoader from './station.name.loader';
+import StatioPathfinderDataLoader from './station.pathfinder.loader';
 import { StationRepository } from './station.repository';
 import { StationResolver } from './station.resolver';
 import { StationService } from './station.service';
@@ -21,6 +22,7 @@ import { StationService } from './station.service';
     StationLineDataLoader,
     StationNameDataLoader,
     StationCoordsDataLoader,
+    StatioPathfinderDataLoader,
     MysqlService,
     StationRepository,
     RawService,

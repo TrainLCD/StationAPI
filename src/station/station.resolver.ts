@@ -1,11 +1,12 @@
 import { ParseIntPipe } from '@nestjs/common';
 import { Args, Query, Resolver } from '@nestjs/graphql';
-import { Station } from 'src/graphql';
+import { FoundPath, Station } from 'src/graphql';
 import StationCoordsDataLoader from './station.coords.loader';
 import StatioGroupDataLoader from './station.group.loader';
 import StationLineDataLoader from './station.line.loader';
 import StationDataLoader from './station.loader';
 import StationNameDataLoader from './station.name.loader';
+import StatioPathfinderDataLoader from './station.pathfinder.loader';
 import { StationService } from './station.service';
 
 @Resolver(Station)
@@ -17,6 +18,7 @@ export class StationResolver {
     private readonly stationLineDataLoader: StationLineDataLoader,
     private readonly stationNameDataLoader: StationNameDataLoader,
     private readonly stationCoordsDataLoader: StationCoordsDataLoader,
+    private readonly pathfinderDataLoader: StatioPathfinderDataLoader,
   ) {}
 
   @Query(() => Station)
@@ -51,5 +53,13 @@ export class StationResolver {
   @Query(() => Station)
   async random(): Promise<Station> {
     return this.stationService.getRandomStation();
+  }
+
+  @Query(() => [FoundPath])
+  async pathfinder(
+    @Args('srcGroupId') srcGroupId: number,
+    @Args('dstGroupId') dstGroupId: number,
+  ): Promise<FoundPath[]> {
+    return this.pathfinderDataLoader.load([srcGroupId, dstGroupId]);
   }
 }

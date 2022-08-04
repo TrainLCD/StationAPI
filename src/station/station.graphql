@@ -5,6 +5,7 @@ type Query {
   stationsByLineId(lineId: ID!): [Station]
   stationsByName(name: String!): [Station]
   random: Station
+  pathfinder(srcGroupId: ID!, dstGroupId: ID!): [FoundPath]
 }
 
 type StationNumber {
@@ -60,4 +61,15 @@ type StationOnly {
   nameR: String
   nameZh: String
   nameKo: String
+}
+
+enum BoundDirection {
+  INBOUND
+  OUTBOUND
+}
+
+type FoundPath {
+  line: Line
+  stations: [StationOnly]
+  bound: BoundDirection
 }

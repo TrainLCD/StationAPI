@@ -164,4 +164,49 @@ export class LineRepository {
       );
     });
   }
+
+  async getBySrcAndDstGroupId(
+    srcGID: number,
+    dstGID: number,
+  ): Promise<LineRaw[]> {
+    const { connection } = this.mysqlService;
+    if (!connection) {
+      return [];
+    }
+
+    return new Promise<LineRaw[]>((resolve, reject) => {
+      connection.query(
+        `SELECT *
+        FROM \`lines\`
+        WHERE
+          line_cd IN (
+            SELECT line_cd
+            FROM stations
+            WHERE station_g_cd = ?
+          )
+          AND
+          line_cd IN (
+            SELECT line_cd
+            FROM stations
+            WHERE station_g_cd = ?
+          )
+          AND
+          e_status = 0
+          AND NOT
+          line_cd = ?
+        `,
+        [srcGID, dstGID, NEX_ID],
+        async (err, results: RowDataPacket[]) => {
+          if (err) {
+            return reject(err);
+          }
+          if (!results.length) {
+            return resolve([]);
+          }
+
+          return resolve(results as LineRaw[]);
+        },
+      );
+    });
+  }
 }

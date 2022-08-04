@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Station } from 'src/graphql';
+import { BoundDirection, FoundPath, Station } from 'src/graphql';
 import { LineRepository } from 'src/line/line.repository';
 import { RawService } from 'src/raw/raw.service';
 import { StationRepository } from './station.repository';
@@ -89,5 +89,49 @@ export class StationService {
       station.lines.map((l) => l.line_cd),
     );
     return this.rawService.convertStation(station, companies, []);
+  }
+
+  async findPath(allPaths: [number, number][]): Promise<FoundPath[][]> {
+    return Promise.all(
+      allPaths.map(async (paths) => {
+        const linesRaw = await this.lineRepo.getBySrcAndDstGroupId(...paths);
+        if (!linesRaw?.length) {
+          return [];
+        }
+        const stationsByLineIds = await this.stationRepo.getByLineIds(
+          linesRaw.map((l) => l.line_cd),
+        );
+
+        return Promise.all(
+          linesRaw.map(async (l) => {
+            const srcIndex = stationsByLineIds.findIndex(
+              (s) =>
+                s.station_g_cd === Number(paths[0]) && s.line_cd === l.line_cd,
+            );
+            const dstIndex = stationsByLineIds.findIndex(
+              (s) =>
+                s.station_g_cd === Number(paths[1]) && s.line_cd === l.line_cd,
+            );
+
+            const bound: BoundDirection =
+              srcIndex > dstIndex
+                ? BoundDirection.INBOUND
+                : BoundDirection.OUTBOUND;
+            const slicedStationsRaw =
+              bound === BoundDirection.INBOUND
+                ? stationsByLineIds.slice(dstIndex, srcIndex + 1).reverse()
+                : stationsByLineIds.slice(srcIndex, dstIndex + 1);
+
+            return {
+              line: this.rawService.convertLine(l),
+              stations: slicedStationsRaw
+                .filter((s) => s.line_cd === l.line_cd)
+                .map((s) => this.rawService.convertStation(s)),
+              bound,
+            };
+          }),
+        );
+      }),
+    );
   }
 }

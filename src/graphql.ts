@@ -14,6 +14,11 @@ export enum StopCondition {
     HOLIDAY = "HOLIDAY"
 }
 
+export enum BoundDirection {
+    INBOUND = "INBOUND",
+    OUTBOUND = "OUTBOUND"
+}
+
 export enum TrainDirection {
     BOTH = "BOTH",
     INBOUND = "INBOUND",
@@ -34,6 +39,8 @@ export abstract class IQuery {
     abstract stationsByName(name: string): Station[] | Promise<Station[]>;
 
     abstract random(): Station | Promise<Station>;
+
+    abstract pathfinder(srcGroupId: string, dstGroupId: string): FoundPath[] | Promise<FoundPath[]>;
 
     abstract trainType(id: string): TrainType | Promise<TrainType>;
 }
@@ -119,6 +126,12 @@ export class StationOnly {
     nameR?: string;
     nameZh?: string;
     nameKo?: string;
+}
+
+export class FoundPath {
+    line?: Line;
+    stations?: StationOnly[];
+    bound?: BoundDirection;
 }
 
 export class TrainTypeMinimum {
