@@ -16,10 +16,10 @@ export class LineRepository {
         `SELECT *
         FROM \`lines\`
         WHERE line_cd = ?
-        AND NOT line_cd = ${NEX_ID}
+        AND NOT line_cd = ?
         AND e_status = 0
         LIMIT 1`,
-        [id],
+        [id, NEX_ID],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -41,9 +41,9 @@ export class LineRepository {
         `SELECT *
         FROM \`lines\`
         WHERE line_cd in (?)
-        AND NOT line_cd = ${NEX_ID}
+        AND NOT line_cd = ?
         AND e_status = 0`,
-        [ids],
+        [ids, NEX_ID],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -118,9 +118,9 @@ export class LineRepository {
         FROM \`lines\`
         WHERE line_cd
         IN (SELECT line_cd FROM stations WHERE station_g_cd = ?)
-        AND NOT line_cd = ${NEX_ID}
+        AND NOT line_cd = ?
         AND e_status = 0`,
-        [groupId],
+        [groupId, NEX_ID],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -147,10 +147,10 @@ export class LineRepository {
         FROM \`lines\`
         WHERE line_cd
         IN (SELECT line_cd FROM stations WHERE station_cd = ?)
-        AND NOT line_cd = ${NEX_ID}
+        AND NOT line_cd = ?
         AND e_status = 0
         LIMIT 1`,
-        [stationId],
+        [stationId, NEX_ID],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
