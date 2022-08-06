@@ -29,9 +29,9 @@ export class StationRepository {
           FROM stations
           WHERE station_cd = ?
           AND e_status = 0
-          AND NOT line_cd = ${NEX_ID}
+          AND NOT line_cd = ?
         `,
-        [id],
+        [id, NEX_ID],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -62,9 +62,9 @@ export class StationRepository {
           FROM stations
           WHERE station_cd in (?)
           AND e_status = 0
-          AND NOT line_cd = ${NEX_ID}
+          AND NOT line_cd = ?
         `,
-        [ids],
+        [ids, NEX_ID],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -461,10 +461,10 @@ export class StationRepository {
           FROM stations
           WHERE line_cd in (?)
           AND e_status = 0
-          AND NOT line_cd = ${NEX_ID}
+          AND NOT line_cd = ?
           ORDER BY e_sort, station_cd
         `,
-        [lineIds],
+        [lineIds, NEX_ID],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -503,10 +503,10 @@ export class StationRepository {
           OR station_name_zh LIKE "%"?"%"
           OR station_name_ko LIKE "%"?"%")
           AND e_status = 0
-          AND NOT line_cd = ${NEX_ID}
+          AND NOT line_cd = ?
           ORDER BY e_sort, station_cd
         `,
-        [name, name, name, name, name],
+        [name, name, name, name, name, NEX_ID],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -541,13 +541,13 @@ export class StationRepository {
           SELECT *
           FROM stations
           WHERE e_status = 0
-          AND NOT line_cd = ${NEX_ID}
+          AND NOT line_cd = ?
           AND station_g_cd IN (
             SELECT DISTINCT station_g_cd
             FROM stations
           )
         `,
-        [],
+        [NEX_ID],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -571,7 +571,7 @@ export class StationRepository {
         SELECT *
         FROM stations
         WHERE e_status = 0
-        AND NOT line_cd = ${NEX_ID}
+        AND NOT line_cd = ?
         AND station_g_cd IN (
           SELECT DISTINCT station_g_cd
           FROM stations
@@ -579,7 +579,7 @@ export class StationRepository {
         ORDER BY RAND()
         LIMIT 1
       `,
-        [],
+        [NEX_ID],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
