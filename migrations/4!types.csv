@@ -106,6 +106,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 226,富士回遊,フジカイユウ,FUJI EXCURSION,富士回游,후지카이유,#7B68EE,0,中央線-富士急行直通用,COMPLETE
 227,はちおうじ,ハチオウジ,Hachioji,八王子,하치오지,#F15A22,0,,COMPLETE
 228,おうめ,オウメ,Ome,青梅,오메,#F15A22,0,,COMPLETE
+229,しなの,シナノ,Shinano,信浓,시나노,#d56a29,0,,COMPLETE
 300,普通,フツウ,Local,慢车,慢车,#1f63c6,0,,PARTIAL
 301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1f63c7,0,,PARTIAL
 302,快速,カイソク,Rapid,快车,쾌속,#dc143c,0,,PARTIAL
@@ -167,3 +168,6 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 513,こうや,コウヤ,KŌYA,高野,코야,#009A41,0,,COMPLETE
 514,りんかん,リンカン,RINKAN,林间,린칸,#009A42,0,,COMPLETE
 515,はしだて,ハシダテ,Hashidate,桥立,하시다테,#e80000,0,,COMPLETE
+516,スーパーはこね,スーパーハコネ,Super Hakone,超级箱根,슈퍼 하코네,#2288CC,0,,COMPLETE
+517,はこね,ハコネ,Hakone,箱根,하코네,#2288CC,0,,COMPLETE
+518,メトロはこね,メトロハコネ,Metro Hakone,地下铁箱根,메트로 하코네,#2288CC,0,,COMPLETE
