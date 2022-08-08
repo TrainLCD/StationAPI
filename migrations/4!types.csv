@@ -168,3 +168,6 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 513,こうや,コウヤ,KŌYA,高野,코야,#009A41,0,,COMPLETE
 514,りんかん,リンカン,RINKAN,林间,린칸,#009A42,0,,COMPLETE
 515,はしだて,ハシダテ,Hashidate,桥立,하시다테,#e80000,0,,COMPLETE
+516,スーパーはこね,スーパーハコネ,Super Hakone,超级箱根,슈퍼 하코네,#2288CC,0,,COMPLETE
+517,はこね,ハコネ,Hakone,箱根,하코네,#2288CC,0,,COMPLETE
+518,メトロはこね,メトロハコネ,Metro Hakone,地下铁箱根,메트로 하코네,#2288CC,0,,COMPLETE
