@@ -140,6 +140,8 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 332,アクセス特急,アクセストッキュウ,Access Express,访问特快,액세스 특급,#ed7d00,0,,PARTIAL
 333,堺筋準急,サカイスジジュンキュウ,Sakaisuji Semi Rapid,堺筋准急,사카이스지 준급,#2a9b50,0,,PARTIAL
 334,直通特急,チョクツウトッキュウ,Limited Express,直通特急,직통특급,#dd2e1e,0,山陽電車,COMPLETE
+335,区間快速,クカンカイソク,Semi Rapid,区间快速,구간쾌속,#000084,0,TX用,COMPLETE
+336,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#FFA500,0,,COMPLETE
 400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner(开往京王八王子),게이오 라이너 (게이오 하치 오지 방면),#dd0077,0,,COMPLETE
 401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner(开往桥本),게이오 라이너 (하시모토 방면),#dd0078,0,,COMPLETE
 402,"モーニング
