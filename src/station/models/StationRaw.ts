@@ -1,5 +1,20 @@
 import { LineRaw } from 'src/line/models/LineRaw';
 
+enum StopCondition {
+  ALL,
+  NOT,
+  PARTIAL,
+  WEEKDAY,
+  HOLIDAY,
+  PARTIAL_STOP,
+}
+
+enum TrainDirection {
+  BOTH,
+  INBOUND,
+  OUTBOUND,
+}
+
 export class StationRaw {
   station_cd: number;
   station_g_cd: number;
@@ -25,6 +40,6 @@ export class StationRaw {
   distance?: number;
   lines: LineRaw[];
   currentLine: LineRaw;
-  pass?: number;
-  direction: number;
+  pass?: StopCondition;
+  direction: TrainDirection;
 }

@@ -11,7 +11,8 @@ export enum StopCondition {
     NOT = "NOT",
     PARTIAL = "PARTIAL",
     WEEKDAY = "WEEKDAY",
-    HOLIDAY = "HOLIDAY"
+    HOLIDAY = "HOLIDAY",
+    PARTIAL_STOP = "PARTIAL_STOP"
 }
 
 export enum TrainDirection {

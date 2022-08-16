@@ -35,6 +35,8 @@ export class RawService {
           return StopCondition.WEEKDAY;
         case 4:
           return StopCondition.HOLIDAY;
+        case 5:
+          return StopCondition.PARTIAL_STOP;
         default:
           return StopCondition.ALL;
       }
