@@ -19,6 +19,7 @@ enum StopCondition {
   PARTIAL
   WEEKDAY
   HOLIDAY
+  PARTIAL_STOP
 }
 
 type Station {
