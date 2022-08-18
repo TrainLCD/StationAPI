@@ -107,6 +107,9 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 227,はちおうじ,ハチオウジ,Hachioji,八王子,하치오지,#F15A22,0,,COMPLETE
 228,おうめ,オウメ,Ome,青梅,오메,#F15A22,0,,COMPLETE
 229,しなの,シナノ,Shinano,信浓,시나노,#d56a29,0,,COMPLETE
+230,"成田
+エクスプレス",ナリタエクスプレス,Narita Express,成田特快,"나리타
+익스프레스",#ff3333,,,COMPLETE
 300,普通,フツウ,Local,慢车,慢车,#1f63c6,0,,PARTIAL
 301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1f63c7,0,,PARTIAL
 302,快速,カイソク,Rapid,快车,쾌속,#dc143c,0,,PARTIAL
