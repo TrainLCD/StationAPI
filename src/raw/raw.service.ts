@@ -105,7 +105,7 @@ export class RawService {
       nameKo: raw.station_name_ko,
       pass: raw.pass === 1 ? true : false,
       stopCondition: enumStopCondition,
-      trainTypes: trainTypes,
+      trainTypes: trainTypes ?? [],
       stationNumbers: fullStationNumbers,
       threeLetterCode: raw.three_letter_code,
     };
