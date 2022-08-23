@@ -88,8 +88,10 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 208,ソニック,ソニック,Sonic,索尼克,소닉,#0095d9,0,,COMPLETE
 209,かいじ,カイジ,Kaiji,甲斐路,가이지,#0074be,0,,COMPLETE
 210,あずさ,アズサ,Azusa,梓,아즈사,#0074be,0,,COMPLETE
-211,サンライズ瀬戸,サンライズセト,Sunrise Seto,日出濑户,선라이즈 세토,#aa8d01,0,,COMPLETE
-212,サンライズ出雲,サンライズイズモ,Sunrise Izumo,日出出云,선라이즈 이즈모,#aa8d01,0,,COMPLETE
+211,"サンライズ
+瀬戸",サンライズセト,Sunrise Seto,日出濑户,선라이즈 세토,#aa8d01,0,,COMPLETE
+212,"サンライズ
+出雲",サンライズイズモ,Sunrise Izumo,日出出云,선라이즈 이즈모,#aa8d01,0,,COMPLETE
 213,サロベツ,サロベツ,Sarobetsu,佐呂別,살로베츠,#2cb431,0,,COMPLETE
 214,ライラック,ライラック,Lilac,丁香,라일락,#2cb431,0,,COMPLETE
 215,カムイ,カムイ,Kamui,神威,카무이,#2cb431,0,,COMPLETE
