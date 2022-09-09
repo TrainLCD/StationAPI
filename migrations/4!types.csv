@@ -88,8 +88,10 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 208,ソニック,ソニック,Sonic,索尼克,소닉,#0095d9,0,,COMPLETE
 209,かいじ,カイジ,Kaiji,甲斐路,가이지,#0074be,0,,COMPLETE
 210,あずさ,アズサ,Azusa,梓,아즈사,#0074be,0,,COMPLETE
-211,サンライズ瀬戸,サンライズセト,Sunrise Seto,日出濑户,선라이즈 세토,#aa8d01,0,,COMPLETE
-212,サンライズ出雲,サンライズイズモ,Sunrise Izumo,日出出云,선라이즈 이즈모,#aa8d01,0,,COMPLETE
+211,"サンライズ
+瀬戸",サンライズセト,Sunrise Seto,日出濑户,선라이즈 세토,#aa8d01,0,,COMPLETE
+212,"サンライズ
+出雲",サンライズイズモ,Sunrise Izumo,日出出云,선라이즈 이즈모,#aa8d01,0,,COMPLETE
 213,サロベツ,サロベツ,Sarobetsu,佐呂別,살로베츠,#2cb431,0,,COMPLETE
 214,ライラック,ライラック,Lilac,丁香,라일락,#2cb431,0,,COMPLETE
 215,カムイ,カムイ,Kamui,神威,카무이,#2cb431,0,,COMPLETE
@@ -116,11 +118,14 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 303,区間急行,クカンキュウコウ,Semi Express,区域特快,구간급행,#d8ca00,0,,PARTIAL
 304,急行,キュウコウ,Express,特快,급행,#dc143c,0,,PARTIAL
 306,特急,トッキュウ,Limited Express,特快,특급,#dc143c,0,,COMPLETE
-307,エアポート快特,エアポートカイトク,Airport Limited Express,机场特快,공항쾌특,#fa9715,0,,COMPLETE
+307,"エアポート
+快特",エアポートカイトク,Airport Limited Express,机场特快,공항쾌특,#fa9715,0,,COMPLETE
 308,快特(泉岳寺〜三崎口),カイトク,Limited Express(Sengakuji to Misakiguchi),特快(开往三崎口),쾌특 (미사키 구치 방면),#379412,0,,COMPLETE
 309,快特(泉岳寺〜羽田空港),カイトク,Limited Express(Sengakuji to Haneda Airport),特快(开往羽田机场),쾌특 (하네다 공항 방면),#379412,0,,COMPLETE
-310,エアポート急行(泉岳寺〜羽田空港),エアポートキュウコウ,Airport Express(Haneda Airport to Sengakuji),机场特快(开往泉岳寺),공항급행 (센 가쿠 방면),#0d83c3,0,,COMPLETE
-311,エアポート急行(逗子・葉山〜羽田空港),エアポートキュウコウ,Airport Express(Haneda Airport to Zushi･Hayama),机场特快(开往逗子·叶山),공항급행 (즈시 하야마 방면),#0d83c3,0,,COMPLETE
+310,"エアポート
+急行(泉岳寺〜羽田空港)",エアポートキュウコウ,Airport Express(Haneda Airport to Sengakuji),机场特快(开往泉岳寺),공항급행 (센 가쿠 방면),#0d83c3,0,,COMPLETE
+311,"エアポート
+急行(逗子・葉山〜羽田空港)",エアポートキュウコウ,Airport Express(Haneda Airport to Zushi･Hayama),机场特快(开往逗子·叶山),공항급행 (즈시 하야마 방면),#0d83c3,0,,COMPLETE
 312,特急(泉岳寺〜三崎口),トッキュウ,Limited Express(Sengakuji to Misakiguchi),特快(开往三崎口),특급 (미사키 구치 방면),#ea0104,0,,COMPLETE
 313,特急(泉岳寺〜浦賀),トッキュウ,Limited Express(Sengakuji to Uraga),特快(开往浦贺),특급 (우라 방면),#ea0104,0,,PARTIAL
 314,通勤急行,ツウキンキュウコウ,Commuter Express,通勤快车,통근급행,#eeaa66,0,,PARTIAL
@@ -173,6 +178,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 513,こうや,コウヤ,KŌYA,高野,코야,#009A41,0,,COMPLETE
 514,りんかん,リンカン,RINKAN,林间,린칸,#009A42,0,,COMPLETE
 515,はしだて,ハシダテ,Hashidate,桥立,하시다테,#e80000,0,,COMPLETE
-516,スーパーはこね,スーパーハコネ,Super Hakone,超级箱根,슈퍼 하코네,#2288CC,0,,COMPLETE
+516,"スーパー
+はこね",スーパーハコネ,Super Hakone,超级箱根,슈퍼 하코네,#2288CC,0,,COMPLETE
 517,はこね,ハコネ,Hakone,箱根,하코네,#2288CC,0,,COMPLETE
 518,メトロはこね,メトロハコネ,Metro Hakone,地下铁箱根,메트로 하코네,#2288CC,0,,COMPLETE
