@@ -39,6 +39,7 @@ jobs:
           MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD_DEV }}
           MYSQL_HOST: ${{ secrets.MYSQL_HOST_DEV }}
           MACKEREL_APIKEY: ${{ secrets.MACKEREL_APIKEY }}
+          NRIA_LICENSE_KEY: ${{ secrets.NRIA_LICENSE_KEY }}
         run: |
           JSON_TEMPLATE=$(cat $(pwd)/scripts/aws-container-template.json)
 
@@ -55,6 +56,7 @@ jobs:
                             --arg MYSQL_PASSWORD "$MYSQL_PASSWORD" \
                             --arg MYSQL_HOST "$MYSQL_HOST" \
                             --arg MACKEREL_APIKEY "$MACKEREL_APIKEY" \
+                            --arg NRIA_LICENSE_KEY "$NRIA_LICENSE_KEY" \
                             "$JSON_TEMPLATE"
                       )
           echo $JSON_STRING > aws-container.json

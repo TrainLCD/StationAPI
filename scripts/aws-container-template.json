@@ -18,6 +18,12 @@
         "MACKEREL_CONTAINER_PLATFORM": "ecs_v3",
         "MACKEREL_APIKEY": $MACKEREL_APIKEY
       }
+    },
+    "newrelic-infra": {
+      "image": "newrelic/infrastructure:latest",
+      "environment": {
+        "NRIA_LICENSE_KEY": $NRIA_LICENSE_KEY
+      }
     }
   },
   "publicEndpoint": {
