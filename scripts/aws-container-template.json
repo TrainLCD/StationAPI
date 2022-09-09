@@ -23,7 +23,27 @@
       "image": "newrelic/infrastructure:latest",
       "environment": {
         "NRIA_LICENSE_KEY": $NRIA_LICENSE_KEY
-      }
+      },
+      "networkMode": "host",
+      "privileged": true,
+      "pidMode": "host",
+      "linuxParameters": {
+        "capabilities": {
+          "add": ["SYS_PTRACE"]
+        }
+      },
+      "mountPoints": [
+        {
+          "sourceVolume": "/",
+          "containerPath": "/host",
+          "readOnly": true
+        },
+        {
+          "sourceVolume": "/var/run/docker.sock",
+          "containerPath": "/var/run/docker.sock",
+          "readOnly": true
+        }
+      ]
     }
   },
   "publicEndpoint": {
