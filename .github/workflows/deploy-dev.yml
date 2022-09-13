@@ -1,0 +1,56 @@
+name: Deploy development
+
+on:
+  pull_request:
+    types: synchronize
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Utilities
+        run: sudo apt-get install -y jq
+      - name: Install AWS Client and LightsailControl Plugin
+        run: |
+          aws --version
+          curl "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" -o "lightsailctl"
+          sudo mv "lightsailctl" "/usr/local/bin/lightsailctl"
+          sudo chmod +x /usr/local/bin/lightsailctl
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+      - name: Build Docker Image
+        run: |
+          docker build -t stationapi:latest .
+      - name: Push and Deploy
+        env:
+          SERVICE_NAME: ${{ secrets.SERVICE_NAME_DEV }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE_DEV }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER_DEV }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD_DEV }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST_DEV }}
+          MACKEREL_APIKEY: ${{ secrets.MACKEREL_APIKEY }}
+        run: |
+          JSON_TEMPLATE=$(cat $(pwd)/scripts/aws-container-template.json)
+
+          aws lightsail push-container-image \
+              --region ap-northeast-1 \
+              --service-name ${SERVICE_NAME} \
+              --label api \
+              --image stationapi:latest
+          JSON_STRING=$(jq -n \
+                            --arg IMAGE "$(aws lightsail get-container-images --service-name ${SERVICE_NAME} | jq --raw-output ".containerImages[0].image")" \
+                            --arg SERVICE_NAME "$SERVICE_NAME" \
+                            --arg MYSQL_DATABASE "$MYSQL_DATABASE" \
+                            --arg MYSQL_USER "$MYSQL_USER" \
+                            --arg MYSQL_PASSWORD "$MYSQL_PASSWORD" \
+                            --arg MYSQL_HOST "$MYSQL_HOST" \
+                            --arg MACKEREL_APIKEY "$MACKEREL_APIKEY" \
+                            "$JSON_TEMPLATE"
+                      )
+          echo $JSON_STRING > aws-container.json
+          aws lightsail create-container-service-deployment --service-name ${SERVICE_NAME} --cli-input-json file://$(pwd)/aws-container.json
