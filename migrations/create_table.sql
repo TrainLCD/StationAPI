@@ -179,7 +179,7 @@ DROP TABLE IF EXISTS `types`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `types` (
   `type_cd` int unsigned NOT NULL AUTO_INCREMENT,
-  `type_name` varchar(19) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
+  `type_name` varchar(20) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
   `type_name_k` varchar(14) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
   `type_name_r` varchar(53) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
   `type_name_zh` varchar(19) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
