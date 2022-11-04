@@ -17,6 +17,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 16,はくたか,ハクタカ,Hakutaka,白鹰,하쿠타카,#FF0000,0,,COMPLETE
 17,あさま,アサマ,Asama,浅间,아사마,#0000FF,0,,COMPLETE
 18,つるぎ,ツルギ,Tsurugi,剑,쓰루기,#3050FF,0,,COMPLETE
+19,かもめ,カモメ,KAMOME,海鸥,카모메,#E10017,0,,COMPLETE
 100,普通,フツウ,Local,慢车,보통,#1f63c6,0,,PARTIAL
 101,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1f63c7,0,,PARTIAL
 102,快速,カイソク,Rapid,快车,쾌속,#dc143c,0,,PARTIAL
@@ -119,7 +120,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 304,急行,キュウコウ,Express,特快,급행,#dc143c,0,,PARTIAL
 306,特急,トッキュウ,Limited Express,特快,특급,#dc143c,0,,COMPLETE
 307,"エアポート
-快特",エアポートカイトク,Airport Limited Express,机场特快,공항쾌특,#fa9715,0,,COMPLETE
+快特",エアポートカイトク,Airport Limited Express,机场特快,공항쾌특,#fa9715,0,浅草線のデータしか入っていないので後で他社線直通の対応が必要,COMPLETE
 308,快特(泉岳寺〜三崎口),カイトク,Limited Express(Sengakuji to Misakiguchi),特快(开往三崎口),쾌특 (미사키 구치 방면),#379412,0,,COMPLETE
 309,快特(泉岳寺〜羽田空港),カイトク,Limited Express(Sengakuji to Haneda Airport),特快(开往羽田机场),쾌특 (하네다 공항 방면),#379412,0,,COMPLETE
 310,"エアポート
@@ -182,8 +183,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 はこね",スーパーハコネ,Super Hakone,超级箱根,슈퍼 하코네,#2288CC,0,,COMPLETE
 517,はこね,ハコネ,Hakone,箱根,하코네,#2288CC,0,,COMPLETE
 518,メトロはこね,メトロハコネ,Metro Hakone,地下铁箱根,메트로 하코네,#2288CC,0,,COMPLETE
-519,かもめ,カモメ,KAMOME,海鸥,카모메,#E10017,0,,COMPLETE
-520,"リレー
+519,"リレー
 かもめ",リレーカモメ,"Relay
 KAMOME",接力海鸥,"릴레이
 카모메",#E10018,0,,COMPLETE
