@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { RowDataPacket } from 'mysql2';
+import { NEX_ID } from 'src/constants/ignore';
 import { LineRepository } from 'src/line/line.repository';
 import { LineRaw } from 'src/line/models/LineRaw';
 import { MysqlService } from 'src/mysql/mysql.service';
@@ -12,6 +13,41 @@ export class TrainTypeRepository {
     private readonly mysqlService: MysqlService,
     private lineRepo: LineRepository,
   ) {}
+
+  async getStationsByGroupIds(groupIds: number[]): Promise<StationRaw[]> {
+    const { connection } = this.mysqlService;
+
+    return new Promise<StationRaw[]>((resolve, reject) => {
+      connection.query(
+        `
+          SELECT *
+          FROM stations
+          WHERE station_g_cd in (?)
+          AND e_status = 0
+          AND NOT line_cd = ?
+        `,
+        [groupIds, NEX_ID],
+        async (err, results: RowDataPacket[]) => {
+          if (err) {
+            return reject(err);
+          }
+          if (!results.length) {
+            return resolve([] as StationRaw[]);
+          }
+
+          return resolve(
+            Promise.all(
+              results.map(async (r) => ({
+                ...(r as StationRaw),
+                currentLine: await this.lineRepo.findOneStationId(r.station_cd),
+                lines: await this.lineRepo.getByGroupId(r.station_g_cd),
+              })),
+            ),
+          );
+        },
+      );
+    });
+  }
 
   async getByIds(lineGroupIds: number[]): Promise<TrainTypeRaw[]> {
     const { connection } = this.mysqlService;
@@ -58,6 +94,11 @@ export class TrainTypeRepository {
           if (!results.length) {
             return resolve([]);
           }
+
+          const belongStations = await this.getStationsByGroupIds(
+            results.map((r) => r.station_g_cd),
+          );
+
           return resolve(
             Promise.all(
               results.map(
@@ -66,7 +107,14 @@ export class TrainTypeRepository {
                   currentLine: await this.lineRepo.findOneStationId(
                     r.station_cd,
                   ),
-                  lines: await this.lineRepo.getByGroupId(r.station_g_cd),
+                  lines: (await this.lineRepo.getByGroupId(r.station_g_cd)).map(
+                    (l, i) => ({
+                      ...l,
+                      transferStation: belongStations.filter(
+                        (bs) => bs.station_g_cd === r.station_g_cd,
+                      )[i],
+                    }),
+                  ),
                 }),
               ),
             ),
