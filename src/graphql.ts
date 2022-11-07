@@ -61,6 +61,7 @@ export class Line {
     lineType?: number;
     zoom?: number;
     company?: Company;
+    transferStation?: Station;
 }
 
 export class Company {

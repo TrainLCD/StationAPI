@@ -1,3 +1,5 @@
+import { StationRaw } from 'src/station/models/StationRaw';
+
 export class CompanyRaw {
   line_cd: number;
   company_cd: number;
@@ -36,4 +38,5 @@ export class LineRaw {
   zoom: number;
   e_status: number;
   e_sort: number;
+  transferStation?: StationRaw;
 }
