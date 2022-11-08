@@ -21,17 +21,16 @@ export class TrainTypeService {
       lineGroupIds,
     );
 
-    const belongingStationsLineIds = belongingStations.map((s) =>
-      s.lines.map((l) => l.line_cd),
-    );
-    const belongingStationsCompanies = await Promise.all(
-      belongingStationsLineIds.map(
-        async (lids) => await this.lineRepo.getCompaniesByLineIds(lids),
-      ),
+    const stationsByGroupIds = await this.trainTypeRepo.getStationsByGroupIds(
+      belongingStations.map((bs) => bs.station_g_cd),
     );
 
-    const trainTypeStations = belongingStations.map((bs, i) =>
-      this.rawService.convertStation(bs, belongingStationsCompanies[i]),
+    const belongingStationsCompanies = await this.lineRepo.getCompaniesByLineIds(
+      stationsByGroupIds.map((s) => s.line_cd),
+    );
+
+    const trainTypeStations = belongingStations.map((bs) =>
+      this.rawService.convertStation(bs, belongingStationsCompanies),
     );
     const trainTypeLines = belongingLines.map((bl) =>
       this.rawService.convertLine(bl),

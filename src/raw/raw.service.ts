@@ -42,7 +42,7 @@ export class RawService {
       }
     })() as StopCondition;
 
-    const rawCurrentLine = raw.lines.find((l) => l.line_cd === raw.line_cd);
+    const rawCurrentLine = raw.lines?.find((l) => l.line_cd === raw.line_cd);
 
     const lineSymbolsRaw = [
       rawCurrentLine?.line_symbol_primary,
@@ -86,12 +86,12 @@ export class RawService {
       longitude: raw.lon,
       currentLine: this.convertLine(
         raw.currentLine,
-        companies.find((c) => c.company_cd === raw.currentLine.company_cd),
+        companies?.find((c) => c.company_cd === raw.currentLine.company_cd),
       ),
       lines: raw.lines?.map((l) =>
         this.convertLine(
           l,
-          companies.find((c) => c.company_cd === l.company_cd),
+          companies?.find((c) => c.company_cd === l.company_cd),
         ),
       ),
       openYmd: raw.open_ymd,
@@ -158,6 +158,7 @@ export class RawService {
         url: companyRaw.company_url,
         companyType: companyRaw.company_type,
       },
+      transferStation: this.convertStation(lineRaw.transferStation),
     };
   }
 

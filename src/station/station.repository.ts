@@ -465,7 +465,7 @@ export class StationRepository {
           ORDER BY e_sort, station_cd
         `,
         [lineIds, NEX_ID],
-        (err, results: RowDataPacket[]) => {
+        async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
@@ -473,12 +473,24 @@ export class StationRepository {
             return resolve([]);
           }
 
+          const rawLines = await Promise.all(
+            results.map((r) => this.lineRepo.getByGroupId(r.station_g_cd)),
+          );
+          const belongStations = await this.getByGroupIds(
+            results.map((r) => r.station_g_cd),
+          );
+
           return resolve(
             Promise.all(
-              results.map(async (r) => ({
+              results.map(async (r, i) => ({
                 ...(r as StationRaw),
                 currentLine: await this.lineRepo.findOneStationId(r.station_cd),
-                lines: await this.lineRepo.getByGroupId(r.station_g_cd),
+                lines: rawLines[i].map((rl, li) => ({
+                  ...rl,
+                  transferStation: belongStations.filter(
+                    (bs) => bs.station_g_cd === r.station_g_cd,
+                  )[li],
+                })),
               })),
             ),
           );
@@ -595,6 +607,41 @@ export class StationRepository {
             ),
             lines: await this.lineRepo.getByGroupId(results[0].station_g_cd),
           } as StationRaw);
+        },
+      );
+    });
+  }
+
+  async getByGroupIds(groupIds: number[]): Promise<StationRaw[]> {
+    const { connection } = this.mysqlService;
+
+    return new Promise<StationRaw[]>((resolve, reject) => {
+      connection.query(
+        `
+          SELECT *
+          FROM stations
+          WHERE station_g_cd in (?)
+          AND e_status = 0
+          AND NOT line_cd = ?
+        `,
+        [groupIds, NEX_ID],
+        async (err, results: RowDataPacket[]) => {
+          if (err) {
+            return reject(err);
+          }
+          if (!results.length) {
+            return resolve([] as StationRaw[]);
+          }
+
+          return resolve(
+            Promise.all(
+              results.map(async (r) => ({
+                ...(r as StationRaw),
+                currentLine: await this.lineRepo.findOneStationId(r.station_cd),
+                lines: await this.lineRepo.getByGroupId(r.station_g_cd),
+              })),
+            ),
+          );
         },
       );
     });

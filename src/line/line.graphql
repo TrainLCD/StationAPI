@@ -24,6 +24,7 @@ type Line {
   lineType: Int
   zoom: Int
   company: Company
+  transferStation: Station
 }
 
 type Company {
