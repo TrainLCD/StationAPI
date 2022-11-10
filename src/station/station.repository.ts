@@ -485,11 +485,13 @@ export class StationRepository {
               results.map(async (r, i) => ({
                 ...(r as StationRaw),
                 currentLine: await this.lineRepo.findOneStationId(r.station_cd),
-                lines: rawLines[i].map((rl, li) => ({
+                lines: rawLines[i].map((rl) => ({
                   ...rl,
-                  transferStation: belongStations.filter(
-                    (bs) => bs.station_g_cd === r.station_g_cd,
-                  )[li],
+                  transferStation: belongStations.find(
+                    (bs) =>
+                      bs.station_g_cd === r.station_g_cd &&
+                      bs.line_cd === rl.line_cd,
+                  ),
                 })),
               })),
             ),
