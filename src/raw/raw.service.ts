@@ -50,7 +50,9 @@ export class RawService {
       rawCurrentLine?.line_symbol_extra,
     ];
     const lineSymbolColorsRaw = [
-      rawCurrentLine?.line_symbol_primary_color,
+      rawCurrentLine?.line_symbol_primary_color.length
+        ? rawCurrentLine?.line_symbol_primary_color
+        : rawCurrentLine.line_color_c,
       rawCurrentLine?.line_symbol_secondary_color,
       rawCurrentLine?.line_symbol_extra_color,
     ];
@@ -119,7 +121,9 @@ export class RawService {
     const lineSymbols: LineSymbol[] = [
       lineRaw.line_symbol_primary && {
         lineSymbol: lineRaw.line_symbol_primary || null,
-        lineSymbolColor: lineRaw.line_symbol_primary_color || null,
+        lineSymbolColor: lineRaw.line_symbol_primary_color.length
+          ? lineRaw.line_symbol_primary_color
+          : lineRaw.line_color_c,
       },
       lineRaw.line_symbol_secondary && {
         lineSymbol: lineRaw.line_symbol_secondary || null,
