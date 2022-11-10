@@ -108,11 +108,13 @@ export class TrainTypeRepository {
                     r.station_cd,
                   ),
                   lines: (await this.lineRepo.getByGroupId(r.station_g_cd)).map(
-                    (l, i) => ({
+                    (l) => ({
                       ...l,
-                      transferStation: belongStations.filter(
-                        (bs) => bs.station_g_cd === r.station_g_cd,
-                      )[i],
+                      transferStation: belongStations.find(
+                        (bs) =>
+                          bs.station_g_cd === r.station_g_cd &&
+                          bs.line_cd === l.line_cd,
+                      ),
                     }),
                   ),
                 }),
