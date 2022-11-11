@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { RowDataPacket } from 'mysql2';
-import { NEX_ID } from 'src/constants/ignore';
 import { MysqlService } from 'src/mysql/mysql.service';
 import { CompanyRaw, LineRaw } from './models/LineRaw';
 
@@ -16,10 +15,9 @@ export class LineRepository {
         `SELECT *
         FROM \`lines\`
         WHERE line_cd = ?
-        AND NOT line_cd = ?
         AND e_status = 0
         LIMIT 1`,
-        [id, NEX_ID],
+        [id],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -41,9 +39,8 @@ export class LineRepository {
         `SELECT *
         FROM \`lines\`
         WHERE line_cd in (?)
-        AND NOT line_cd = ?
         AND e_status = 0`,
-        [ids, NEX_ID],
+        [ids],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -118,9 +115,8 @@ export class LineRepository {
         FROM \`lines\`
         WHERE line_cd
         IN (SELECT line_cd FROM stations WHERE station_g_cd = ?)
-        AND NOT line_cd = ?
         AND e_status = 0`,
-        [groupId, NEX_ID],
+        [groupId],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -147,10 +143,9 @@ export class LineRepository {
         FROM \`lines\`
         WHERE line_cd
         IN (SELECT line_cd FROM stations WHERE station_cd = ?)
-        AND NOT line_cd = ?
         AND e_status = 0
         LIMIT 1`,
-        [stationId, NEX_ID],
+        [stationId],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);

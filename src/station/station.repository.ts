@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { uniqBy } from 'lodash';
 import { RowDataPacket } from 'mysql2';
-import { NEX_ID } from 'src/constants/ignore';
 import { TrainType } from 'src/graphql';
 import { LineRepository } from 'src/line/line.repository';
 import { MysqlService } from 'src/mysql/mysql.service';
@@ -29,9 +28,8 @@ export class StationRepository {
           FROM stations
           WHERE station_cd = ?
           AND e_status = 0
-          AND NOT line_cd = ?
         `,
-        [id, NEX_ID],
+        [id],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -62,9 +60,8 @@ export class StationRepository {
           FROM stations
           WHERE station_cd in (?)
           AND e_status = 0
-          AND NOT line_cd = ?
         `,
-        [ids, NEX_ID],
+        [ids],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -461,10 +458,9 @@ export class StationRepository {
           FROM stations
           WHERE line_cd in (?)
           AND e_status = 0
-          AND NOT line_cd = ?
           ORDER BY e_sort, station_cd
         `,
-        [lineIds, NEX_ID],
+        [lineIds],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -517,10 +513,9 @@ export class StationRepository {
           OR station_name_zh LIKE "%"?"%"
           OR station_name_ko LIKE "%"?"%")
           AND e_status = 0
-          AND NOT line_cd = ?
           ORDER BY e_sort, station_cd
         `,
-        [name, name, name, name, name, NEX_ID],
+        [name, name, name, name, name],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -555,13 +550,12 @@ export class StationRepository {
           SELECT *
           FROM stations
           WHERE e_status = 0
-          AND NOT line_cd = ?
           AND station_g_cd IN (
             SELECT DISTINCT station_g_cd
             FROM stations
           )
         `,
-        [NEX_ID],
+        [],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -585,7 +579,6 @@ export class StationRepository {
         SELECT *
         FROM stations
         WHERE e_status = 0
-        AND NOT line_cd = ?
         AND station_g_cd IN (
           SELECT DISTINCT station_g_cd
           FROM stations
@@ -593,7 +586,7 @@ export class StationRepository {
         ORDER BY RAND()
         LIMIT 1
       `,
-        [NEX_ID],
+        [],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
@@ -624,9 +617,8 @@ export class StationRepository {
           FROM stations
           WHERE station_g_cd in (?)
           AND e_status = 0
-          AND NOT line_cd = ?
         `,
-        [groupIds, NEX_ID],
+        [groupIds],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
