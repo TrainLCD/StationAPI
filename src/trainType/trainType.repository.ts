@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { RowDataPacket } from 'mysql2';
-import { NEX_ID } from 'src/constants/ignore';
 import { LineRepository } from 'src/line/line.repository';
 import { LineRaw } from 'src/line/models/LineRaw';
 import { MysqlService } from 'src/mysql/mysql.service';
@@ -24,9 +23,8 @@ export class TrainTypeRepository {
           FROM stations
           WHERE station_g_cd in (?)
           AND e_status = 0
-          AND NOT line_cd = ?
         `,
-        [groupIds, NEX_ID],
+        [groupIds],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
