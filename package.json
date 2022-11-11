@@ -28,7 +28,7 @@
     "apollo-server-fastify": "^3.0.0-alpha.3",
     "dataloader": "^2.1.0",
     "graphql": "^15.4.0",
-    "graphql-tools": "^7.0.2",
+    "graphql-tools": "^8.3.11",
     "lodash": "^4.17.21",
     "mysql2": "^2.2.5",
     "reflect-metadata": "^0.1.13",
