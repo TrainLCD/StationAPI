@@ -51,14 +51,14 @@ export class RawService {
     ];
     const lineSymbolColorsRaw = [
       rawCurrentLine?.line_symbol_primary_color.length
-        ? rawCurrentLine.line_symbol_primary_color
-        : rawCurrentLine.line_color_c,
+        ? rawCurrentLine?.line_symbol_primary_color
+        : rawCurrentLine?.line_color_c,
       rawCurrentLine?.line_symbol_secondary_color.length
-        ? rawCurrentLine.line_symbol_secondary_color
-        : rawCurrentLine.line_color_c,
+        ? rawCurrentLine?.line_symbol_secondary_color
+        : rawCurrentLine?.line_color_c,
       rawCurrentLine?.line_symbol_extra_color.length
-        ? rawCurrentLine.line_symbol_extra_color
-        : rawCurrentLine.line_color_c,
+        ? rawCurrentLine?.line_symbol_extra_color
+        : rawCurrentLine?.line_color_c,
     ];
     const stationNumbersRaw = [
       raw.primary_station_number,
