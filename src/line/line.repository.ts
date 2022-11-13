@@ -114,7 +114,7 @@ export class LineRepository {
         `SELECT *
         FROM \`lines\`
         WHERE line_cd
-        IN (SELECT line_cd FROM stations WHERE station_g_cd = ?)
+        IN (SELECT line_cd FROM stations WHERE station_g_cd = ? AND e_status = 0)
         AND e_status = 0`,
         [groupId],
         (err, results: RowDataPacket[]) => {
@@ -142,7 +142,7 @@ export class LineRepository {
         `SELECT *
         FROM \`lines\`
         WHERE line_cd
-        IN (SELECT line_cd FROM stations WHERE station_cd = ?)
+        IN (SELECT line_cd FROM stations WHERE station_cd = ? AND e_status = 0)
         AND e_status = 0
         LIMIT 1`,
         [stationId],
