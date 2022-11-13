@@ -554,6 +554,7 @@ export class StationRepository {
           AND station_g_cd IN (
             SELECT DISTINCT station_g_cd
             FROM stations
+            WHERE e_status = 0
           )
         `,
         [],
@@ -583,6 +584,7 @@ export class StationRepository {
         AND station_g_cd IN (
           SELECT DISTINCT station_g_cd
           FROM stations
+          WHERE e_status = 0
         )
         ORDER BY RAND()
         LIMIT 1
