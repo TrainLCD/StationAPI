@@ -136,7 +136,7 @@ export class RawService {
           : lineRaw.line_color_c,
       },
       lineRaw.line_symbol_extra && {
-        lineSymbol: lineRaw.line_symbol_extra_color || null,
+        lineSymbol: lineRaw.line_symbol_extra || null,
         lineSymbolColor: lineRaw.line_symbol_extra_color.length
           ? lineRaw.line_symbol_extra_color
           : lineRaw.line_color_c,
