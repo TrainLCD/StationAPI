@@ -117,6 +117,8 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 かもめ",リレーカモメ,"Relay
 KAMOME",接力海鸥,"릴레이
 카모메",#E10018,0,,COMPLETE
+232,あかぎ,アカギ,Akagi,赤城,아카기,#008000,0,,COMPLETE
+233,草津,クサツ,Kusatsu,草津,구사쓰,#008000,0,,COMPLETE
 300,普通,フツウ,Local,慢车,慢车,#1f63c6,0,,PARTIAL
 301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1f63c7,0,,PARTIAL
 302,快速,カイソク,Rapid,快车,쾌속,#dc143c,0,,PARTIAL
