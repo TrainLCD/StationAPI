@@ -126,7 +126,7 @@ KAMOME",接力海鸥,"릴레이
 304,急行,キュウコウ,Express,特快,급행,#dc143c,0,,PARTIAL
 306,特急,トッキュウ,Limited Express,特快,특급,#dc143c,0,,COMPLETE
 307,"エアポート
-快特",エアポートカイトク,Airport Limited Express,机场特快,공항쾌특,#fa9715,0,浅草線のデータしか入っていないので後で他社線直通の対応が必要,COMPLETE
+快特",エアポートカイトク,Airport Limited Express,机场特快,공항쾌특,#fa9715,0,,COMPLETE
 308,快特(泉岳寺〜三崎口),カイトク,Limited Express(Sengakuji to Misakiguchi),特快(开往三崎口),쾌특 (미사키 구치 방면),#379412,0,,COMPLETE
 309,快特(泉岳寺〜羽田空港),カイトク,Limited Express(Sengakuji to Haneda Airport),特快(开往羽田机场),쾌특 (하네다 공항 방면),#379412,0,,COMPLETE
 310,"エアポート
