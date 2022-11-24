@@ -104,8 +104,8 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 221,うずしお,ウズシオ,Uzushio,涡潮,우즈시오,#1cadca,0,,COMPLETE
 222,こうのとり,コウノトリ,Kounotori,东方白鹳,고노토리,#ffcc00,0,,COMPLETE
 223,サンダーバード,サンダーバード,Thunderbird,雷鸟,선더버드,#0072BA,0,,COMPLETE
-224,ひだ(大阪〜富山）,ヒダ,Hida(Osaka to Toyama),飞驒(开往大阪),히다(오사카 방면),#f77321,0,,COMPLETE
-225,ひだ(名古屋〜富山）,ヒダ,Hida(Nagoya to Toyama),飞驒(开往名古屋),히다(나고야 방면),#f77321,0,,COMPLETE
+224,ひだ(大阪〜富山),ヒダ,Hida(Osaka to Toyama),飞驒(开往大阪),히다(오사카 방면),#f77321,0,,COMPLETE
+225,ひだ(名古屋〜富山),ヒダ,Hida(Nagoya to Toyama),飞驒(开往名古屋),히다(나고야 방면),#f77321,0,,COMPLETE
 226,富士回遊,フジカイユウ,FUJI EXCURSION,富士回游,후지카이유,#7B68EE,0,中央線-富士急行直通用,COMPLETE
 227,はちおうじ,ハチオウジ,Hachioji,八王子,하치오지,#F15A22,0,,COMPLETE
 228,おうめ,オウメ,Ome,青梅,오메,#F15A22,0,,COMPLETE
