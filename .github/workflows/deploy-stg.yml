@@ -1,61 +1,81 @@
-name: Deploy staging
+name: Deploy staging to Amazon ECS
 
 on:
-  workflow_run:
-    workflows:
-      - Test
-    branches:
-      - dev
-    types:
-      - completed
+  push:
+    branches: ['dev']
+
+env:
+  AWS_REGION: ap-northeast-1 # set this to your preferred AWS region, e.g. us-west-1
+  ECR_REPOSITORY: stationapi-stg # set this to your Amazon ECR repository name
+  ECS_SERVICE: stationapi-staging-service # set this to your Amazon ECS service name
+  ECS_CLUSTER: stationapi-staging # set this to your Amazon ECS cluster name
+  ECS_TASK_DEFINITION:
+    .aws/task-definition.json # set this to the path to your Amazon ECS task definition
+    # file, e.g. .aws/task-definition.json
+  CONTAINER_NAME:
+    stationapi-stg # set this to the name of the container in the
+    # containerDefinitions section of your task definition
+
+permissions:
+  contents: read
 
 jobs:
-  deploy-staging:
+  deploy:
+    name: Deploy
     runs-on: ubuntu-latest
+    environment: production
+
     steps:
-      - uses: actions/checkout@v2
-      - name: Install Utilities
-        run: sudo apt-get install -y jq
-      - name: Install AWS Client and LightsailControl Plugin
-        run: |
-          aws --version
-          curl "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" -o "lightsailctl"
-          sudo mv "lightsailctl" "/usr/local/bin/lightsailctl"
-          sudo chmod +x /usr/local/bin/lightsailctl
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-1
-      - name: Build Docker Image
-        run: |
-          docker build -t stationapi:latest .
-      - name: Push and Deploy
-        env:
-          SERVICE_NAME: ${{ secrets.SERVICE_NAME_STG }}
-          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE_STG }}
-          MYSQL_USER: ${{ secrets.MYSQL_USER_STG }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD_STG }}
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST_STG }}
-          MACKEREL_APIKEY: ${{ secrets.MACKEREL_APIKEY }}
-        run: |
-          JSON_TEMPLATE=$(cat $(pwd)/scripts/aws-container-template.json)
+          aws-region: ${{ env.AWS_REGION }}
 
-          aws lightsail push-container-image \
-              --region ap-northeast-1 \
-              --service-name ${SERVICE_NAME} \
-              --label api \
-              --image stationapi:latest
-          JSON_STRING=$(jq -n \
-                            --arg IMAGE "$(aws lightsail get-container-images --service-name ${SERVICE_NAME} | jq --raw-output ".containerImages[0].image")" \
-                            --arg SERVICE_NAME "$SERVICE_NAME" \
-                            --arg MYSQL_DATABASE "$MYSQL_DATABASE" \
-                            --arg MYSQL_USER "$MYSQL_USER" \
-                            --arg MYSQL_PASSWORD "$MYSQL_PASSWORD" \
-                            --arg MYSQL_HOST "$MYSQL_HOST" \
-                            --arg MACKEREL_APIKEY "$MACKEREL_APIKEY" \
-                            "$JSON_TEMPLATE"
-                      )
-          echo $JSON_STRING > aws-container.json
-          aws lightsail create-container-service-deployment --service-name ${SERVICE_NAME} --cli-input-json file://$(pwd)/aws-container.json
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Build a docker container and
+          # push it to ECR so that it can
+          # be deployed to ECS.
+          docker build --platform linux/arm64 -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Decode task definiton of base64 into json
+        env:
+          STG_JSON_TASK_DEFINITION: ${{ secrets.STG_JSON_TASK_DEFINITION }}
+
+        run: |
+          mkdir ./.aws
+          echo -n $STG_JSON_TASK_DEFINITION | base64 --decode > ./.aws/task-definition.json
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.ECS_TASK_DEFINITION }}
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
