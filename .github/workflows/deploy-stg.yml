@@ -10,7 +10,7 @@ env:
   ECS_SERVICE: stationapi-staging-service # set this to your Amazon ECS service name
   ECS_CLUSTER: stationapi-staging # set this to your Amazon ECS cluster name
   ECS_TASK_DEFINITION:
-    stationapi-stg # set this to the path to your Amazon ECS task definition
+    .aws/task-definition.json # set this to the path to your Amazon ECS task definition
     # file, e.g. .aws/task-definition.json
   CONTAINER_NAME:
     stationapi-stg # set this to the name of the container in the
@@ -52,6 +52,14 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Decode task definiton of base64 into json
+        env:
+          STG_JSON_TASK_DEFINITION: ${{ secrets.STG_JSON_TASK_DEFINITION }}
+
+        run: |
+          mkdir ./.aws
+          echo -n $STG_JSON_TASK_DEFINITION | base64 --decode > ./.aws/task-definition.json
 
       - name: Fill in the new image ID in the Amazon ECS task definition
         id: task-def
