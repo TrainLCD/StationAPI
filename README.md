@@ -17,7 +17,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 <!-- markdownlint-disable -->
 <table>
   <tr>
-    <td align="center"><a href="https://neiro.work"><img src="https://avatars.githubusercontent.com/u/31317056?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Neiro Somemiya</b></sub></a><br /><a href="#ideas-nirsmmy" title="Ideas, Planning, & Feedback">🤔</a> <a href="#data-nirsmmy" title="Data">🔣</a></td>
+    <td align="center"><a href="https://neiro.work"><img src="https://avatars.githubusercontent.com/u/31317056?v=4?s=100" width="100px;" alt=""/><br /><sub><b>SAIGUSA Tomotada</b></sub></a><br /><a href="#ideas-nirsmmy" title="Ideas, Planning, & Feedback">🤔</a> <a href="#data-nirsmmy" title="Data">🔣</a></td>
     <td align="center"><a href="https://sw-saturn.dev"><img src="https://avatars.githubusercontent.com/u/20313668?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Kanta Demizu</b></sub></a><br /><a href="#data-Sw-Saturn" title="Data">🔣</a></td>
   </tr>
 </table>
