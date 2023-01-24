@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { TrainType } from 'src/graphql';
 import { LineRepository } from 'src/line/line.repository';
+import { TrainType } from 'src/models/traintype.model';
 import { RawService } from 'src/raw/raw.service';
 import { TrainTypeRepository } from './trainType.repository';
 
@@ -25,9 +25,10 @@ export class TrainTypeService {
       belongingStations.map((bs) => bs.station_g_cd),
     );
 
-    const belongingStationsCompanies = await this.lineRepo.getCompaniesByLineIds(
-      stationsByGroupIds.map((s) => s.line_cd),
-    );
+    const belongingStationsCompanies =
+      await this.lineRepo.getCompaniesByLineIds(
+        stationsByGroupIds.map((s) => s.line_cd),
+      );
 
     const trainTypeStations = belongingStations.map((bs) =>
       this.rawService.convertStation(bs, belongingStationsCompanies),

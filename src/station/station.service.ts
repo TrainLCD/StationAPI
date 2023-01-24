@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Station } from 'src/graphql';
 import { LineRepository } from 'src/line/line.repository';
+import { Station } from 'src/models/station.model';
 import { RawService } from 'src/raw/raw.service';
 import { StationRepository } from './station.repository';
 

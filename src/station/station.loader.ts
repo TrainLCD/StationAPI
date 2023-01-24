@@ -1,7 +1,6 @@
 import { Injectable, Scope } from '@nestjs/common';
 import { BaseDataloader } from 'src/BaseDataloader';
-import { Station } from 'src/graphql';
-
+import { Station } from 'src/models/station.model';
 import { StationService } from './station.service';
 
 @Injectable({ scope: Scope.REQUEST })

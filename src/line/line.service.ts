@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Line } from 'src/graphql';
+import { Line } from 'src/models/line.model';
 import { RawService } from 'src/raw/raw.service';
 import { LineRepository } from './line.repository';
 
@@ -18,7 +18,9 @@ export class LineService {
 
   async getLinesByGroupId(groupId: number): Promise<Line[]> {
     return await Promise.all(
-      (await this.lineRepo.getByGroupId(groupId)).map(async (l) =>
+      (
+        await this.lineRepo.getByGroupId(groupId)
+      ).map(async (l) =>
         this.rawService.convertLine(
           l,
           await this.lineRepo.findOneCompany(l.line_cd),

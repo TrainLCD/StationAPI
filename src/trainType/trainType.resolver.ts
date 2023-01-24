@@ -1,5 +1,5 @@
 import { Args, Query, Resolver } from '@nestjs/graphql';
-import { TrainType } from 'src/graphql';
+import { TrainType } from 'src/models/traintype.model';
 import TrainTypeDataLoader from './trainType.loader';
 
 @Resolver(TrainType)

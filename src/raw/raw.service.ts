@@ -1,15 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import {
-  Line,
-  LineSymbol,
-  Station,
-  StationNumber,
-  StopCondition,
-  TrainDirection,
-  TrainType,
-} from 'src/graphql';
 import { CompanyRaw, LineRaw } from 'src/line/models/LineRaw';
-import { StationRaw } from 'src/station/models/StationRaw';
+import { Line } from 'src/models/line.model';
+import { LineSymbol } from 'src/models/lineSymbol.model';
+import { Station } from 'src/models/station.model';
+import { StationNumber } from 'src/models/stationNumber.model';
+import { StationRaw } from 'src/models/stationRaw';
+import { StopCondition } from 'src/models/stopCondition.model';
+import { TrainDirection } from 'src/models/trainDirection.model';
+import { TrainType } from 'src/models/traintype.model';
 import { TrainTypeRaw } from 'src/trainType/models/TrainTypeRaw';
 
 @Injectable()
@@ -198,6 +196,7 @@ export class RawService {
 
     return {
       id: raw.type_cd,
+      typeId: raw.type_cd,
       groupId: raw.line_group_cd,
       name: raw.type_name,
       nameK: raw.type_name_k,
@@ -206,6 +205,7 @@ export class RawService {
       nameKo: raw.type_name_ko,
       color: raw.color,
       direction: enumDirection,
+      allTrainTypes: [],
       stations,
       lines,
     };

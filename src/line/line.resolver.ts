@@ -1,5 +1,5 @@
 import { Args, Query, Resolver } from '@nestjs/graphql';
-import { Line } from 'src/graphql';
+import { Line } from 'src/models/line.model';
 import LineDataLoader from './line.loader';
 
 @Resolver(Line)

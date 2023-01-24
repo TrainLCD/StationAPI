@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { uniqBy } from 'lodash';
 import { RowDataPacket } from 'mysql2';
-import { TrainType } from 'src/graphql';
 import { LineRepository } from 'src/line/line.repository';
+import { TrainType, TrainTypeMinimum } from 'src/models/traintype.model';
 import { MysqlService } from 'src/mysql/mysql.service';
 import { RawService } from 'src/raw/raw.service';
 import { TrainTypeWithLineRaw } from 'src/trainType/models/TrainTypeRaw';
 import { TrainTypeRepository } from 'src/trainType/trainType.repository';
-import { StationRaw } from './models/StationRaw';
+import { StationRaw } from '../models/stationRaw';
 
 @Injectable()
 export class StationRepository {
@@ -132,9 +132,8 @@ export class StationRepository {
             filteredAllTrainTypes: TrainTypeWithLineRaw[];
             allTrainTypes: TrainTypeWithLineRaw[];
           }> => {
-            const allTrainTypes = await this.trainTypeRepo.getAllLinesTrainTypes(
-              r.line_group_cd,
-            );
+            const allTrainTypes =
+              await this.trainTypeRepo.getAllLinesTrainTypes(r.line_group_cd);
 
             const filteredAllTrainTypes = allTrainTypes.filter(
               (tt) => tt.line_cd !== r.line_cd,
@@ -177,16 +176,10 @@ export class StationRepository {
 
                 return `${r.type_name}(${filteredAllTrainTypes
                   .map((tt, idx, arr) => {
-                    const isPrevStationOperatedSameCompany = getIsPrevStationOperatedSameCompany(
-                      arr,
-                      tt,
-                      idx,
-                    );
-                    const isNextStationOperatedSameCompany = getIsNextStationOperatedSameCompany(
-                      arr,
-                      tt,
-                      idx,
-                    );
+                    const isPrevStationOperatedSameCompany =
+                      getIsPrevStationOperatedSameCompany(arr, tt, idx);
+                    const isNextStationOperatedSameCompany =
+                      getIsNextStationOperatedSameCompany(arr, tt, idx);
 
                     if (isPrevStationOperatedSameCompany) {
                       return null;
@@ -226,16 +219,10 @@ export class StationRepository {
 
                 return `${r.type_name_r}(${filteredAllTrainTypes
                   .map((tt, idx, arr) => {
-                    const isPrevStationOperatedSameCompany = getIsPrevStationOperatedSameCompany(
-                      arr,
-                      tt,
-                      idx,
-                    );
-                    const isNextStationOperatedSameCompany = getIsNextStationOperatedSameCompany(
-                      arr,
-                      tt,
-                      idx,
-                    );
+                    const isPrevStationOperatedSameCompany =
+                      getIsPrevStationOperatedSameCompany(arr, tt, idx);
+                    const isNextStationOperatedSameCompany =
+                      getIsNextStationOperatedSameCompany(arr, tt, idx);
 
                     if (isPrevStationOperatedSameCompany) {
                       return null;
@@ -303,40 +290,43 @@ export class StationRepository {
                 Promise.all(
                   results
                     .filter((r) => r.station_cd === id)
-                    .map(
-                      async (r): Promise<TrainType> => {
-                        const {
-                          typesName,
-                          typesNameR,
-                          filteredAllTrainTypes,
-                          allTrainTypes,
-                        } = await getReplacedTrainTypeName(r);
+                    .map(async (r): Promise<TrainType> => {
+                      const {
+                        typesName,
+                        typesNameR,
+                        filteredAllTrainTypes,
+                        allTrainTypes,
+                      } = await getReplacedTrainTypeName(r);
 
-                        const lineGroupIds = allTrainTypes.map(
-                          (tt) => tt.line_group_cd,
-                        );
-                        const linesRaw = await this.trainTypeRepo.getBelongingLines(
+                      const lineGroupIds = allTrainTypes.map(
+                        (tt) => tt.line_group_cd,
+                      );
+                      const linesRaw =
+                        await this.trainTypeRepo.getBelongingLines(
                           lineGroupIds,
                         );
-                        const companies = await this.lineRepo.getCompaniesByLineIds(
+                      const companies =
+                        await this.lineRepo.getCompaniesByLineIds(
                           linesRaw.map((l) => l.line_cd),
                         );
 
-                        return {
-                          id: r.line_group_cd,
-                          typeId: r.type_cd,
-                          groupId: r.line_group_cd,
-                          name: !filteredAllTrainTypes.length
-                            ? r.type_name
-                            : typesName,
-                          nameK: r.type_name_k,
-                          nameR: !filteredAllTrainTypes.length
-                            ? r.type_name_r
-                            : typesNameR,
-                          nameZh: r.type_name_zh,
-                          nameKo: r.type_name_ko,
-                          color: r.color,
-                          allTrainTypes: allTrainTypes.map((tt) => ({
+                      return {
+                        id: r.line_group_cd,
+                        typeId: r.type_cd,
+                        groupId: r.line_group_cd,
+                        name: !filteredAllTrainTypes.length
+                          ? r.type_name
+                          : typesName,
+                        nameK: r.type_name_k,
+                        nameR: !filteredAllTrainTypes.length
+                          ? r.type_name_r
+                          : typesNameR,
+                        nameZh: r.type_name_zh,
+                        nameKo: r.type_name_ko,
+                        color: r.color,
+                        stations: [],
+                        allTrainTypes: allTrainTypes.map<TrainTypeMinimum>(
+                          (tt) => ({
                             id: tt.type_cd + tt.line_cd,
                             typeId: tt.type_cd,
                             groupId: r.line_group_cd,
@@ -361,20 +351,23 @@ export class StationRepository {
                               nameKo: tt.line_name_ko,
                               lineType: tt.line_type,
                               zoom: tt.zoom,
+                              lineSymbols: [],
+                              company: null,
+                              transferStation: null,
                             },
-                          })),
-                          lines: linesRaw.map((l) =>
-                            this.rawService.convertLine(
-                              l,
-                              companies.find(
-                                (c) => c.company_cd === l.company_cd,
-                              ),
+                          }),
+                        ),
+                        lines: linesRaw.map((l) =>
+                          this.rawService.convertLine(
+                            l,
+                            companies.find(
+                              (c) => c.company_cd === l.company_cd,
                             ),
                           ),
-                          direction: r.direction,
-                        };
-                      },
-                    ),
+                        ),
+                        direction: r.direction,
+                      };
+                    }),
                 ),
               ),
             ),
