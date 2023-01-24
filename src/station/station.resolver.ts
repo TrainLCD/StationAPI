@@ -33,7 +33,7 @@ export class StationResolver {
   async nearbyStations(
     @Args('latitude', { type: () => Float }) latitude: number,
     @Args('longitude', { type: () => Float }) longitude: number,
-    @Args('limit', { type: () => Int }) limit = 1,
+    @Args('limit', { type: () => Int, nullable: true }) limit = 1,
   ): Promise<Station[]> {
     return this.stationCoordsDataLoader.load([latitude, longitude, limit]);
   }

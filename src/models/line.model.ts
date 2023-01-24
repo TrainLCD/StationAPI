@@ -37,6 +37,6 @@ export class Line {
   zoom: number;
   @Field((type) => Company, { nullable: true })
   company: Company;
-  @Field((type) => Station)
+  @Field((type) => Station, { nullable: true })
   transferStation: Station;
 }

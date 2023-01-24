@@ -1,7 +1,11 @@
-import { Field, ID, Int, ObjectType } from '@nestjs/graphql';
+import { Field, ID, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
 import { Line } from './line.model';
 import { Station } from './station.model';
 import { TrainDirection } from './trainDirection.model';
+
+registerEnumType(TrainDirection, {
+  name: 'TrainDirection',
+});
 
 @ObjectType()
 export class TrainTypeMinimum {
@@ -51,6 +55,7 @@ export class TrainType {
   stations: Station[];
   @Field(() => [Line])
   lines: Line[];
+  @Field(() => [TrainTypeMinimum])
   allTrainTypes: TrainTypeMinimum[];
   @Field(() => TrainDirection)
   direction: TrainDirection;

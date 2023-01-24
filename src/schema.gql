@@ -25,6 +25,19 @@ type StationNumber {
   stationNumber: String!
 }
 
+type TrainTypeMinimum {
+  id: ID!
+  typeId: Int!
+  groupId: Int!
+  name: String!
+  nameK: String!
+  nameR: String!
+  nameZh: String!
+  nameKo: String!
+  color: String!
+  line: Line!
+}
+
 type TrainType {
   id: ID!
   typeId: Int!
@@ -37,6 +50,7 @@ type TrainType {
   color: String!
   stations: [Station!]!
   lines: [Line!]!
+  allTrainTypes: [TrainTypeMinimum!]!
   direction: TrainDirection!
 }
 
@@ -96,13 +110,13 @@ type Line {
   lineType: Int!
   zoom: Int!
   company: Company
-  transferStation: Station!
+  transferStation: Station
 }
 
 type Query {
   station(id: Float!): Station!
   stationByGroupId(groupId: Float!): Station!
-  nearbyStations(latitude: Float!, longitude: Float!, limit: Int!): [Station!]!
+  nearbyStations(latitude: Float!, longitude: Float!, limit: Int): [Station!]!
   stationsByLineId(lineId: Float!): [Station!]!
   stationsByName(name: String!): [Station!]!
   random: Station!

@@ -40,6 +40,19 @@ export class RawService {
       }
     })() as StopCondition;
 
+    const enumDirection = (() => {
+      switch (raw.direction) {
+        case 0:
+          return TrainDirection.BOTH;
+        case 1:
+          return TrainDirection.INBOUND;
+        case 2:
+          return TrainDirection.OUTBOUND;
+        default:
+          return TrainDirection.BOTH;
+      }
+    })() as TrainDirection;
+
     const rawCurrentLine = raw.lines?.find((l) => l.line_cd === raw.line_cd);
 
     const lineSymbolsRaw = [
@@ -109,7 +122,8 @@ export class RawService {
       nameKo: raw.station_name_ko,
       pass: raw.pass === 1 ? true : false,
       stopCondition: enumStopCondition,
-      trainTypes: trainTypes ?? [],
+      trainTypes:
+        trainTypes?.map((tt) => ({ ...tt, direction: enumDirection })) ?? [],
       stationNumbers: fullStationNumbers,
       threeLetterCode: raw.three_letter_code,
     };
