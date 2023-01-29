@@ -2,9 +2,9 @@ import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { Module } from '@nestjs/common';
 import { GraphQLModule } from '@nestjs/graphql';
 import { join } from 'path';
-import { LineModule } from './deprecated/line/line.module';
-import { StationModule } from './deprecated/station/station.module';
-import { TrainTypeModule } from './deprecated/trainType/trainType.module';
+import { LineModule } from './line/line.module';
+import { StationModule } from './station/station.module';
+import { TrainTypeModule } from './trainType/trainType.module';
 
 @Module({
   imports: [

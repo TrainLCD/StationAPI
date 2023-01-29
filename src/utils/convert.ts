@@ -1,5 +1,4 @@
-import { CompanyRaw, LineRaw } from 'src/deprecated/line/models/LineRaw';
-import { TrainTypeRaw } from 'src/deprecated/trainType/models/TrainTypeRaw';
+import { CompanyRaw, LineRaw } from 'src/line/models/LineRaw';
 import { Line } from 'src/models/line.model';
 import { LineSymbol } from 'src/models/lineSymbol.model';
 import { Station } from 'src/models/station.model';
@@ -8,6 +7,7 @@ import { StationRaw } from 'src/models/stationRaw';
 import { StopCondition } from 'src/models/stopCondition.model';
 import { TrainDirection } from 'src/models/trainDirection.model';
 import { TrainType } from 'src/models/traintype.model';
+import { TrainTypeRaw } from 'src/trainType/models/TrainTypeRaw';
 
 export const convertStation = (
   raw: StationRaw,

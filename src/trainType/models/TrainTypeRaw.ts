@@ -1,4 +1,4 @@
-import { LineRaw } from 'src/deprecated/line/models/LineRaw';
+import { LineRaw } from 'src/line/models/LineRaw';
 
 export class TrainTypeRaw {
   type_cd: number;

@@ -1,13 +1,5 @@
 import { ParseIntPipe } from '@nestjs/common';
-import {
-  Args,
-  Directive,
-  Float,
-  ID,
-  Int,
-  Query,
-  Resolver,
-} from '@nestjs/graphql';
+import { Args, Float, ID, Int, Query, Resolver } from '@nestjs/graphql';
 import { Station } from 'src/models/station.model';
 import StationCoordsDataLoader from './station.coords.loader';
 import StatioGroupDataLoader from './station.group.loader';
@@ -27,25 +19,16 @@ export class StationResolver {
     private readonly stationCoordsDataLoader: StationCoordsDataLoader,
   ) {}
 
-  @Directive(
-    '@deprecated(reason: "This query will be removed in the next version")',
-  )
   @Query(() => Station)
   async station(@Args('id', ParseIntPipe) id: number): Promise<Station> {
     return this.stationDataLoader.load(id);
   }
 
-  @Directive(
-    '@deprecated(reason: "This query will be removed in the next version")',
-  )
   @Query(() => Station)
   async stationByGroupId(@Args('groupId') groupId: number): Promise<Station> {
     return this.stationGroupDataLoader.load(groupId);
   }
 
-  @Directive(
-    '@deprecated(reason: "This query will be removed in the next version")',
-  )
   @Query(() => [Station])
   async nearbyStations(
     @Args('latitude', { type: () => Float }) latitude: number,
@@ -55,9 +38,6 @@ export class StationResolver {
     return this.stationCoordsDataLoader.load([latitude, longitude, limit]);
   }
 
-  @Directive(
-    '@deprecated(reason: "This query will be removed in the next version")',
-  )
   @Query(() => [Station])
   async stationsByLineId(
     @Args('lineId', { type: () => ID }) lineId: number,
@@ -65,17 +45,11 @@ export class StationResolver {
     return this.stationLineDataLoader.load(lineId);
   }
 
-  @Directive(
-    '@deprecated(reason: "This query will be removed in the next version")',
-  )
   @Query(() => [Station])
   async stationsByName(@Args('name') name: string): Promise<Station[]> {
     return this.stationNameDataLoader.load(name);
   }
 
-  @Directive(
-    '@deprecated(reason: "This query will be removed in the next version")',
-  )
   @Query(() => Station)
   async random(): Promise<Station> {
     return this.stationService.getRandomStation();
