@@ -3,7 +3,7 @@
 # ------------------------------------------------------
 
 type Company {
-  id: ID!
+  id: Int!
   railroadId: Int!
   name: String!
   nameK: String!
@@ -26,7 +26,7 @@ type StationNumber {
 }
 
 type TrainTypeMinimum {
-  id: ID!
+  id: Int!
   typeId: Int!
   groupId: Int!
   name: String!
@@ -39,7 +39,7 @@ type TrainTypeMinimum {
 }
 
 type TrainType {
-  id: ID!
+  id: Int!
   typeId: Int!
   groupId: Int!
   name: String!
@@ -61,7 +61,7 @@ enum TrainDirection {
 }
 
 type Station {
-  id: ID!
+  id: Int!
   address: String!
   distance: Float
   latitude: Float!
@@ -94,7 +94,7 @@ enum StopCondition {
 }
 
 type Line {
-  id: ID!
+  id: Int!
   companyId: Int!
   latitude: Float!
   longitude: Float!
@@ -117,9 +117,9 @@ type Query {
   station(id: Float!): Station!
   stationByGroupId(groupId: Float!): Station!
   nearbyStations(latitude: Float!, longitude: Float!, limit: Int): [Station!]!
-  stationsByLineId(lineId: Float!): [Station!]!
+  stationsByLineId(lineId: ID!): [Station!]!
   stationsByName(name: String!): [Station!]!
   random: Station!
   line(id: Float!): Line!
-  trainType(id: Float!): TrainType!
+  trainType(id: ID!): TrainType!
 }

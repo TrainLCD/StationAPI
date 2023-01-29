@@ -1,5 +1,13 @@
 import { ParseIntPipe } from '@nestjs/common';
-import { Args, Directive, Float, Int, Query, Resolver } from '@nestjs/graphql';
+import {
+  Args,
+  Directive,
+  Float,
+  ID,
+  Int,
+  Query,
+  Resolver,
+} from '@nestjs/graphql';
 import { Station } from 'src/models/station.model';
 import StationCoordsDataLoader from './station.coords.loader';
 import StatioGroupDataLoader from './station.group.loader';
@@ -51,7 +59,9 @@ export class StationResolver {
     '@deprecated(reason: "This query will be removed in the next version")',
   )
   @Query(() => [Station])
-  async stationsByLineId(@Args('lineId') lineId: number): Promise<Station[]> {
+  async stationsByLineId(
+    @Args('lineId', { type: () => ID }) lineId: number,
+  ): Promise<Station[]> {
     return this.stationLineDataLoader.load(lineId);
   }
 

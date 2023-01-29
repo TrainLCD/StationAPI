@@ -1,11 +1,11 @@
-import { Field, Float, ID, Int, ObjectType } from '@nestjs/graphql';
+import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
 import { Company } from './company.model';
 import { LineSymbol } from './lineSymbol.model';
 import { Station } from './station.model';
 
 @ObjectType()
 export class Line {
-  @Field((type) => ID)
+  @Field((type) => Int)
   id: number;
   @Field((type) => Int)
   companyId: number;

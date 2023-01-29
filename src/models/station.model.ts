@@ -1,4 +1,4 @@
-import { Field, Float, ID, Int, ObjectType } from '@nestjs/graphql';
+import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
 import { Line } from './line.model';
 import { StationNumber } from './stationNumber.model';
 import { StopCondition } from './stopCondition.model';
@@ -6,7 +6,7 @@ import { TrainType } from './traintype.model';
 
 @ObjectType()
 export class Station {
-  @Field((type) => ID)
+  @Field((type) => Int)
   id: number;
   @Field()
   address: string;
