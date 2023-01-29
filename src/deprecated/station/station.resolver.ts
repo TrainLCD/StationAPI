@@ -1,6 +1,6 @@
 import { ParseIntPipe } from '@nestjs/common';
 import { Args, Float, Int, Query, Resolver } from '@nestjs/graphql';
-import { Station } from '../models/station.model';
+import { Station } from 'src/models/station.model';
 import StationCoordsDataLoader from './station.coords.loader';
 import StatioGroupDataLoader from './station.group.loader';
 import StationLineDataLoader from './station.line.loader';

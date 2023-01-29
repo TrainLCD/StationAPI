@@ -1,19 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { uniqBy } from 'lodash';
 import { RowDataPacket } from 'mysql2';
-import { LineRepository } from 'src/line/line.repository';
+import { StationRaw } from 'src/models/stationRaw';
 import { TrainType, TrainTypeMinimum } from 'src/models/traintype.model';
 import { MysqlService } from 'src/mysql/mysql.service';
-import { RawService } from 'src/raw/raw.service';
-import { TrainTypeWithLineRaw } from 'src/trainType/models/TrainTypeRaw';
-import { TrainTypeRepository } from 'src/trainType/trainType.repository';
-import { StationRaw } from '../models/stationRaw';
+import { convertLine } from 'src/utils/convert';
+import { LineRepository } from '../line/line.repository';
+import { TrainTypeWithLineRaw } from '../trainType/models/TrainTypeRaw';
+import { TrainTypeRepository } from '../trainType/trainType.repository';
 
 @Injectable()
 export class StationRepository {
   constructor(
     private readonly mysqlService: MysqlService,
-    private readonly rawService: RawService,
     private readonly lineRepo: LineRepository,
     private readonly trainTypeRepo: TrainTypeRepository,
   ) {}
@@ -358,7 +357,7 @@ export class StationRepository {
                           }),
                         ),
                         lines: linesRaw.map((l) =>
-                          this.rawService.convertLine(
+                          convertLine(
                             l,
                             companies.find(
                               (c) => c.company_cd === l.company_cd,

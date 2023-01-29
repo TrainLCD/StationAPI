@@ -1,8 +1,7 @@
 import { Module } from '@nestjs/common';
-import { LineRepository } from 'src/line/line.repository';
 import { MysqlService } from 'src/mysql/mysql.service';
-import { RawService } from 'src/raw/raw.service';
-import { TrainTypeRepository } from 'src/trainType/trainType.repository';
+import { LineRepository } from '../line/line.repository';
+import { TrainTypeRepository } from '../trainType/trainType.repository';
 import StationCoordsDataLoader from './station.coords.loader';
 import StationGroupDataLoader from './station.group.loader';
 import StationLineDataLoader from './station.line.loader';
@@ -23,7 +22,6 @@ import { StationService } from './station.service';
     StationCoordsDataLoader,
     MysqlService,
     StationRepository,
-    RawService,
     LineRepository,
     TrainTypeRepository,
   ],
