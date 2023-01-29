@@ -1,0 +1,125 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type Company {
+  id: Int!
+  railroadId: Int!
+  name: String!
+  nameK: String!
+  nameH: String!
+  nameR: String!
+  nameEn: String!
+  url: String!
+  companyType: Int!
+}
+
+type LineSymbol {
+  lineSymbol: String!
+  lineSymbolColor: String!
+}
+
+type StationNumber {
+  lineSymbol: String!
+  lineSymbolColor: String!
+  stationNumber: String!
+}
+
+type TrainTypeMinimum {
+  id: Int!
+  typeId: Int!
+  groupId: Int!
+  name: String!
+  nameK: String!
+  nameR: String!
+  nameZh: String!
+  nameKo: String!
+  color: String!
+  line: Line!
+}
+
+type TrainType {
+  id: Int!
+  typeId: Int!
+  groupId: Int!
+  name: String!
+  nameK: String!
+  nameR: String!
+  nameZh: String!
+  nameKo: String!
+  color: String!
+  stations: [Station!]!
+  lines: [Line!]!
+  allTrainTypes: [TrainTypeMinimum!]!
+  direction: TrainDirection!
+}
+
+enum TrainDirection {
+  BOTH
+  INBOUND
+  OUTBOUND
+}
+
+type Station {
+  id: Int!
+  address: String!
+  distance: Float
+  latitude: Float!
+  longitude: Float!
+  lines: [Line!]!
+  currentLine: Line!
+  openYmd: String!
+  postalCode: String!
+  prefId: Int!
+  groupId: Int!
+  name: String!
+  nameK: String!
+  nameR: String!
+  nameZh: String!
+  nameKo: String!
+  trainTypes: [TrainType!]!
+  pass: Boolean!
+  stopCondition: StopCondition!
+  stationNumbers: [StationNumber!]!
+  threeLetterCode: String!
+}
+
+enum StopCondition {
+  ALL
+  NOT
+  PARTIAL
+  WEEKDAY
+  HOLIDAY
+  PARTIAL_STOP
+}
+
+type Line {
+  id: Int!
+  companyId: Int!
+  latitude: Float!
+  longitude: Float!
+  lineColorC: String!
+  lineColorT: String!
+  lineSymbols: [LineSymbol!]!
+  name: String!
+  nameH: String!
+  nameK: String!
+  nameR: String!
+  nameZh: String!
+  nameKo: String!
+  lineType: Int!
+  zoom: Int!
+  company: Company
+  transferStation: Station
+}
+
+type Query {
+  station(id: Float!): Station!
+  stationByGroupId(groupId: Float!): Station!
+  nearbyStations(latitude: Float!, longitude: Float!, limit: Int): [Station!]!
+  stationsByLineId(lineId: ID!): [Station!]!
+  stationsByName(name: String!): [Station!]!
+  random: Station!
+  line(id: Float!): Line!
+  trainType(id: ID!): TrainType!
+}

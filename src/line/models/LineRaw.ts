@@ -1,4 +1,4 @@
-import { StationRaw } from 'src/station/models/StationRaw';
+import { StationRaw } from 'src/models/stationRaw';
 
 export class CompanyRaw {
   line_cd: number;
