@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { TrainType } from 'src/graphql';
-import { LineRepository } from 'src/line/line.repository';
-import { RawService } from 'src/raw/raw.service';
+import { TrainType } from 'src/models/traintype.model';
+import {
+  convertLine,
+  convertStation,
+  convertTrainType,
+} from 'src/utils/convert';
+import { LineRepository } from '../line/line.repository';
 import { TrainTypeRepository } from './trainType.repository';
 
 @Injectable()
@@ -9,7 +13,6 @@ export class TrainTypeService {
   constructor(
     private readonly trainTypeRepo: TrainTypeRepository,
     private readonly lineRepo: LineRepository,
-    private readonly rawService: RawService,
   ) {}
 
   async getByIds(lineGroupIds: number[]): Promise<TrainType[]> {
@@ -25,24 +28,19 @@ export class TrainTypeService {
       belongingStations.map((bs) => bs.station_g_cd),
     );
 
-    const belongingStationsCompanies = await this.lineRepo.getCompaniesByLineIds(
-      stationsByGroupIds.map((s) => s.line_cd),
-    );
+    const belongingStationsCompanies =
+      await this.lineRepo.getCompaniesByLineIds(
+        stationsByGroupIds.map((s) => s.line_cd),
+      );
 
     const trainTypeStations = belongingStations.map((bs) =>
-      this.rawService.convertStation(bs, belongingStationsCompanies),
+      convertStation(bs, belongingStationsCompanies),
     );
-    const trainTypeLines = belongingLines.map((bl) =>
-      this.rawService.convertLine(bl),
-    );
+    const trainTypeLines = belongingLines.map((bl) => convertLine(bl));
 
     return Promise.all(
       trainTypes.map((tt) => {
-        return this.rawService.convertTrainType(
-          tt,
-          trainTypeStations,
-          trainTypeLines,
-        );
+        return convertTrainType(tt, trainTypeStations, trainTypeLines);
       }),
     );
   }

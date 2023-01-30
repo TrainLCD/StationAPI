@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { RowDataPacket } from 'mysql2';
-import { LineRepository } from 'src/line/line.repository';
-import { LineRaw } from 'src/line/models/LineRaw';
+import { StationRaw } from 'src/models/stationRaw';
 import { MysqlService } from 'src/mysql/mysql.service';
-import { StationRaw } from 'src/station/models/StationRaw';
+import { LineRepository } from '../line/line.repository';
+import { LineRaw } from '../line/models/LineRaw';
 import { TrainTypeRaw, TrainTypeWithLineRaw } from './models/TrainTypeRaw';
 
 @Injectable()
