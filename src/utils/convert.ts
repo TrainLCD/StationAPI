@@ -80,9 +80,9 @@ export const convertStation = (
         num && {
           lineSymbol: lineSymbolsRaw[idx] ?? null,
           lineSymbolColor: lineSymbolColorsRaw[idx] ?? null,
-          stationNumber: `${lineSymbolsRaw[idx] ?? ''}-${
-            stationNumbersRaw[idx]
-          }`,
+          stationNumber: lineSymbolsRaw[idx]
+            ? `${lineSymbolsRaw[idx]}-${stationNumbersRaw[idx]}`
+            : stationNumbersRaw[idx],
         },
     )
     .filter((num) => num)
