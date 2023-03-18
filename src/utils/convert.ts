@@ -73,6 +73,11 @@ export const convertStation = (
     raw.secondary_station_number,
     raw.extra_station_number,
   ];
+  const lineSymbolShapeRaw = [
+    rawCurrentLine?.line_symbol_primary_shape,
+    rawCurrentLine?.line_symbol_secondary_shape,
+    rawCurrentLine?.line_symbol_extra_shape,
+  ];
 
   const fullStationNumbers: StationNumber[] = stationNumbersRaw
     .map(
@@ -83,6 +88,7 @@ export const convertStation = (
           stationNumber: lineSymbolsRaw[idx]
             ? `${lineSymbolsRaw[idx]}-${stationNumbersRaw[idx]}`
             : stationNumbersRaw[idx],
+          lineSymbolShape: lineSymbolShapeRaw[idx],
         },
     )
     .filter((num) => num)
@@ -140,18 +146,21 @@ export const convertLine = (
       lineSymbolColor: lineRaw.line_symbol_primary_color.length
         ? lineRaw.line_symbol_primary_color
         : lineRaw.line_color_c,
+      lineSymbolShape: lineRaw.line_symbol_primary_shape,
     },
     lineRaw.line_symbol_secondary && {
       lineSymbol: lineRaw.line_symbol_secondary || null,
       lineSymbolColor: lineRaw.line_symbol_secondary_color.length
         ? lineRaw.line_symbol_secondary_color
         : lineRaw.line_color_c,
+      lineSymbolShape: lineRaw.line_symbol_secondary_shape,
     },
     lineRaw.line_symbol_extra && {
       lineSymbol: lineRaw.line_symbol_extra || null,
       lineSymbolColor: lineRaw.line_symbol_extra_color.length
         ? lineRaw.line_symbol_extra_color
         : lineRaw.line_color_c,
+      lineSymbolShape: lineRaw.line_symbol_extra_shape,
     },
   ].filter((sym) => sym);
 

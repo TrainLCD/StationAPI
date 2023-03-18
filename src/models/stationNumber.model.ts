@@ -7,5 +7,7 @@ export class StationNumber {
   @Field()
   lineSymbolColor: string;
   @Field()
+  lineSymbolShape: string;
+  @Field()
   stationNumber: string;
 }

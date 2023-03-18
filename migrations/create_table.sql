@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.0.28, for macos12.0 (arm64)
+-- MySQL dump 10.13  Distrib 8.0.32, for macos13.0 (arm64)
 --
 -- Host: localhost    Database: stationapi
 -- ------------------------------------------------------
--- Server version	8.0.28
+-- Server version	8.0.32
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -25,13 +25,13 @@ DROP TABLE IF EXISTS `companies`;
 CREATE TABLE `companies` (
   `company_cd` int unsigned NOT NULL,
   `rr_cd` int unsigned NOT NULL,
-  `company_name` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `company_name_k` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `company_name_h` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `company_name_r` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `company_name_en` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `company_name` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `company_name_k` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `company_name_h` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `company_name_r` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `company_name_en` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `company_name_full_en` text NOT NULL,
-  `company_url` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `company_url` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `company_type` int NOT NULL,
   `e_status` int unsigned NOT NULL,
   `e_sort` int unsigned NOT NULL,
@@ -58,21 +58,24 @@ DROP TABLE IF EXISTS `lines`;
 CREATE TABLE `lines` (
   `line_cd` int unsigned NOT NULL,
   `company_cd` int unsigned NOT NULL,
-  `line_name` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `line_name_k` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `line_name_h` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `line_name_r` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `line_name_zh` text CHARACTER SET utf8 COLLATE utf8_general_ci,
-  `line_name_ko` text CHARACTER SET utf8 COLLATE utf8_general_ci,
-  `line_color_c` text CHARACTER SET utf8 COLLATE utf8_general_ci,
-  `line_color_t` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `line_name` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `line_name_k` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `line_name_h` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `line_name_r` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `line_name_zh` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
+  `line_name_ko` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
+  `line_color_c` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
+  `line_color_t` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `line_type` int unsigned NOT NULL,
-  `line_symbol_primary` text CHARACTER SET utf8 COLLATE utf8_general_ci,
+  `line_symbol_primary` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
   `line_symbol_secondary` text,
   `line_symbol_extra` text,
   `line_symbol_primary_color` text,
   `line_symbol_secondary_color` text,
   `line_symbol_extra_color` text,
+  `line_symbol_primary_shape` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
+  `line_symbol_secondary_shape` text,
+  `line_symbol_extra_shape` text,
   `lon` decimal(18,14) unsigned NOT NULL,
   `lat` decimal(18,15) unsigned NOT NULL,
   `zoom` int unsigned NOT NULL,
@@ -140,9 +143,9 @@ CREATE TABLE `stations` (
   `station_name_zh` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `station_name_ko` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `primary_station_number` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `secondary_station_number` text COLLATE utf8mb4_unicode_ci,
-  `extra_station_number` text COLLATE utf8mb4_unicode_ci,
-  `three_letter_code` text COLLATE utf8mb4_unicode_ci,
+  `secondary_station_number` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `extra_station_number` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `three_letter_code` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `line_cd` int unsigned NOT NULL,
   `pref_cd` int unsigned NOT NULL,
   `post` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -179,12 +182,12 @@ DROP TABLE IF EXISTS `types`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `types` (
   `type_cd` int unsigned NOT NULL AUTO_INCREMENT,
-  `type_name` varchar(20) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
-  `type_name_k` varchar(14) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
-  `type_name_r` varchar(53) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
-  `type_name_zh` varchar(19) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
-  `type_name_ko` varchar(25) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
-  `color` varchar(7) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT '',
+  `type_name` varchar(20) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
+  `type_name_k` varchar(14) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
+  `type_name_r` varchar(53) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
+  `type_name_zh` varchar(19) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
+  `type_name_ko` varchar(25) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
+  `color` varchar(7) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
   `direction` int unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`type_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
@@ -208,4 +211,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-05-16 22:05:59
+-- Dump completed on 2023-03-19 18:35:52

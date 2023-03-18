@@ -17,11 +17,13 @@ type Company {
 type LineSymbol {
   lineSymbol: String!
   lineSymbolColor: String!
+  lineSymbolShape: String!
 }
 
 type StationNumber {
   lineSymbol: String!
   lineSymbolColor: String!
+  lineSymbolShape: String!
   stationNumber: String!
 }
 
