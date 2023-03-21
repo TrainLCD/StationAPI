@@ -6,4 +6,6 @@ export class LineSymbol {
   lineSymbol: string;
   @Field()
   lineSymbolColor: string;
+  @Field()
+  lineSymbolShape: string;
 }

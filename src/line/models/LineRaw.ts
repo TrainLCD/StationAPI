@@ -26,13 +26,16 @@ export class LineRaw {
   line_name_ko: string;
   line_color_c: string;
   line_color_t: string;
+  line_type: number;
   line_symbol_primary: string;
   line_symbol_secondary: string;
   line_symbol_extra: string;
   line_symbol_primary_color: string;
   line_symbol_secondary_color: string;
   line_symbol_extra_color: string;
-  line_type: number;
+  line_symbol_primary_shape: string;
+  line_symbol_secondary_shape: string;
+  line_symbol_extra_shape: string;
   lon: number;
   lat: number;
   zoom: number;
