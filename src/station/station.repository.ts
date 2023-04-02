@@ -189,7 +189,7 @@ export class StationRepository {
                       isNextStationOperatedSameCompany &&
                       !isAllLinesOperatedSameCompany
                     ) {
-                      return `${tt.company_name}線${tt.type_name.replace(
+                      return `${tt.company_name_r}線${tt.type_name.replace(
                         parenthesisRegexp,
                         '',
                       )}`;
