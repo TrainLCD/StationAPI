@@ -40,9 +40,12 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 116,みやこ路快速,ミヤコジカイソク,Miyakoji Rapid,都路快速,미야코지 쾌속,#fec210,0,,COMPLETE
 117,関空快速,カンクウカイソク,Kansai Airport Rapid,关空快速,간쿠 쾌속,#007ac2,0,,COMPLETE
 118,紀州路快速,キシュウジカイソク,Kishūji Rapid,紀州路快速,기슈로 쾌속,#fd7e00,0,,COMPLETE
-119,青梅特快,オウメトッカイ,Ōme Special Rapid,青梅特快,오메특쾌,#F15A22,0,,COMPLETE
-120,中央特快,チュウオウトッカイ,Chūō Special Rapid,中央特快,중앙특쾌,#F15A23,0,,COMPLETE
-121,通勤特快,ツウキントッカイ,Commuter Special Rapid,通勤特快,통근특쾌,#F15A24,0,,COMPLETE
+119,青梅特快,オウメトッカイ,"Ōme
+Special Rapid",青梅特快,오메특쾌,#F15A22,0,,COMPLETE
+120,中央特快,チュウオウトッカイ,"Chūō
+Special Rapid",中央特快,중앙특쾌,#F15A23,0,,COMPLETE
+121,通勤特快,ツウキントッカイ,"Commuter
+Special Rapid",通勤特快,통근특쾌,#F15A24,0,,COMPLETE
 122,サンライナー,サンライナー,Sun Liner,Sun Liner,산 라이너,#dc143c,0,,COMPLETE
 123,マリンライナー,マリンライナー,Marine Liner,Marine Liner,마린라이나,#dc143c,0,,NOT
 124,快速ことぶき,カイソクコトブキ,Rapid Kotobuki,快速寿,쾌속 축수,#dc143c,0,,NOT
