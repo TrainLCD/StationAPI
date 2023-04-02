@@ -47,5 +47,6 @@ export class TrainTypeWithLineRaw {
   e_sort: number;
   // Company
   company_name: string;
+  company_name_r: string;
   company_name_en: string;
 }
