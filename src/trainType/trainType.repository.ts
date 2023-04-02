@@ -149,14 +149,14 @@ export class TrainTypeRepository {
     });
   }
 
-  async getAllLinesTrainTypes(
+  async getAllLineTrainTypes(
     lineGroupIds: number[],
   ): Promise<TrainTypeWithLineRaw[]> {
     const { connection } = this.mysqlService;
 
     return new Promise<TrainTypeWithLineRaw[]>((resolve, reject) => {
       connection.query(
-        `SELECT DISTINCT t.*, l.*, c.company_name, c.company_name_en, sst.line_group_cd
+        `SELECT DISTINCT t.*, l.*, c.company_name, c.company_name_en, sst.id, sst.line_group_cd
         FROM \`lines\` as l,
         \`types\` as t,
         stations as s,
