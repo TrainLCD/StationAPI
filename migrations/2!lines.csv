@@ -151,7 +151,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 11614,4,嵯峨野線,サガノセン,山陰本線(京都～園部),Sagano Line,嵯峨野线,사가노선,9370DB,紫,2,E,,,9370DB,,,REVERSED_SQUARE_WEST,,,135.6041557,35.05307104,11,0,11614
 11615,4,山陰本線(園部～豊岡),サンインホンセン,山陰本線(園部～豊岡),San'in Main Line(Sonobe to Toyooka),山阴本线,산인 본선,669933,抹茶,2,E,,,669933,,,REVERSED_SQUARE_WEST,,,135.0886844,35.32609457,10,0,11615
 11616,4,山陰本線(豊岡～米子),サンインホンセン,山陰本線(豊岡～米子),San’in Main Line(Toyooka to Yonago),山阴本线,산인 본선,669933,抹茶,2,A,,,669933,,,REVERSED_SQUARE_WEST,,,134.0209022,35.5218286,9,0,11616
-11617,4,学研都市線,ガッケントシセン,片町線,Gakkentoshi Line,学研都市线,갓켄토시선,9ACD32,黄緑,2,H,,,9ACD32,,,REVERSED_SQUARE_WEST,,,135.6901646,34.7599984,11,0,11617
+11617,4,学研都市線,ガッケントシセン,片町線,Gakkentoshi Line,学研都市线,갓켄토시선,9ACD32,黄緑,2,H,,,FF1493,,,REVERSED_SQUARE_WEST,,,135.6901646,34.7599984,11,0,11617
 11618,4,奈良線,ナラセン,奈良線,Nara Line,奈良线,나라선,A52A2A,茶,2,D,,,A52A2A,,,REVERSED_SQUARE_WEST,,,135.7864342,34.83402323,11,0,11618
 11622,4,舞鶴線,マイヅルセン,舞鶴線,Maizuru Line,舞鹤线,마이즈루선,7BA1C5,水色,2,L,,,7BA1C5,,,REVERSED_SQUARE_WEST,,,135.2793138,35.36774424,11,0,11622
 11623,4,大阪環状線,オオサカカンジョウセン,大阪環状線,Osaka Loop Line,大阪环状线,오사카 순환선,FF0000,赤,2,O,,,FF0000,,,REVERSED_SQUARE_WEST,,,135.5021892,34.68154143,13,0,11623
