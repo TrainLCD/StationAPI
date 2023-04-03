@@ -131,8 +131,9 @@ export class StationRepository {
             filteredAllTrainTypes: TrainTypeWithLineRaw[];
             allTrainTypes: TrainTypeWithLineRaw[];
           }> => {
-            const allTrainTypes =
-              await this.trainTypeRepo.getAllLinesTrainTypes(r.line_group_cd);
+            const allTrainTypes = await this.trainTypeRepo.getAllLineTrainTypes(
+              r.line_group_cd,
+            );
 
             const filteredAllTrainTypes = allTrainTypes.filter(
               (tt) => tt.line_cd !== r.line_cd,
@@ -188,7 +189,7 @@ export class StationRepository {
                       isNextStationOperatedSameCompany &&
                       !isAllLinesOperatedSameCompany
                     ) {
-                      return `${tt.company_name}線${tt.type_name.replace(
+                      return `${tt.company_name_r}線${tt.type_name.replace(
                         parenthesisRegexp,
                         '',
                       )}`;
@@ -310,7 +311,7 @@ export class StationRepository {
                         );
 
                       return {
-                        id: r.line_group_cd,
+                        id: r.id,
                         typeId: r.type_cd,
                         groupId: r.line_group_cd,
                         name: !filteredAllTrainTypes.length
@@ -326,9 +327,9 @@ export class StationRepository {
                         stations: [],
                         allTrainTypes: allTrainTypes.map<TrainTypeMinimum>(
                           (tt) => ({
-                            id: tt.type_cd + tt.line_cd,
+                            id: tt.id,
                             typeId: tt.type_cd,
-                            groupId: r.line_group_cd,
+                            groupId: tt.line_group_cd,
                             name: tt.type_name,
                             nameK: tt.type_name_k,
                             nameR: tt.type_name_r,
