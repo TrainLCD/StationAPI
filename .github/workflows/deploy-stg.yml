@@ -7,8 +7,8 @@ on:
 env:
   AWS_REGION: ap-northeast-1 # set this to your preferred AWS region, e.g. us-west-1
   ECR_REPOSITORY: stationapi-stg # set this to your Amazon ECR repository name
-  ECS_SERVICE: stationapi-staging-service # set this to your Amazon ECS service name
-  ECS_CLUSTER: stationapi-staging # set this to your Amazon ECS cluster name
+  ECS_SERVICE: stationapi-stg-svc # set this to your Amazon ECS service name
+  ECS_CLUSTER: stationapi-stg # set this to your Amazon ECS cluster name
   ECS_TASK_DEFINITION:
     .aws/task-definition.json # set this to the path to your Amazon ECS task definition
     # file, e.g. .aws/task-definition.json
