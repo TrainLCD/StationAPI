@@ -11,13 +11,6 @@
         "MYSQL_HOST": $MYSQL_HOST
       },
       "ports": { "3000": "HTTP" }
-    },
-    "mackerel-container-agent": {
-      "image": "mackerel/mackerel-container-agent:latest",
-      "environment": {
-        "MACKEREL_CONTAINER_PLATFORM": "ecs_v3",
-        "MACKEREL_APIKEY": $MACKEREL_APIKEY
-      }
     }
   },
   "publicEndpoint": {
