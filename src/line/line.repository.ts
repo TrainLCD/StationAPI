@@ -1,17 +1,15 @@
-import { Injectable } from '@nestjs/common';
-import { RowDataPacket } from 'mysql2';
-import { MysqlService } from 'src/mysql/mysql.service';
+import { Inject, Injectable } from '@nestjs/common';
+import { Connection, RowDataPacket } from 'mysql2';
+import { DB_CONNECTION } from 'src/db/db.module';
 import { CompanyRaw, LineRaw } from './models/LineRaw';
 
 @Injectable()
 export class LineRepository {
-  constructor(private readonly mysqlService: MysqlService) {}
+  constructor(@Inject(DB_CONNECTION) private readonly conn: Connection) {}
 
   async findOne(id: number): Promise<LineRaw> {
-    const { connection } = this.mysqlService;
-
     return new Promise<LineRaw>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `SELECT *
         FROM \`lines\`
         WHERE line_cd = ?
@@ -32,10 +30,8 @@ export class LineRepository {
   }
 
   async getByIds(ids: number[]): Promise<LineRaw[]> {
-    const { connection } = this.mysqlService;
-
     return new Promise<LineRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `SELECT *
         FROM \`lines\`
         WHERE line_cd in (?)
@@ -55,10 +51,8 @@ export class LineRepository {
   }
 
   async findOneCompany(lineId: number): Promise<CompanyRaw> {
-    const { connection } = this.mysqlService;
-
     return new Promise<CompanyRaw>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `SELECT c.*
         FROM \`lines\` as l, \`companies\` as c
         WHERE l.line_cd = ?
@@ -80,10 +74,8 @@ export class LineRepository {
   }
 
   async getCompaniesByLineIds(lineIds: number[]): Promise<CompanyRaw[]> {
-    const { connection } = this.mysqlService;
-
     return new Promise<CompanyRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `SELECT c.*, l.line_cd
         FROM \`lines\` as l, \`companies\` as c
         WHERE l.line_cd in (?)
@@ -104,13 +96,8 @@ export class LineRepository {
   }
 
   async getByGroupId(groupId: number): Promise<LineRaw[]> {
-    const { connection } = this.mysqlService;
-    if (!connection) {
-      return [];
-    }
-
     return new Promise<LineRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `SELECT *
         FROM \`lines\`
         WHERE line_cd
@@ -132,13 +119,8 @@ export class LineRepository {
   }
 
   async findOneStationId(stationId: number): Promise<LineRaw> {
-    const { connection } = this.mysqlService;
-    if (!connection) {
-      return null;
-    }
-
     return new Promise<LineRaw>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `SELECT *
         FROM \`lines\`
         WHERE line_cd
