@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { RowDataPacket } from 'mysql2';
+import { Inject, Injectable } from '@nestjs/common';
+import { Connection, RowDataPacket } from 'mysql2';
+import { DB_CONNECTION } from 'src/db/db.module';
 import { StationRaw } from 'src/models/stationRaw';
-import { MysqlService } from 'src/mysql/mysql.service';
 import { LineRepository } from '../line/line.repository';
 import { LineRaw } from '../line/models/LineRaw';
 import { TrainTypeRaw, TrainTypeWithLineRaw } from './models/TrainTypeRaw';
@@ -9,15 +9,13 @@ import { TrainTypeRaw, TrainTypeWithLineRaw } from './models/TrainTypeRaw';
 @Injectable()
 export class TrainTypeRepository {
   constructor(
-    private readonly mysqlService: MysqlService,
+    @Inject(DB_CONNECTION) private readonly conn: Connection,
     private lineRepo: LineRepository,
   ) {}
 
   async getStationsByGroupIds(groupIds: number[]): Promise<StationRaw[]> {
-    const { connection } = this.mysqlService;
-
     return new Promise<StationRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `
           SELECT *
           FROM stations
@@ -48,10 +46,8 @@ export class TrainTypeRepository {
   }
 
   async getByIds(lineGroupIds: number[]): Promise<TrainTypeRaw[]> {
-    const { connection } = this.mysqlService;
-
     return new Promise<TrainTypeRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `SELECT *
         FROM types as t, station_station_types as sst
         WHERE sst.line_group_cd in (?)
@@ -72,10 +68,8 @@ export class TrainTypeRepository {
   }
 
   async getBelongingStations(lineGroupIds: number[]): Promise<StationRaw[]> {
-    const { connection } = this.mysqlService;
-
     return new Promise<StationRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `
           SELECT *
           FROM station_station_types as sst, stations as s
@@ -125,10 +119,8 @@ export class TrainTypeRepository {
   }
 
   async getBelongingLines(lineGroupIds: number[]): Promise<LineRaw[]> {
-    const { connection } = this.mysqlService;
-
     return new Promise<LineRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `SELECT DISTINCT l.*
         FROM \`lines\` as l, stations as s, station_station_types as sst
         WHERE sst.line_group_cd = ?
@@ -152,10 +144,8 @@ export class TrainTypeRepository {
   async getAllLineTrainTypes(
     lineGroupIds: number[],
   ): Promise<TrainTypeWithLineRaw[]> {
-    const { connection } = this.mysqlService;
-
     return new Promise<TrainTypeWithLineRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `SELECT DISTINCT t.*, l.*, c.company_name_r, c.company_name_en, sst.id, sst.line_group_cd
         FROM \`lines\` as l,
         \`types\` as t,

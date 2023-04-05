@@ -1,17 +1,12 @@
 import { Module } from '@nestjs/common';
-import { MysqlService } from 'src/mysql/mysql.service';
+import { DbModule } from 'src/db/db.module';
 import LineDataLoader from './line.loader';
 import { LineRepository } from './line.repository';
 import { LineResolver } from './line.resolver';
 import { LineService } from './line.service';
 
 @Module({
-  providers: [
-    LineResolver,
-    LineService,
-    LineDataLoader,
-    LineRepository,
-    MysqlService,
-  ],
+  imports: [DbModule],
+  providers: [LineResolver, LineService, LineDataLoader, LineRepository],
 })
 export class LineModule {}

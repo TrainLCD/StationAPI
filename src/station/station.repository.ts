@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { uniqBy } from 'lodash';
-import { RowDataPacket } from 'mysql2';
+import { Connection, RowDataPacket } from 'mysql2';
+import { DB_CONNECTION } from 'src/db/db.module';
 import { StationRaw } from 'src/models/stationRaw';
 import { TrainType, TrainTypeMinimum } from 'src/models/traintype.model';
-import { MysqlService } from 'src/mysql/mysql.service';
 import { convertLine } from 'src/utils/convert';
 import { LineRepository } from '../line/line.repository';
 import { TrainTypeWithLineRaw } from '../trainType/models/TrainTypeRaw';
@@ -12,16 +12,14 @@ import { TrainTypeRepository } from '../trainType/trainType.repository';
 @Injectable()
 export class StationRepository {
   constructor(
-    private readonly mysqlService: MysqlService,
+    @Inject(DB_CONNECTION) private readonly conn: Connection,
     private readonly lineRepo: LineRepository,
     private readonly trainTypeRepo: TrainTypeRepository,
   ) {}
 
   async findOneById(id: number): Promise<StationRaw> {
-    const { connection } = this.mysqlService;
-
     return new Promise<StationRaw>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `
           SELECT *
           FROM stations
@@ -50,10 +48,8 @@ export class StationRepository {
   }
 
   async getByIds(ids: number[]): Promise<StationRaw[]> {
-    const { connection } = this.mysqlService;
-
     return new Promise<StationRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `
           SELECT *
           FROM stations
@@ -84,10 +80,8 @@ export class StationRepository {
   }
 
   async getTrainTypesByIds(ids: number[]): Promise<TrainType[][]> {
-    const { connection } = this.mysqlService;
-
     return new Promise<TrainType[][]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `
         SELECT sst.type_cd,
             sst.id,
@@ -382,14 +376,12 @@ export class StationRepository {
     longitude: number,
     limit?: number,
   ): Promise<StationRaw[]> {
-    const { connection } = this.mysqlService;
-
     // if (limit > 10) {
     //   throw new Error('Invalid limit');
     // }
 
     return new Promise<StationRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `
         SELECT *,
         (
@@ -440,13 +432,8 @@ export class StationRepository {
   }
 
   async getByLineIds(lineIds: number[]): Promise<StationRaw[]> {
-    const { connection } = this.mysqlService;
-    if (!connection) {
-      return [];
-    }
-
     return new Promise<StationRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `
           SELECT *
           FROM stations
@@ -492,13 +479,8 @@ export class StationRepository {
   }
 
   async getByName(name: string): Promise<StationRaw[]> {
-    const { connection } = this.mysqlService;
-    if (!connection) {
-      return [];
-    }
-
     return new Promise<StationRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `
           SELECT * FROM stations
           WHERE (station_name LIKE "%"?"%"
@@ -536,10 +518,8 @@ export class StationRepository {
   }
 
   async getAll(): Promise<StationRaw[]> {
-    const { connection } = this.mysqlService;
-
     return new Promise<StationRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `
           SELECT *
           FROM stations
@@ -566,10 +546,8 @@ export class StationRepository {
   }
 
   async getRandomly(): Promise<StationRaw> {
-    const { connection } = this.mysqlService;
-
     return new Promise<StationRaw>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `
         SELECT *
         FROM stations
@@ -604,10 +582,8 @@ export class StationRepository {
   }
 
   async getByGroupIds(groupIds: number[]): Promise<StationRaw[]> {
-    const { connection } = this.mysqlService;
-
     return new Promise<StationRaw[]>((resolve, reject) => {
-      connection.query(
+      this.conn.query(
         `
           SELECT *
           FROM stations

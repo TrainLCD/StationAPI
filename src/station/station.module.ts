@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { MysqlService } from 'src/mysql/mysql.service';
+import { DbModule } from 'src/db/db.module';
 import { LineRepository } from '../line/line.repository';
 import { TrainTypeRepository } from '../trainType/trainType.repository';
 import StationCoordsDataLoader from './station.coords.loader';
@@ -12,6 +12,7 @@ import { StationResolver } from './station.resolver';
 import { StationService } from './station.service';
 
 @Module({
+  imports: [DbModule],
   providers: [
     StationService,
     StationResolver,
@@ -20,7 +21,6 @@ import { StationService } from './station.service';
     StationLineDataLoader,
     StationNameDataLoader,
     StationCoordsDataLoader,
-    MysqlService,
     StationRepository,
     LineRepository,
     TrainTypeRepository,
