@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Station } from 'src/models/station.model';
+import { TrainTypeRepository } from 'src/trainType/trainType.repository';
 import { convertStation } from 'src/utils/convert';
 import { LineRepository } from '../line/line.repository';
 import { StationRepository } from './station.repository';
@@ -9,28 +10,29 @@ export class StationService {
   constructor(
     private readonly stationRepo: StationRepository,
     private readonly lineRepo: LineRepository,
+    private readonly trainTypeRepo: TrainTypeRepository,
   ) {}
 
-  async getStationsByIds(ids: number[]): Promise<Station[]> {
-    const stations = await this.stationRepo.getByIds(ids);
-    const lineIds = stations.map((s) => s.lines.map((l) => l.line_cd)).flat();
-    const stationIds = stations.map((s) => s.station_cd);
-    const companies = await this.lineRepo.getCompaniesByLineIds(lineIds);
-    const trainTypes = await this.stationRepo.getTrainTypesByIds(stationIds);
+  async findOne(id: number): Promise<Station> {
+    const station = await this.stationRepo.findOneById(id);
 
-    return stations.map((s, i) => convertStation(s, companies, trainTypes[i]));
+    return convertStation(
+      station,
+      await this.lineRepo.getCompaniesByLineIds([station.line_cd]),
+      (await this.stationRepo.getTrainTypesByIds([id]))[0],
+    );
   }
 
-  async getStationsByGroupIds(ids: number[]): Promise<Station[]> {
-    const stations = await this.stationRepo.getByIds(ids);
-    const lineIds = stations.map((s) => s.lines.map((l) => l.line_cd)).flat();
-    const stationIds = stations.map((s) => s.station_cd);
-    const companies = await this.lineRepo.getCompaniesByLineIds(lineIds);
-    const trainTypes = await this.stationRepo.getTrainTypesByIds(stationIds);
+  async findStationByGroupId(groupId: number): Promise<Station> {
+    const station = await this.stationRepo.findOneById(groupId);
+    const companies = await this.lineRepo.getCompaniesByLineIds([
+      station.line_cd,
+    ]);
+    const trainTypes = (
+      await this.stationRepo.getTrainTypesByIds([station.station_cd])
+    )[0];
 
-    return Promise.all(
-      stations.map((s, i) => convertStation(s, companies, trainTypes[i])),
-    );
+    return convertStation(station, companies, trainTypes);
   }
 
   async getByCoords(
@@ -53,8 +55,8 @@ export class StationService {
     );
   }
 
-  async getByLineIds(lineIds: number[]): Promise<Station[]> {
-    const stations = await this.stationRepo.getByLineIds(lineIds);
+  async getByLineId(lineId: number): Promise<Station[]> {
+    const stations = await this.stationRepo.getByLineIds([lineId]);
     if (!stations.length) {
       return [];
     }

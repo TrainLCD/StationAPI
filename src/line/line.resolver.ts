@@ -8,6 +8,6 @@ export class LineResolver {
 
   @Query(() => Line)
   async line(@Args('id') id: number): Promise<Line> {
-    return (await this.lineService.getByIds([id]))[0];
+    return this.lineService.findOne(id);
   }
 }

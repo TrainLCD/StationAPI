@@ -9,12 +9,12 @@ export class StationResolver {
 
   @Query(() => Station)
   async station(@Args('id', ParseIntPipe) id: number): Promise<Station> {
-    return (await this.stationService.getStationsByIds([id]))[0];
+    return this.stationService.findOne(id);
   }
 
   @Query(() => Station)
   async stationByGroupId(@Args('groupId') groupId: number): Promise<Station> {
-    return (await this.stationService.getStationsByGroupIds([groupId]))[0];
+    return this.stationService.findStationByGroupId(groupId);
   }
 
   @Query(() => [Station])
@@ -30,7 +30,7 @@ export class StationResolver {
   async stationsByLineId(
     @Args('lineId', { type: () => ID }) lineId: number,
   ): Promise<Station[]> {
-    return this.stationService.getByLineIds([lineId]);
+    return this.stationService.getByLineId(lineId);
   }
 
   @Query(() => [Station])

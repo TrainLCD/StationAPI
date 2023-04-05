@@ -10,6 +10,6 @@ export class TrainTypeResolver {
   async trainType(
     @Args('id', { type: () => ID }) id: number,
   ): Promise<TrainType> {
-    return (await this.trainTypeService.getByIds([id]))[0];
+    return this.trainTypeService.findOneByLineGroupId(id);
   }
 }
