@@ -5,6 +5,7 @@ import { join } from 'path';
 import { LineModule } from './line/line.module';
 import { StationModule } from './station/station.module';
 import { TrainTypeModule } from './trainType/trainType.module';
+import { DbModule } from './db/db.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { TrainTypeModule } from './trainType/trainType.module';
     StationModule,
     LineModule,
     TrainTypeModule,
+    DbModule,
   ],
   controllers: [],
   providers: [],
