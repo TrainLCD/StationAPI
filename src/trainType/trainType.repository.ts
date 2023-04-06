@@ -50,7 +50,7 @@ export class TrainTypeRepository {
       this.conn.query(
         `SELECT *
         FROM types as t, station_station_types as sst
-        WHERE sst.line_group_cd in (?)
+        WHERE sst.line_group_cd = ?
           AND t.type_cd = sst.type_cd
         LIMIT 1`,
         [lineGroupId],

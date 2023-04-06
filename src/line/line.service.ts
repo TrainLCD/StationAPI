@@ -9,7 +9,7 @@ export class LineService {
 
   async findOne(id: number): Promise<Line> {
     const line = await this.lineRepo.findOne(id);
-    const company = (await this.lineRepo.findOneCompany(id))[0];
+    const company = await this.lineRepo.findOneCompany(id);
     return convertLine(line, company);
   }
 }
