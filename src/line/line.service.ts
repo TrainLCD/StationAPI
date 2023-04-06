@@ -8,8 +8,8 @@ export class LineService {
   constructor(private readonly lineRepo: LineRepository) {}
 
   async findOne(id: number): Promise<Line> {
-    const line = (await this.lineRepo.getByIds([id]))[0];
-    const company = (await this.lineRepo.getCompaniesByLineIds([id]))[0];
+    const line = await this.lineRepo.findOne(id);
+    const company = (await this.lineRepo.findOneCompany(id))[0];
     return convertLine(line, company);
   }
 }

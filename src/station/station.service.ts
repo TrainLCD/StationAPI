@@ -18,8 +18,8 @@ export class StationService {
 
     return convertStation(
       station,
-      await this.lineRepo.getCompaniesByLineIds([station.line_cd]),
-      (await this.stationRepo.getTrainTypesByIds([id]))[0],
+      [await this.lineRepo.findOneCompany(station.line_cd)],
+      await this.stationRepo.getTrainTypesByIds([id])[0],
     );
   }
 
@@ -28,11 +28,11 @@ export class StationService {
     const companies = await this.lineRepo.getCompaniesByLineIds([
       station.line_cd,
     ]);
-    const trainTypes = (
-      await this.stationRepo.getTrainTypesByIds([station.station_cd])
-    )[0];
+    const trainTypes = await this.stationRepo.getTrainTypesByIds([
+      station.station_cd,
+    ]);
 
-    return convertStation(station, companies, trainTypes);
+    return convertStation(station, companies, trainTypes[0]);
   }
 
   async getByCoords(
@@ -69,14 +69,9 @@ export class StationService {
     return stations.map((s, i) => convertStation(s, companies, trainTypes[i]));
   }
 
-  async getByNames(names: string[]): Promise<Station[][]> {
-    return Promise.all(
-      names.map(async (name) => {
-        const stations = await this.stationRepo.getByName(name);
-
-        return stations.map((s) => convertStation(s, [], []));
-      }),
-    );
+  async getByName(name: string): Promise<Station[]> {
+    const stations = await this.stationRepo.getByName(name);
+    return stations.map((s) => convertStation(s, [], []));
   }
 
   async getRandomStation(): Promise<Station> {

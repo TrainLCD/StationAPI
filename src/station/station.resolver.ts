@@ -35,7 +35,7 @@ export class StationResolver {
 
   @Query(() => [Station])
   async stationsByName(@Args('name') name: string): Promise<Station[]> {
-    return (await this.stationService.getByNames([name]))[0];
+    return this.stationService.getByName(name);
   }
 
   @Query(() => Station)
