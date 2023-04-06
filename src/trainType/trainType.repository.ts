@@ -45,23 +45,23 @@ export class TrainTypeRepository {
     });
   }
 
-  async getByIds(lineGroupIds: number[]): Promise<TrainTypeRaw[]> {
-    return new Promise<TrainTypeRaw[]>((resolve, reject) => {
+  async findOne(lineGroupId: number): Promise<TrainTypeRaw> {
+    return new Promise<TrainTypeRaw>((resolve, reject) => {
       this.conn.query(
         `SELECT *
         FROM types as t, station_station_types as sst
         WHERE sst.line_group_cd in (?)
           AND t.type_cd = sst.type_cd
         LIMIT 1`,
-        [lineGroupIds],
+        [lineGroupId],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
           }
           if (!results.length) {
-            return resolve([]);
+            return resolve(null);
           }
-          return resolve(results as TrainTypeRaw[]);
+          return resolve(results[0] as TrainTypeRaw);
         },
       );
     });
