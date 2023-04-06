@@ -15,14 +15,14 @@ export class TrainTypeService {
     private readonly lineRepo: LineRepository,
   ) {}
 
-  async getByIds(lineGroupIds: number[]): Promise<TrainType[]> {
-    const trainTypes = await this.trainTypeRepo.getByIds(lineGroupIds);
-    const belongingStations = await this.trainTypeRepo.getBelongingStations(
-      lineGroupIds,
-    );
-    const belongingLines = await this.trainTypeRepo.getBelongingLines(
-      lineGroupIds,
-    );
+  async findOneByLineGroupId(lineGroupId: number): Promise<TrainType> {
+    const trainType = (await this.trainTypeRepo.getByIds([lineGroupId]))[0];
+    const belongingStations = await this.trainTypeRepo.getBelongingStations([
+      lineGroupId,
+    ]);
+    const belongingLines = await this.trainTypeRepo.getBelongingLines([
+      lineGroupId,
+    ]);
 
     const stationsByGroupIds = await this.trainTypeRepo.getStationsByGroupIds(
       belongingStations.map((bs) => bs.station_g_cd),
@@ -38,10 +38,6 @@ export class TrainTypeService {
     );
     const trainTypeLines = belongingLines.map((bl) => convertLine(bl));
 
-    return Promise.all(
-      trainTypes.map((tt) => {
-        return convertTrainType(tt, trainTypeStations, trainTypeLines);
-      }),
-    );
+    return convertTrainType(trainType, trainTypeStations, trainTypeLines);
   }
 }

@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DbModule } from 'src/db/db.module';
 import { LineRepository } from '../line/line.repository';
-import TrainTypeDataLoader from './trainType.loader';
 import { TrainTypeRepository } from './trainType.repository';
 import { TrainTypeResolver } from './trainType.resolver';
 import { TrainTypeService } from './trainType.service';
@@ -11,7 +10,6 @@ import { TrainTypeService } from './trainType.service';
   providers: [
     TrainTypeResolver,
     TrainTypeService,
-    TrainTypeDataLoader,
     TrainTypeRepository,
     LineRepository,
   ],

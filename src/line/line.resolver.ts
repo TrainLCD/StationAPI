@@ -1,13 +1,13 @@
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import { Line } from 'src/models/line.model';
-import LineDataLoader from './line.loader';
+import { LineService } from './line.service';
 
 @Resolver(Line)
 export class LineResolver {
-  constructor(private readonly lineDataLoader: LineDataLoader) {}
+  constructor(private readonly lineService: LineService) {}
 
   @Query(() => Line)
   async line(@Args('id') id: number): Promise<Line> {
-    return this.lineDataLoader.load(id);
+    return this.lineService.findOne(id);
   }
 }
