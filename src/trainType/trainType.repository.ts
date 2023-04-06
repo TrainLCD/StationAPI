@@ -118,16 +118,16 @@ export class TrainTypeRepository {
     });
   }
 
-  async getBelongingLines(lineGroupIds: number[]): Promise<LineRaw[]> {
+  async findBelongingLines(lineGroupId: number): Promise<LineRaw[]> {
     return new Promise<LineRaw[]>((resolve, reject) => {
       this.conn.query(
         `SELECT DISTINCT l.*
         FROM \`lines\` as l, stations as s, station_station_types as sst
-        WHERE sst.line_group_cd in (?)
+        WHERE sst.line_group_cd = ?
           AND s.station_cd = sst.station_cd
           AND l.line_cd = s.line_cd
           AND s.e_status = 0`,
-        [lineGroupIds],
+        [lineGroupId],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);

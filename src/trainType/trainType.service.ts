@@ -20,9 +20,9 @@ export class TrainTypeService {
     const belongingStations = await this.trainTypeRepo.getBelongingStations([
       lineGroupId,
     ]);
-    const belongingLines = await this.trainTypeRepo.getBelongingLines([
+    const belongingLines = await this.trainTypeRepo.findBelongingLines(
       lineGroupId,
-    ]);
+    );
 
     const stationsByGroupIds = await this.trainTypeRepo.getStationsByGroupIds(
       belongingStations.map((bs) => bs.station_g_cd),
