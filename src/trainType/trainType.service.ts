@@ -16,7 +16,7 @@ export class TrainTypeService {
   ) {}
 
   async findOneByLineGroupId(lineGroupId: number): Promise<TrainType> {
-    const trainType = (await this.trainTypeRepo.getByIds([lineGroupId]))[0];
+    const trainType = await this.trainTypeRepo.findOne(lineGroupId);
     const belongingStations = await this.trainTypeRepo.getBelongingStations([
       lineGroupId,
     ]);
