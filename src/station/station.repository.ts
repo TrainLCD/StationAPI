@@ -292,12 +292,9 @@ export class StationRepository {
                         allTrainTypes,
                       } = await getReplacedTrainTypeName(r);
 
-                      const lineGroupIds = allTrainTypes.map(
-                        (tt) => tt.line_group_cd,
-                      );
                       const linesRaw =
-                        await this.trainTypeRepo.getBelongingLines(
-                          lineGroupIds,
+                        await this.trainTypeRepo.findBelongingLines(
+                          r.line_group_cd,
                         );
                       const companies =
                         await this.lineRepo.getCompaniesByLineIds(
@@ -431,17 +428,17 @@ export class StationRepository {
     });
   }
 
-  async getByLineIds(lineIds: number[]): Promise<StationRaw[]> {
+  async getByLineId(lineId: number): Promise<StationRaw[]> {
     return new Promise<StationRaw[]>((resolve, reject) => {
       this.conn.query(
         `
           SELECT *
           FROM stations
-          WHERE line_cd in (?)
+          WHERE line_cd = ?
           AND e_status = 0
           ORDER BY e_sort, station_cd
         `,
-        [lineIds],
+        [lineId],
         async (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
