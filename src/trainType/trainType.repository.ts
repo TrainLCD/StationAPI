@@ -123,11 +123,11 @@ export class TrainTypeRepository {
       this.conn.query(
         `SELECT DISTINCT l.*
         FROM \`lines\` as l, stations as s, station_station_types as sst
-        WHERE sst.line_group_cd = ?
+        WHERE sst.line_group_cd in (?)
           AND s.station_cd = sst.station_cd
           AND l.line_cd = s.line_cd
           AND s.e_status = 0`,
-        [lineGroupIds[0]],
+        [lineGroupIds],
         (err, results: RowDataPacket[]) => {
           if (err) {
             return reject(err);
