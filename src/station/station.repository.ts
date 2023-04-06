@@ -292,12 +292,9 @@ export class StationRepository {
                         allTrainTypes,
                       } = await getReplacedTrainTypeName(r);
 
-                      const lineGroupIds = allTrainTypes.map(
-                        (tt) => tt.line_group_cd,
-                      );
                       const linesRaw =
-                        await this.trainTypeRepo.getBelongingLines(
-                          lineGroupIds,
+                        await this.trainTypeRepo.findBelongingLines(
+                          r.line_group_cd,
                         );
                       const companies =
                         await this.lineRepo.getCompaniesByLineIds(
