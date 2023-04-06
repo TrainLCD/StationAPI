@@ -56,7 +56,7 @@ export class StationService {
   }
 
   async getByLineId(lineId: number): Promise<Station[]> {
-    const stations = await this.stationRepo.getByLineIds([lineId]);
+    const stations = await this.stationRepo.getByLineId(lineId);
     if (!stations.length) {
       return [];
     }
