@@ -72,7 +72,11 @@ Special Rapid",通勤特快,통근특쾌,#F15A24,0,,COMPLETE
 145,支線,シセン,Branch Line,支線,경로,#2cb431,0,,COMPLETE
 146,シーサイドライナー,シーサイドライナー,Sea Side Liner,滨海快线,바다 사이드 라이너,#0095d9,0,,COMPLETE
 147,エアポート,エアポート,Airport,机场号,에어포트,#ff0080,0,,COMPLETE
-148,ニセコライナー,ニセコライナー,Niseko Liner,二世谷快车,니세코라이너,#0098e1,0,,COMPLETE
+148,"ニセコ
+ライナー","ニセコ
+ライナー","Niseko
+Liner",二世谷快车,"니세코
+라이너",#0098e1,0,,COMPLETE
 149,美濃赤坂線,ミノアカサカセン,Mino-Akasaka Line,美浓赤坂线,미노아카사카 지선,#F68b1e,0,,COMPLETE
 150,本山支線,モトヤマシセン,Motoyama Branch Line,本山支线,모토야마 지선,#695faa,0,小野田線,COMPLETE
 151,"ホリデー快速
