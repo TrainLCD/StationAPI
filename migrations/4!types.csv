@@ -31,7 +31,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 110,新快速,シンカイソク,Special Rapid,新快速,새쾌속,#0071be,0,,COMPLETE
 111,直通快速,チョクツウカイソク,Direct Rapid,直接快速,직통쾌속,#f5a200,0,,COMPLETE
 112,B快速,Bカイソク,B Rapid,B快速,B쾌속,#0071be,0,,COMPLETE
-113,ホリデー快速おくたま号,ホリデーカイソオクタマ,Okutama Holiday Rapid,假期快速奧多摩号,홀리데이 쾌속 오쿠타마호,#f15a22,0,,COMPLETE
+113,おくたま号,オクタマゴウ,Okutama,奧多摩号,오쿠타마호,#f15a22,0,,COMPLETE
 114,大和路快速,ヤマトジカイソク,Yamatoji Rapid,大和路快速,야마토지 쾌속,#02ad73,0,,COMPLETE
 115,丹波路快速,タンバジカイソク,Tambaji Rapid,坦巴路快速,단바로 쾌속,#fec210,0,,COMPLETE
 116,みやこ路快速,ミヤコジカイソク,Miyakoji Rapid,都路快速,미야코지 쾌속,#fec210,0,,COMPLETE
@@ -69,7 +69,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 148,ニセコライナー,ニセコライナー,Niseko Liner,二世谷快车,니세코라이너,#0098e1,0,,COMPLETE
 149,美濃赤坂線,ミノアカサカセン,Mino-Akasaka Line,美浓赤坂线,미노아카사카 지선,#F68b1e,0,,COMPLETE
 150,本山支線,モトヤマシセン,Motoyama Branch Line,本山支线,모토야마 지선,#695faa,0,小野田線,COMPLETE
-151,ホリデー快速あきがわ号,ホリデーカイソクアキガワゴウ,Akigawa Holiday Rapid,假期快速秋川号,홀리데이 쾌속 아키가와호,#f15a22,0,,COMPLETE
+151,あきがわ号,アキガワゴウ,Akigawa,秋川号,아키가와호,#f15a22,0,,COMPLETE
 152,普通,フツウ,Local,慢车,보통,#1f63c6,1,上り系統,PARTIAL
 153,普通,フツウ,Local,慢车,보통,#1f63c6,2,下り系統,PARTIAL
 200,踊り子(池袋〜伊豆急下田),オドリコ,Odoriko(Ikebukuro to Izukyū-shimoda),踊子,무희,#035d67,0,,COMPLETE
