@@ -15,9 +15,10 @@ export class StationService {
 
   async findOne(id: number): Promise<Station> {
     const station = await this.stationRepo.findOneById(id);
+    const currentLine = await this.lineRepo.findOneStationId(id);
 
     return convertStation(
-      station,
+      { ...station, currentLine },
       [await this.lineRepo.findOneCompany(station.line_cd)],
       await this.stationRepo.getTrainTypesByIds([id])[0],
     );
