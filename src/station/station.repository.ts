@@ -25,6 +25,7 @@ export class StationRepository {
           FROM stations
           WHERE station_cd = ?
           AND e_status = 0
+          LIMIT 1
         `,
         [id],
         async (err, results: RowDataPacket[]) => {
@@ -38,8 +39,13 @@ export class StationRepository {
           const lines = await this.lineRepo.getByGroupId(
             results[0].station_g_cd,
           );
+          const currentLine = await this.lineRepo.findOneStationId(
+            results[0].station_cd,
+          );
+
           return resolve({
             ...(results[0] as StationRaw),
+            currentLine,
             lines,
           });
         },

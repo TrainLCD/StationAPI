@@ -18,7 +18,7 @@ export class Station {
   longitude: number;
   @Field((type) => [Line])
   lines: Line[];
-  @Field((type) => Line)
+  @Field((type) => Line, { nullable: true })
   currentLine: Line;
   @Field()
   openYmd: string;
