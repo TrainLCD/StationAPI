@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { Station } from 'src/models/station.model';
-import { TrainTypeRepository } from 'src/trainType/trainType.repository';
 import { convertStation } from 'src/utils/convert';
 import { LineRepository } from '../line/line.repository';
 import { StationRepository } from './station.repository';
@@ -10,15 +9,13 @@ export class StationService {
   constructor(
     private readonly stationRepo: StationRepository,
     private readonly lineRepo: LineRepository,
-    private readonly trainTypeRepo: TrainTypeRepository,
   ) {}
 
   async findOne(id: number): Promise<Station> {
     const station = await this.stationRepo.findOneById(id);
-    const currentLine = await this.lineRepo.findOneStationId(id);
 
     return convertStation(
-      { ...station, currentLine },
+      station,
       [await this.lineRepo.findOneCompany(station.line_cd)],
       await this.stationRepo.getTrainTypesByIds([id])[0],
     );
