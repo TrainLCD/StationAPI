@@ -106,7 +106,7 @@ export const convertStation = (
     longitude: raw.lon,
     currentLine: convertLine(
       raw.currentLine,
-      companies?.find((c) => c.company_cd === raw.currentLine?.company_cd),
+      companies?.find((c) => c.company_cd === raw.currentLine.company_cd),
     ),
     lines: raw.lines?.map((l) =>
       convertLine(
