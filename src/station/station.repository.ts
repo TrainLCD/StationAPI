@@ -25,6 +25,7 @@ export class StationRepository {
           FROM stations
           WHERE station_cd = ?
           AND e_status = 0
+          LIMIT 1
         `,
         [id],
         async (err, results: RowDataPacket[]) => {
@@ -38,8 +39,13 @@ export class StationRepository {
           const lines = await this.lineRepo.getByGroupId(
             results[0].station_g_cd,
           );
+          const currentLine = await this.lineRepo.findOneStationId(
+            results[0].station_cd,
+          );
+
           return resolve({
             ...(results[0] as StationRaw),
+            currentLine,
             lines,
           });
         },
@@ -501,12 +507,17 @@ export class StationRepository {
           const lines = await this.lineRepo.getByIds(lineIds);
 
           return resolve(
-            results.map(
-              (r) =>
-                ({
-                  ...r,
-                  lines: lines.filter((l) => l.line_cd === r.line_cd),
-                } as StationRaw),
+            Promise.all(
+              results.map(
+                async (r) =>
+                  ({
+                    ...r,
+                    currentLine: await this.lineRepo.findOneStationId(
+                      results[0]?.station_cd,
+                    ),
+                    lines: lines.filter((l) => l.line_cd === r.line_cd),
+                  } as StationRaw),
+              ),
             ),
           );
         },
