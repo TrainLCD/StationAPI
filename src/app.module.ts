@@ -6,6 +6,7 @@ import { LineModule } from './line/line.module';
 import { StationModule } from './station/station.module';
 import { TrainTypeModule } from './trainType/trainType.module';
 import { DbModule } from './db/db.module';
+import { HealthcheckController } from './healthcheck/healthcheck.controller';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { DbModule } from './db/db.module';
     TrainTypeModule,
     DbModule,
   ],
-  controllers: [],
+  controllers: [HealthcheckController],
   providers: [],
 })
 export class AppModule {}
