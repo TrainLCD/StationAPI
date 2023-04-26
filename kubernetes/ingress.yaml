@@ -1,0 +1,10 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: stationapi
+spec:
+  defaultBackend:
+    service:
+      name: stationapi
+      port:
+        number: 443
