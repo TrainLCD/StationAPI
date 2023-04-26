@@ -8,4 +8,5 @@ steps:
     - run
     - --filename=./kubernetes/deploy.yaml
     - --location=asia-northeast1
+    - --image=gcr.io/trainlcd/github.com/trainlcd/stationapi:latest
     - --cluster=stationapi-prod
