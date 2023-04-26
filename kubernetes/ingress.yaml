@@ -2,9 +2,13 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: stationapi
+  annotations:
+      kubernetes.io/ingress.global-static-ip-name: stationapi-prod-addr
+      networking.gke.io/managed-certificates: managed-cert
+      kubernetes.io/ingress.class: gce
 spec:
   defaultBackend:
     service:
       name: stationapi
       port:
-        number: 443
+        number: 80
