@@ -1,0 +1,11 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/trainlcd/github.com/trainlcd/stationapi', '.']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/trainlcd/github.com/trainlcd/stationapi']
+  - name: "gcr.io/cloud-builders/gke-deploy"
+    args:
+    - run
+    - --filename=./kubernetes/deploy.yaml
+    - --location=asia-northeast1
+    - --cluster=stationapi-prod
