@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    cloud.google.com/app-protocols: '{"my-port":"HTTP2"}'
+    cloud.google.com/app-protocols: '{"my-port":"HTTP"}'
     cloud.google.com/backend-config: '{"default": "stationapi"}'
   name: stationapi
   labels:
