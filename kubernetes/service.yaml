@@ -3,13 +3,14 @@ kind: Service
 metadata:
   annotations:
     cloud.google.com/app-protocols: '{"my-port":"HTTP2"}'
+    cloud.google.com/backend-config: '{"default": "stationapi"}'
   name: stationapi
   labels:
     app: stationapi
 spec:
   type: NodePort
   ports:
-  - port: 443
+  - port: 80
     targetPort: 3000
     protocol: TCP
     name: my-port
