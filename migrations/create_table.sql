@@ -83,6 +83,7 @@ CREATE TABLE `lines` (
   `e_sort` int unsigned NOT NULL,
   PRIMARY KEY (`line_cd`),
   KEY `company_cd` (`company_cd`),
+  KEY `e_sort` (`e_sort`),
   CONSTRAINT `lines_ibfk_1` FOREIGN KEY (`company_cd`) REFERENCES `companies` (`company_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -211,4 +212,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-04-29 16:27:42
+-- Dump completed on 2023-04-29 18:39:49
