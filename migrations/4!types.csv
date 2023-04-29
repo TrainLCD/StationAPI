@@ -143,6 +143,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 334,直通特急,チョクツウトッキュウ,Limited Express,直通特急,직통특급,#dd2e1e,0,山陽電車,COMPLETE
 335,区間快速,クカンカイソク,Semi Rapid,区间快速,구간쾌속,#000084,0,TX用,COMPLETE
 336,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#FFA500,0,,COMPLETE
+337,準特急,ジュントッキュウ,Semi-Limited Express,准特急,준특급,#FF6E00,0,,COMPLETE
 400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#dd0077,0,,COMPLETE
 401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#dd0078,0,,COMPLETE
 402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,,COMPLETE
