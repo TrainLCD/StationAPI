@@ -83,6 +83,7 @@ CREATE TABLE `lines` (
   `e_sort` int unsigned NOT NULL,
   PRIMARY KEY (`line_cd`),
   KEY `company_cd` (`company_cd`),
+  KEY `e_sort` (`e_sort`),
   CONSTRAINT `lines_ibfk_1` FOREIGN KEY (`company_cd`) REFERENCES `companies` (`company_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -112,6 +113,7 @@ CREATE TABLE `station_station_types` (
   PRIMARY KEY (`id`),
   KEY `type_cd` (`type_cd`),
   KEY `station_cd` (`station_cd`),
+  KEY `line_group_cd` (`line_group_cd`),
   CONSTRAINT `station_station_types_ibfk_1` FOREIGN KEY (`station_cd`) REFERENCES `stations` (`station_cd`),
   CONSTRAINT `station_station_types_ibfk_2` FOREIGN KEY (`type_cd`) REFERENCES `types` (`type_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
@@ -157,7 +159,9 @@ CREATE TABLE `stations` (
   `e_sort` int unsigned NOT NULL,
   PRIMARY KEY (`station_cd`),
   KEY `line_cd` (`line_cd`),
-  KEY `coordinates` (`lat`,`lon`),
+  KEY `station_g_cd` (`station_g_cd`),
+  KEY `e_status` (`e_status`),
+  KEY `e_sort` (`e_sort`),
   CONSTRAINT `stations_ibfk_1` FOREIGN KEY (`line_cd`) REFERENCES `lines` (`line_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -209,4 +213,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-04-29  8:52:10
+-- Dump completed on 2023-04-30  9:11:26
