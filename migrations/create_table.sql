@@ -113,6 +113,7 @@ CREATE TABLE `station_station_types` (
   PRIMARY KEY (`id`),
   KEY `type_cd` (`type_cd`),
   KEY `station_cd` (`station_cd`),
+  KEY `line_group_cd` (`line_group_cd`),
   CONSTRAINT `station_station_types_ibfk_1` FOREIGN KEY (`station_cd`) REFERENCES `stations` (`station_cd`),
   CONSTRAINT `station_station_types_ibfk_2` FOREIGN KEY (`type_cd`) REFERENCES `types` (`type_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
@@ -212,4 +213,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-04-29 18:39:49
+-- Dump completed on 2023-04-30  9:11:26
