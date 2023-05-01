@@ -5,3 +5,4 @@ metadata:
 spec:
   domains:
     - sapi.tinykitten.me
+    - sapi.stg.tinykitten.me
