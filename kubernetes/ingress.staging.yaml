@@ -4,7 +4,7 @@ metadata:
   name: stationapi-stg
   annotations:
       kubernetes.io/ingress.global-static-ip-name: stationapi-stg-addr
-      networking.gke.io/managed-certificates: managed-cert
+      networking.gke.io/managed-certificates: managed-cert-stg
       kubernetes.io/ingress.class: gce
 spec:
   defaultBackend:
