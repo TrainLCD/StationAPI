@@ -9,8 +9,8 @@ RUN node ./scripts/sqlgen.js
 
 FROM mysql:8 AS migration
 WORKDIR /app
-COPY /app/scripts/migration.sh .
-COPY /app/migrations/create_table.sql ./migrations
+COPY --from=builder /app/scripts/migration.sh .
+COPY --from=builder /app/migrations/create_table.sql ./migrations
 COPY --from=builder /app/tmp.sql .
 RUN sh ./migration.sh
 
