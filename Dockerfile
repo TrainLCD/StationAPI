@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+
 FROM node:18 AS builder
 WORKDIR /app
 COPY . /app
