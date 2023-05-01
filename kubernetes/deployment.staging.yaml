@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stationapi-stg
+spec:
+  selector:
+    matchLabels:
+      app: stationapi-stg
+  template:
+    metadata:
+      labels:
+        app: stationapi-stg
+    spec:
+      serviceAccountName: ksa-cloud-sql
+      containers:
+      - name: stationapi-stg
+        image: gcr.io/trainlcd/github.com/trainlcd/stationapi_stg
+        ports:
+        - containerPort: 3000
+        env:
+        - name: PORT
+          value: "3000"
+        - name: MYSQL_HOST
+          value: "127.0.0.1"
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: gke-cloud-sql-secrets-stg
+              key: username
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: gke-cloud-sql-secrets-stg
+              key: password
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: gke-cloud-sql-secrets-stg
+              key: database
+      - name: cloud-sql-proxy
+        image: gcr.io/cloudsql-docker/gce-proxy:latest
+        command:
+          - "/cloud_sql_proxy"
+          - "-instances=trainlcd:asia-northeast1:root=tcp:3306"
+        securityContext:
+          runAsNonRoot: true
