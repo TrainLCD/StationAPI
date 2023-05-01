@@ -8,7 +8,11 @@ RUN cd ./scripts && npm install
 RUN node ./scripts/sqlgen.js
 
 FROM mysql:8 AS migration
-RUN sh ./scripts/migration.sh
+WORKDIR /app
+COPY /app/scripts/migration.sh .
+COPY /app/migrations/create_table.sql ./migrations
+COPY --from=builder /app/tmp.sql .
+RUN sh ./migration.sh
 
 FROM gcr.io/distroless/nodejs18:latest
 WORKDIR /app
