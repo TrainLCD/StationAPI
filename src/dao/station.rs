@@ -4,7 +4,6 @@ use sqlx::{MySql, Pool};
 
 #[async_trait]
 pub trait StationDao<'a> {
-    // fn new(pool: &'a Pool<MySql>) -> Self;
     async fn find_one(&self, id: i64) -> Result<Station, sqlx::Error>;
 }
 
@@ -12,9 +11,6 @@ pub struct StationMySQLDao<'a>(pub &'a Pool<MySql>);
 
 #[async_trait]
 impl<'a> StationDao<'a> for StationMySQLDao<'a> {
-    // fn new(pool: &'a Pool<MySql>) -> Self {
-    //     Self(pool)
-    // }
     async fn find_one(&self, id: i64) -> Result<Station, sqlx::Error> {
         sqlx::query_as!(Station, "SELECT * FROM stations WHERE station_cd = ?", id)
             .fetch_one(self.0)
