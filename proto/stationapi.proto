@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package app.traincd.grpc;
+
+service StationAPI {
+    rpc SingleStation (SingleStationRequest) returns (SingleStationReply) {}
+}
+
+message SingleStationRequest {
+    int32 id = 1;
+}
+
+message SingleStationReply {
+    string name = 1;
+}
