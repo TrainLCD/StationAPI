@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    cloud.google.com/app-protocols: '{"my-port":"HTTP"}'
+    cloud.google.com/app-protocols: '{"prod-port":"HTTP"}'
     cloud.google.com/backend-config: '{"default": "stationapi"}'
   name: stationapi
   labels:
@@ -13,6 +13,6 @@ spec:
   - port: 80
     targetPort: 3000
     protocol: TCP
-    name: my-port
+    name: prod-port
   selector:
     app: stationapi
