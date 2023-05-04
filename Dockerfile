@@ -1,6 +1,7 @@
-FROM node:16.13.2-alpine
+# syntax=docker/dockerfile:1
+FROM node:18-alpine
 
-RUN apk add alpine-sdk python3 mysql-client
+RUN apk add alpine-sdk mysql-client
 
 RUN mkdir /app
 WORKDIR /app
