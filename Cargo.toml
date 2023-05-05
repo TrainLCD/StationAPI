@@ -7,7 +7,7 @@ build = "build.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
-name = "stationapi-server"
+name = "stationapi"
 path = "src/server.rs"
 
 [dependencies]
