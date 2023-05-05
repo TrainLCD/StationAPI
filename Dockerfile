@@ -3,7 +3,6 @@ WORKDIR /usr/src/stationapi
 COPY . .
 RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
 ENV SQLX_OFFLINE true
-RUN cargo install sqlx-cli
 RUN cargo install --path .
 
 FROM node:18-alpine as migration

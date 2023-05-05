@@ -5,6 +5,6 @@ metadata:
 spec:
   healthCheck:
     checkIntervalSec: 15
-    port: 3000
-    type: HTTP
+    port: 50051
+    type: HTTP2
     requestPath: /healthcheck

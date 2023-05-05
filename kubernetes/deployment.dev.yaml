@@ -16,10 +16,8 @@ spec:
       - name: stationapi-dev
         image: gcr.io/trainlcd/github.com/trainlcd/stationapi_dev
         ports:
-        - containerPort: 3000
+        - containerPort: 50051
         env:
-        - name: PORT
-          value: "3000"
         - name: MYSQL_HOST
           value: "127.0.0.1"
         - name: MYSQL_USER
