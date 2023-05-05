@@ -14,7 +14,7 @@ path = "src/server.rs"
 async-trait = "0.1.68"
 dotenv = "0.15.0"
 prost = "0.11.9"
-sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls", "mysql", "macros", "bigdecimal" ] }
+sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls", "mysql", "macros", "bigdecimal", "offline" ] }
 tokio = { version = "1.28.0", features = ["full"] }
 tonic = "0.9.2"
 tonic-web = "0.9.2"
