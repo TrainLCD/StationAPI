@@ -8,3 +8,9 @@ nestjs:
   - src/**/*
 data:
   - migrations/*
+deploy-prod:
+  - master
+deploy-staging:
+  - staging
+deploy-dev:
+  - dev
