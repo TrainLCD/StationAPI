@@ -37,6 +37,11 @@ spec:
             secretKeyRef:
               name: gke-cloud-sql-secrets-dev
               key: database
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: gke-cloud-sql-secrets-dev
+              key: url
       - name: cloud-sql-proxy
         image: gcr.io/cloudsql-docker/gce-proxy:latest
         command:
