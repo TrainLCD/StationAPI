@@ -1,12 +1,14 @@
 use std::env;
 
-use service::{
-    station_api_server::{StationApi, StationApiServer},
-    SingleStationReply, SingleStationRequest,
-};
 use sqlx::{MySql, MySqlPool, Pool};
 use stationapi::{
-    repositories::station::StationRepositoryImplOnMySQL, usecases::station::find_one_station,
+    repositories::station::StationRepositoryImplOnMySQL,
+    service::{
+        station_api_server::{StationApi, StationApiServer},
+        GetStationByCoordinatesRequest, GetStationByIdRequest, MultipleStationResponse,
+        SingleStationResponse,
+    },
+    usecases::station::{find_station_by_coordinates, find_station_by_id},
 };
 use tonic::{transport::Server, Request, Response, Status};
 use tonic_web::GrpcWebLayer;
@@ -23,22 +25,34 @@ pub struct MyApi {
 
 #[tonic::async_trait]
 impl StationApi for MyApi {
-    async fn single_station(
+    async fn get_station_by_id(
         &self,
-        request: Request<SingleStationRequest>,
-    ) -> Result<Response<SingleStationReply>, Status> {
-        if let Some(station) = find_one_station(
+        request: Request<GetStationByIdRequest>,
+    ) -> Result<Response<SingleStationResponse>, Status> {
+        if let Some(resp) = find_station_by_id(
             StationRepositoryImplOnMySQL { pool: &self.pool },
             request.into_inner().id,
         )
         .await
         {
-            let reply = SingleStationReply {
-                name: station.station_name,
-            };
-            return Ok(Response::new(reply));
+            return Ok(Response::new(resp));
         }
         Err(Status::not_found("The station is not found"))
+    }
+
+    async fn get_station_by_coordinates(
+        &self,
+        request: Request<GetStationByCoordinatesRequest>,
+    ) -> Result<Response<MultipleStationResponse>, Status> {
+        let req_inner = request.into_inner();
+        let resp = find_station_by_coordinates(
+            StationRepositoryImplOnMySQL { pool: &self.pool },
+            req_inner.latitude,
+            req_inner.longitude,
+            req_inner.limit,
+        )
+        .await;
+        Ok(Response::new(resp))
     }
 }
 

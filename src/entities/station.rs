@@ -1,4 +1,6 @@
-use sqlx::types::BigDecimal;
+use bigdecimal::BigDecimal;
+
+use crate::service::StationResponse;
 
 #[derive(sqlx::FromRow)]
 pub struct Station {
@@ -23,4 +25,34 @@ pub struct Station {
     pub close_ymd: String,
     pub e_status: u32,
     pub e_sort: u32,
+    #[sqlx(default)]
+    pub distance: Option<f64>,
+}
+
+impl From<Station> for StationResponse {
+    fn from(value: Station) -> Self {
+        StationResponse {
+            id: value.station_cd,
+            group_id: value.station_g_cd,
+            name: value.station_name,
+            name_katakana: value.station_name_k,
+            name_roman: value.station_name_r,
+            name_chinese: value.station_name_zh,
+            name_korean: value.station_name_ko,
+            primary_station_number: value.primary_station_number,
+            secondary_station_number: value.secondary_station_number,
+            extra_station_number: value.extra_station_number,
+            three_letter_code: value.three_letter_code,
+            line_id: value.line_cd,
+            prefecture: value.pref_cd as i32,
+            postal_code: value.post,
+            address: value.address,
+            latitude: serde_json::from_str(&value.lat.to_string().as_str()).unwrap(),
+            longitude: serde_json::from_str(&value.lon.to_string().as_str()).unwrap(),
+            opened_at: value.open_ymd,
+            closed_at: value.close_ymd,
+            status: value.e_status as i32,
+            distance: value.distance,
+        }
+    }
 }

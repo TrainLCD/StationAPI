@@ -22,6 +22,9 @@ tower-http = "0.4.0"
 tracing = "0.1.37"
 tracing-subscriber = "0.3.17"
 mockall = "0.11.2"
+bigdecimal = {version = "0.3.0", features = ["serde"] }
+serde = { version = "1.0.162", features = ["derive"] }
+serde_json = "1.0.96"
 
 [build-dependencies]
 tonic-build = "0.9.2"
