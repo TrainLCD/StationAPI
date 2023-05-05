@@ -91,6 +91,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("StationAPI Server listening on {}", addr);
 
+    let mut config = prost_build::Config::new();
+    config.protoc_arg("--experimental_allow_proto3_optional");
+
     Server::builder()
         .accept_http1(true)
         .layer(allow_cors)
