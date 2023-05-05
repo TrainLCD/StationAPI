@@ -41,6 +41,6 @@ spec:
         image: gcr.io/cloudsql-docker/gce-proxy:latest
         command:
           - "/cloud_sql_proxy"
-          - "-instances=trainlcd:asia-northeast1:root=tcp:3306"
+          - "-instances=trainlcd:asia-northeast1:stationapi=tcp:3306"
         securityContext:
           runAsNonRoot: true
