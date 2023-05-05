@@ -7,4 +7,4 @@ spec:
     checkIntervalSec: 15
     port: 50051
     type: HTTP2
-    requestPath: /healthcheck
+    requestPath: /
