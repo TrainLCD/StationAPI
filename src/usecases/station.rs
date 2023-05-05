@@ -15,7 +15,19 @@ pub async fn find_station_by_id(
     None
 }
 
-pub async fn find_station_by_coordinates(
+pub async fn get_stations_by_group_id(
+    repository: impl StationRepository,
+    group_id: u32,
+) -> MultipleStationResponse {
+    if let Some(stations) = repository.get_by_group_id(group_id).await {
+        return MultipleStationResponse {
+            stations: stations.into_iter().map(|s| s.into()).collect(),
+        };
+    }
+    MultipleStationResponse { stations: vec![] }
+}
+
+pub async fn get_stations_by_coordinates(
     repository: impl StationRepository,
     latitude: f64,
     longitude: f64,

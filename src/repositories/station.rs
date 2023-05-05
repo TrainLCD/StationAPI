@@ -12,6 +12,7 @@ pub trait StationRepository {
         longitude: f64,
         limit: Option<i32>,
     ) -> Option<Vec<Station>>;
+    async fn get_by_group_id(&self, id: u32) -> Option<Vec<Station>>;
 }
 
 pub struct StationRepositoryImplOnMySQL<'a> {
@@ -21,7 +22,7 @@ pub struct StationRepositoryImplOnMySQL<'a> {
 #[async_trait]
 impl StationRepository for StationRepositoryImplOnMySQL<'_> {
     async fn find_one(&self, id: u32) -> Option<Station> {
-        sqlx::query_as::<_, Station>("SELECT * FROM stations WHERE station_cd = ?")
+        sqlx::query_as::<_, Station>("SELECT * FROM stations WHERE station_cd = ? LIMIT 1")
             .bind(id)
             .fetch_one(self.pool)
             .await
@@ -68,5 +69,13 @@ impl StationRepository for StationRepositoryImplOnMySQL<'_> {
         .fetch_all(self.pool)
         .await
         .ok()
+    }
+
+    async fn get_by_group_id(&self, group_id: u32) -> Option<Vec<Station>> {
+        sqlx::query_as::<_, Station>("SELECT * FROM stations WHERE station_g_cd = ?")
+            .bind(group_id)
+            .fetch_all(self.pool)
+            .await
+            .ok()
     }
 }

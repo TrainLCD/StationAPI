@@ -5,10 +5,12 @@ use stationapi::{
     repositories::station::StationRepositoryImplOnMySQL,
     service::{
         station_api_server::{StationApi, StationApiServer},
-        GetStationByCoordinatesRequest, GetStationByIdRequest, MultipleStationResponse,
-        SingleStationResponse,
+        GetStationByCoordinatesRequest, GetStationByGroupIdRequest, GetStationByIdRequest,
+        MultipleStationResponse, SingleStationResponse,
     },
-    usecases::station::{find_station_by_coordinates, find_station_by_id},
+    usecases::station::{
+        find_station_by_id, get_stations_by_coordinates, get_stations_by_group_id,
+    },
 };
 use tonic::{transport::Server, Request, Response, Status};
 use tonic_web::GrpcWebLayer;
@@ -45,11 +47,24 @@ impl StationApi for MyApi {
         request: Request<GetStationByCoordinatesRequest>,
     ) -> Result<Response<MultipleStationResponse>, Status> {
         let req_inner = request.into_inner();
-        let resp = find_station_by_coordinates(
+        let resp = get_stations_by_coordinates(
             StationRepositoryImplOnMySQL { pool: &self.pool },
             req_inner.latitude,
             req_inner.longitude,
             req_inner.limit,
+        )
+        .await;
+        Ok(Response::new(resp))
+    }
+
+    async fn get_station_by_group_id(
+        &self,
+        request: Request<GetStationByGroupIdRequest>,
+    ) -> Result<Response<MultipleStationResponse>, Status> {
+        let req_inner = request.into_inner();
+        let resp = get_stations_by_group_id(
+            StationRepositoryImplOnMySQL { pool: &self.pool },
+            req_inner.group_id,
         )
         .await;
         Ok(Response::new(resp))

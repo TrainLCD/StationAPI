@@ -4,11 +4,16 @@ package app.traincd.grpc;
 
 service StationAPI {
     rpc GetStationById (GetStationByIdRequest) returns (SingleStationResponse) {}
+    rpc GetStationByGroupId (GetStationByGroupIdRequest) returns (MultipleStationResponse) {}
     rpc GetStationByCoordinates (GetStationByCoordinatesRequest) returns (MultipleStationResponse) {}
 }
 
 message GetStationByIdRequest {
     uint32 id = 1;
+}
+
+message GetStationByGroupIdRequest {
+    uint32 group_id = 1;
 }
 
 message GetStationByCoordinatesRequest {
