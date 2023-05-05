@@ -16,6 +16,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
+      - uses: arduino/setup-protoc@v1
 
   test:
     name: Test Suite
@@ -30,6 +31,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
+      - uses: arduino/setup-protoc@v1
 
   fmt:
     name: Rustfmt
@@ -62,3 +64,4 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
+      - uses: arduino/setup-protoc@v1
