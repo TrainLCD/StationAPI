@@ -1,5 +1,6 @@
 use std::env;
 
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use sqlx::{MySql, MySqlPool, Pool};
 use stationapi::{
     repositories::station::StationRepositoryImplOnMySQL,
@@ -15,6 +16,7 @@ use stationapi::{
 use tonic::{transport::Server, Request, Response, Status};
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::CorsLayer;
+use url::Url;
 
 pub mod service {
     tonic::include_proto!("app.traincd.grpc");
@@ -75,11 +77,25 @@ impl StationApi for MyApi {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
-    dotenv::from_filename(".env").ok();
+    dotenv::from_filename(".env.local").ok();
 
     let addr = "[::1]:50051".parse().unwrap();
 
-    let pool = MySqlPool::connect(&env::var("DATABASE_URL")?).await?;
+    let host = env::var("MYSQL_HOST").unwrap();
+    let database = env::var("MYSQL_DATABASE").unwrap();
+    let user = env::var("MYSQL_USER").unwrap();
+    let pass = env::var("MYSQL_PASSWORD").unwrap();
+    let db_uri = format!("mysql://{}:3306/{}", host, database);
+    let mut uri = Url::parse(&db_uri).unwrap();
+    uri.set_username(user.as_str()).unwrap();
+    uri.set_password(Some(
+        utf8_percent_encode(pass.as_str(), NON_ALPHANUMERIC)
+            .to_string()
+            .as_str(),
+    ))
+    .unwrap();
+    let uri = uri.as_str();
+    let pool = MySqlPool::connect(uri).await?;
 
     let api_server = MyApi { pool };
     let api_server = StationApiServer::new(api_server);

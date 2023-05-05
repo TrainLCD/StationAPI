@@ -1572,6 +1572,7 @@ dependencies = [
  "bigdecimal",
  "dotenv",
  "mockall",
+ "percent-encoding",
  "prost",
  "prost-build",
  "serde",
@@ -1584,6 +1585,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
