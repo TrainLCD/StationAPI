@@ -1,7 +1,9 @@
 apiVersion: networking.gke.io/v1
 kind: ManagedCertificate
 metadata:
-  name: managed-cert
+  name: managed-cert-both
 spec:
   domains:
     - sapi.tinykitten.me
+    - sapi.stg.tinykitten.me
+    - sapi.dev.tinykitten.me

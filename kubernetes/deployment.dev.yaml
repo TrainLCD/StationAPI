@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: stationapi-stg
+  name: stationapi-dev
 spec:
   selector:
     matchLabels:
-      app: stationapi-stg
+      app: stationapi-dev
   template:
     metadata:
       labels:
-        app: stationapi-stg
+        app: stationapi-dev
     spec:
       serviceAccountName: ksa-cloud-sql
       containers:
-      - name: stationapi-stg
-        image: gcr.io/trainlcd/github.com/trainlcd/stationapi_stg
+      - name: stationapi-dev
+        image: gcr.io/trainlcd/github.com/trainlcd/stationapi_dev
         ports:
         - containerPort: 3000
         env:
@@ -25,17 +25,17 @@ spec:
         - name: MYSQL_USER
           valueFrom:
             secretKeyRef:
-              name: gke-cloud-sql-secrets-stg
+              name: gke-cloud-sql-secrets-dev
               key: username
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: gke-cloud-sql-secrets-stg
+              name: gke-cloud-sql-secrets-dev
               key: password
         - name: MYSQL_DATABASE
           valueFrom:
             secretKeyRef:
-              name: gke-cloud-sql-secrets-stg
+              name: gke-cloud-sql-secrets-dev
               key: database
       - name: cloud-sql-proxy
         image: gcr.io/cloudsql-docker/gce-proxy:latest

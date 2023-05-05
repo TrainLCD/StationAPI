@@ -11,3 +11,9 @@ data:
 protobuf:
   - proto/*
   - proto/**/*
+deploy-prod:
+  - master
+deploy-staging:
+  - staging
+deploy-dev:
+  - dev
