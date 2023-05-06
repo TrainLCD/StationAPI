@@ -12,7 +12,7 @@ spec:
   type: ClusterIP
   ports:
   - port: 443
-    targetPort: 50051
+    targetPort: 9000
     protocol: TCP
     name: dev-port
   selector:

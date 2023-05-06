@@ -6,4 +6,4 @@ spec:
   healthCheck:
     type: HTTP2
     requestPath: /healthz
-    port: 50051
+    port: 9000
