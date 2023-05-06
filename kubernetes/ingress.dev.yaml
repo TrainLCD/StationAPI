@@ -11,4 +11,4 @@ spec:
     service:
       name: stationapi-dev
       port:
-        number: 80
+        number: 443
