@@ -23,7 +23,7 @@ message GetStationByCoordinatesRequest {
 }
 
 enum OperationStatus {
-    UnderOperation = 0;
+    InOperation = 0;
     NotOpened = 1;
     Closed = 2;
 }
