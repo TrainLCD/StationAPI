@@ -2,7 +2,7 @@ use bigdecimal::BigDecimal;
 
 use crate::service::StationResponse;
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Clone)]
 pub struct Station {
     pub station_cd: u32,
     pub station_g_cd: u32,
@@ -43,7 +43,7 @@ impl From<Station> for StationResponse {
             secondary_station_number: value.secondary_station_number,
             extra_station_number: value.extra_station_number,
             three_letter_code: value.three_letter_code,
-            line_id: value.line_cd,
+            lines: vec![],
             prefecture: value.pref_cd as i32,
             postal_code: value.post,
             address: value.address,
@@ -52,6 +52,8 @@ impl From<Station> for StationResponse {
             opened_at: value.open_ymd,
             closed_at: value.close_ymd,
             status: value.e_status as i32,
+            station_numbers: vec![],
+            stop_condition: 0,
             distance: value.distance,
         }
     }

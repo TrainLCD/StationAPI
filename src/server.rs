@@ -1,7 +1,7 @@
 use std::env;
 
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use sqlx::{MySql, MySqlPool, Pool};
+use sqlx::{mysql::MySqlPoolOptions, MySql, Pool};
 use stationapi::{
     repositories::station::StationRepositoryImplOnMySQL,
     service::{
@@ -85,7 +85,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let host = env::var("MYSQL_HOST").unwrap();
     let database = env::var("MYSQL_DATABASE").unwrap();
     let user = env::var("MYSQL_USER").unwrap();
-    let pass = env::var("MYSQL_PASSWORD").unwrap();
+    let pass: String = env::var("MYSQL_PASSWORD").unwrap();
+    let max_connections: u32 = env::var("DATABASE_MAX_CONNECTIONS")
+        .unwrap()
+        .parse()
+        .unwrap();
     let db_uri = format!(
         "mysql://{}:3306/{}?characterEncoding=utf8mb4",
         host, database
@@ -99,7 +103,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ))
     .unwrap();
     let uri = uri.as_str();
-    let pool = MySqlPool::connect(uri).await?;
+    let pool = MySqlPoolOptions::new()
+        .max_connections(max_connections)
+        .connect(uri)
+        .await?;
 
     let api_server = MyApi { pool };
     let api_server = StationApiServer::new(api_server);
