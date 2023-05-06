@@ -1,0 +1,10 @@
+
+
+type: google.api.Service
+config_version: 3
+
+name: stationapi.endpoints.trainlcd.cloud.goog
+
+title: StationAPI
+apis:
+- name: app.traincd.grpc.StationAPI

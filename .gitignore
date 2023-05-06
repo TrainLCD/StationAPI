@@ -1,3 +1,6 @@
 /target
 .env.local
 tmp.sql
+server.crt
+server.key
+api_descriptor.pb

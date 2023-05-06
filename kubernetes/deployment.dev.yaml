@@ -11,6 +11,10 @@ spec:
       labels:
         app: stationapi-dev
     spec:
+      volumes:
+      - name: esp-ssl
+        secret:
+          secretName: esp-ssl
       serviceAccountName: ksa-cloud-sql
       containers:
       - name: stationapi-dev
@@ -42,3 +46,13 @@ spec:
           - "-instances=trainlcd:asia-northeast1:stationapi=tcp:3306"
         securityContext:
           runAsNonRoot: true
+      - name: esp
+        image: gcr.io/endpoints-release/endpoints-runtime:2
+        args: [
+          "--listener_port=50051",
+          "--service=stationapi.endpoints.trainlcd.cloud.goog",
+          "--rollout_strategy=managed",
+          "--backend=grpc://127.0.0.1:50051",
+          "--healthz=/healthz",
+          "--ssl_server_cert_path=/etc/esp/ssl",
+        ]

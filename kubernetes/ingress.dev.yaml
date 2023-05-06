@@ -3,10 +3,15 @@ kind: Ingress
 metadata:
   name: stationapi-dev
   annotations:
+      kubernetes.io/ingress.class: gce
+      kubernetes.io/ingress.allow-http: "false"
       kubernetes.io/ingress.global-static-ip-name: stationapi-dev-addr
       networking.gke.io/managed-certificates: managed-cert-both
-      kubernetes.io/ingress.class: gce
 spec:
+  tls:
+  - hosts:
+      - stationapi.endpoints.trainlcd.cloud.goog
+    secretName: esp-ssl
   defaultBackend:
     service:
       name: stationapi-dev
