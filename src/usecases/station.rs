@@ -1,7 +1,7 @@
 use std::vec;
 
 use crate::{
-    entities::{company::Company, line::Line},
+    entities::line::Line,
     repositories::station::StationRepository,
     service::{
         LineResponse, LineSymbol, MultipleStationResponse, SingleStationResponse, StationResponse,
@@ -86,11 +86,6 @@ pub async fn get_stations_by_group_id(
     group_id: u32,
 ) -> MultipleStationResponse {
     let stations = repository.get_by_group_id(group_id).await.unwrap_or(vec![]);
-    let station_ids = stations
-        .clone()
-        .into_iter()
-        .map(|s| s.station_cd)
-        .collect::<Vec<u32>>();
     let station_responses: Vec<StationResponse> = stations.into_iter().map(|s| s.into()).collect();
 
     let station_responses_futures = station_responses.clone().into_iter().map(|s| async {
@@ -126,9 +121,9 @@ pub async fn get_stations_by_group_id(
 
     let station_responses = join_all(station_responses_futures).await;
 
-    return MultipleStationResponse {
+    MultipleStationResponse {
         stations: station_responses,
-    };
+    }
 }
 
 pub async fn get_stations_by_coordinates(
@@ -177,7 +172,7 @@ pub async fn get_stations_by_coordinates(
 
     let station_responses = join_all(futures).await;
 
-    return MultipleStationResponse {
+    MultipleStationResponse {
         stations: station_responses,
-    };
+    }
 }

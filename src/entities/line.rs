@@ -25,9 +25,9 @@ pub struct Line {
     pub line_symbol_extra_shape: String,
     pub lon: BigDecimal,
     pub lat: BigDecimal,
-    zoom: u32,
-    e_status: u32,
-    e_sort: u32,
+    pub zoom: u32,
+    pub e_status: u32,
+    pub e_sort: u32,
 }
 
 impl From<Line> for LineResponse {
