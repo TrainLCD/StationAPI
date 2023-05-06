@@ -86,7 +86,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database = env::var("MYSQL_DATABASE").unwrap();
     let user = env::var("MYSQL_USER").unwrap();
     let pass = env::var("MYSQL_PASSWORD").unwrap();
-    let db_uri = format!("mysql://{}:3306/{}", host, database);
+    let db_uri = format!(
+        "mysql://{}:3306/{}?characterEncoding=utf8mb4",
+        host, database
+    );
     let mut uri = Url::parse(&db_uri).unwrap();
     uri.set_username(user.as_str()).unwrap();
     uri.set_password(Some(
