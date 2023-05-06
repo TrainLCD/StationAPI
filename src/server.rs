@@ -79,7 +79,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     dotenv::from_filename(".env.local").ok();
 
-    let addr = "127.0.0.1:50051".parse().unwrap();
+    let port = env::var("PORT").unwrap_or("50051".to_string());
+    let addr = format!("127.0.0.1:{}", port).parse().unwrap();
 
     let host = env::var("MYSQL_HOST").unwrap();
     let database = env::var("MYSQL_DATABASE").unwrap();
