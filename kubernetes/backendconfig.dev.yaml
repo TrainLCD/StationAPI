@@ -4,7 +4,6 @@ metadata:
   name: stationapi-dev
 spec:
   healthCheck:
-    checkIntervalSec: 15
-    port: 3000
-    type: HTTP
-    requestPath: /healthcheck
+    type: HTTP2
+    requestPath: /healthz
+    port: 9000

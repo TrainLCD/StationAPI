@@ -11,15 +11,40 @@ spec:
       labels:
         app: stationapi-dev
     spec:
+      volumes:
+      - name: esp-ssl
+        secret:
+          secretName: esp-ssl
       serviceAccountName: ksa-cloud-sql
       containers:
+      - name: esp
+        image: gcr.io/endpoints-release/endpoints-runtime:2
+        args: [
+          "--listener_port=9000",
+          "--service=stationapi.endpoints.trainlcd.cloud.goog",
+          "--rollout_strategy=managed",
+          "--backend=grpc://127.0.0.1:50051",
+          "--healthz=/healthz",
+          "--ssl_server_cert_path=/etc/esp/ssl",
+        ]
+        ports:
+          - containerPort: 9000
+        volumeMounts:
+        - mountPath: /etc/esp/ssl
+          name:  esp-ssl
+          readOnly: true
+      - name: cloud-sql-proxy
+        image: gcr.io/cloudsql-docker/gce-proxy:latest
+        command:
+          - "/cloud_sql_proxy"
+          - "-instances=trainlcd:asia-northeast1:stationapi=tcp:3306"
+        securityContext:
+          runAsNonRoot: true
       - name: stationapi-dev
         image: gcr.io/trainlcd/github.com/trainlcd/stationapi_dev
         ports:
-        - containerPort: 3000
+        - containerPort: 50051
         env:
-        - name: PORT
-          value: "3000"
         - name: MYSQL_HOST
           value: "127.0.0.1"
         - name: MYSQL_USER
@@ -37,10 +62,3 @@ spec:
             secretKeyRef:
               name: gke-cloud-sql-secrets-dev
               key: database
-      - name: cloud-sql-proxy
-        image: gcr.io/cloudsql-docker/gce-proxy:latest
-        command:
-          - "/cloud_sql_proxy"
-          - "-instances=trainlcd:asia-northeast1:stationapi=tcp:3306"
-        securityContext:
-          runAsNonRoot: true
