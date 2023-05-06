@@ -62,3 +62,8 @@ spec:
             secretKeyRef:
               name: gke-cloud-sql-secrets-dev
               key: database
+        - name: DATABASE_MAX_CONNECTIONS
+          valueFrom:
+            secretKeyRef:
+              name: gke-cloud-sql-secrets-dev
+              key: db_max_connections
