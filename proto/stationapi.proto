@@ -106,9 +106,9 @@ message StationResponse {
     string name_roman = 5;
     string name_chinese = 6;
     string name_korean = 7;
-    optional string primary_station_number = 8;
-    optional string secondary_station_number = 9;
-    optional string extra_station_number = 10;
+    // optional string primary_station_number = 8;
+    // optional string secondary_station_number = 9;
+    // optional string extra_station_number = 10;
     optional string three_letter_code = 11;
     repeated LineResponse lines = 12;
     LineResponse line = 13;

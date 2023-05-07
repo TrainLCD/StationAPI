@@ -16,6 +16,7 @@ use stationapi::{
 use tonic::{transport::Server, Request, Response, Status};
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::CorsLayer;
+use tracing_log::LogTracer;
 use url::Url;
 
 pub mod service {
@@ -75,7 +76,7 @@ impl StationApi for MyApi {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
+    LogTracer::init()?;
 
     dotenv::from_filename(".env.local").ok();
 

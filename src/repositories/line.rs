@@ -5,7 +5,7 @@ type LineEntity = crate::entities::line::Line;
 
 #[async_trait]
 pub trait LineRepository {
-    async fn find_one(&self, id: u32) -> Option<LineEntity>;
+    async fn find_one(&self, id: u32) -> Result<LineEntity, sqlx::Error>;
 }
 
 pub struct LineRepositoryImplOnMySQL<'a> {
@@ -14,8 +14,8 @@ pub struct LineRepositoryImplOnMySQL<'a> {
 
 #[async_trait]
 impl LineRepository for LineRepositoryImplOnMySQL<'_> {
-    async fn find_one(&self, id: u32) -> Option<LineEntity> {
-        sqlx::query_as::<_, LineEntity>(
+    async fn find_one(&self, id: u32) -> Result<LineEntity, sqlx::Error> {
+        match sqlx::query_as::<_, LineEntity>(
             "SELECT *
         FROM `lines`
         WHERE line_cd = ?
@@ -25,6 +25,12 @@ impl LineRepository for LineRepositoryImplOnMySQL<'_> {
         .bind(id)
         .fetch_one(self.pool)
         .await
-        .ok()
+        {
+            Ok(line) => Ok(line),
+            Err(err) => {
+                log::error!("Error: {}", err);
+                Err(err)
+            }
+        }
     }
 }
