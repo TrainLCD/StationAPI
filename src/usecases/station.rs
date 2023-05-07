@@ -75,6 +75,10 @@ pub async fn find_station_by_id(
             station_response.lines = lines;
         }
 
+        if let Some(line) = repository.find_one_line_by_station_id(id).await {
+            station_response.line = Some(line.into());
+        }
+
         return Some(SingleStationResponse {
             station: Some(station_response),
         });
@@ -86,7 +90,8 @@ pub async fn get_stations_by_group_id(
     group_id: u32,
 ) -> MultipleStationResponse {
     let stations = repository.get_by_group_id(group_id).await.unwrap_or(vec![]);
-    let station_responses: Vec<StationResponse> = stations.into_iter().map(|s| s.into()).collect();
+    let station_responses: Vec<StationResponse> =
+        stations.clone().into_iter().map(|s| s.into()).collect();
 
     let station_responses_futures = station_responses.clone().into_iter().map(|s| async {
         let mut station_response: StationResponse = s;
@@ -115,15 +120,37 @@ pub async fn get_stations_by_group_id(
                 resp
             })
             .collect();
+        if let Some(line) = repository
+            .find_one_line_by_station_id(station_response.id)
+            .await
+        {
+            let line_resp: LineResponse = line.into();
+            station_response.line = Some(line_resp);
+        }
         station_response.lines = lines;
         station_response
     });
 
     let station_responses = join_all(station_responses_futures).await;
 
-    MultipleStationResponse {
-        stations: station_responses,
-    }
+    let station_ids = stations.into_iter().map(|s| s.station_cd).collect();
+    let lines = repository
+        .get_lines_by_station_ids(station_ids)
+        .await
+        .unwrap_or(vec![]);
+
+    let stations: Vec<StationResponse> = station_responses
+        .into_iter()
+        .enumerate()
+        .map(|(i, mut r)| {
+            if let Some(line) = lines.get(i) {
+                let line_resp: LineResponse = line.clone().into();
+                r.line = Some(line_resp);
+            }
+            r
+        })
+        .collect();
+    MultipleStationResponse { stations }
 }
 
 pub async fn get_stations_by_coordinates(
@@ -166,6 +193,14 @@ pub async fn get_stations_by_coordinates(
                     resp
                 })
                 .collect();
+
+            if let Some(line) = repository
+                .find_one_line_by_station_id(station_response.id)
+                .await
+            {
+                let line_resp: LineResponse = line.into();
+                station_response.line = Some(line_resp);
+            }
             station_response.lines = lines;
             station_response
         });
