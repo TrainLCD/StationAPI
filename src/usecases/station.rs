@@ -100,7 +100,7 @@ pub async fn get_stations_by_group_id(
             .get_lines_by_station_id(station_response.id)
             .await
         {
-            let line_ids: Vec<u32> = lines.clone().into_iter().map(|l| l.line_cd).collect();
+            let line_ids = lines.iter().map(|l| l.line_cd).collect();
             let companies = repository
                 .get_companies_by_line_ids(line_ids)
                 .await
@@ -123,7 +123,12 @@ pub async fn get_stations_by_group_id(
                 .find_one_line_by_station_id(station_response.id)
                 .await
             {
-                let line_resp: LineResponse = line.into();
+                let mut line_resp: LineResponse = line.clone().into();
+                if let Ok(company) = repository.find_one_company_by_line_id(line_resp.id).await {
+                    line_resp.company = Some(company.into());
+                }
+                let line_symbols = get_line_symbols(line);
+                line_resp.line_symbols = line_symbols;
                 station_response.line = Some(line_resp);
             }
             station_response.lines = lines;
@@ -150,11 +155,8 @@ pub async fn get_stations_by_coordinates(
         .await
         .unwrap();
 
-    let station_responses: Vec<StationResponse> = stations
-        .clone()
-        .into_iter()
-        .map(|s| s.clone().into())
-        .collect();
+    let station_responses: Vec<StationResponse> =
+        stations.clone().into_iter().map(|s| s.into()).collect();
     let futures = station_responses.into_iter().map(|s| async {
         let mut station_response = s;
         let lines = repository
@@ -186,7 +188,12 @@ pub async fn get_stations_by_coordinates(
             .find_one_line_by_station_id(station_response.id)
             .await
         {
-            let line_resp: LineResponse = line.into();
+            let mut line_resp: LineResponse = line.clone().into();
+            if let Ok(company) = repository.find_one_company_by_line_id(line_resp.id).await {
+                line_resp.company = Some(company.into());
+            }
+            let line_symbols = get_line_symbols(line);
+            line_resp.line_symbols = line_symbols;
             station_response.line = Some(line_resp);
         }
         station_response.lines = lines;
@@ -194,11 +201,6 @@ pub async fn get_stations_by_coordinates(
     });
 
     let station_responses = join_all(futures).await;
-    let station_responses: Vec<StationResponse> = station_responses
-        .into_iter()
-        .map(|s| s.clone().into())
-        .collect();
-
     MultipleStationResponse {
         stations: station_responses,
     }
