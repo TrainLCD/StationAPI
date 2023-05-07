@@ -162,6 +162,7 @@ CREATE TABLE `stations` (
   KEY `station_g_cd` (`station_g_cd`),
   KEY `e_status` (`e_status`),
   KEY `e_sort` (`e_sort`),
+  KEY `station_g_cd_2` (`station_g_cd`,`e_status`),
   CONSTRAINT `stations_ibfk_1` FOREIGN KEY (`line_cd`) REFERENCES `lines` (`line_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -184,12 +185,12 @@ DROP TABLE IF EXISTS `types`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `types` (
   `type_cd` int unsigned NOT NULL AUTO_INCREMENT,
-  `type_name` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
-  `type_name_k` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
-  `type_name_r` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
-  `type_name_zh` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
-  `type_name_ko` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
-  `color` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
+  `type_name` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `type_name_k` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `type_name_r` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `type_name_zh` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `type_name_ko` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `color` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `direction` int unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`type_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
@@ -213,4 +214,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-04-30  9:11:26
+-- Dump completed on 2023-05-07 16:14:33
