@@ -44,6 +44,7 @@ impl From<Station> for StationResponse {
             extra_station_number: value.extra_station_number,
             three_letter_code: value.three_letter_code,
             lines: vec![],
+            line: None,
             prefecture: value.pref_cd as i32,
             postal_code: value.post,
             address: value.address,

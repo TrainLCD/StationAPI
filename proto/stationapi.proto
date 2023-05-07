@@ -111,17 +111,18 @@ message StationResponse {
     optional string extra_station_number = 10;
     optional string three_letter_code = 11;
     repeated LineResponse lines = 12;
-    Prefecture prefecture = 13;
-    string postal_code = 14;
-    string address = 15;
-    double latitude = 16;
-    double longitude = 17;
-    string opened_at = 18;
-    string closed_at = 19;
-    OperationStatus status = 20;
-    repeated StationNumber station_numbers = 21;
-    StopCondition stop_condition = 22;
-    optional double distance = 23;
+    LineResponse line = 13;
+    Prefecture prefecture = 14;
+    string postal_code = 15;
+    string address = 16;
+    double latitude = 17;
+    double longitude = 18;
+    string opened_at = 19;
+    string closed_at = 20;
+    OperationStatus status = 21;
+    repeated StationNumber station_numbers = 22;
+    StopCondition stop_condition = 23;
+    optional double distance = 24;
 }
 
 message SingleStationResponse {

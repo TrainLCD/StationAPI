@@ -16,8 +16,9 @@ pub trait StationRepository {
     ) -> Option<Vec<StationEntity>>;
     async fn get_by_group_id(&self, id: u32) -> Option<Vec<StationEntity>>;
     async fn get_lines_by_station_id(&self, station_id: u32) -> Option<Vec<LineEntity>>;
-    async fn get_lines_by_line_ids(&self, line_ids: Vec<u32>) -> Option<Vec<LineEntity>>;
     async fn get_lines_by_station_ids(&self, station_ids: Vec<u32>) -> Option<Vec<LineEntity>>;
+    async fn get_lines_by_line_ids(&self, line_ids: Vec<u32>) -> Option<Vec<LineEntity>>;
+    async fn find_one_line_by_station_id(&self, station_id: u32) -> Option<LineEntity>;
     async fn get_companies_by_line_ids(&self, line_ids: Vec<u32>) -> Option<Vec<CompanyEntity>>;
 }
 
@@ -134,6 +135,14 @@ impl StationRepository for StationRepositoryImplOnMySQL<'_> {
         }
 
         query.fetch_all(self.pool).await.ok()
+    }
+
+    async fn find_one_line_by_station_id(&self, station_id: u32) -> Option<LineEntity> {
+        sqlx::query_as::<_, LineEntity>("SELECT * FROM `lines` WHERE line_cd=(SELECT line_cd FROM stations WHERE station_cd = ?) LIMIT 1")
+            .bind(station_id)
+            .fetch_one(self.pool)
+            .await
+            .ok()
     }
 
     async fn get_companies_by_line_ids(&self, line_ids: Vec<u32>) -> Option<Vec<CompanyEntity>> {
