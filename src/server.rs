@@ -19,10 +19,6 @@ use tower_http::cors::CorsLayer;
 use tracing_log::LogTracer;
 use url::Url;
 
-pub mod service {
-    tonic::include_proto!("app.traincd.grpc");
-}
-
 #[derive(Debug)]
 pub struct MyApi {
     pool: Pool<MySql>,
