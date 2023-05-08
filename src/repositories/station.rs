@@ -37,6 +37,7 @@ pub trait StationRepository {
     ) -> Result<Vec<CompanyEntity>, sqlx::Error>;
     async fn find_one_company_by_line_id(&self, line_id: u32)
         -> Result<CompanyEntity, sqlx::Error>;
+    async fn get_by_line_id(&self, id: u32) -> Result<Vec<StationEntity>, sqlx::Error>;
 }
 
 pub struct StationRepositoryImplOnMySQL<'a> {
@@ -251,6 +252,20 @@ impl StationRepository for StationRepositoryImplOnMySQL<'_> {
         .await;
         match result {
             Ok(company) => Ok(company),
+            Err(err) => {
+                log::error!("Error: {}", err);
+                Err(err)
+            }
+        }
+    }
+
+    async fn get_by_line_id(&self, line_id: u32) -> Result<Vec<StationEntity>, sqlx::Error> {
+        let result = sqlx::query_as::<_, StationEntity>("SELECT * FROM stations WHERE line_cd = ?")
+            .bind(line_id)
+            .fetch_all(self.pool)
+            .await;
+        match result {
+            Ok(stations) => Ok(stations),
             Err(err) => {
                 log::error!("Error: {}", err);
                 Err(err)

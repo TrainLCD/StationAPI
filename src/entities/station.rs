@@ -25,7 +25,6 @@ pub struct Station {
     pub close_ymd: String,
     pub e_status: u32,
     pub e_sort: u32,
-    #[sqlx(default)]
     pub distance: Option<f64>,
 }
 
