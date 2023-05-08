@@ -21,6 +21,9 @@ COPY --from=migration /app/scripts/migration.sh ./scripts
 COPY --from=migration /app/migrations/create_table.sql ./migrations
 COPY --from=builder /usr/local/cargo/bin/stationapi /usr/local/bin/stationapi
 RUN apt-get update && apt-get install -y default-mysql-client && rm -rf /var/lib/apt/lists/*
+RUN GRPC_HEALTH_PROBE_VERSION=v0.4.13 && \
+    wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-amd64 && \
+    chmod +x /bin/grpc_health_probe
 
 EXPOSE 50051
 

@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let max_connections: u32 = env::var("DATABASE_MAX_CONNECTIONS")
         .unwrap()
         .parse()
-        .unwrap_or(5);
+        .unwrap();
     let db_uri = format!(
         "mysql://{}:3306/{}?characterEncoding=utf8mb4",
         host, database

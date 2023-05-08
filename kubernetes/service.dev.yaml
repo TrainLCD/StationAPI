@@ -2,17 +2,16 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    service.alpha.kubernetes.io/app-protocols: '{"dev-port":"HTTP2"}'
-    cloud.google.com/neg: '{"ingress": true, "exposed_ports": {"443":{}}}'
+    cloud.google.com/app-protocols: '{"dev-port":"HTTP"}'
     cloud.google.com/backend-config: '{"default": "stationapi-dev"}'
   name: stationapi-dev
   labels:
     app: stationapi-dev
 spec:
-  type: ClusterIP
+  type: NodePort
   ports:
-  - port: 443
-    targetPort: 9000
+  - port: 80
+    targetPort: 50051
     protocol: TCP
     name: dev-port
   selector:

@@ -1,9 +1,0 @@
-apiVersion: cloud.google.com/v1
-kind: BackendConfig
-metadata:
-  name: stationapi-dev
-spec:
-  healthCheck:
-    type: HTTP2
-    requestPath: /healthz
-    port: 9000
