@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package app.traincd.grpc;
+package app.trainlcd.grpc;
 
 service StationAPI {
     rpc GetStationById (GetStationByIdRequest) returns (SingleStationResponse) {}

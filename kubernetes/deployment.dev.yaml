@@ -17,14 +17,6 @@ spec:
         image: gcr.io/trainlcd/github.com/trainlcd/stationapi_dev
         ports:
         - containerPort: 50051
-        readinessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:50051"]
-          initialDelaySeconds: 5
-        livenessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:50051"]
-          initialDelaySeconds: 10
         env:
         - name: PORT
           value: "50051"
