@@ -84,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let user = env::var("MYSQL_USER").unwrap();
     let pass: String = env::var("MYSQL_PASSWORD").unwrap();
     let max_connections: u32 = env::var("DATABASE_MAX_CONNECTIONS")
-        .unwrap()
+        .unwrap_or("5".to_string())
         .parse()
         .unwrap();
     let db_uri = format!(
