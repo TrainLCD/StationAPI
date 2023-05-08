@@ -150,11 +150,8 @@ pub async fn get_stations_by_coordinates(
         .await
         .unwrap();
 
-    let station_responses: Vec<StationResponse> = stations
-        .clone()
-        .into_iter()
-        .map(|s| s.clone().into())
-        .collect();
+    let station_responses: Vec<StationResponse> =
+        stations.clone().into_iter().map(|s| s.into()).collect();
     let futures = station_responses.into_iter().map(|s| async {
         let mut station_response = s;
         let lines = repository
@@ -194,10 +191,6 @@ pub async fn get_stations_by_coordinates(
     });
 
     let station_responses = join_all(futures).await;
-    let station_responses: Vec<StationResponse> = station_responses
-        .into_iter()
-        .map(|s| s.clone().into())
-        .collect();
 
     MultipleStationResponse {
         stations: station_responses,
