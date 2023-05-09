@@ -10,32 +10,68 @@ use crate::{
 use bigdecimal::Zero;
 use futures::future::join_all;
 
-fn get_line_symbols(l: Line) -> Vec<LineSymbol> {
+fn get_line_symbols(line: &mut Line) -> Vec<LineSymbol> {
     let mut line_symbols = vec![];
 
-    if !l.line_symbol_primary.len().is_zero() {
+    if !line
+        .line_symbol_primary
+        .clone()
+        .unwrap_or("".to_string())
+        .len()
+        .is_zero()
+    {
         let line_symbol = LineSymbol {
-            symbol: l.line_symbol_primary,
-            color: l.line_symbol_primary_color,
-            shape: l.line_symbol_primary_shape,
+            symbol: line.clone().line_symbol_primary.unwrap_or("".to_string()),
+            color: line
+                .clone()
+                .line_symbol_primary_color
+                .unwrap_or("".to_string()),
+            shape: line
+                .clone()
+                .line_symbol_primary_shape
+                .unwrap_or("".to_string()),
         };
         line_symbols.push(line_symbol);
     }
 
-    if !l.line_symbol_secondary.len().is_zero() {
+    if !line
+        .line_symbol_secondary
+        .clone()
+        .unwrap_or("".to_string())
+        .len()
+        .is_zero()
+    {
         let line_symbol = LineSymbol {
-            symbol: l.line_symbol_secondary,
-            color: l.line_symbol_secondary_color,
-            shape: l.line_symbol_secondary_shape,
+            symbol: line.clone().line_symbol_secondary.unwrap_or("".to_string()),
+            color: line
+                .clone()
+                .line_symbol_secondary_color
+                .unwrap_or("".to_string()),
+            shape: line
+                .clone()
+                .line_symbol_secondary_shape
+                .unwrap_or("".to_string()),
         };
         line_symbols.push(line_symbol);
     }
 
-    if !l.line_symbol_extra.len().is_zero() {
+    if !line
+        .line_symbol_extra
+        .clone()
+        .unwrap_or("".to_string())
+        .len()
+        .is_zero()
+    {
         let line_symbol = LineSymbol {
-            symbol: l.line_symbol_extra,
-            color: l.line_symbol_extra_color,
-            shape: l.line_symbol_extra_shape,
+            symbol: line.clone().line_symbol_extra.unwrap_or("".to_string()),
+            color: line
+                .clone()
+                .line_symbol_extra_color
+                .unwrap_or("".to_string()),
+            shape: line
+                .clone()
+                .line_symbol_extra_shape
+                .unwrap_or("".to_string()),
         };
         line_symbols.push(line_symbol);
     }
@@ -62,9 +98,9 @@ pub async fn find_station_by_id(
             let lines = lines
                 .into_iter()
                 .enumerate()
-                .map(|(i, l)| {
+                .map(|(i, mut l)| {
                     let mut resp: LineResponse = l.clone().into();
-                    let line_symbols = get_line_symbols(l);
+                    let line_symbols = get_line_symbols(&mut l);
                     resp.line_symbols = line_symbols;
                     if let Some(company) = companies.get(i) {
                         resp.company = Some(company.clone().into());
@@ -109,9 +145,9 @@ pub async fn get_stations_by_group_id(
             let lines = lines
                 .into_iter()
                 .enumerate()
-                .map(|(i, l)| {
+                .map(|(i, mut l)| {
                     let mut resp: LineResponse = l.clone().into();
-                    let line_symbols = get_line_symbols(l);
+                    let line_symbols = get_line_symbols(&mut l);
                     resp.line_symbols = line_symbols;
                     if let Some(company) = companies.get(i) {
                         resp.company = Some(company.clone().into());
@@ -123,11 +159,12 @@ pub async fn get_stations_by_group_id(
                 .find_one_line_by_station_id(station_response.id)
                 .await
             {
+                let mut line = line;
                 let mut line_resp: LineResponse = line.clone().into();
                 if let Ok(company) = repository.find_one_company_by_line_id(line_resp.id).await {
                     line_resp.company = Some(company.into());
                 }
-                let line_symbols = get_line_symbols(line);
+                let line_symbols = get_line_symbols(&mut line);
                 line_resp.line_symbols = line_symbols;
                 station_response.line = Some(line_resp);
             }
@@ -173,18 +210,18 @@ pub async fn get_stations_by_coordinates(
         let lines: Vec<LineResponse> = lines
             .into_iter()
             .enumerate()
-            .map(|(i, l)| {
+            .map(|(i, mut l)| {
                 let mut resp: LineResponse = l.clone().into();
                 if let Some(company) = companies.get(i) {
                     resp.company = Some(company.clone().into());
                 }
-                let line_symbols = get_line_symbols(l);
+                let line_symbols = get_line_symbols(&mut l);
                 resp.line_symbols = line_symbols;
                 resp
             })
             .collect();
 
-        if let Ok(line) = repository
+        if let Ok(mut line) = repository
             .find_one_line_by_station_id(station_response.id)
             .await
         {
@@ -192,7 +229,7 @@ pub async fn get_stations_by_coordinates(
             if let Ok(company) = repository.find_one_company_by_line_id(line_resp.id).await {
                 line_resp.company = Some(company.into());
             }
-            let line_symbols = get_line_symbols(line);
+            let line_symbols = get_line_symbols(&mut line);
             line_resp.line_symbols = line_symbols;
             station_response.line = Some(line_resp);
         }
@@ -230,9 +267,9 @@ pub async fn get_stations_by_line_id(
             let lines = lines
                 .into_iter()
                 .enumerate()
-                .map(|(i, l)| {
+                .map(|(i, mut l)| {
                     let mut resp: LineResponse = l.clone().into();
-                    let line_symbols = get_line_symbols(l);
+                    let line_symbols = get_line_symbols(&mut l);
                     resp.line_symbols = line_symbols;
                     if let Some(company) = companies.get(i) {
                         resp.company = Some(company.clone().into());
@@ -240,7 +277,7 @@ pub async fn get_stations_by_line_id(
                     resp
                 })
                 .collect();
-            if let Ok(line) = repository
+            if let Ok(mut line) = repository
                 .find_one_line_by_station_id(station_response.id)
                 .await
             {
@@ -248,7 +285,7 @@ pub async fn get_stations_by_line_id(
                 if let Ok(company) = repository.find_one_company_by_line_id(line_resp.id).await {
                     line_resp.company = Some(company.into());
                 }
-                let line_symbols = get_line_symbols(line);
+                let line_symbols = get_line_symbols(&mut line);
                 line_resp.line_symbols = line_symbols;
                 station_response.line = Some(line_resp);
             }
