@@ -94,12 +94,12 @@ message StationNumber {
 }
 
 enum StopCondition {
-    ALL = 0;
-    NOT = 1;
-    PARTIAL = 2;
-    WEEKDAY = 3;
-    HOLIDAY = 4;
-    PARTIAL_STOP = 5;
+    All = 0;
+    Not = 1;
+    Partial = 2;
+    Weekday = 3;
+    Holiday = 4;
+    PartialStop = 5;
   
 }
 
