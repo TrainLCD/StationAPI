@@ -15,14 +15,15 @@ pub struct LineRepositoryImplOnMySQL<'a> {
 #[async_trait]
 impl LineRepository for LineRepositoryImplOnMySQL<'_> {
     async fn find_one(&self, id: u32) -> Result<LineEntity, sqlx::Error> {
-        match sqlx::query_as::<_, LineEntity>(
+        match sqlx::query_as!(
+            LineEntity,
             "SELECT *
         FROM `lines`
         WHERE line_cd = ?
         AND e_status = 0
         LIMIT 1",
+            id
         )
-        .bind(id)
         .fetch_one(self.pool)
         .await
         {
