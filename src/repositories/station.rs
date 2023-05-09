@@ -4,6 +4,7 @@ use sqlx::{MySql, Pool};
 use crate::entities::line::Line;
 
 type StationEntity = crate::entities::station::Station;
+type StationWithDistanceEntity = crate::entities::station::StationWithDistance;
 type LineEntity = crate::entities::line::Line;
 type CompanyEntity = crate::entities::company::Company;
 
@@ -15,15 +16,11 @@ pub trait StationRepository {
         latitude: f64,
         longitude: f64,
         limit: Option<i32>,
-    ) -> Result<Vec<StationEntity>, sqlx::Error>;
+    ) -> Result<Vec<StationWithDistanceEntity>, sqlx::Error>;
     async fn get_by_group_id(&self, id: u32) -> Result<Vec<StationEntity>, sqlx::Error>;
     async fn get_lines_by_station_id(
         &self,
         station_id: u32,
-    ) -> Result<Vec<LineEntity>, sqlx::Error>;
-    async fn get_lines_by_station_ids(
-        &self,
-        station_ids: Vec<u32>,
     ) -> Result<Vec<LineEntity>, sqlx::Error>;
     async fn get_lines_by_line_ids(
         &self,
@@ -35,6 +32,9 @@ pub trait StationRepository {
         &self,
         line_ids: Vec<u32>,
     ) -> Result<Vec<CompanyEntity>, sqlx::Error>;
+    async fn find_one_company_by_line_id(&self, line_id: u32)
+        -> Result<CompanyEntity, sqlx::Error>;
+    async fn get_by_line_id(&self, id: u32) -> Result<Vec<StationEntity>, sqlx::Error>;
 }
 
 pub struct StationRepositoryImplOnMySQL<'a> {
@@ -44,10 +44,11 @@ pub struct StationRepositoryImplOnMySQL<'a> {
 #[async_trait]
 impl StationRepository for StationRepositoryImplOnMySQL<'_> {
     async fn find_one(&self, id: u32) -> Result<StationEntity, sqlx::Error> {
-        match sqlx::query_as::<_, StationEntity>(
+        match sqlx::query_as!(
+            StationEntity,
             "SELECT * FROM stations WHERE station_cd = ? LIMIT 1",
+            id
         )
-        .bind(id)
         .fetch_one(self.pool)
         .await
         {
@@ -64,9 +65,9 @@ impl StationRepository for StationRepositoryImplOnMySQL<'_> {
         latitude: f64,
         longitude: f64,
         limit: Option<i32>,
-    ) -> Result<Vec<StationEntity>, sqlx::Error> {
+    ) -> Result<Vec<StationWithDistanceEntity>, sqlx::Error> {
         match sqlx::query_as!(
-            StationEntity,
+            StationWithDistanceEntity,
             "SELECT *,
         (
           6371 * acos(
@@ -108,11 +109,13 @@ impl StationRepository for StationRepositoryImplOnMySQL<'_> {
     }
 
     async fn get_by_group_id(&self, group_id: u32) -> Result<Vec<StationEntity>, sqlx::Error> {
-        let result =
-            sqlx::query_as::<_, StationEntity>("SELECT * FROM stations WHERE station_g_cd = ?")
-                .bind(group_id)
-                .fetch_all(self.pool)
-                .await;
+        let result = sqlx::query_as!(
+            StationEntity,
+            "SELECT * FROM stations WHERE station_g_cd = ?",
+            group_id
+        )
+        .fetch_all(self.pool)
+        .await;
         match result {
             Ok(stations) => Ok(stations),
             Err(err) => {
@@ -123,46 +126,18 @@ impl StationRepository for StationRepositoryImplOnMySQL<'_> {
     }
 
     async fn get_lines_by_station_id(&self, station_id: u32) -> Result<Vec<Line>, sqlx::Error> {
-        let result = sqlx::query_as::<_, LineEntity>(
+        let result = sqlx::query_as!(
+            LineEntity,
             "SELECT l.* FROM `lines` AS l WHERE EXISTS
             (SELECT * FROM stations AS s1 WHERE s1.station_g_cd IN
             (SELECT station_g_cd FROM stations WHERE station_cd = ?)
             AND l.line_cd = s1.line_cd AND e_status = 0)
             ORDER BY l.e_sort, l.line_cd",
+            station_id
         )
-        .bind(station_id)
         .fetch_all(self.pool)
         .await?;
         Ok(result)
-    }
-
-    async fn get_lines_by_station_ids(
-        &self,
-        station_ids: Vec<u32>,
-    ) -> Result<Vec<LineEntity>, sqlx::Error> {
-        let params = format!("?{}", ", ?".repeat(station_ids.len() - 1));
-        let query_str = format!(
-            "SELECT l.* FROM `lines` AS l WHERE EXISTS
-            (SELECT * FROM stations AS s1 WHERE s1.station_g_cd IN
-            (SELECT station_g_cd FROM stations WHERE station_cd IN ({})
-            AND l.line_cd = s1.line_cd AND e_status = 0)
-            ORDER BY l.e_sort, l.line_cd",
-            params
-        );
-        let mut query = sqlx::query_as::<_, LineEntity>(&query_str);
-
-        for id in station_ids {
-            query = query.bind(id);
-        }
-
-        let result = query.fetch_all(self.pool).await;
-        match result {
-            Ok(lines) => Ok(lines),
-            Err(err) => {
-                log::error!("Error: {}", err);
-                Err(err)
-            }
-        }
     }
 
     async fn get_lines_by_line_ids(
@@ -197,8 +172,7 @@ impl StationRepository for StationRepositoryImplOnMySQL<'_> {
         &self,
         station_id: u32,
     ) -> Result<LineEntity, sqlx::Error> {
-        let result = sqlx::query_as::<_, LineEntity>("SELECT * FROM `lines` WHERE line_cd=(SELECT line_cd FROM stations WHERE station_cd = ?) LIMIT 1")
-        .bind(station_id)
+        let result = sqlx::query_as!(LineEntity,"SELECT * FROM `lines` WHERE line_cd=(SELECT line_cd FROM stations WHERE station_cd = ?) LIMIT 1",station_id)
         .fetch_one(self.pool)
         .await;
         match result {
@@ -232,6 +206,39 @@ impl StationRepository for StationRepositoryImplOnMySQL<'_> {
         let result = query.fetch_all(self.pool).await;
         match result {
             Ok(companies) => Ok(companies),
+            Err(err) => {
+                log::error!("Error: {}", err);
+                Err(err)
+            }
+        }
+    }
+
+    async fn find_one_company_by_line_id(
+        &self,
+        line_id: u32,
+    ) -> Result<CompanyEntity, sqlx::Error> {
+        let result = sqlx::query_as!(CompanyEntity,"SELECT * FROM companies WHERE company_cd=(SELECT company_cd FROM `lines` WHERE line_cd = ?) LIMIT 1",line_id)
+        .fetch_one(self.pool)
+        .await;
+        match result {
+            Ok(company) => Ok(company),
+            Err(err) => {
+                log::error!("Error: {}", err);
+                Err(err)
+            }
+        }
+    }
+
+    async fn get_by_line_id(&self, line_id: u32) -> Result<Vec<StationEntity>, sqlx::Error> {
+        let result = sqlx::query_as!(
+            StationEntity,
+            "SELECT * FROM stations WHERE line_cd = ?",
+            line_id
+        )
+        .fetch_all(self.pool)
+        .await;
+        match result {
+            Ok(stations) => Ok(stations),
             Err(err) => {
                 log::error!("Error: {}", err);
                 Err(err)

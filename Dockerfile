@@ -22,6 +22,8 @@ COPY --from=migration /app/migrations/create_table.sql ./migrations
 COPY --from=builder /usr/local/cargo/bin/stationapi /usr/local/bin/stationapi
 RUN apt-get update && apt-get install -y default-mysql-client && rm -rf /var/lib/apt/lists/*
 
-EXPOSE 50051
+ENV PORT 50051
+
+EXPOSE $PORT
 
 CMD ["sh", "./scripts/start.sh"]

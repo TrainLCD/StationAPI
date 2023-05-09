@@ -1,27 +1,22 @@
 use std::env;
 
-use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use sqlx::{mysql::MySqlPoolOptions, MySql, Pool};
+use sqlx::{MySql, MySqlPool, Pool};
 use stationapi::{
     repositories::station::StationRepositoryImplOnMySQL,
     service::{
         station_api_server::{StationApi, StationApiServer},
         GetStationByCoordinatesRequest, GetStationByGroupIdRequest, GetStationByIdRequest,
-        MultipleStationResponse, SingleStationResponse,
+        GetStationByLineIdRequest, MultipleStationResponse, SingleStationResponse,
     },
     usecases::station::{
         find_station_by_id, get_stations_by_coordinates, get_stations_by_group_id,
+        get_stations_by_line_id,
     },
 };
 use tonic::{transport::Server, Request, Response, Status};
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::CorsLayer;
 use tracing_log::LogTracer;
-use url::Url;
-
-pub mod service {
-    tonic::include_proto!("app.traincd.grpc");
-}
 
 #[derive(Debug)]
 pub struct MyApi {
@@ -72,6 +67,19 @@ impl StationApi for MyApi {
         .await;
         Ok(Response::new(resp))
     }
+
+    async fn get_stations_by_line_id(
+        &self,
+        request: Request<GetStationByLineIdRequest>,
+    ) -> Result<Response<MultipleStationResponse>, Status> {
+        let req_inner = request.into_inner();
+        let resp = get_stations_by_line_id(
+            StationRepositoryImplOnMySQL { pool: &self.pool },
+            req_inner.line_id,
+        )
+        .await;
+        Ok(Response::new(resp))
+    }
 }
 
 #[tokio::main]
@@ -83,31 +91,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let port = env::var("PORT").unwrap_or("50051".to_string());
     let addr = format!("[::]:{}", port).parse().unwrap();
 
-    let host = env::var("MYSQL_HOST").unwrap();
-    let database = env::var("MYSQL_DATABASE").unwrap();
-    let user = env::var("MYSQL_USER").unwrap();
-    let pass: String = env::var("MYSQL_PASSWORD").unwrap();
-    let max_connections: u32 = env::var("DATABASE_MAX_CONNECTIONS")
-        .unwrap()
-        .parse()
-        .unwrap_or(5);
-    let db_uri = format!(
-        "mysql://{}:3306/{}?characterEncoding=utf8mb4",
-        host, database
-    );
-    let mut uri = Url::parse(&db_uri).unwrap();
-    uri.set_username(user.as_str()).unwrap();
-    uri.set_password(Some(
-        utf8_percent_encode(pass.as_str(), NON_ALPHANUMERIC)
-            .to_string()
-            .as_str(),
-    ))
-    .unwrap();
-    let uri = uri.as_str();
-    let pool = MySqlPoolOptions::new()
-        .max_connections(max_connections)
-        .connect(uri)
-        .await?;
+    let db_url = env::var("DATABASE_URL").unwrap();
+    let pool = MySqlPool::connect(db_url.as_str()).await?;
 
     let api_server = MyApi { pool };
     let api_server = StationApiServer::new(api_server);

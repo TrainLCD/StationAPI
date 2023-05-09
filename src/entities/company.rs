@@ -9,7 +9,7 @@ pub struct Company {
     pub company_name_h: String,
     pub company_name_r: String,
     pub company_name_en: String,
-    company_name_full_en: String,
+    pub company_name_full_en: String,
     pub company_url: String,
     pub company_type: i32,
     pub e_status: u32,
