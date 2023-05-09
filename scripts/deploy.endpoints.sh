@@ -1,6 +1,6 @@
 #!/bin/bash
 
-python -m grpc_tools.protoc \
+protoc \
     --include_imports \
     --include_source_info \
     --proto_path=. \
