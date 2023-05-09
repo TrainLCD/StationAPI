@@ -64,7 +64,7 @@ CREATE TABLE `lines` (
   `line_name_r` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `line_name_zh` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
   `line_name_ko` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
-  `line_color_c` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
+  `line_color_c` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `line_color_t` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
   `line_type` int unsigned NOT NULL,
   `line_symbol_primary` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
