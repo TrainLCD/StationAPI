@@ -4,7 +4,7 @@ COPY . .
 RUN apt-get update && apt-get install -y protobuf-compiler libprotobuf-dev && rm -rf /var/lib/apt/lists/*
 RUN cargo install --path .
 
-FROM node:18-alpine as migration
+FROM node:18-slim as migration
 WORKDIR /app
 COPY ./migrations /app/migrations
 COPY ./scripts /app/scripts
