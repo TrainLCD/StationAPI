@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-const fs = require('fs');
-const path = require('path');
-const { parse } = require('csv-parse');
+const { readdir, createReadStream, createWriteStream } = require("node:fs");
+const { Buffer } = require("node:buffer");
+const path = require("path");
+const { parse } = require("csv-parse");
 
-fs.readdir('./migrations', (err, files) => {
+readdir("./migrations", (err, files) => {
   if (err) throw err;
   const fileList = files
     .filter((file) => /.*\.csv$/.test(file))
@@ -11,28 +12,30 @@ fs.readdir('./migrations', (err, files) => {
   let csvData = [];
   let sqlLines = [];
   fileList.forEach((fileName) => {
-    if (fileName.split('!')[1].split('.')[1] !== 'csv') {
+    if (fileName.split("!")[1].split(".")[1] !== "csv") {
       return;
     }
-    const index = parseInt(fileName.split('!')[0], 10) - 1;
+    const index = parseInt(fileName.split("!")[0], 10) - 1;
 
-    fs.createReadStream(path.join(__dirname, '../migrations/', fileName))
+    createReadStream(path.join(__dirname, "../migrations/", fileName), {
+      encoding: "utf-8",
+    })
       .pipe(parse())
-      .on('data', (csvrow) => {
+      .on("data", (csvrow) => {
         if (!csvData[index]) {
           csvData[index] = [];
         }
         csvData[index].push(csvrow);
       })
-      .on('end', () => {
+      .on("end", () => {
         let sqlLinesInner = [
-          `INSERT INTO \`${fileName.split('!')[1].split('.')[0]}\` VALUES `,
+          `INSERT INTO \`${fileName.split("!")[1].split(".")[0]}\` VALUES `,
         ];
         csvData[index].forEach((data, idx) => {
           if (idx === 0) return;
           const cols = data
             .map((col, idx) => {
-              if (csvData[index][0][idx]?.startsWith('#')) {
+              if (csvData[index][0][idx]?.startsWith("#")) {
                 return null;
               }
               return `'${col.replace(`'`, `\\'`)}'`;
@@ -44,9 +47,10 @@ fs.readdir('./migrations', (err, files) => {
             sqlLinesInner.push(`(${cols}),`);
           }
         });
-        sqlLines[index] = sqlLinesInner.join('');
+        sqlLines[index] = sqlLinesInner.join("");
         if (sqlLines.length === fileList.length) {
-          fs.writeFile('./tmp.sql', sqlLines.join(';\n'), (err) => {
+          const data = new Uint8Array(Buffer.from(sqlLines.join(";")));
+          createWriteStream("./tmp.sql").write(data, (err) => {
             if (err) throw err;
           });
         }
