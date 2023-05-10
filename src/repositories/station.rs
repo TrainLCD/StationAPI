@@ -1,8 +1,6 @@
 use async_trait::async_trait;
 use sqlx::{MySql, Pool};
 
-use crate::entities::line::Line;
-
 type StationEntity = crate::entities::station::Station;
 type StationWithDistanceEntity = crate::entities::station::StationWithDistance;
 type LineEntity = crate::entities::line::Line;
@@ -125,7 +123,10 @@ impl StationRepository for StationRepositoryImplOnMySQL<'_> {
         }
     }
 
-    async fn get_lines_by_station_id(&self, station_id: u32) -> Result<Vec<Line>, sqlx::Error> {
+    async fn get_lines_by_station_id(
+        &self,
+        station_id: u32,
+    ) -> Result<Vec<LineEntity>, sqlx::Error> {
         let result = sqlx::query_as!(
             LineEntity,
             "SELECT l.* FROM `lines` AS l WHERE EXISTS

@@ -82,44 +82,50 @@ pub async fn find_station_by_id(
     repository: impl StationRepository,
     id: u32,
 ) -> Option<SingleStationResponse> {
-    if let Ok(station) = repository.find_one(id).await {
-        let mut station_response: StationResponse = station.clone().into();
+    let Ok(station) = repository.find_one(id).await else {
+        return None
+    };
+    let mut station_response: StationResponse = station.clone().into();
 
-        if let Ok(lines) = repository
-            .get_lines_by_station_id(station_response.id)
-            .await
-        {
-            let line_ids: Vec<u32> = lines.iter().map(|l| l.line_cd).collect::<Vec<u32>>();
-            let companies = repository
-                .get_companies_by_line_ids(line_ids)
-                .await
-                .unwrap();
+    let Ok(lines) = repository
+        .get_lines_by_station_id(station_response.id)
+        .await else {
+        return None;
+        };
 
-            let lines = lines
-                .into_iter()
-                .enumerate()
-                .map(|(i, mut l)| {
-                    let mut resp: LineResponse = l.clone().into();
-                    let line_symbols = get_line_symbols(&mut l);
-                    resp.line_symbols = line_symbols;
-                    if let Some(company) = companies.get(i) {
-                        resp.company = Some(company.clone().into());
-                    }
-                    resp
-                })
-                .collect();
-            station_response.lines = lines;
-        }
+    let line_ids: Vec<u32> = lines.iter().map(|l| l.line_cd).collect::<Vec<u32>>();
+    let companies = repository
+        .get_companies_by_line_ids(line_ids)
+        .await
+        .unwrap();
 
-        if let Ok(line) = repository.find_one_line_by_station_id(id).await {
-            station_response.line = Some(line.into());
-        }
+    let lines = lines
+        .into_iter()
+        .enumerate()
+        .map(|(i, mut l)| {
+            let mut resp: LineResponse = l.clone().into();
+            let line_symbols = get_line_symbols(&mut l);
+            resp.line_symbols = line_symbols;
+            let Some(company) = companies.get(i) else {
+                return resp;
+            };
+            resp.company = Some(company.clone().into());
+            resp
+        })
+        .collect();
+    station_response.lines = lines;
 
+    let Ok(line) = repository.find_one_line_by_station_id(id).await else {
         return Some(SingleStationResponse {
             station: Some(station_response),
         });
-    }
-    None
+    };
+
+    station_response.line = Some(Box::new(line.into()));
+
+    Some(SingleStationResponse {
+        station: Some(station_response),
+    })
 }
 pub async fn get_stations_by_group_id(
     repository: impl StationRepository,
@@ -132,45 +138,48 @@ pub async fn get_stations_by_group_id(
     let station_responses_futures = station_responses.into_iter().map(|s| async {
         let mut station_response: StationResponse = s;
 
-        if let Ok(lines) = repository
+        let Ok(lines) = repository
             .get_lines_by_station_id(station_response.id)
+            .await else {
+            return station_response;
+            };
+
+        let line_ids = lines.iter().map(|l| l.line_cd).collect();
+        let companies = repository
+            .get_companies_by_line_ids(line_ids)
             .await
-        {
-            let line_ids = lines.iter().map(|l| l.line_cd).collect();
-            let companies = repository
-                .get_companies_by_line_ids(line_ids)
-                .await
-                .unwrap();
+            .unwrap();
 
-            let lines = lines
-                .into_iter()
-                .enumerate()
-                .map(|(i, mut l)| {
-                    let mut resp: LineResponse = l.clone().into();
-                    let line_symbols = get_line_symbols(&mut l);
-                    resp.line_symbols = line_symbols;
-                    if let Some(company) = companies.get(i) {
-                        resp.company = Some(company.clone().into());
-                    }
-                    resp
-                })
-                .collect();
-            if let Ok(line) = repository
-                .find_one_line_by_station_id(station_response.id)
-                .await
-            {
-                let mut line = line;
-                let mut line_resp: LineResponse = line.clone().into();
-                if let Ok(company) = repository.find_one_company_by_line_id(line_resp.id).await {
-                    line_resp.company = Some(company.into());
-                }
-                let line_symbols = get_line_symbols(&mut line);
-                line_resp.line_symbols = line_symbols;
-                station_response.line = Some(line_resp);
-            }
-            station_response.lines = lines;
-        }
+        let lines = lines
+            .into_iter()
+            .enumerate()
+            .map(|(i, mut l)| {
+                let mut resp: LineResponse = l.clone().into();
+                let line_symbols = get_line_symbols(&mut l);
+                resp.line_symbols = line_symbols;
+                let Some(company) = companies.get(i) else {
+                    return resp;
+                };
+                resp.company = Some(company.clone().into());
+                resp
+            })
+            .collect();
+        let Ok(line) = repository
+            .find_one_line_by_station_id(station_response.id)
+            .await else {
+                return station_response;
+            };
 
+        let mut line = line;
+        let mut line_resp: LineResponse = line.clone().into();
+        let Ok(company) = repository.find_one_company_by_line_id(line_resp.id).await  else{
+            return station_response;
+        };
+        line_resp.company = Some(company.into());
+        let line_symbols = get_line_symbols(&mut line);
+        line_resp.line_symbols = line_symbols;
+        station_response.line = Some(Box::new(line_resp));
+        station_response.lines = lines;
         station_response
     });
 
@@ -212,27 +221,31 @@ pub async fn get_stations_by_coordinates(
             .enumerate()
             .map(|(i, mut l)| {
                 let mut resp: LineResponse = l.clone().into();
-                if let Some(company) = companies.get(i) {
-                    resp.company = Some(company.clone().into());
-                }
+                let Some(company) = companies.get(i)  else{
+                    return resp;
+                };
+                resp.company = Some(company.clone().into());
                 let line_symbols = get_line_symbols(&mut l);
                 resp.line_symbols = line_symbols;
                 resp
             })
             .collect();
 
-        if let Ok(mut line) = repository
+        let Ok(mut line) = repository
             .find_one_line_by_station_id(station_response.id)
-            .await
-        {
-            let mut line_resp: LineResponse = line.clone().into();
-            if let Ok(company) = repository.find_one_company_by_line_id(line_resp.id).await {
-                line_resp.company = Some(company.into());
-            }
-            let line_symbols = get_line_symbols(&mut line);
-            line_resp.line_symbols = line_symbols;
-            station_response.line = Some(line_resp);
-        }
+            .await else {
+                return station_response;
+            };
+
+        let mut line_resp: LineResponse = line.clone().into();
+        let Ok(company) = repository.find_one_company_by_line_id(line_resp.id).await else {
+                return station_response;
+            };
+        line_resp.company = Some(company.into());
+        let line_symbols = get_line_symbols(&mut line);
+        line_resp.line_symbols = line_symbols;
+        station_response.line = Some(Box::new(line_resp));
+
         station_response.lines = lines;
         station_response
     });
@@ -254,44 +267,48 @@ pub async fn get_stations_by_line_id(
     let station_responses_futures = station_responses.into_iter().map(|s| async {
         let mut station_response: StationResponse = s;
 
-        if let Ok(lines) = repository
+        let Ok(lines) = repository
             .get_lines_by_station_id(station_response.id)
+            .await else {
+                return station_response;
+            };
+
+        let line_ids = lines.iter().map(|l| l.line_cd).collect();
+        let companies = repository
+            .get_companies_by_line_ids(line_ids)
             .await
-        {
-            let line_ids = lines.iter().map(|l| l.line_cd).collect();
-            let companies = repository
-                .get_companies_by_line_ids(line_ids)
-                .await
-                .unwrap();
+            .unwrap();
 
-            let lines = lines
-                .into_iter()
-                .enumerate()
-                .map(|(i, mut l)| {
-                    let mut resp: LineResponse = l.clone().into();
-                    let line_symbols = get_line_symbols(&mut l);
-                    resp.line_symbols = line_symbols;
-                    if let Some(company) = companies.get(i) {
-                        resp.company = Some(company.clone().into());
-                    }
-                    resp
-                })
-                .collect();
-            if let Ok(mut line) = repository
-                .find_one_line_by_station_id(station_response.id)
-                .await
-            {
-                let mut line_resp: LineResponse = line.clone().into();
-                if let Ok(company) = repository.find_one_company_by_line_id(line_resp.id).await {
-                    line_resp.company = Some(company.into());
-                }
-                let line_symbols = get_line_symbols(&mut line);
-                line_resp.line_symbols = line_symbols;
-                station_response.line = Some(line_resp);
-            }
-            station_response.lines = lines;
-        }
+        let lines = lines
+            .into_iter()
+            .enumerate()
+            .map(|(i, mut l)| {
+                let mut resp: LineResponse = l.clone().into();
+                let line_symbols = get_line_symbols(&mut l);
+                resp.line_symbols = line_symbols;
+                let Some(company) = companies.get(i) else{
+                    return resp;
+                };
+                resp.company = Some(company.clone().into());
+                resp
+            })
+            .collect();
+        let Ok(mut line) = repository
+            .find_one_line_by_station_id(station_response.id)
+            .await else{
+                return station_response;
+            };
 
+        let mut line_resp: LineResponse = line.clone().into();
+        let Ok(company) = repository.find_one_company_by_line_id(line_resp.id).await else {
+            return station_response;
+        };
+        line_resp.company = Some(company.into());
+        let line_symbols = get_line_symbols(&mut line);
+        line_resp.line_symbols = line_symbols;
+        station_response.line = Some(Box::new(line_resp));
+
+        station_response.lines = lines;
         station_response
     });
 
