@@ -188,6 +188,7 @@ message LineResponse {
     CompanyResponse company = 10;
     repeated LineSymbol line_symbols = 11;
     OperationStatus status = 12;
+    StationResponse station = 13;
 }
 
 message SingleLineResponse {
