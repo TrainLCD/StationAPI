@@ -1,8 +1,6 @@
 use async_trait::async_trait;
 use sqlx::{MySql, Pool};
 
-use crate::entities::line::Line;
-
 type StationEntity = crate::entities::station::Station;
 type StationWithDistanceEntity = crate::entities::station::StationWithDistance;
 type LineEntity = crate::entities::line::Line;
@@ -35,6 +33,11 @@ pub trait StationRepository {
     async fn find_one_company_by_line_id(&self, line_id: u32)
         -> Result<CompanyEntity, sqlx::Error>;
     async fn get_by_line_id(&self, id: u32) -> Result<Vec<StationEntity>, sqlx::Error>;
+    async fn get_transferable_stations(
+        &self,
+        station_group_id: u32,
+        target_line_ids: Vec<u32>,
+    ) -> Result<Vec<StationEntity>, sqlx::Error>;
 }
 
 pub struct StationRepositoryImplOnMySQL<'a> {
@@ -125,7 +128,10 @@ impl StationRepository for StationRepositoryImplOnMySQL<'_> {
         }
     }
 
-    async fn get_lines_by_station_id(&self, station_id: u32) -> Result<Vec<Line>, sqlx::Error> {
+    async fn get_lines_by_station_id(
+        &self,
+        station_id: u32,
+    ) -> Result<Vec<LineEntity>, sqlx::Error> {
         let result = sqlx::query_as!(
             LineEntity,
             "SELECT l.* FROM `lines` AS l WHERE EXISTS
@@ -237,6 +243,35 @@ impl StationRepository for StationRepositoryImplOnMySQL<'_> {
         )
         .fetch_all(self.pool)
         .await;
+        match result {
+            Ok(stations) => Ok(stations),
+            Err(err) => {
+                log::error!("Error: {}", err);
+                Err(err)
+            }
+        }
+    }
+
+    async fn get_transferable_stations(
+        &self,
+        station_group_id: u32,
+        target_line_ids: Vec<u32>,
+    ) -> Result<Vec<StationEntity>, sqlx::Error> {
+        let params: String = format!("?{}", ", ?".repeat(target_line_ids.len() - 1));
+        let query_str = format!(
+            "SELECT * FROM stations WHERE station_g_cd = ? AND line_cd IN ({})",
+            params
+        );
+        let mut query = sqlx::query_as::<_, StationEntity>(&query_str);
+
+        query = query.bind(station_group_id);
+
+        for id in target_line_ids {
+            query = query.bind(id);
+        }
+
+        let result = query.fetch_all(self.pool).await;
+
         match result {
             Ok(stations) => Ok(stations),
             Err(err) => {

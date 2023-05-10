@@ -29,15 +29,15 @@ impl StationApi for MyApi {
         &self,
         request: Request<GetStationByIdRequest>,
     ) -> Result<Response<SingleStationResponse>, Status> {
-        if let Some(resp) = find_station_by_id(
+        let Some(resp) = find_station_by_id(
             StationRepositoryImplOnMySQL { pool: &self.pool },
             request.into_inner().id,
         )
-        .await
-        {
-            return Ok(Response::new(resp));
-        }
-        Err(Status::not_found("The station is not found"))
+        .await else {
+            return Err(Status::not_found("Requested station is not found"));
+        };
+
+        return Ok(Response::new(resp));
     }
 
     async fn get_station_by_coordinates(
@@ -46,7 +46,7 @@ impl StationApi for MyApi {
     ) -> Result<Response<MultipleStationResponse>, Status> {
         let req_inner = request.into_inner();
         let resp = get_stations_by_coordinates(
-            StationRepositoryImplOnMySQL { pool: &self.pool },
+            &StationRepositoryImplOnMySQL { pool: &self.pool },
             req_inner.latitude,
             req_inner.longitude,
             req_inner.limit,
