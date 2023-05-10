@@ -76,9 +76,11 @@ async fn get_station_responses(
     repository: impl StationRepository,
     stations: Vec<Station>,
 ) -> Vec<StationResponse> {
-    let partially_constructed_response =
-        get_minimal_station_responses(&repository, stations.into_iter().map(|s| s.into()).collect())
-            .await;
+    let partially_constructed_response = get_minimal_station_responses(
+        &repository,
+        stations.into_iter().map(|s| s.into()).collect(),
+    )
+    .await;
 
     let station_responses_futures = partially_constructed_response.into_iter().map(|s| async {
         let mut station_response: StationResponse = s;
@@ -86,13 +88,12 @@ async fn get_station_responses(
             return station_response;
         };
         let line_ids: Vec<u32> = station_response.lines.iter().map(|l| l.id).collect();
-        
 
         let Ok(transferable_stations) = repository
         .get_transferable_stations(station_response.group_id, line_ids).await else {
             return station_response;
         };
-        let Some(transferable_station) = 
+        let Some(transferable_station) =
             transferable_stations.iter().find_map(|ts| {
                 if ts.line_cd == line_response.id {
                     return Some(ts);
