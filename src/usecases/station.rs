@@ -38,7 +38,6 @@ async fn get_minimal_station_responses(
         let lines: Vec<LineResponse> = lines
             .iter()
             .enumerate()
-            .into_iter()
             .map(|(i, l)| {
                 let mut resp: LineResponse = l.clone().into();
                 let line_symbols = get_line_symbols(&mut l.clone());
@@ -94,11 +93,11 @@ async fn get_station_responses(
             return station_response;
         };
         let Some(transferable_station) =
-            transferable_stations.iter().find_map(|ts| {
+            transferable_stations.iter().find(|ts| {
                 if ts.line_cd == line_response.id {
-                    return Some(ts);
+                    return true;
                 }
-                None
+                false
             }).cloned() else {
                 return station_response;
             };
