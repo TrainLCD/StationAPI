@@ -153,7 +153,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -165,7 +165,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -177,7 +177,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -189,7 +189,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -201,7 +201,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -225,7 +225,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -237,7 +237,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -336,6 +336,291 @@
       }
     },
     "query": "SELECT *\n        FROM `lines`\n        WHERE line_cd = ?\n        AND e_status = 0\n        LIMIT 1"
+  },
+  "152108a47fb4dacfceb7d20fd3a0e583db4a834e7d653adfc041d083c9b12221": {
+    "describe": {
+      "columns": [
+        {
+          "name": "station_cd",
+          "ordinal": 0,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4131
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "station_g_cd",
+          "ordinal": 1,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4137
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "station_name",
+          "ordinal": 2,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4241
+            },
+            "max_size": 262140,
+            "type": "Blob"
+          }
+        },
+        {
+          "name": "station_name_k",
+          "ordinal": 3,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4241
+            },
+            "max_size": 262140,
+            "type": "Blob"
+          }
+        },
+        {
+          "name": "station_name_r",
+          "ordinal": 4,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4241
+            },
+            "max_size": 262140,
+            "type": "Blob"
+          }
+        },
+        {
+          "name": "station_name_zh",
+          "ordinal": 5,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4241
+            },
+            "max_size": 262140,
+            "type": "Blob"
+          }
+        },
+        {
+          "name": "station_name_ko",
+          "ordinal": 6,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4241
+            },
+            "max_size": 262140,
+            "type": "Blob"
+          }
+        },
+        {
+          "name": "primary_station_number",
+          "ordinal": 7,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 144
+            },
+            "max_size": 262140,
+            "type": "Blob"
+          }
+        },
+        {
+          "name": "secondary_station_number",
+          "ordinal": 8,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 144
+            },
+            "max_size": 262140,
+            "type": "Blob"
+          }
+        },
+        {
+          "name": "extra_station_number",
+          "ordinal": 9,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 144
+            },
+            "max_size": 262140,
+            "type": "Blob"
+          }
+        },
+        {
+          "name": "three_letter_code",
+          "ordinal": 10,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 144
+            },
+            "max_size": 262140,
+            "type": "Blob"
+          }
+        },
+        {
+          "name": "line_cd",
+          "ordinal": 11,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4137
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "pref_cd",
+          "ordinal": 12,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4129
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "post",
+          "ordinal": 13,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4241
+            },
+            "max_size": 262140,
+            "type": "Blob"
+          }
+        },
+        {
+          "name": "address",
+          "ordinal": 14,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4241
+            },
+            "max_size": 262140,
+            "type": "Blob"
+          }
+        },
+        {
+          "name": "lon",
+          "ordinal": 15,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4129
+            },
+            "max_size": 12,
+            "type": "NewDecimal"
+          }
+        },
+        {
+          "name": "lat",
+          "ordinal": 16,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4129
+            },
+            "max_size": 12,
+            "type": "NewDecimal"
+          }
+        },
+        {
+          "name": "open_ymd",
+          "ordinal": 17,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4241
+            },
+            "max_size": 262140,
+            "type": "Blob"
+          }
+        },
+        {
+          "name": "close_ymd",
+          "ordinal": 18,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4241
+            },
+            "max_size": 262140,
+            "type": "Blob"
+          }
+        },
+        {
+          "name": "e_status",
+          "ordinal": 19,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4137
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "e_sort",
+          "ordinal": 20,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4137
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 2
+      }
+    },
+    "query": "SELECT * FROM stations WHERE station_g_cd = ? AND line_cd = ?"
   },
   "345201ea03ede9dad96ce9b6f86780984200ed2f22a6e2970f1b2b6779af022f": {
     "describe": {
@@ -490,7 +775,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -502,7 +787,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -514,7 +799,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -526,7 +811,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -538,7 +823,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -562,7 +847,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -574,7 +859,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -1065,7 +1350,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 4113
+              "bits": 4241
             },
             "max_size": 262140,
             "type": "Blob"
@@ -1863,7 +2148,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -1875,7 +2160,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -1887,7 +2172,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -1899,7 +2184,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -1911,7 +2196,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -1935,7 +2220,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
@@ -1947,7 +2232,7 @@
           "type_info": {
             "char_set": 224,
             "flags": {
-              "bits": 16
+              "bits": 144
             },
             "max_size": 262140,
             "type": "Blob"
