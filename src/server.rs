@@ -46,7 +46,7 @@ impl StationApi for MyApi {
     ) -> Result<Response<MultipleStationResponse>, Status> {
         let req_inner = request.into_inner();
         let resp = get_stations_by_coordinates(
-            StationRepositoryImplOnMySQL { pool: &self.pool },
+            &StationRepositoryImplOnMySQL { pool: &self.pool },
             req_inner.latitude,
             req_inner.longitude,
             req_inner.limit,

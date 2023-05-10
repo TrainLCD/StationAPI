@@ -2,7 +2,7 @@ use bigdecimal::BigDecimal;
 
 use crate::service::StationResponse;
 
-#[derive(sqlx::FromRow, Clone)]
+#[derive(sqlx::FromRow, Clone, Debug)]
 pub struct Station {
     pub station_cd: u32,
     pub station_g_cd: u32,
@@ -104,6 +104,63 @@ impl From<Station> for StationResponse {
             status: value.e_status as i32,
             station_numbers: vec![],
             stop_condition: 0,
+            distance: Some(0.0),
+        }
+    }
+}
+
+impl From<StationWithDistance> for Station {
+    fn from(value: StationWithDistance) -> Self {
+        Station {
+            station_cd: value.station_cd,
+            station_g_cd: value.station_g_cd,
+            station_name: value.station_name,
+            station_name_k: value.station_name_k,
+            station_name_r: value.station_name_r,
+            station_name_zh: value.station_name_zh,
+            station_name_ko: value.station_name_ko,
+            primary_station_number: value.primary_station_number,
+            secondary_station_number: value.secondary_station_number,
+            extra_station_number: value.extra_station_number,
+            three_letter_code: value.three_letter_code,
+            line_cd: value.line_cd,
+            pref_cd: value.pref_cd,
+            post: value.post,
+            address: value.address,
+            lon: value.lon,
+            lat: value.lat,
+            open_ymd: value.open_ymd,
+            close_ymd: value.close_ymd,
+            e_status: value.e_status,
+            e_sort: value.e_sort,
+        }
+    }
+}
+
+impl From<Station> for StationWithDistance {
+    fn from(value: Station) -> Self {
+        StationWithDistance {
+            station_cd: value.station_cd,
+            station_g_cd: value.station_g_cd,
+            station_name: value.station_name,
+            station_name_k: value.station_name_k,
+            station_name_r: value.station_name_r,
+            station_name_zh: value.station_name_zh,
+            station_name_ko: value.station_name_ko,
+            primary_station_number: value.primary_station_number,
+            secondary_station_number: value.secondary_station_number,
+            extra_station_number: value.extra_station_number,
+            three_letter_code: value.three_letter_code,
+            line_cd: value.line_cd,
+            pref_cd: value.pref_cd,
+            post: value.post,
+            address: value.address,
+            lon: value.lon,
+            lat: value.lat,
+            open_ymd: value.open_ymd,
+            close_ymd: value.close_ymd,
+            e_status: value.e_status,
+            e_sort: value.e_sort,
             distance: Some(0.0),
         }
     }
