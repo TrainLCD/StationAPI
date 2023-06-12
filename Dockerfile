@@ -10,7 +10,7 @@ COPY ./migrations /app/migrations
 COPY ./scripts /app/scripts
 RUN cd ./scripts && npm install
 RUN node ./scripts/sqlgen.js
-COPY ./tmp.sql /app
+COPY tmp.sql /app
 
 FROM debian:bullseye-slim
 WORKDIR /app
