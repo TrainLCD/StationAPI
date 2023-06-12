@@ -6,13 +6,7 @@ export const DB_CONNECTION = 'DB_CONNECTION';
 
 const dbProvider = {
   provide: DB_CONNECTION,
-  useValue: mysql.createPool({
-    connectionLimit: 10,
-    host: process.env.MYSQL_HOST,
-    user: process.env.MYSQL_USER,
-    password: process.env.MYSQL_PASSWORD,
-    database: process.env.MYSQL_DATABASE,
-  }),
+  useValue: mysql.createConnection(process.env.DATABASE_URL),
 };
 
 @Module({
