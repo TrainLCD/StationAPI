@@ -13,7 +13,7 @@ RUN npm run build
 
 RUN cd ./scripts && npm install
 RUN node ./scripts/sqlgen.js
-COPY ./tmp.sql .
+COPY ./tmp.sql /app
 
 EXPOSE 3000
 
