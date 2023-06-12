@@ -27,8 +27,10 @@ const dbProviderLocal = {
   }),
 };
 
+const dbProvider = isGCP ? dbProviderGCP : dbProviderLocal;
+
 @Module({
-  providers: [isGCP ? dbProviderGCP : dbProviderLocal],
-  exports: [isGCP ? dbProviderGCP : dbProviderLocal],
+  providers: [dbProvider],
+  exports: [dbProvider],
 })
 export class DbModule {}

@@ -12,7 +12,9 @@ RUN npm install
 RUN npm run build
 
 RUN cd ./scripts && npm install
+RUN node ./scripts/sqlgen.js
 
 EXPOSE 3000
 
-CMD ["sh", "./scripts/start.prod.sh"]
+CMD ["sh", "./scripts/start.sh"]
+
