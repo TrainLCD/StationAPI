@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mysql = require('mysql2');
 
+const isGCP = process.env.IS_GCP === 'true';
+
 export const DB_CONNECTION = 'DB_CONNECTION';
 
 const dbProviderGCP = {
@@ -26,7 +28,7 @@ const dbProviderLocal = {
 };
 
 @Module({
-  providers: [process.env.IS_GCP ? dbProviderGCP : dbProviderLocal],
-  exports: [process.env.IS_GCP ? dbProviderGCP : dbProviderLocal],
+  providers: [isGCP ? dbProviderGCP : dbProviderLocal],
+  exports: [isGCP ? dbProviderGCP : dbProviderLocal],
 })
 export class DbModule {}
