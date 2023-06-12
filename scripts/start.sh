@@ -1,3 +1,3 @@
 #!/bin/bash
 sh ./scripts/migration.sh
-npm run start:prod
+/usr/local/bin/stationapi

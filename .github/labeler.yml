@@ -3,8 +3,17 @@ ci/cd:
   - .github/**/*
   - scripts/*
   - scripts/**/*
-nestjs:
+rust:
   - src/*
   - src/**/*
 data:
   - migrations/*
+protobuf:
+  - proto/*
+  - proto/**/*
+deploy-prod:
+  - master
+deploy-staging:
+  - staging
+deploy-dev:
+  - dev
