@@ -1,3 +1,6 @@
 #!/bin/bash
-sh ./scripts/migration.sh
+if [ -e "./tmp.sql" ]; then
+    echo "Migration file exists"
+    sh ./scripts/migration.sh
+fi
 /usr/local/bin/stationapi
