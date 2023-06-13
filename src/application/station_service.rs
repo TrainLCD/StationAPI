@@ -35,7 +35,7 @@ impl From<Station> for StationResponse {
             status: value.e_status as i32,
             station_numbers: vec![],
             stop_condition: 0,
-            distance: Some(0.0),
+            distance: value.distance,
         }
     }
 }
