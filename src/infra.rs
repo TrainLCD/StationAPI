@@ -1,2 +1,2 @@
-pub mod line;
+pub mod grpc;
 pub mod station;

@@ -1,7 +1,7 @@
-pub mod entities;
-pub mod repositories;
-pub mod usecases;
+pub mod application;
+pub mod domain;
+pub mod infra;
 
-pub mod service {
+pub mod pb {
     tonic::include_proto!("app.trainlcd.grpc");
 }
