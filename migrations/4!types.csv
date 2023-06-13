@@ -174,10 +174,6 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 517,はこね,ハコネ,Hakone,箱根,하코네,#2288CC,0,,COMPLETE
 518,メトロはこね,メトロハコネ,Metro Hakone,地下铁箱根,메트로 하코네,#2288CC,0,,COMPLETE
 519,THライナー,THライナー,TH Liner,TH Liner,TH Liner,#B50033,0,,COMPLETE
-520,"スペーシア
-けごん・きぬ","スペーシア
-ケゴン・キヌ","SPACIA
-Kegon/Kinu","SPACIA
-华严・绢","SPACIA
-케곤・키누",#00458F,0,,COMPLETE
+520,けごん・きぬ,ケゴン・キヌ,Kegon/Kinu,华严・绢,케곤・키누,#00458F,0,,COMPLETE
 521,きぬがわ,キヌガワ,Kinugawa,鬼怒川,기누가와,#378640,0,,COMPLETE
+522,会津,アイヅ,Aizu,会津,아이즈,#009F49,0,,COMPLETE
