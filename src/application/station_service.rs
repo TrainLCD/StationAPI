@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::{
-    domain::models::station::{station::Station, station_repository::StationRepository},
+    domain::models::station::{station_model::Station, station_repository::StationRepository},
     pb::StationResponse,
 };
 

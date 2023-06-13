@@ -2,7 +2,9 @@ use anyhow::Result;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use sqlx::{MySql, Pool};
 
-use crate::domain::models::station::{station::Station, station_repository::StationRepository};
+use crate::domain::models::station::{
+    station_model::Station, station_repository::StationRepository,
+};
 
 #[derive(sqlx::FromRow, Clone, Debug)]
 pub struct StationEntity {

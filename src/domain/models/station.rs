@@ -1,2 +1,2 @@
-pub mod station;
+pub mod station_model;
 pub mod station_repository;

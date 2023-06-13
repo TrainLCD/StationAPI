@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use super::station::Station;
+use super::station_model::Station;
 
 #[async_trait::async_trait]
 pub trait StationRepository {
