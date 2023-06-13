@@ -5,6 +5,7 @@ use crate::{
     pb::StationResponse,
 };
 
+#[derive(Debug)]
 pub struct StationService<T>
 where
     T: StationRepository,
