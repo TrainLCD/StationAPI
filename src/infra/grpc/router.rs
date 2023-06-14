@@ -3,12 +3,18 @@ use std::env;
 use anyhow::Result;
 use sqlx::{MySql, MySqlPool, Pool};
 use tonic::{transport::Server, Response};
-use tonic_web::GrpcWebLayer;
 use tower_http::cors::CorsLayer;
 use tracing_log::LogTracer;
 
 use crate::{
-    domain::models::station::station_repository::StationRepository,
+    domain::models::{
+        company::company_repository::CompanyRepository, line::line_repository::LineRepository,
+        station::station_repository::StationRepository,
+    },
+    infra::{
+        company::company_repository_impl::CompanyRepositoryImpl,
+        line::line_repository_impl::LineRepositoryImpl,
+    },
     pb::{
         station_api_server::{StationApi, StationApiServer},
         GetStationByCoordinatesRequest, GetStationByGroupIdRequest, GetStationByIdRequest,
@@ -28,8 +34,18 @@ impl ApiContext {
         Self { pool }
     }
     pub fn station_repository(&self) -> impl StationRepository {
-        use crate::infra::station::station_repository::StationRepositoryImpl;
+        use crate::infra::station::station_repository_impl::StationRepositoryImpl;
         StationRepositoryImpl {
+            pool: Box::new(self.pool.to_owned()),
+        }
+    }
+    pub fn line_repository(&self) -> impl LineRepository {
+        LineRepositoryImpl {
+            pool: Box::new(self.pool.to_owned()),
+        }
+    }
+    pub fn company_repository(&self) -> impl CompanyRepository {
+        CompanyRepositoryImpl {
             pool: Box::new(self.pool.to_owned()),
         }
     }
@@ -99,18 +115,11 @@ pub async fn run() -> Result<()> {
         .allow_headers(tower_http::cors::Any)
         .allow_methods(tower_http::cors::Any);
 
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-    health_reporter
-        .set_serving::<StationApiServer<ApiContext>>()
-        .await;
-
     println!("StationAPI Server listening on {}", addr);
 
     Server::builder()
         .accept_http1(true)
         .layer(allow_cors)
-        .layer(GrpcWebLayer::new())
-        .add_service(health_service)
         .add_service(tonic_web::enable(api_server))
         .serve(addr)
         .await?;
