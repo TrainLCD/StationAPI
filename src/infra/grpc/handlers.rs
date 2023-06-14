@@ -1,3 +1,5 @@
+use std::vec;
+
 use anyhow::Result;
 
 use crate::{
@@ -34,11 +36,14 @@ pub async fn get_station_by_id(
         .collect();
     let mut station_line = line_service.find_by_station_id(data.station_cd).await?;
     let mut line_response: LineResponse = station_line.clone().into();
-    let mut station_response: StationResponse = data.into();
+    let mut station_response: StationResponse = data.clone().into();
     station_response.lines = lines_response;
     let line_symbols = line_service.get_line_symbols(&mut station_line);
     line_response.line_symbols = line_symbols;
     station_response.line = Some(line_response);
+
+    station_service.update_station_numbers(&mut station_response, &data, &station_line);
+
     Ok(SingleStationResponse {
         station: Some(station_response),
     })
@@ -93,6 +98,12 @@ pub async fn get_station_by_group_id(
 
                 station_response.line = Some(line_response);
                 station_response.lines = station_lines_response;
+
+                station_service.update_station_numbers(
+                    &mut station_response,
+                    &station,
+                    station_line,
+                );
 
                 SingleStationResponse {
                     station: Some(station_response),
@@ -158,6 +169,12 @@ pub async fn get_station_by_coordinates(
                 station_response.line = Some(line_response);
                 station_response.lines = station_lines_response;
 
+                station_service.update_station_numbers(
+                    &mut station_response,
+                    &station,
+                    station_line,
+                );
+
                 SingleStationResponse {
                     station: Some(station_response),
                 }
@@ -218,6 +235,12 @@ pub async fn get_stations_by_line_id(
                 station_response.line = Some(line_response);
                 station_response.lines = station_lines_response;
 
+                station_service.update_station_numbers(
+                    &mut station_response,
+                    &station,
+                    station_line,
+                );
+
                 SingleStationResponse {
                     station: Some(station_response),
                 }
@@ -276,6 +299,12 @@ pub async fn get_stations_by_station_name(
 
                 station_response.line = Some(line_response);
                 station_response.lines = station_lines_response;
+
+                station_service.update_station_numbers(
+                    &mut station_response,
+                    &station,
+                    station_line,
+                );
 
                 SingleStationResponse {
                     station: Some(station_response),
