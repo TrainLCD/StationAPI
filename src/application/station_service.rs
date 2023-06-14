@@ -46,7 +46,7 @@ impl<T: StationRepository> StationService<T> {
     }
     pub async fn find_by_id(&self, id: u32) -> Result<Station> {
         match self.station_repository.find_by_id(id).await {
-            Ok(value) => Ok(value.into()),
+            Ok(value) => Ok(value),
             Err(_) => Err(anyhow::anyhow!(
                 "Could not find the station. Provided ID: {:?}",
                 id
@@ -55,7 +55,7 @@ impl<T: StationRepository> StationService<T> {
     }
     pub async fn get_by_group_id(&self, group_id: u32) -> Result<Vec<Station>> {
         match self.station_repository.find_by_group_id(group_id).await {
-            Ok(value) => Ok(value.into_iter().map(|station| station.into()).collect()),
+            Ok(value) => Ok(value),
             Err(_) => Err(anyhow::anyhow!(
                 "Could not find the station. Provided Group ID: {:?}",
                 group_id
@@ -73,7 +73,7 @@ impl<T: StationRepository> StationService<T> {
             .find_by_coordinates(latitude, longitude, limit)
             .await
         {
-            Ok(value) => Ok(value.into_iter().map(|station| station.into()).collect()),
+            Ok(value) => Ok(value),
             Err(_) => Err(anyhow::anyhow!(
                 "Could not find the station. Provided Latitude: {:?}, Longitude: {:?}",
                 latitude,
@@ -83,7 +83,7 @@ impl<T: StationRepository> StationService<T> {
     }
     pub async fn get_stations_by_line_id(&self, line_id: u32) -> Result<Vec<Station>> {
         match self.station_repository.find_by_line_id(line_id).await {
-            Ok(value) => Ok(value.into_iter().map(|station| station.into()).collect()),
+            Ok(value) => Ok(value),
             Err(_) => Err(anyhow::anyhow!(
                 "Could not find the station. Provided Line ID: {:?}",
                 line_id
@@ -92,7 +92,7 @@ impl<T: StationRepository> StationService<T> {
     }
     pub async fn get_stations_by_name(&self, name: &str) -> Result<Vec<Station>> {
         match self.station_repository.find_by_name(name).await {
-            Ok(value) => Ok(value.into_iter().map(|station| station.into()).collect()),
+            Ok(value) => Ok(value),
             Err(_) => Err(anyhow::anyhow!(
                 "Could not find the station. Provided Station Name: {:?}",
                 name

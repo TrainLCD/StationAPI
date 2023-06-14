@@ -41,7 +41,7 @@ impl<T: LineRepository> LineService<T> {
     }
     pub async fn find_by_id(&self, id: u32) -> Result<Line> {
         match self.line_repository.find_by_id(id).await {
-            Ok(value) => Ok(value.into()),
+            Ok(value) => Ok(value),
             Err(_) => Err(anyhow::anyhow!(
                 "Could not find the line. Provided ID: {:?}",
                 id
@@ -54,7 +54,7 @@ impl<T: LineRepository> LineService<T> {
             .get_by_station_group_id(station_group_id)
             .await
         {
-            Ok(value) => Ok(value.into()),
+            Ok(value) => Ok(value),
             Err(_) => Err(anyhow::anyhow!(
                 "Could not find the line. Provided Group ID: {:?}",
                 station_group_id
@@ -64,7 +64,7 @@ impl<T: LineRepository> LineService<T> {
 
     pub async fn find_by_station_id(&self, station_id: u32) -> Result<Line> {
         match self.line_repository.find_by_station_id(station_id).await {
-            Ok(value) => Ok(value.into()),
+            Ok(value) => Ok(value),
             Err(_) => Err(anyhow::anyhow!(
                 "Could not find the line. Provided Station ID: {:?}",
                 station_id

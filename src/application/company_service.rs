@@ -37,7 +37,7 @@ impl<T: CompanyRepository> CompanyService<T> {
     }
     pub async fn find_by_id(&self, id: u32) -> Result<Company> {
         match self.company_repository.find_by_id(id).await {
-            Ok(value) => Ok(value.into()),
+            Ok(value) => Ok(value),
             Err(_) => Err(anyhow::anyhow!(
                 "Could not find the company. Provided ID: {:?}",
                 id
@@ -50,7 +50,7 @@ impl<T: CompanyRepository> CompanyService<T> {
             .get_by_line_ids(line_ids.clone())
             .await
         {
-            Ok(values) => Ok(values.into_iter().map(|value| value.into()).collect()),
+            Ok(values) => Ok(values),
             Err(_) => Err(anyhow::anyhow!(
                 "Could not find the companies. Provided Line IDs: {:?}",
                 line_ids

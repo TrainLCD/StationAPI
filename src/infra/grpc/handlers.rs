@@ -77,7 +77,7 @@ pub async fn get_station_by_group_id(
                     .find(|line| line.line_cd == station.line_cd)
                     .unwrap();
                 let station_lines_response: Vec<LineResponse> = station_lines
-                    .into_iter()
+                    .iter()
                     .map(|line| {
                         let mut line_response: LineResponse = line.clone().into();
                         let line_symbols = line_service.get_line_symbols(&mut line.clone());
@@ -92,7 +92,7 @@ pub async fn get_station_by_group_id(
                 line_response.line_symbols = line_symbols;
 
                 SingleStationResponse {
-                    station: Some(station_response.clone()),
+                    station: Some(station_response),
                     lines: station_lines_response,
                     line: Some(line_response),
                 }
@@ -139,7 +139,7 @@ pub async fn get_station_by_coordinates(
                     .find(|line| line.line_cd == station.line_cd)
                     .unwrap();
                 let station_lines_response: Vec<LineResponse> = station_lines
-                    .into_iter()
+                    .iter()
                     .map(|line| {
                         let mut line_response: LineResponse = line.clone().into();
                         let line_symbols = line_service.get_line_symbols(&mut line.clone());
@@ -155,7 +155,7 @@ pub async fn get_station_by_coordinates(
                 line_response.line_symbols = line_symbols;
 
                 SingleStationResponse {
-                    station: Some(station_response.clone()),
+                    station: Some(station_response),
                     lines: station_lines_response,
                     line: Some(line_response),
                 }
@@ -198,7 +198,7 @@ pub async fn get_stations_by_line_id(
                     .find(|line| line.line_cd == station.line_cd)
                     .unwrap();
                 let station_lines_response: Vec<LineResponse> = station_lines
-                    .into_iter()
+                    .iter()
                     .map(|line| {
                         let mut line_response: LineResponse = line.clone().into();
                         let line_symbols = line_service.get_line_symbols(&mut line.clone());
@@ -213,7 +213,7 @@ pub async fn get_stations_by_line_id(
                 line_response.line_symbols = line_symbols;
 
                 SingleStationResponse {
-                    station: Some(station_response.clone()),
+                    station: Some(station_response),
                     lines: station_lines_response,
                     line: Some(line_response),
                 }
@@ -256,7 +256,7 @@ pub async fn get_stations_by_station_name(
                     .find(|line| line.line_cd == station.line_cd)
                     .unwrap();
                 let station_lines_response: Vec<LineResponse> = station_lines
-                    .into_iter()
+                    .iter()
                     .map(|line| {
                         let mut line_response: LineResponse = line.clone().into();
                         let line_symbols = line_service.get_line_symbols(&mut line.clone());
@@ -271,7 +271,7 @@ pub async fn get_stations_by_station_name(
                 line_response.line_symbols = line_symbols;
 
                 SingleStationResponse {
-                    station: Some(station_response.clone()),
+                    station: Some(station_response),
                     lines: station_lines_response,
                     line: Some(line_response),
                 }
