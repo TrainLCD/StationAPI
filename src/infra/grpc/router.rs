@@ -115,17 +115,11 @@ pub async fn run() -> Result<()> {
         .allow_headers(tower_http::cors::Any)
         .allow_methods(tower_http::cors::Any);
 
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-    health_reporter
-        .set_serving::<StationApiServer<ApiContext>>()
-        .await;
-
     println!("StationAPI Server listening on {}", addr);
 
     Server::builder()
         .accept_http1(true)
         .layer(allow_cors)
-        .add_service(health_service)
         .add_service(tonic_web::enable(api_server))
         .serve(addr)
         .await?;
