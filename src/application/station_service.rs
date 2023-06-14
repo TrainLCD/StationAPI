@@ -24,8 +24,7 @@ impl From<Station> for StationResponse {
             name_chinese: value.station_name_zh,
             name_korean: value.station_name_ko,
             three_letter_code: value.three_letter_code,
-            lines: vec![],
-            line: None,
+            line_id: value.line_cd,
             prefecture_id: value.pref_cd,
             postal_code: value.post,
             address: value.address,
@@ -45,7 +44,7 @@ impl<T: StationRepository> StationService<T> {
     pub fn new(station_repository: T) -> Self {
         Self { station_repository }
     }
-    pub async fn find_by_id(&self, id: u32) -> Result<StationResponse> {
+    pub async fn find_by_id(&self, id: u32) -> Result<Station> {
         match self.station_repository.find_by_id(id).await {
             Ok(value) => Ok(value.into()),
             Err(_) => Err(anyhow::anyhow!(
@@ -54,7 +53,7 @@ impl<T: StationRepository> StationService<T> {
             )),
         }
     }
-    pub async fn get_by_group_id(&self, group_id: u32) -> Result<Vec<StationResponse>> {
+    pub async fn get_by_group_id(&self, group_id: u32) -> Result<Vec<Station>> {
         match self.station_repository.find_by_group_id(group_id).await {
             Ok(value) => Ok(value.into_iter().map(|station| station.into()).collect()),
             Err(_) => Err(anyhow::anyhow!(
@@ -68,7 +67,7 @@ impl<T: StationRepository> StationService<T> {
         latitude: f64,
         longitude: f64,
         limit: Option<i32>,
-    ) -> Result<Vec<StationResponse>> {
+    ) -> Result<Vec<Station>> {
         match self
             .station_repository
             .find_by_coordinates(latitude, longitude, limit)
@@ -82,7 +81,7 @@ impl<T: StationRepository> StationService<T> {
             )),
         }
     }
-    pub async fn get_stations_by_line_id(&self, line_id: u32) -> Result<Vec<StationResponse>> {
+    pub async fn get_stations_by_line_id(&self, line_id: u32) -> Result<Vec<Station>> {
         match self.station_repository.find_by_line_id(line_id).await {
             Ok(value) => Ok(value.into_iter().map(|station| station.into()).collect()),
             Err(_) => Err(anyhow::anyhow!(
@@ -91,7 +90,7 @@ impl<T: StationRepository> StationService<T> {
             )),
         }
     }
-    pub async fn get_stations_by_name(&self, name: &str) -> Result<Vec<StationResponse>> {
+    pub async fn get_stations_by_name(&self, name: &str) -> Result<Vec<Station>> {
         match self.station_repository.find_by_name(name).await {
             Ok(value) => Ok(value.into_iter().map(|station| station.into()).collect()),
             Err(_) => Err(anyhow::anyhow!(

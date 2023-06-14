@@ -1,1 +1,1 @@
-pub mod station_repository;
+pub mod station_repository_impl;

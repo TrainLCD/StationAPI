@@ -18,7 +18,7 @@ async fn test_find_by_id() -> Result<()> {
     let res = service.find_by_id(1111553).await?;
 
     let expected_station = get_station_fixture();
-    assert_eq!(res.id, expected_station.station_cd);
+    assert_eq!(res.station_cd, expected_station.station_cd);
 
     Ok(())
 }
@@ -35,7 +35,7 @@ async fn test_find_by_group_id() -> Result<()> {
 
     let expected_station = get_station_fixture();
     actual.iter().for_each(|station| {
-        assert_eq!(station.group_id, expected_station.station_g_cd);
+        assert_eq!(station.station_g_cd, expected_station.station_g_cd);
     });
 
     Ok(())
@@ -53,7 +53,7 @@ async fn test_find_by_line_id() -> Result<()> {
 
     let expected_station = get_station_fixture();
     actual.iter().for_each(|station| {
-        assert_eq!(station.id, expected_station.station_cd);
+        assert_eq!(station.station_cd, expected_station.station_cd);
     });
 
     Ok(())
@@ -71,7 +71,7 @@ async fn test_find_by_name() -> Result<()> {
 
     let expected_station = get_station_fixture();
     actual.iter().for_each(|station| {
-        assert_eq!(station.id, expected_station.station_cd);
+        assert_eq!(station.station_cd, expected_station.station_cd);
     });
 
     Ok(())
@@ -91,7 +91,7 @@ async fn test_find_by_coordinates() -> Result<()> {
 
     let expected_station = get_station_fixture();
     actual.iter().for_each(|station| {
-        assert_eq!(station.id, expected_station.station_cd);
+        assert_eq!(station.station_cd, expected_station.station_cd);
     });
 
     Ok(())
