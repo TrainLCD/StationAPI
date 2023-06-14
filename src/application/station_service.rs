@@ -1,8 +1,11 @@
 use anyhow::Result;
 
 use crate::{
-    domain::models::station::{station_model::Station, station_repository::StationRepository},
-    pb::StationResponse,
+    domain::models::{
+        line::line_model::Line,
+        station::{station_model::Station, station_repository::StationRepository},
+    },
+    pb::{StationNumber, StationResponse},
 };
 
 #[derive(Debug)]
@@ -45,6 +48,79 @@ impl<T: StationRepository> StationService<T> {
     pub fn new(station_repository: T) -> Self {
         Self { station_repository }
     }
+
+    pub fn update_station_numbers(
+        &self,
+        station_response_ref: &mut StationResponse,
+        station: &Station,
+        station_line: &Line,
+    ) {
+        let cloned_station_line = station_line.clone();
+        let line_symbols_raw: Vec<Option<String>> = vec![
+            cloned_station_line.line_symbol_primary,
+            cloned_station_line.line_symbol_secondary,
+            cloned_station_line.line_symbol_extra,
+        ];
+
+        let line_color = &station_line.line_color_c;
+        let line_symbol_colors_raw: Vec<Option<String>> = vec![
+            cloned_station_line
+                .line_symbol_primary_color
+                .or(Some(line_color.to_string())),
+            cloned_station_line
+                .line_symbol_secondary_color
+                .or(Some(line_color.to_string())),
+            cloned_station_line
+                .line_symbol_extra_color
+                .or(Some(line_color.to_string())),
+        ];
+
+        let cloned_station = station.clone();
+        let station_numbers_raw: Vec<Option<String>> = vec![
+            cloned_station.primary_station_number,
+            cloned_station.secondary_station_number,
+            cloned_station.extra_station_number,
+        ];
+
+        let line_symbols_shape_raw: Vec<String> = vec![
+            cloned_station_line
+                .line_symbol_primary_shape
+                .unwrap_or(String::from("")),
+            cloned_station_line
+                .line_symbol_secondary_shape
+                .unwrap_or(String::from("")),
+            cloned_station_line
+                .line_symbol_extra_shape
+                .unwrap_or(String::from("")),
+        ];
+
+        let station_numbers: Vec<Option<StationNumber>> = station_numbers_raw
+            .into_iter()
+            .filter(|num| !num.clone().unwrap_or(String::from("")).is_empty())
+            .enumerate()
+            .map(|(index, opt_num)| {
+                let num = opt_num.unwrap_or(String::from(""));
+
+                let mut station_number = StationNumber::default();
+                let line_symbol = &line_symbols_raw[index];
+                if let Some(sym) = line_symbol {
+                    station_number.line_symbol = sym.to_string();
+                    station_number.line_symbol_color = line_symbol_colors_raw[index]
+                        .as_ref()
+                        .unwrap_or(&String::from(""))
+                        .to_string();
+                    station_number.line_symbol_shape = line_symbols_shape_raw[index].to_string();
+                    station_number.station_number = format!("{}-{}", sym, num);
+                }
+                Some(station_number)
+            })
+            .collect();
+        station_response_ref.station_numbers = station_numbers
+            .into_iter()
+            .map(|num| num.unwrap())
+            .collect();
+    }
+
     pub async fn find_by_id(&self, id: u32) -> Result<Station> {
         match self.station_repository.find_by_id(id).await {
             Ok(value) => Ok(value),
