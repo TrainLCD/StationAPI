@@ -23,7 +23,7 @@ pub async fn get_station_by_id(
     let lines = line_service
         .get_by_station_group_id(data.station_g_cd)
         .await?;
-    let lines_response = lines
+    let lines_response: Vec<LineResponse> = lines
         .into_iter()
         .map(|mut line| {
             let mut line_response: LineResponse = line.clone().into();
@@ -34,13 +34,13 @@ pub async fn get_station_by_id(
         .collect();
     let mut station_line = line_service.find_by_station_id(data.station_cd).await?;
     let mut line_response: LineResponse = station_line.clone().into();
-    let station_response: StationResponse = data.into();
+    let mut station_response: StationResponse = data.into();
+    station_response.lines = lines_response;
     let line_symbols = line_service.get_line_symbols(&mut station_line);
     line_response.line_symbols = line_symbols;
+    station_response.line = Some(line_response);
     Ok(SingleStationResponse {
         station: Some(station_response),
-        line: Some(line_response),
-        lines: lines_response,
     })
 }
 pub async fn get_station_by_group_id(
@@ -66,11 +66,11 @@ pub async fn get_station_by_group_id(
     }
 
     Ok(MultipleStationResponse {
-        data: stations
+        stations: stations
             .into_iter()
             .enumerate()
             .map(|(index, station)| {
-                let station_response: StationResponse = station.clone().into();
+                let mut station_response: StationResponse = station.clone().into();
                 let station_lines = lines.get(index).unwrap();
                 let station_line = station_lines
                     .iter()
@@ -91,10 +91,11 @@ pub async fn get_station_by_group_id(
                 let line_symbols = line_service.get_line_symbols(&mut station_line.clone());
                 line_response.line_symbols = line_symbols;
 
+                station_response.line = Some(line_response);
+                station_response.lines = station_lines_response;
+
                 SingleStationResponse {
                     station: Some(station_response),
-                    lines: station_lines_response,
-                    line: Some(line_response),
                 }
             })
             .collect(),
@@ -128,11 +129,11 @@ pub async fn get_station_by_coordinates(
     }
 
     Ok(MultipleStationResponse {
-        data: stations
+        stations: stations
             .into_iter()
             .enumerate()
             .map(|(index, station)| {
-                let station_response: StationResponse = station.clone().into();
+                let mut station_response: StationResponse = station.clone().into();
                 let station_lines = lines.get(index).unwrap();
                 let station_line = station_lines
                     .iter()
@@ -154,10 +155,11 @@ pub async fn get_station_by_coordinates(
 
                 line_response.line_symbols = line_symbols;
 
+                station_response.line = Some(line_response);
+                station_response.lines = station_lines_response;
+
                 SingleStationResponse {
                     station: Some(station_response),
-                    lines: station_lines_response,
-                    line: Some(line_response),
                 }
             })
             .collect(),
@@ -187,16 +189,17 @@ pub async fn get_stations_by_line_id(
     }
 
     Ok(MultipleStationResponse {
-        data: stations
+        stations: stations
             .into_iter()
             .enumerate()
             .map(|(index, station)| {
-                let station_response: StationResponse = station.clone().into();
+                let mut station_response: StationResponse = station.clone().into();
                 let station_lines = lines.get(index).unwrap();
                 let station_line = station_lines
                     .iter()
                     .find(|line| line.line_cd == station.line_cd)
                     .unwrap();
+
                 let station_lines_response: Vec<LineResponse> = station_lines
                     .iter()
                     .map(|line| {
@@ -212,10 +215,11 @@ pub async fn get_stations_by_line_id(
                 let line_symbols = line_service.get_line_symbols(&mut station_line.clone());
                 line_response.line_symbols = line_symbols;
 
+                station_response.line = Some(line_response);
+                station_response.lines = station_lines_response;
+
                 SingleStationResponse {
                     station: Some(station_response),
-                    lines: station_lines_response,
-                    line: Some(line_response),
                 }
             })
             .collect(),
@@ -245,11 +249,11 @@ pub async fn get_stations_by_station_name(
     }
 
     Ok(MultipleStationResponse {
-        data: stations
+        stations: stations
             .into_iter()
             .enumerate()
             .map(|(index, station)| {
-                let station_response: StationResponse = station.clone().into();
+                let mut station_response: StationResponse = station.clone().into();
                 let station_lines = lines.get(index).unwrap();
                 let station_line = station_lines
                     .iter()
@@ -270,10 +274,11 @@ pub async fn get_stations_by_station_name(
                 let line_symbols = line_service.get_line_symbols(&mut station_line.clone());
                 line_response.line_symbols = line_symbols;
 
+                station_response.line = Some(line_response);
+                station_response.lines = station_lines_response;
+
                 SingleStationResponse {
                     station: Some(station_response),
-                    lines: station_lines_response,
-                    line: Some(line_response),
                 }
             })
             .collect(),
