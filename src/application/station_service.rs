@@ -107,12 +107,12 @@ impl<T: StationRepository> StationService<T> {
                 };
 
                 let opt_sym = &line_symbols_raw[index];
-                let station_number_string = match opt_sym {
-                    Some(sym) => format!("{}-{}", sym, num),
-                    None => num,
-                };
-
                 let sym = opt_sym.to_owned().unwrap_or(String::from(""));
+
+                let station_number_string = match sym.is_empty() {
+                    true => num,
+                    false => format!("{}-{}", sym, num),
+                };
 
                 let station_number = StationNumber {
                     line_symbol: sym,
