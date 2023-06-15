@@ -82,38 +82,48 @@ impl<T: StationRepository> StationService<T> {
             cloned_station.extra_station_number,
         ];
 
-        let line_symbols_shape_raw: Vec<String> = vec![
-            cloned_station_line
-                .line_symbol_primary_shape
-                .unwrap_or(String::from("")),
-            cloned_station_line
-                .line_symbol_secondary_shape
-                .unwrap_or(String::from("")),
-            cloned_station_line
-                .line_symbol_extra_shape
-                .unwrap_or(String::from("")),
+        let line_symbols_shape_raw: Vec<Option<String>> = vec![
+            cloned_station_line.line_symbol_primary_shape,
+            cloned_station_line.line_symbol_secondary_shape,
+            cloned_station_line.line_symbol_extra_shape,
         ];
 
         let station_numbers: Vec<Option<StationNumber>> = station_numbers_raw
             .into_iter()
-            .filter(|num| !num.clone().unwrap_or(String::from("")).is_empty())
             .enumerate()
             .map(|(index, opt_num)| {
-                let num = opt_num.unwrap_or(String::from(""));
-
-                let mut station_number = StationNumber::default();
-                let line_symbol = &line_symbols_raw[index];
-                if let Some(sym) = line_symbol {
-                    station_number.line_symbol = sym.to_string();
-                    station_number.line_symbol_color = line_symbol_colors_raw[index]
-                        .as_ref()
-                        .unwrap_or(&String::from(""))
-                        .to_string();
-                    station_number.line_symbol_shape = line_symbols_shape_raw[index].to_string();
-                    station_number.station_number = format!("{}-{}", sym, num);
+                let Some(num) = opt_num else {
+                    return None;
+                };
+                if num.is_empty() {
+                    return None;
                 }
+
+                let Some(sym_color) = &line_symbol_colors_raw[index] else {
+                    return None;
+                };
+                let Some(sym_shape) = &line_symbols_shape_raw[index] else {
+                    return None;
+                };
+
+                let opt_sym = &line_symbols_raw[index];
+                let station_number_string = match opt_sym {
+                    Some(sym) => format!("{}-{}", sym, num),
+                    None => num,
+                };
+
+                let sym = opt_sym.to_owned().unwrap_or(String::from(""));
+
+                let station_number = StationNumber {
+                    line_symbol: sym,
+                    line_symbol_color: sym_color.to_string(),
+                    line_symbol_shape: sym_shape.to_string(),
+                    station_number: station_number_string,
+                };
+
                 Some(station_number)
             })
+            .filter(|num| num.is_some())
             .collect();
         station_response_ref.station_numbers = station_numbers
             .into_iter()
