@@ -62,12 +62,16 @@ async fn test_find_by_line_id() -> Result<()> {
 #[tokio::test]
 async fn test_find_by_name() -> Result<()> {
     let mut station_repo = MockStationRepository::new();
-    let actual_station = get_station_fixture();
+    let station_fixture = get_station_fixture();
     station_repo
         .expect_find_by_name()
-        .return_once(move |_| Box::pin(future::ready(Ok(vec![actual_station]))));
+        .return_once(move |_, limit| {
+            let mut fixture_vec = Vec::with_capacity(limit.unwrap().try_into().unwrap());
+            fixture_vec.fill(station_fixture);
+            Box::pin(future::ready(Ok(fixture_vec)))
+        });
     let service: StationService<MockStationRepository> = StationService::new(station_repo);
-    let actual = service.get_stations_by_name("稚内").await?;
+    let actual = service.get_stations_by_name("稚内", &Some(1)).await?;
 
     let expected_station = get_station_fixture();
     actual.iter().for_each(|station| {
@@ -86,7 +90,7 @@ async fn test_find_by_coordinates() -> Result<()> {
         .return_once(move |_, _, _| Box::pin(future::ready(Ok(vec![actual_station]))));
     let service: StationService<MockStationRepository> = StationService::new(station_repo);
     let actual = service
-        .get_station_by_coordinates(0.0, 0.0, Some(1))
+        .get_station_by_coordinates(0.0, 0.0, &Some(1))
         .await?;
 
     let expected_station = get_station_fixture();

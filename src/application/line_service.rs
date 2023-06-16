@@ -31,6 +31,7 @@ impl From<Line> for LineResponse {
             company_id: value.company_cd,
             line_symbols: vec![],
             status: value.e_status as i32,
+            station: None,
         }
     }
 }

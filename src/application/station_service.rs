@@ -153,7 +153,7 @@ impl<T: StationRepository> StationService<T> {
         &self,
         latitude: f64,
         longitude: f64,
-        limit: Option<i32>,
+        limit: &Option<u32>,
     ) -> Result<Vec<Station>> {
         match self
             .station_repository
@@ -177,8 +177,12 @@ impl<T: StationRepository> StationService<T> {
             )),
         }
     }
-    pub async fn get_stations_by_name(&self, name: &str) -> Result<Vec<Station>> {
-        match self.station_repository.find_by_name(name).await {
+    pub async fn get_stations_by_name(
+        &self,
+        name: &str,
+        limit: &Option<u32>,
+    ) -> Result<Vec<Station>> {
+        match self.station_repository.find_by_name(name, limit).await {
             Ok(value) => Ok(value),
             Err(_) => Err(anyhow::anyhow!(
                 "Could not find the station. Provided Station Name: {:?}",
