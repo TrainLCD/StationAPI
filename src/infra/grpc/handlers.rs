@@ -40,7 +40,7 @@ pub async fn get_station_by_id(
     station_response.lines = lines_response;
     let line_symbols = line_service.get_line_symbols(&mut station_line);
     line_response.line_symbols = line_symbols;
-    station_response.line = Some(line_response);
+    station_response.line = Some(Box::new(line_response));
 
     station_service.update_station_numbers(&mut station_response, &data, &station_line);
 
@@ -96,7 +96,7 @@ pub async fn get_station_by_group_id(
                 let line_symbols = line_service.get_line_symbols(&mut station_line.clone());
                 line_response.line_symbols = line_symbols;
 
-                station_response.line = Some(line_response);
+                station_response.line = Some(Box::new(line_response));
                 station_response.lines = station_lines_response;
 
                 station_service.update_station_numbers(
@@ -122,7 +122,7 @@ pub async fn get_station_by_coordinates(
 
     let latitude = request.get_ref().latitude;
     let longitude = request.get_ref().longitude;
-    let limit = request.get_ref().limit;
+    let limit = &request.get_ref().limit;
     let stations = station_service
         .get_station_by_coordinates(latitude, longitude, limit)
         .await?;
@@ -166,7 +166,7 @@ pub async fn get_station_by_coordinates(
 
                 line_response.line_symbols = line_symbols;
 
-                station_response.line = Some(line_response);
+                station_response.line = Some(Box::new(line_response));
                 station_response.lines = station_lines_response;
 
                 station_service.update_station_numbers(
@@ -232,7 +232,7 @@ pub async fn get_stations_by_line_id(
                 let line_symbols = line_service.get_line_symbols(&mut station_line.clone());
                 line_response.line_symbols = line_symbols;
 
-                station_response.line = Some(line_response);
+                station_response.line = Some(Box::new(line_response));
                 station_response.lines = station_lines_response;
 
                 station_service.update_station_numbers(
@@ -257,7 +257,10 @@ pub async fn get_stations_by_station_name(
     let line_service = LineService::new(ctx.line_repository());
 
     let station_name = &request.get_ref().station_name;
-    let stations = station_service.get_stations_by_name(station_name).await?;
+    let limit = &request.get_ref().limit;
+    let stations = station_service
+        .get_stations_by_name(station_name, limit)
+        .await?;
     let station_group_ids: Vec<u32> = stations
         .iter()
         .map(|station| station.station_g_cd)
@@ -297,7 +300,7 @@ pub async fn get_stations_by_station_name(
                 let line_symbols = line_service.get_line_symbols(&mut station_line.clone());
                 line_response.line_symbols = line_symbols;
 
-                station_response.line = Some(line_response);
+                station_response.line = Some(Box::new(line_response));
                 station_response.lines = station_lines_response;
 
                 station_service.update_station_numbers(

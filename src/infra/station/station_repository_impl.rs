@@ -119,6 +119,8 @@ pub struct StationRepositoryImpl {
     pub pool: Box<Pool<MySql>>,
 }
 
+const MAXIMUM_COLUMN_COUNT: u32 = 100;
+
 #[async_trait::async_trait]
 impl StationRepository for StationRepositoryImpl {
     async fn find_by_id(&self, id: u32) -> Result<Station> {
@@ -149,7 +151,7 @@ impl StationRepository for StationRepositoryImpl {
         }
     }
 
-    async fn find_by_name(&self, name: &str) -> Result<Vec<Station>> {
+    async fn find_by_name(&self, name: &str, limit: &Option<u32>) -> Result<Vec<Station>> {
         let query_str = format!(
             "SELECT * FROM stations
             WHERE (
@@ -160,8 +162,15 @@ impl StationRepository for StationRepositoryImpl {
                 OR station_name_ko LIKE '%{}%'
         )
             AND e_status = 0
-            ORDER BY e_sort, station_cd",
-            name, name, name, name, name
+            ORDER BY e_sort, station_cd
+            LIMIT {}
+        ",
+            name,
+            name,
+            name,
+            name,
+            name,
+            limit.unwrap_or(MAXIMUM_COLUMN_COUNT)
         );
         let result = sqlx::query_as::<_, StationEntity>(&query_str)
             .fetch_all(self.pool.as_ref())
@@ -176,7 +185,7 @@ impl StationRepository for StationRepositoryImpl {
         &self,
         latitude: f64,
         longitude: f64,
-        limit: Option<i32>,
+        limit: &Option<u32>,
     ) -> Result<Vec<Station>> {
         let result = sqlx::query_as!(
             StationWithDistanceEntity,
@@ -207,7 +216,7 @@ impl StationRepository for StationRepositoryImpl {
             latitude,
             longitude,
             latitude,
-            limit.or(Some(1))
+            limit.unwrap_or(MAXIMUM_COLUMN_COUNT)
         )
         .fetch_all(self.pool.as_ref())
         .await;

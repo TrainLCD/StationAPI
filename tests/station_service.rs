@@ -67,7 +67,7 @@ async fn test_find_by_name() -> Result<()> {
         .expect_find_by_name()
         .return_once(move |_| Box::pin(future::ready(Ok(vec![actual_station]))));
     let service: StationService<MockStationRepository> = StationService::new(station_repo);
-    let actual = service.get_stations_by_name("稚内").await?;
+    let actual = service.get_stations_by_name("稚内", Some(1)).await?;
 
     let expected_station = get_station_fixture();
     actual.iter().for_each(|station| {
