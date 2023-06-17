@@ -4,8 +4,11 @@ use anyhow::Result;
 use bigdecimal::Zero;
 
 use crate::{
-    domain::models::line::{line_model::Line, line_repository::LineRepository},
-    pb::{LineResponse, LineSymbol},
+    domain::models::{
+        line::{line_model::Line, line_repository::LineRepository},
+        station::station_model::Station,
+    },
+    pb::{LineResponse, LineSymbol, SingleStationResponse, StationResponse},
 };
 
 #[derive(Debug)]
@@ -139,5 +142,64 @@ impl<T: LineRepository> LineService<T> {
             line_symbols.push(line_symbol);
         }
         line_symbols
+    }
+
+    pub async fn get_stations_lines(&self, stations: &[Station]) -> Result<Vec<Vec<Line>>> {
+        let station_group_ids: Vec<u32> = stations
+            .iter()
+            .map(|station| station.station_g_cd)
+            .collect();
+
+        let mut stations_lines = vec![];
+        for station_group_id in station_group_ids {
+            let line = self.get_by_station_group_id(station_group_id).await?;
+            stations_lines.push(line);
+        }
+
+        Ok(stations_lines)
+    }
+
+    pub async fn get_response_stations_from_stations(
+        &self,
+        stations: &[Station],
+        stations_lines: &[Vec<Line>],
+    ) -> Result<Vec<SingleStationResponse>> {
+        let response_stations: Vec<SingleStationResponse> = stations
+            .iter()
+            .enumerate()
+            .map(|(index, station)| {
+                let mut station_response: StationResponse = station.clone().into();
+                let station_lines = stations_lines.get(index).unwrap();
+                let station_line = station_lines
+                    .iter()
+                    .find(|line| line.line_cd == station.line_cd)
+                    .unwrap();
+
+                let station_lines_response: Vec<LineResponse> = station_lines
+                    .iter()
+                    .map(|line| {
+                        let mut line_response: LineResponse = line.clone().into();
+                        let line_symbols = self.get_line_symbols(&mut line.clone());
+                        line_response.line_symbols = line_symbols;
+                        line_response.station = Some(Box::new(station_response.clone()));
+                        line_response
+                    })
+                    .collect();
+
+                let mut line_response: LineResponse = station_line.clone().into();
+
+                let line_symbols = self.get_line_symbols(&mut station_line.clone());
+                line_response.line_symbols = line_symbols;
+
+                station_response.line = Some(Box::new(line_response));
+                station_response.lines = station_lines_response;
+
+                SingleStationResponse {
+                    station: Some(station_response),
+                }
+            })
+            .collect();
+
+        Ok(response_stations)
     }
 }

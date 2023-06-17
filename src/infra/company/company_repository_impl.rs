@@ -61,21 +61,19 @@ impl CompanyRepository for CompanyRepositoryImpl {
 
     async fn get_by_line_ids(&self, line_ids: Vec<u32>) -> Result<Vec<Company>> {
         let params = format!("?{}", ", ?".repeat(line_ids.len() - 1));
-        let query_str = format!(
-            "SELECT c.*, l.line_cd
-        FROM `lines` as l, `companies` as c
-        WHERE l.line_cd IN ({})
-        AND l.e_status = 0
-        AND c.company_cd = l.company_cd",
+
+        let result = sqlx::query_as!(
+            CompanyEntity,
+            "SELECT c.*
+            FROM `lines` as l, `companies` as c
+            WHERE l.line_cd IN (?)
+            AND l.e_status = 0
+            AND c.company_cd = l.company_cd",
             params
-        );
-        let mut query = sqlx::query_as::<_, CompanyEntity>(&query_str);
+        )
+        .fetch_all(self.pool.as_ref())
+        .await;
 
-        for id in line_ids {
-            query = query.bind(id);
-        }
-
-        let result = query.fetch_all(self.pool.as_ref()).await;
         match result {
             Ok(companies) => Ok(companies
                 .into_iter()

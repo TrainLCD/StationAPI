@@ -137,7 +137,7 @@ impl StationRepository for StationRepositoryImpl {
         }
     }
 
-    async fn find_by_group_id(&self, group_id: u32) -> Result<Vec<Station>> {
+    async fn get_by_group_id(&self, group_id: u32) -> Result<Vec<Station>> {
         let result = sqlx::query_as!(
             StationEntity,
             "SELECT * FROM stations WHERE station_g_cd = ?",
@@ -151,37 +151,38 @@ impl StationRepository for StationRepositoryImpl {
         }
     }
 
-    async fn find_by_name(&self, name: &str, limit: &Option<u32>) -> Result<Vec<Station>> {
-        let query_str = format!(
-            "SELECT * FROM stations
+    async fn get_by_name(&self, name: &str, limit: &Option<u32>) -> Result<Vec<Station>> {
+        let name_with_quote = format!("%{}%", name);
+        let result = sqlx::query_as!(
+            StationEntity,
+            r#"SELECT * FROM stations
             WHERE (
-                station_name LIKE '%{}%'
-                OR station_name_r LIKE '%{}%'
-                OR station_name_k LIKE '%{}%'
-                OR station_name_zh LIKE '%{}%'
-                OR station_name_ko LIKE '%{}%'
+                station_name LIKE ?
+                OR station_name_r LIKE ?
+                OR station_name_k LIKE ?
+                OR station_name_zh LIKE ?
+                OR station_name_ko LIKE ?
         )
             AND e_status = 0
             ORDER BY e_sort, station_cd
-            LIMIT {}
-        ",
-            name,
-            name,
-            name,
-            name,
-            name,
-            limit.unwrap_or(MAXIMUM_COLUMN_COUNT)
-        );
-        let result = sqlx::query_as::<_, StationEntity>(&query_str)
-            .fetch_all(self.pool.as_ref())
-            .await;
+            LIMIT ? "#,
+            name_with_quote,
+            name_with_quote,
+            name_with_quote,
+            name_with_quote,
+            name_with_quote,
+            limit.unwrap_or(MAXIMUM_COLUMN_COUNT).to_string()
+        )
+        .fetch_all(self.pool.as_ref())
+        .await;
+
         match result {
             Ok(stations) => Ok(stations.into_iter().map(|station| station.into()).collect()),
             Err(err) => Err(err.into()),
         }
     }
 
-    async fn find_by_coordinates(
+    async fn get_by_coordinates(
         &self,
         latitude: f64,
         longitude: f64,
@@ -226,7 +227,7 @@ impl StationRepository for StationRepositoryImpl {
         }
     }
 
-    async fn find_by_line_id(&self, line_id: u32) -> Result<Vec<Station>> {
+    async fn get_by_line_id(&self, line_id: u32) -> Result<Vec<Station>> {
         let result = sqlx::query_as!(
             StationEntity,
             "SELECT *

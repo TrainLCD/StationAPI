@@ -28,7 +28,7 @@ async fn test_find_by_group_id() -> Result<()> {
     let mut station_repo = MockStationRepository::new();
     let actual_station = get_station_fixture();
     station_repo
-        .expect_find_by_group_id()
+        .expect_get_by_group_id()
         .return_once(move |_| Box::pin(future::ready(Ok(vec![actual_station]))));
     let service: StationService<MockStationRepository> = StationService::new(station_repo);
     let actual = service.get_by_group_id(1111553).await?;
@@ -46,7 +46,7 @@ async fn test_find_by_line_id() -> Result<()> {
     let mut station_repo = MockStationRepository::new();
     let actual_station = get_station_fixture();
     station_repo
-        .expect_find_by_line_id()
+        .expect_get_by_line_id()
         .return_once(move |_| Box::pin(future::ready(Ok(vec![actual_station]))));
     let service: StationService<MockStationRepository> = StationService::new(station_repo);
     let actual = service.get_stations_by_line_id(11115).await?;
@@ -64,7 +64,7 @@ async fn test_find_by_name() -> Result<()> {
     let mut station_repo = MockStationRepository::new();
     let station_fixture = get_station_fixture();
     station_repo
-        .expect_find_by_name()
+        .expect_get_by_name()
         .return_once(move |_, limit| {
             let mut fixture_vec = Vec::with_capacity(limit.unwrap().try_into().unwrap());
             fixture_vec.fill(station_fixture);
@@ -86,7 +86,7 @@ async fn test_find_by_coordinates() -> Result<()> {
     let mut station_repo = MockStationRepository::new();
     let actual_station = get_station_fixture();
     station_repo
-        .expect_find_by_coordinates()
+        .expect_get_by_coordinates()
         .return_once(move |_, _, _| Box::pin(future::ready(Ok(vec![actual_station]))));
     let service: StationService<MockStationRepository> = StationService::new(station_repo);
     let actual = service

@@ -7,10 +7,10 @@ use super::station_model::Station;
 #[automock]
 pub trait StationRepository {
     async fn find_by_id(&self, id: u32) -> Result<Station>;
-    async fn find_by_group_id(&self, group_id: u32) -> Result<Vec<Station>>;
-    async fn find_by_line_id(&self, line_id: u32) -> Result<Vec<Station>>;
-    async fn find_by_name(&self, name: &str, limit: &Option<u32>) -> Result<Vec<Station>>;
-    async fn find_by_coordinates(
+    async fn get_by_group_id(&self, group_id: u32) -> Result<Vec<Station>>;
+    async fn get_by_line_id(&self, line_id: u32) -> Result<Vec<Station>>;
+    async fn get_by_name(&self, name: &str, limit: &Option<u32>) -> Result<Vec<Station>>;
+    async fn get_by_coordinates(
         &self,
         latitude: f64,
         longitude: f64,

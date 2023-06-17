@@ -1,5 +1,3 @@
-use std::vec;
-
 use anyhow::Result;
 
 use crate::{
@@ -42,7 +40,7 @@ pub async fn get_station_by_id(
     line_response.line_symbols = line_symbols;
     station_response.line = Some(Box::new(line_response));
 
-    station_service.update_station_numbers(&mut station_response, &data, &station_line);
+    station_response.station_numbers = station_service.get_station_numbers(&data, &station_line);
 
     Ok(SingleStationResponse {
         station: Some(station_response),
@@ -56,60 +54,15 @@ pub async fn get_station_by_group_id(
     let line_service = LineService::new(ctx.line_repository());
 
     let group_id = request.get_ref().group_id;
-    let stations = station_service.get_by_group_id(group_id).await?;
-    let station_group_ids: Vec<u32> = stations
-        .iter()
-        .map(|station| station.station_g_cd)
-        .collect();
+    let stations = &station_service.get_by_group_id(group_id).await?;
 
-    let mut lines = vec![];
-    for station_group_id in station_group_ids {
-        let line = line_service
-            .get_by_station_group_id(station_group_id)
-            .await?;
-        lines.push(line);
-    }
+    let stations_lines = &line_service.get_stations_lines(stations).await?;
+    let response_stations = line_service
+        .get_response_stations_from_stations(stations, stations_lines)
+        .await?;
 
     Ok(MultipleStationResponse {
-        stations: stations
-            .into_iter()
-            .enumerate()
-            .map(|(index, station)| {
-                let mut station_response: StationResponse = station.clone().into();
-                let station_lines = lines.get(index).unwrap();
-                let station_line = station_lines
-                    .iter()
-                    .find(|line| line.line_cd == station.line_cd)
-                    .unwrap();
-                let station_lines_response: Vec<LineResponse> = station_lines
-                    .iter()
-                    .map(|line| {
-                        let mut line_response: LineResponse = line.clone().into();
-                        let line_symbols = line_service.get_line_symbols(&mut line.clone());
-                        line_response.line_symbols = line_symbols;
-                        line_response
-                    })
-                    .collect();
-
-                let mut line_response: LineResponse = station_line.clone().into();
-
-                let line_symbols = line_service.get_line_symbols(&mut station_line.clone());
-                line_response.line_symbols = line_symbols;
-
-                station_response.line = Some(Box::new(line_response));
-                station_response.lines = station_lines_response;
-
-                station_service.update_station_numbers(
-                    &mut station_response,
-                    &station,
-                    station_line,
-                );
-
-                SingleStationResponse {
-                    station: Some(station_response),
-                }
-            })
-            .collect(),
+        stations: response_stations.to_vec(),
     })
 }
 
@@ -123,63 +76,17 @@ pub async fn get_station_by_coordinates(
     let latitude = request.get_ref().latitude;
     let longitude = request.get_ref().longitude;
     let limit = &request.get_ref().limit;
-    let stations = station_service
+    let stations = &station_service
         .get_station_by_coordinates(latitude, longitude, limit)
         .await?;
-    let station_group_ids: Vec<u32> = stations
-        .iter()
-        .map(|station| station.station_g_cd)
-        .collect();
 
-    let mut lines = vec![];
-    for station_group_id in station_group_ids {
-        let line = line_service
-            .get_by_station_group_id(station_group_id)
-            .await?;
-        lines.push(line);
-    }
+    let stations_lines = &line_service.get_stations_lines(stations).await?;
+    let response_stations = &line_service
+        .get_response_stations_from_stations(stations, stations_lines)
+        .await?;
 
     Ok(MultipleStationResponse {
-        stations: stations
-            .into_iter()
-            .enumerate()
-            .map(|(index, station)| {
-                let mut station_response: StationResponse = station.clone().into();
-                let station_lines = lines.get(index).unwrap();
-                let station_line = station_lines
-                    .iter()
-                    .find(|line| line.line_cd == station.line_cd)
-                    .unwrap();
-                let station_lines_response: Vec<LineResponse> = station_lines
-                    .iter()
-                    .map(|line| {
-                        let mut line_response: LineResponse = line.clone().into();
-                        let line_symbols = line_service.get_line_symbols(&mut line.clone());
-                        line_response.line_symbols = line_symbols;
-                        line_response
-                    })
-                    .collect();
-
-                let mut line_response: LineResponse = station_line.clone().into();
-
-                let line_symbols = line_service.get_line_symbols(&mut station_line.clone());
-
-                line_response.line_symbols = line_symbols;
-
-                station_response.line = Some(Box::new(line_response));
-                station_response.lines = station_lines_response;
-
-                station_service.update_station_numbers(
-                    &mut station_response,
-                    &station,
-                    station_line,
-                );
-
-                SingleStationResponse {
-                    station: Some(station_response),
-                }
-            })
-            .collect(),
+        stations: response_stations.to_vec(),
     })
 }
 
@@ -191,61 +98,15 @@ pub async fn get_stations_by_line_id(
     let line_service = LineService::new(ctx.line_repository());
 
     let line_id: u32 = request.get_ref().line_id;
-    let stations = station_service.get_stations_by_line_id(line_id).await?;
-    let station_group_ids: Vec<u32> = stations
-        .iter()
-        .map(|station| station.station_g_cd)
-        .collect();
+    let stations = &station_service.get_stations_by_line_id(line_id).await?;
 
-    let mut lines = vec![];
-    for station_group_id in station_group_ids {
-        let line = line_service
-            .get_by_station_group_id(station_group_id)
-            .await?;
-        lines.push(line);
-    }
+    let stations_lines = &line_service.get_stations_lines(stations).await?;
+    let response_stations = &line_service
+        .get_response_stations_from_stations(stations, stations_lines)
+        .await?;
 
     Ok(MultipleStationResponse {
-        stations: stations
-            .into_iter()
-            .enumerate()
-            .map(|(index, station)| {
-                let mut station_response: StationResponse = station.clone().into();
-                let station_lines = lines.get(index).unwrap();
-                let station_line = station_lines
-                    .iter()
-                    .find(|line| line.line_cd == station.line_cd)
-                    .unwrap();
-
-                let station_lines_response: Vec<LineResponse> = station_lines
-                    .iter()
-                    .map(|line| {
-                        let mut line_response: LineResponse = line.clone().into();
-                        let line_symbols = line_service.get_line_symbols(&mut line.clone());
-                        line_response.line_symbols = line_symbols;
-                        line_response
-                    })
-                    .collect();
-
-                let mut line_response: LineResponse = station_line.clone().into();
-
-                let line_symbols = line_service.get_line_symbols(&mut station_line.clone());
-                line_response.line_symbols = line_symbols;
-
-                station_response.line = Some(Box::new(line_response));
-                station_response.lines = station_lines_response;
-
-                station_service.update_station_numbers(
-                    &mut station_response,
-                    &station,
-                    station_line,
-                );
-
-                SingleStationResponse {
-                    station: Some(station_response),
-                }
-            })
-            .collect(),
+        stations: response_stations.to_vec(),
     })
 }
 
@@ -258,61 +119,16 @@ pub async fn get_stations_by_station_name(
 
     let station_name = &request.get_ref().station_name;
     let limit = &request.get_ref().limit;
-    let stations = station_service
+    let stations = &station_service
         .get_stations_by_name(station_name, limit)
         .await?;
-    let station_group_ids: Vec<u32> = stations
-        .iter()
-        .map(|station| station.station_g_cd)
-        .collect();
 
-    let mut lines = vec![];
-    for station_group_id in station_group_ids {
-        let line = line_service
-            .get_by_station_group_id(station_group_id)
-            .await?;
-        lines.push(line);
-    }
+    let stations_lines = &line_service.get_stations_lines(stations).await?;
+    let response_stations = &line_service
+        .get_response_stations_from_stations(stations, stations_lines)
+        .await?;
 
     Ok(MultipleStationResponse {
-        stations: stations
-            .into_iter()
-            .enumerate()
-            .map(|(index, station)| {
-                let mut station_response: StationResponse = station.clone().into();
-                let station_lines = lines.get(index).unwrap();
-                let station_line = station_lines
-                    .iter()
-                    .find(|line| line.line_cd == station.line_cd)
-                    .unwrap();
-                let station_lines_response: Vec<LineResponse> = station_lines
-                    .iter()
-                    .map(|line| {
-                        let mut line_response: LineResponse = line.clone().into();
-                        let line_symbols = line_service.get_line_symbols(&mut line.clone());
-                        line_response.line_symbols = line_symbols;
-                        line_response
-                    })
-                    .collect();
-
-                let mut line_response: LineResponse = station_line.clone().into();
-
-                let line_symbols = line_service.get_line_symbols(&mut station_line.clone());
-                line_response.line_symbols = line_symbols;
-
-                station_response.line = Some(Box::new(line_response));
-                station_response.lines = station_lines_response;
-
-                station_service.update_station_numbers(
-                    &mut station_response,
-                    &station,
-                    station_line,
-                );
-
-                SingleStationResponse {
-                    station: Some(station_response),
-                }
-            })
-            .collect(),
+        stations: response_stations.to_vec(),
     })
 }

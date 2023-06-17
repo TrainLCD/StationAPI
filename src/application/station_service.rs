@@ -49,12 +49,11 @@ impl<T: StationRepository> StationService<T> {
         Self { station_repository }
     }
 
-    pub fn update_station_numbers(
+    pub fn get_station_numbers(
         &self,
-        station_response_ref: &mut StationResponse,
         station: &Station,
         station_line: &Line,
-    ) {
+    ) -> Vec<StationNumber> {
         let cloned_station_line = station_line.clone();
         let line_symbols_raw: Vec<Option<String>> = vec![
             cloned_station_line.line_symbol_primary,
@@ -125,10 +124,10 @@ impl<T: StationRepository> StationService<T> {
             })
             .filter(|num| num.is_some())
             .collect();
-        station_response_ref.station_numbers = station_numbers
+        station_numbers
             .into_iter()
             .map(|num| num.unwrap())
-            .collect();
+            .collect()
     }
 
     pub async fn find_by_id(&self, id: u32) -> Result<Station> {
@@ -141,7 +140,7 @@ impl<T: StationRepository> StationService<T> {
         }
     }
     pub async fn get_by_group_id(&self, group_id: u32) -> Result<Vec<Station>> {
-        match self.station_repository.find_by_group_id(group_id).await {
+        match self.station_repository.get_by_group_id(group_id).await {
             Ok(value) => Ok(value),
             Err(_) => Err(anyhow::anyhow!(
                 "Could not find the station. Provided Group ID: {:?}",
@@ -157,7 +156,7 @@ impl<T: StationRepository> StationService<T> {
     ) -> Result<Vec<Station>> {
         match self
             .station_repository
-            .find_by_coordinates(latitude, longitude, limit)
+            .get_by_coordinates(latitude, longitude, limit)
             .await
         {
             Ok(value) => Ok(value),
@@ -169,7 +168,7 @@ impl<T: StationRepository> StationService<T> {
         }
     }
     pub async fn get_stations_by_line_id(&self, line_id: u32) -> Result<Vec<Station>> {
-        match self.station_repository.find_by_line_id(line_id).await {
+        match self.station_repository.get_by_line_id(line_id).await {
             Ok(value) => Ok(value),
             Err(_) => Err(anyhow::anyhow!(
                 "Could not find the station. Provided Line ID: {:?}",
@@ -182,12 +181,9 @@ impl<T: StationRepository> StationService<T> {
         name: &str,
         limit: &Option<u32>,
     ) -> Result<Vec<Station>> {
-        match self.station_repository.find_by_name(name, limit).await {
+        match self.station_repository.get_by_name(name, limit).await {
             Ok(value) => Ok(value),
-            Err(_) => Err(anyhow::anyhow!(
-                "Could not find the station. Provided Station Name: {:?}",
-                name
-            )),
+            Err(err) => Err(anyhow::anyhow!("Could not find the station: {:?}", err)),
         }
     }
 }
