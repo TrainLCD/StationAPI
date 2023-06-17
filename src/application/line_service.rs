@@ -2,21 +2,25 @@ use std::vec;
 
 use anyhow::Result;
 use bigdecimal::Zero;
+use futures::stream;
 
 use crate::{
     domain::models::{
         line::{line_model::Line, line_repository::LineRepository},
-        station::station_model::Station,
+        station::{station_model::Station, station_repository::StationRepository},
     },
     pb::{LineResponse, LineSymbol, SingleStationResponse, StationResponse},
 };
+use futures::stream::StreamExt;
 
 #[derive(Debug)]
-pub struct LineService<T>
+pub struct LineService<LR, SR>
 where
-    T: LineRepository,
+    LR: LineRepository,
+    SR: StationRepository,
 {
-    line_repository: T,
+    line_repository: LR,
+    station_repository: SR,
 }
 
 impl From<Line> for LineResponse {
@@ -39,9 +43,12 @@ impl From<Line> for LineResponse {
     }
 }
 
-impl<T: LineRepository> LineService<T> {
-    pub fn new(line_repository: T) -> Self {
-        Self { line_repository }
+impl<LR: LineRepository, SR: StationRepository> LineService<LR, SR> {
+    pub fn new(line_repository: LR, station_repository: SR) -> Self {
+        Self {
+            line_repository,
+            station_repository,
+        }
     }
     pub async fn find_by_id(&self, id: u32) -> Result<Line> {
         match self.line_repository.find_by_id(id).await {
@@ -76,7 +83,7 @@ impl<T: LineRepository> LineService<T> {
         }
     }
 
-    pub fn get_line_symbols(&self, line: &mut Line) -> Vec<LineSymbol> {
+    pub fn get_line_symbols(&self, line: Line) -> Vec<LineSymbol> {
         let mut line_symbols = vec![];
 
         if !line
@@ -134,10 +141,7 @@ impl<T: LineRepository> LineService<T> {
                     .clone()
                     .line_symbol_extra_color
                     .unwrap_or("".to_string()),
-                shape: line
-                    .clone()
-                    .line_symbol_extra_shape
-                    .unwrap_or("".to_string()),
+                shape: line.line_symbol_extra_shape.unwrap_or("".to_string()),
             };
             line_symbols.push(line_symbol);
         }
@@ -152,11 +156,59 @@ impl<T: LineRepository> LineService<T> {
 
         let mut stations_lines = vec![];
         for station_group_id in station_group_ids {
-            let line = self.get_by_station_group_id(station_group_id).await?;
-            stations_lines.push(line);
+            let lines = self.get_by_station_group_id(station_group_id).await?;
+            stations_lines.push(lines);
         }
 
         Ok(stations_lines)
+    }
+
+    async fn get_stations_by_group_id(&self, group_id: u32) -> Result<Vec<Station>> {
+        let stations = self.station_repository.get_by_group_id(group_id).await?;
+        Ok(stations)
+    }
+
+    async fn process_stations_async(
+        &self,
+        station: &Station,
+        station_lines: &[Line],
+    ) -> SingleStationResponse {
+        let mut station_response: StationResponse = station.clone().into();
+
+        let line = self.find_by_station_id(station.station_cd).await.unwrap();
+        let mut line_response: LineResponse = line.clone().into();
+        let line_symbols = self.get_line_symbols(line);
+        line_response.line_symbols = line_symbols;
+        station_response.line = Some(Box::new(line_response));
+
+        let same_group_stations: Vec<Station> = self
+            .get_stations_by_group_id(station.station_g_cd)
+            .await
+            .unwrap();
+
+        let station_lines_response = station_lines
+            .iter()
+            .map(|station_line| {
+                let line_symbols = self.get_line_symbols(station_line.clone());
+                let mut resp: LineResponse = station_line.clone().into();
+                resp.line_symbols = line_symbols;
+
+                let transfer_station_response: StationResponse = same_group_stations
+                    .iter()
+                    .find(|&group_station| group_station.line_cd == station_line.line_cd)
+                    .unwrap()
+                    .clone()
+                    .into();
+                resp.station = Some(Box::new(transfer_station_response));
+
+                resp
+            })
+            .collect::<Vec<LineResponse>>();
+        station_response.lines = station_lines_response;
+
+        SingleStationResponse {
+            station: Some(station_response),
+        }
     }
 
     pub async fn get_response_stations_from_stations(
@@ -164,42 +216,13 @@ impl<T: LineRepository> LineService<T> {
         stations: &[Station],
         stations_lines: &[Vec<Line>],
     ) -> Result<Vec<SingleStationResponse>> {
-        let response_stations: Vec<SingleStationResponse> = stations
-            .iter()
+        let response_stations: Vec<SingleStationResponse> = stream::iter(stations)
             .enumerate()
-            .map(|(index, station)| {
-                let mut station_response: StationResponse = station.clone().into();
-                let station_lines = stations_lines.get(index).unwrap();
-                let station_line = station_lines
-                    .iter()
-                    .find(|line| line.line_cd == station.line_cd)
-                    .unwrap();
-
-                let station_lines_response: Vec<LineResponse> = station_lines
-                    .iter()
-                    .map(|line| {
-                        let mut line_response: LineResponse = line.clone().into();
-                        let line_symbols = self.get_line_symbols(&mut line.clone());
-                        line_response.line_symbols = line_symbols;
-                        line_response.station = Some(Box::new(station_response.clone()));
-                        line_response
-                    })
-                    .collect();
-
-                let mut line_response: LineResponse = station_line.clone().into();
-
-                let line_symbols = self.get_line_symbols(&mut station_line.clone());
-                line_response.line_symbols = line_symbols;
-
-                station_response.line = Some(Box::new(line_response));
-                station_response.lines = station_lines_response;
-
-                SingleStationResponse {
-                    station: Some(station_response),
-                }
+            .then(|(index, station)| {
+                self.process_stations_async(station, stations_lines.get(index).unwrap())
             })
-            .collect();
-
+            .collect()
+            .await;
         Ok(response_stations)
     }
 }
