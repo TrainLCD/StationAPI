@@ -51,6 +51,7 @@ pub struct Station {
 }
 
 impl Station {
+    #![allow(clippy::too_many_arguments)]
     pub fn new(
         station_cd: u32,
         station_g_cd: u32,
