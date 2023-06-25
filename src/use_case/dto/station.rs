@@ -29,7 +29,7 @@ impl From<Station> for StationResponse {
             e_sort: _,
             stop_condition,
             distance,
-        } = station.clone();
+        } = station;
 
         let default_station = Self {
             id: station_cd,
