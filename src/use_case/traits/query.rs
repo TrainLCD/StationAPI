@@ -1,7 +1,10 @@
 use async_trait::async_trait;
 use mockall::automock;
 
-use crate::{domain::entity::station::Station, use_case::error::UseCaseError};
+use crate::{
+    domain::entity::{line::Line, station::Station},
+    use_case::error::UseCaseError,
+};
 
 #[automock]
 #[async_trait]
@@ -23,4 +26,10 @@ pub trait QueryUseCase: Send + Sync + 'static {
         station_name: String,
         get_stations_by_name: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError>;
+    async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError>;
+    async fn get_lines_by_ids(&self, line_ids: Vec<u32>) -> Result<Vec<Line>, UseCaseError>;
+    async fn get_lines_by_station_group_id(
+        &self,
+        station_group_id: u32,
+    ) -> Result<Vec<Line>, UseCaseError>;
 }
