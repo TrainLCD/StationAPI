@@ -8,6 +8,7 @@ use stationapi::{
     pb::station_api_server::StationApiServer, presentation::controller::grpc::GrpcRouter,
 };
 use tonic::transport::Server;
+use tower_http::cors::CorsLayer;
 // use tower_http::cors::CorsLayer;
 use tracing_log::LogTracer;
 
