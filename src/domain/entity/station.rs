@@ -1,4 +1,3 @@
-use bigdecimal::{BigDecimal, ToPrimitive};
 use getset::{Getters, Setters};
 
 use crate::pb::StationNumber;
@@ -25,6 +24,8 @@ pub struct Station {
     pub station_numbers: Vec<StationNumber>,
     #[getset(get = "pub")]
     pub three_letter_code: Option<String>,
+    #[getset(get = "pub")]
+    pub line_cd: u32,
     #[getset(get = "pub", set = "pub")]
     pub line: Option<Line>,
     #[getset(get = "pub", set = "pub")]
@@ -47,6 +48,8 @@ pub struct Station {
     #[getset(get = "pub")]
     pub e_sort: u32,
     #[getset(get = "pub")]
+    pub stop_condition: i32,
+    #[getset(get = "pub")]
     pub distance: Option<f64>,
 }
 
@@ -62,17 +65,19 @@ impl Station {
         station_name_ko: String,
         station_numbers: Vec<StationNumber>,
         three_letter_code: Option<String>,
+        line_cd: u32,
         line: Option<Line>,
         lines: Vec<Line>,
         pref_cd: u32,
         post: String,
         address: String,
-        lon: BigDecimal,
-        lat: BigDecimal,
+        lon: f64,
+        lat: f64,
         open_ymd: String,
         close_ymd: String,
         e_status: u32,
         e_sort: u32,
+        stop_condition: i32,
         distance: Option<f64>,
     ) -> Self {
         Self {
@@ -85,17 +90,19 @@ impl Station {
             station_name_ko,
             station_numbers,
             three_letter_code,
+            line_cd,
             line,
             lines,
             pref_cd,
             post,
             address,
-            lon: lon.to_f64().unwrap_or(0.0),
-            lat: lat.to_f64().unwrap_or(0.0),
+            lon,
+            lat,
             open_ymd,
             close_ymd,
             e_status,
             e_sort,
+            stop_condition,
             distance,
         }
     }

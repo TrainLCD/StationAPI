@@ -22,35 +22,6 @@ pub struct CompanyRow {
     pub e_sort: u32,
 }
 
-#[derive(sqlx::FromRow, Clone)]
-pub struct LineRow {
-    pub line_cd: u32,
-    pub company_cd: u32,
-    pub line_name: String,
-    pub line_name_k: String,
-    pub line_name_h: String,
-    pub line_name_r: String,
-    pub line_name_zh: Option<String>,
-    pub line_name_ko: Option<String>,
-    pub line_color_c: String,
-    pub line_color_t: String,
-    pub line_type: u32,
-    pub line_symbol_primary: Option<String>,
-    pub line_symbol_secondary: Option<String>,
-    pub line_symbol_extra: Option<String>,
-    pub line_symbol_primary_color: Option<String>,
-    pub line_symbol_secondary_color: Option<String>,
-    pub line_symbol_extra_color: Option<String>,
-    pub line_symbol_primary_shape: Option<String>,
-    pub line_symbol_secondary_shape: Option<String>,
-    pub line_symbol_extra_shape: Option<String>,
-    pub lon: f64,
-    pub lat: f64,
-    pub zoom: u32,
-    pub e_status: u32,
-    pub e_sort: u32,
-}
-
 #[derive(sqlx::FromRow)]
 pub struct StationRow {
     pub station_cd: u32,
@@ -88,6 +59,7 @@ impl From<StationRow> for Station {
             station_name_ko: row.station_name_ko,
             station_numbers: vec![],
             three_letter_code: row.three_letter_code,
+            line_cd: row.line_cd,
             line: None,
             lines: vec![],
             pref_cd: row.pref_cd,
@@ -105,6 +77,7 @@ impl From<StationRow> for Station {
             close_ymd: row.close_ymd,
             e_status: row.e_status,
             e_sort: row.e_sort,
+            stop_condition: 0, // TODO: 種別対応時に修正
             distance: None,
         }
     }
@@ -148,6 +121,7 @@ impl From<StationWithDistanceRow> for Station {
             station_name_ko: row.station_name_ko,
             station_numbers: vec![],
             three_letter_code: row.three_letter_code,
+            line_cd: row.line_cd,
             line: None,
             lines: vec![],
             pref_cd: row.pref_cd,
@@ -165,6 +139,7 @@ impl From<StationWithDistanceRow> for Station {
             close_ymd: row.close_ymd,
             e_status: row.e_status,
             e_sort: row.e_sort,
+            stop_condition: 0, // TODO: 種別対応時に修正
             distance: row.distance,
         }
     }
@@ -193,12 +168,12 @@ impl StationRepository for MyStationRepository {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::get_by_line_id(line_id, &mut conn).await
     }
-    async fn get_by_stations_group_id(
+    async fn get_by_station_group_id(
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn: sqlx::pool::PoolConnection<MySql> = self.pool.acquire().await?;
-        InternalStationRepository::get_by_stations_group_id(station_group_id, &mut conn).await
+        InternalStationRepository::get_by_station_group_id(station_group_id, &mut conn).await
     }
 
     async fn get_stations_by_coordinates(
@@ -219,34 +194,8 @@ impl StationRepository for MyStationRepository {
         station_name: String,
         limit: Option<u32>,
     ) -> Result<Vec<Station>, DomainError> {
-        let query_str = format!(
-            "SELECT * FROM stations
-            WHERE (
-                station_name LIKE '%{}%'
-                OR station_name_r LIKE '%{}%'
-                OR station_name_k LIKE '%{}%'
-                OR station_name_zh LIKE '%{}%'
-                OR station_name_ko LIKE '%{}%'
-        )
-            AND e_status = 0
-            ORDER BY e_sort, station_cd
-            LIMIT {}
-        ",
-            station_name,
-            station_name,
-            station_name,
-            station_name,
-            station_name,
-            limit.unwrap_or(MAXIMUM_COLUMN_COUNT)
-        );
         let mut conn = self.pool.acquire().await?;
-        let result = sqlx::query_as::<_, StationRow>(&query_str)
-            .fetch_all(&mut conn)
-            .await;
-        match result {
-            Ok(rows) => Ok(rows.into_iter().map(|row| row.into()).collect()),
-            Err(err) => Err(err.into()),
-        }
+        InternalStationRepository::get_stations_by_name(station_name, limit, &mut conn).await
     }
 }
 
@@ -257,37 +206,13 @@ impl InternalStationRepository {
         id: u32,
         conn: &mut MySqlConnection,
     ) -> Result<Option<Station>, DomainError> {
-        let row: Option<StationRow> =
+        let rows: Option<StationRow> =
             sqlx::query_as("SELECT * FROM stations WHERE station_cd = ? AND e_status = 0")
                 .bind(id)
                 .fetch_optional(conn)
                 .await?;
 
-        let station = row.map(|row| {
-            Station::new(
-                row.station_cd,
-                row.station_g_cd,
-                row.station_name,
-                row.station_name_k,
-                row.station_name_r,
-                row.station_name_zh,
-                row.station_name_ko,
-                vec![],
-                row.three_letter_code,
-                None,
-                vec![],
-                row.pref_cd,
-                row.post,
-                row.address,
-                row.lon,
-                row.lat,
-                row.open_ymd,
-                row.close_ymd,
-                row.e_status,
-                row.e_sort,
-                None,
-            )
-        });
+        let station = rows.map(|row| row.into());
 
         Ok(station)
     }
@@ -301,39 +226,12 @@ impl InternalStationRepository {
                 .fetch_all(conn)
                 .await?;
 
-        let stations = station_row
-            .iter()
-            .map(|row| {
-                Station::new(
-                    row.station_cd,
-                    row.station_g_cd,
-                    row.station_name.clone(),
-                    row.station_name_k.clone(),
-                    row.station_name_r.clone(),
-                    row.station_name_zh.clone(),
-                    row.station_name_ko.clone(),
-                    vec![],
-                    row.three_letter_code.clone(),
-                    None,
-                    vec![],
-                    row.pref_cd,
-                    row.post.clone(),
-                    row.address.clone(),
-                    row.lon.clone(),
-                    row.lat.clone(),
-                    row.open_ymd.clone(),
-                    row.close_ymd.clone(),
-                    row.e_status,
-                    row.e_sort,
-                    None,
-                )
-            })
-            .collect();
+        let stations = station_row.into_iter().map(|row| row.into()).collect();
 
         Ok(stations)
     }
 
-    async fn get_by_stations_group_id(
+    async fn get_by_station_group_id(
         group_id: u32,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
@@ -343,34 +241,7 @@ impl InternalStationRepository {
                 .fetch_all(conn)
                 .await?;
 
-        let stations = rows
-            .iter()
-            .map(|row| {
-                Station::new(
-                    row.station_cd,
-                    row.station_g_cd,
-                    row.station_name.clone(),
-                    row.station_name_k.clone(),
-                    row.station_name_r.clone(),
-                    row.station_name_zh.clone(),
-                    row.station_name_ko.clone(),
-                    vec![],
-                    row.three_letter_code.clone(),
-                    None,
-                    vec![],
-                    row.pref_cd,
-                    row.post.clone(),
-                    row.address.clone(),
-                    row.lon.clone(),
-                    row.lat.clone(),
-                    row.open_ymd.clone(),
-                    row.close_ymd.clone(),
-                    row.e_status,
-                    row.e_sort,
-                    None,
-                )
-            })
-            .collect();
+        let stations = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(stations)
     }
@@ -397,7 +268,7 @@ impl InternalStationRepository {
         e_status = 0
         AND
         station_cd = (
-          SELECT station_cd 
+          SELECT station_cd
           FROM stations as s2
           WHERE s1.station_g_cd = s2.station_g_cd
           LIMIT 1
@@ -414,35 +285,42 @@ impl InternalStationRepository {
             .fetch_all(conn)
             .await?;
 
-        let stations = rows
-            .iter()
-            .map(|row| {
-                Station::new(
-                    row.station_cd,
-                    row.station_g_cd,
-                    row.station_name.clone(),
-                    row.station_name_k.clone(),
-                    row.station_name_r.clone(),
-                    row.station_name_zh.clone(),
-                    row.station_name_ko.clone(),
-                    vec![],
-                    row.three_letter_code.clone(),
-                    None,
-                    vec![],
-                    row.pref_cd,
-                    row.post.clone(),
-                    row.address.clone(),
-                    row.lon.clone(),
-                    row.lat.clone(),
-                    row.open_ymd.clone(),
-                    row.close_ymd.clone(),
-                    row.e_status,
-                    row.e_sort,
-                    None,
-                )
-            })
-            .collect();
+        let stations = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(stations)
+    }
+
+    async fn get_stations_by_name(
+        station_name: String,
+        limit: Option<u32>,
+        conn: &mut MySqlConnection,
+    ) -> Result<Vec<Station>, DomainError> {
+        let query_str: String = format!(
+            "SELECT * FROM stations
+            WHERE (
+                station_name LIKE '%{}%'
+                OR station_name_r LIKE '%{}%'
+                OR station_name_k LIKE '%{}%'
+                OR station_name_zh LIKE '%{}%'
+                OR station_name_ko LIKE '%{}%'
+        )
+            AND e_status = 0
+            ORDER BY e_sort, station_cd
+            LIMIT {}
+        ",
+            station_name,
+            station_name,
+            station_name,
+            station_name,
+            station_name,
+            limit.unwrap_or(MAXIMUM_COLUMN_COUNT)
+        );
+        let result = sqlx::query_as::<_, StationRow>(&query_str)
+            .fetch_all(conn)
+            .await;
+        match result {
+            Ok(rows) => Ok(rows.into_iter().map(|row| row.into()).collect()),
+            Err(err) => Err(err.into()),
+        }
     }
 }

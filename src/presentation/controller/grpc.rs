@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use sqlx::{MySql, Pool};
 use tonic::Response;
 
 use crate::{
-    infrastructure::station_repository::MyStationRepository,
+    infrastructure::{line_repository::MyLineRepository, station_repository::MyStationRepository},
     pb::{
         station_api_server::StationApi, GetStationByCoordinatesRequest, GetStationByGroupIdRequest,
         GetStationByIdRequest, GetStationByLineIdRequest, GetStationByNameRequest,
@@ -13,13 +15,17 @@ use crate::{
 };
 
 pub struct GrpcRouter {
-    query_use_case: QueryInteractor<MyStationRepository>,
+    query_use_case: QueryInteractor<MyStationRepository, MyLineRepository>,
 }
 
 impl GrpcRouter {
     pub fn new(pool: Pool<MySql>) -> Self {
-        let station_repository = MyStationRepository::new(pool);
-        let query_use_case = QueryInteractor { station_repository };
+        let station_repository = MyStationRepository::new(pool.clone());
+        let line_repository = MyLineRepository::new(pool);
+        let query_use_case = QueryInteractor {
+            station_repository,
+            line_repository,
+        };
         Self { query_use_case }
     }
 }
@@ -30,16 +36,25 @@ impl StationApi for GrpcRouter {
         &self,
         request: tonic::Request<GetStationByIdRequest>,
     ) -> Result<tonic::Response<SingleStationResponse>, tonic::Status> {
-        match self
-            .query_use_case
-            .find_station_by_id(request.get_ref().id)
-            .await
-        {
-            Ok(opt_station) => Ok(Response::new(SingleStationResponse {
-                station: Some(opt_station.unwrap().into()),
-            })),
-            Err(err) => Err(PresentationalError::from(err).into()),
-        }
+        let station_id = request.get_ref().id;
+
+        let station = match self.query_use_case.find_station_by_id(station_id).await {
+            Ok(Some(station)) => station,
+            Ok(None) => {
+                return Err(PresentationalError::NotFound(format!(
+                    "Station with id {} not found",
+                    station_id
+                ))
+                .into())
+            }
+            Err(err) => {
+                return Err(PresentationalError::OtherError(Arc::new(anyhow::anyhow!(err))).into())
+            }
+        };
+
+        Ok(Response::new(SingleStationResponse {
+            station: Some(station.into()),
+        }))
     }
     async fn get_stations_by_group_id(
         &self,
