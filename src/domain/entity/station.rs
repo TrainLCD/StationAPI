@@ -20,8 +20,14 @@ pub struct Station {
     pub station_name_zh: String,
     #[getset(get = "pub")]
     pub station_name_ko: String,
-    #[getset(get = "pub")]
+    #[getset(get = "pub", set = "pub")]
     pub station_numbers: Vec<StationNumber>,
+    #[getset(get = "pub")]
+    pub primary_station_number: Option<String>,
+    #[getset(get = "pub")]
+    pub secondary_station_number: Option<String>,
+    #[getset(get = "pub")]
+    pub extra_station_number: Option<String>,
     #[getset(get = "pub")]
     pub three_letter_code: Option<String>,
     #[getset(get = "pub")]
@@ -64,6 +70,9 @@ impl Station {
         station_name_zh: String,
         station_name_ko: String,
         station_numbers: Vec<StationNumber>,
+        primary_station_number: Option<String>,
+        secondary_station_number: Option<String>,
+        extra_station_number: Option<String>,
         three_letter_code: Option<String>,
         line_cd: u32,
         line: Option<Line>,
@@ -89,6 +98,9 @@ impl Station {
             station_name_zh,
             station_name_ko,
             station_numbers,
+            primary_station_number,
+            secondary_station_number,
+            extra_station_number,
             three_letter_code,
             line_cd,
             line,
