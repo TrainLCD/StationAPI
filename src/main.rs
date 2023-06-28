@@ -8,7 +8,6 @@ use stationapi::{
     pb::station_api_server::StationApiServer, presentation::controller::grpc::GrpcRouter,
 };
 use tonic::transport::Server;
-// use tower_http::cors::CorsLayer;
 use tracing_log::LogTracer;
 
 #[tokio::main]
@@ -28,18 +27,10 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     let api_server = GrpcRouter::new(pool);
     let api_server = StationApiServer::new(api_server);
 
-    // これを使うとアプリから接続できなくなる
-    // let allow_cors = CorsLayer::new()
-    //     .allow_origin(tower_http::cors::Any)
-    //     .allow_headers(tower_http::cors::Any)
-    //     .allow_methods(tower_http::cors::Any);
-
     println!("StationAPI Server listening on {}", addr);
 
     Server::builder()
         .accept_http1(true)
-        // これを使うとアプリから接続できなくなる
-        // .layer(allow_cors)
         .add_service(tonic_web::enable(api_server))
         .serve(addr)
         .await?;
