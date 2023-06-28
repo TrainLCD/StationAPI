@@ -66,11 +66,11 @@ impl From<StationRow> for Station {
             post: row.post,
             address: row.address,
             lon: row
-                .lat
+                .lon
                 .to_f64()
                 .expect("Failed to convert BigDecimal to f64"),
             lat: row
-                .lon
+                .lat
                 .to_f64()
                 .expect("Failed to convert BigDecimal to f64"),
             open_ymd: row.open_ymd,
@@ -128,11 +128,11 @@ impl From<StationWithDistanceRow> for Station {
             post: row.post,
             address: row.address,
             lon: row
-                .lat
+                .lon
                 .to_f64()
                 .expect("Failed to convert BigDecimal to f64"),
             lat: row
-                .lon
+                .lat
                 .to_f64()
                 .expect("Failed to convert BigDecimal to f64"),
             open_ymd: row.open_ymd,
