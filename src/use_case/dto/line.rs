@@ -16,6 +16,7 @@ impl From<Line> for LineResponse {
             line_symbols: value.line_symbols,
             status: value.e_status as i32,
             station: None,
+            company: None,
         }
     }
 }
