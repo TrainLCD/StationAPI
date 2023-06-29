@@ -1,5 +1,7 @@
 use getset::{Getters, Setters};
 
+use crate::pb::LineSymbol;
+
 #[derive(Debug, Clone, PartialEq, Getters, Setters)]
 pub struct Line {
     #[getset(get = "pub")]
@@ -24,6 +26,8 @@ pub struct Line {
     pub line_color_t: String,
     #[getset(get = "pub")]
     pub line_type: u32,
+    #[getset(get = "pub", set = "pub")]
+    pub line_symbols: Vec<LineSymbol>,
     #[getset(get = "pub")]
     pub line_symbol_primary: Option<String>,
     #[getset(get = "pub")]
@@ -68,6 +72,7 @@ impl Line {
         line_color_c: String,
         line_color_t: String,
         line_type: u32,
+        line_symbols: Vec<LineSymbol>,
         line_symbol_primary: Option<String>,
         line_symbol_secondary: Option<String>,
         line_symbol_extra: Option<String>,
@@ -95,6 +100,7 @@ impl Line {
             line_color_c,
             line_color_t,
             line_type,
+            line_symbols,
             line_symbol_primary,
             line_symbol_secondary,
             line_symbol_extra,

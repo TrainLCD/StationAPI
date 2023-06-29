@@ -3,7 +3,7 @@ use mockall::automock;
 
 use crate::{
     domain::entity::{line::Line, station::Station},
-    pb::StationNumber,
+    pb::{LineSymbol, StationNumber},
     use_case::error::UseCaseError,
 };
 
@@ -42,4 +42,5 @@ pub trait QueryUseCase: Send + Sync + 'static {
         station_group_id: u32,
     ) -> Result<Vec<Line>, UseCaseError>;
     fn get_station_numbers(&self, station: Station, line: Line) -> Vec<StationNumber>;
+    fn get_line_symbols(&self, line: Line) -> Vec<LineSymbol>;
 }

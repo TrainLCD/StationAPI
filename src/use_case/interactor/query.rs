@@ -7,7 +7,8 @@ use crate::{
         entity::{line::Line, station::Station},
         repository::{line_repository::LineRepository, station_repository::StationRepository},
     },
-    pb::StationNumber,
+    pb::{LineSymbol, StationNumber},
+    presentation::utils::option_array::delete_option_from_string_vec,
     use_case::{error::UseCaseError, traits::query::QueryUseCase},
 };
 
@@ -89,21 +90,35 @@ where
             Err(err) => return Err(UseCaseError::Unexpected(err.to_string())),
         };
 
-        let lines = self
+        let lines: Vec<Line> = self
             .get_lines_by_station_group_id(station.station_g_cd)
             .await?;
+        let lines = lines
+            .into_iter()
+            .map(|line| {
+                let mut line = line;
+                line.set_line_symbols(self.get_line_symbols(line.clone()));
+                line
+            })
+            .collect();
 
         let belong_line = belong_lines
             .clone()
             .into_iter()
             .find(|line| station.line_cd == line.line_cd);
-        station.set_line(belong_line.clone());
         station.set_lines(lines);
 
-        if let Some(belong_line) = belong_line {
-            let station_numbers = self.get_station_numbers(station.clone(), belong_line);
-            station.set_station_numbers(station_numbers);
-        }
+        let Some(mut belong_line) = belong_line else {
+            return Err(UseCaseError::Unexpected(
+                "station does not belong to any line".to_string(),
+            ));
+        };
+
+        let line_symbols = self.get_line_symbols(belong_line.clone());
+        belong_line.set_line_symbols(line_symbols);
+        let station_numbers = self.get_station_numbers(station.clone(), belong_line.clone());
+        station.set_station_numbers(station_numbers);
+        station.set_line(Some(belong_line));
 
         Ok(station)
     }
@@ -135,6 +150,15 @@ where
             Err(err) => return Err(UseCaseError::Unexpected(err.to_string())),
         };
 
+        let belong_lines: Vec<Line> = belong_lines
+            .into_iter()
+            .map(|line| {
+                let mut line = line;
+                line.set_line_symbols(self.get_line_symbols(line.clone()));
+                line
+            })
+            .collect();
+
         let get_lines_futures = stations
             .iter()
             .map(|station| self.get_lines_by_station_group_id(station.station_g_cd));
@@ -148,12 +172,25 @@ where
                     .clone()
                     .into_iter()
                     .find(|line| station.line_cd == line.line_cd);
+
                 station.set_line(belong_line.clone());
+
                 if let Some(lines) = lines.get(index).cloned() {
+                    let lines = lines
+                        .into_iter()
+                        .map(|line| {
+                            let mut line = line;
+                            line.set_line_symbols(self.get_line_symbols(line.clone()));
+                            line
+                        })
+                        .collect();
                     station.set_lines(lines);
                 }
 
                 if let Some(belong_line) = belong_line {
+                    let mut belong_line = belong_line;
+                    belong_line.set_line_symbols(self.get_line_symbols(belong_line.clone()));
+
                     let station_numbers = self.get_station_numbers(station.clone(), belong_line);
                     station.set_station_numbers(station_numbers);
                 }
@@ -166,38 +203,44 @@ where
     }
 
     fn get_station_numbers(&self, station: Station, line: Line) -> Vec<StationNumber> {
-        let cloned_station_line = line.clone();
-        let line_symbols_raw: Vec<Option<String>> = vec![
-            cloned_station_line.line_symbol_primary,
-            cloned_station_line.line_symbol_secondary,
-            cloned_station_line.line_symbol_extra,
+        let line_symbols_raw = vec![
+            line.line_symbol_primary,
+            line.line_symbol_secondary,
+            line.line_symbol_extra,
         ];
+        let line_symbols_raw = delete_option_from_string_vec(line_symbols_raw);
 
         let line_color = &line.line_color_c;
-        let line_symbol_colors_raw: Vec<Option<String>> = vec![
-            cloned_station_line
-                .line_symbol_primary_color
-                .or(Some(line_color.to_string())),
-            cloned_station_line
-                .line_symbol_secondary_color
-                .or(Some(line_color.to_string())),
-            cloned_station_line
-                .line_symbol_extra_color
-                .or(Some(line_color.to_string())),
+        let line_symbol_colors_raw: Vec<String> = vec![
+            line.line_symbol_primary_color
+                .unwrap_or(line_color.to_string()),
+            line.line_symbol_secondary_color
+                .unwrap_or(line_color.to_string()),
+            line.line_symbol_extra_color
+                .unwrap_or(line_color.to_string()),
         ];
 
         let cloned_station = station;
-        let station_numbers_raw: Vec<Option<String>> = vec![
+        let station_numbers_raw = vec![
             cloned_station.primary_station_number,
             cloned_station.secondary_station_number,
             cloned_station.extra_station_number,
         ];
+        let station_numbers_raw = delete_option_from_string_vec(station_numbers_raw);
 
-        let line_symbols_shape_raw: Vec<Option<String>> = vec![
-            cloned_station_line.line_symbol_primary_shape,
-            cloned_station_line.line_symbol_secondary_shape,
-            cloned_station_line.line_symbol_extra_shape,
-        ];
+        let line_symbols_shape_raw: Vec<String> = vec![
+            line.line_symbol_primary_shape,
+            line.line_symbol_secondary_shape,
+            line.line_symbol_extra_shape,
+        ]
+        .into_iter()
+        .filter_map(|sym| {
+            if sym.is_some() {
+                return sym;
+            }
+            None
+        })
+        .collect();
 
         let mut station_numbers: Vec<StationNumber> = Vec::with_capacity(station_numbers_raw.len());
 
@@ -205,22 +248,20 @@ where
             let Some(num) = station_numbers_raw.get(index) else {
                 break;
             };
-            let Some(num) = num else {
-                break;
-            };
             if num.is_empty() {
                 break;
             }
 
-            let Some(sym_color) = &line_symbol_colors_raw[index] else {
+            let Some(sym_color) = line_symbol_colors_raw.get(index) else {
                 break;
             };
-            let Some(sym_shape) = &line_symbols_shape_raw[index] else {
+            let Some(sym_shape) = line_symbols_shape_raw.get(index) else {
                 break;
             };
 
-            let opt_sym = &line_symbols_raw[index];
-            let sym = opt_sym.to_owned().unwrap_or(String::from(""));
+            let Some(sym) = line_symbols_raw.get(index) else {
+                break
+            };
 
             let station_number_string = match sym.is_empty() {
                 true => num.clone(),
@@ -228,7 +269,7 @@ where
             };
 
             let station_number = StationNumber {
-                line_symbol: sym,
+                line_symbol: sym.to_string(),
                 line_symbol_color: sym_color.to_string(),
                 line_symbol_shape: sym_shape.to_string(),
                 station_number: station_number_string,
@@ -238,5 +279,57 @@ where
         }
 
         station_numbers
+    }
+
+    fn get_line_symbols(&self, line: Line) -> Vec<LineSymbol> {
+        let line_symbols_raw = vec![
+            line.line_symbol_primary,
+            line.line_symbol_secondary,
+            line.line_symbol_extra,
+        ];
+        let line_symbols_raw = delete_option_from_string_vec(line_symbols_raw);
+
+        let line_color = &line.line_color_c;
+        let line_symbol_colors_raw: Vec<String> = vec![
+            line.line_symbol_primary_color
+                .unwrap_or(line_color.to_string()),
+            line.line_symbol_secondary_color
+                .unwrap_or(line_color.to_string()),
+            line.line_symbol_extra_color
+                .unwrap_or(line_color.to_string()),
+        ];
+
+        let line_symbols_shape_raw = vec![
+            line.line_symbol_primary_shape,
+            line.line_symbol_secondary_shape,
+            line.line_symbol_extra_shape,
+        ];
+        let line_symbols_shape_raw = delete_option_from_string_vec(line_symbols_shape_raw);
+
+        let mut line_symbols: Vec<LineSymbol> = Vec::with_capacity(line_symbols_raw.len());
+
+        for index in 0..line_symbols_raw.len() {
+            let Some(symbol) = line_symbols_raw.get(index) else{
+                break;
+            };
+            let Some(color) = line_symbol_colors_raw.get(index) else{
+                break;
+            };
+            let Some(shape) = line_symbols_shape_raw.get(index) else{
+                break;
+            };
+
+            if symbol.is_empty() {
+                break;
+            }
+
+            line_symbols.push(LineSymbol {
+                symbol: symbol.to_string(),
+                color: color.to_string(),
+                shape: shape.to_string(),
+            });
+        }
+
+        line_symbols
     }
 }

@@ -50,6 +50,7 @@ impl From<LineRow> for Line {
             line_color_c: row.line_color_c,
             line_color_t: row.line_color_t,
             line_type: row.line_type,
+            line_symbols: vec![],
             line_symbol_primary: row.line_symbol_primary,
             line_symbol_secondary: row.line_symbol_secondary,
             line_symbol_extra: row.line_symbol_extra,
