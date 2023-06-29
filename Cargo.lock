@@ -1672,7 +1672,6 @@ dependencies = [
  "tonic-build",
  "tonic-web",
  "tracing",
- "tracing-log",
  "tracing-subscriber",
  "url",
 ]

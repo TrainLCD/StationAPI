@@ -8,7 +8,7 @@ use stationapi::{
     pb::station_api_server::StationApiServer, presentation::controller::grpc::GrpcRouter,
 };
 use tonic::transport::Server;
-use tracing_log::LogTracer;
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> std::result::Result<(), anyhow::Error> {
@@ -16,7 +16,7 @@ async fn main() -> std::result::Result<(), anyhow::Error> {
 }
 
 async fn run() -> std::result::Result<(), anyhow::Error> {
-    LogTracer::init().expect("Failed to initialize LogTracer.");
+    tracing_subscriber::fmt::init();
 
     dotenv::from_filename(".env.local").ok();
 
@@ -27,7 +27,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     let api_server = GrpcRouter::new(pool);
     let api_server = StationApiServer::new(api_server);
 
-    println!("StationAPI Server listening on {}", addr);
+    info!("StationAPI Server listening on {}", addr);
 
     Server::builder()
         .accept_http1(true)
