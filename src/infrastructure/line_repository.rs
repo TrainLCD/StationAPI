@@ -41,6 +41,7 @@ impl From<LineRow> for Line {
         Self {
             line_cd: row.line_cd,
             company_cd: row.company_cd,
+            company: None,
             line_name: row.line_name,
             line_name_k: row.line_name_k,
             line_name_h: row.line_name_h,

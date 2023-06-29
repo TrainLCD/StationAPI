@@ -1,6 +1,6 @@
 use getset::{Getters, Setters};
 
-use crate::pb::LineSymbol;
+use crate::pb::{CompanyResponse, LineSymbol};
 
 #[derive(Debug, Clone, PartialEq, Getters, Setters)]
 pub struct Line {
@@ -8,6 +8,8 @@ pub struct Line {
     pub line_cd: u32,
     #[getset(get = "pub")]
     pub company_cd: u32,
+    #[getset(get = "pub")]
+    pub company: Option<CompanyResponse>,
     #[getset(get = "pub")]
     pub line_name: String,
     #[getset(get = "pub")]
@@ -63,6 +65,7 @@ impl Line {
     pub fn new(
         line_cd: u32,
         company_cd: u32,
+        company: Option<CompanyResponse>,
         line_name: String,
         line_name_k: String,
         line_name_h: String,
@@ -91,6 +94,7 @@ impl Line {
         Self {
             line_cd,
             company_cd,
+            company,
             line_name,
             line_name_k,
             line_name_h,
