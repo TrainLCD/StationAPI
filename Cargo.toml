@@ -37,7 +37,7 @@ log = "0.4.17"
 anyhow = "1.0.71"
 getset = "0.1.2"
 thiserror = "1.0.40"
-fake = { version = "2.6.1", features = ["derive"] }
+fake = { version = "2.6.1", features = ["derive", "bigdecimal"] }
 rand = "0.8.5"
 
 [build-dependencies]
