@@ -153,7 +153,7 @@ mod tests {
     use super::LineRow;
 
     #[test]
-    fn from() {
+    fn from_line_row() {
         let row: LineRow = Faker.fake();
         let LineRow {
             line_cd,
