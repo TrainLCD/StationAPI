@@ -125,10 +125,10 @@ impl Station {
 mod tests {
     use fake::{Fake, Faker};
 
+    use crate::domain::entity::station::Station;
+
     #[test]
     fn new() {
-        use super::Station;
-
         // expected
         let Station {
             station_cd,
