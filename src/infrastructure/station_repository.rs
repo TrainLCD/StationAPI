@@ -163,7 +163,7 @@ impl MyStationRepository {
     }
 }
 
-const MAXIMUM_COLUMN_COUNT: u32 = 1;
+const DEFAULT_COLUMN_COUNT: u32 = 1;
 
 #[async_trait]
 impl StationRepository for MyStationRepository {
@@ -288,7 +288,7 @@ impl InternalStationRepository {
             .bind(latitude)
             .bind(longitude)
             .bind(latitude)
-            .bind(limit.unwrap_or(MAXIMUM_COLUMN_COUNT)) // TODO: 100 is a magic number
+            .bind(limit.unwrap_or(DEFAULT_COLUMN_COUNT)) // TODO: 100 is a magic number
             .fetch_all(conn)
             .await?;
 
@@ -320,7 +320,7 @@ impl InternalStationRepository {
             station_name,
             station_name,
             station_name,
-            limit.unwrap_or(MAXIMUM_COLUMN_COUNT)
+            limit.unwrap_or(DEFAULT_COLUMN_COUNT)
         );
         let result = sqlx::query_as::<_, StationRow>(&query_str)
             .fetch_all(conn)
