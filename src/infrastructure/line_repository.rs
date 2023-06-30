@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use bigdecimal::{BigDecimal, ToPrimitive};
+use bigdecimal::{BigDecimal, ToPrimitive, Zero};
 use fake::Dummy;
 use sqlx::{MySql, MySqlConnection, Pool};
 
@@ -67,6 +67,7 @@ impl From<LineRow> for Line {
             zoom: row.zoom,
             e_status: row.e_status,
             e_sort: row.e_sort,
+            station: None,
         }
     }
 }
@@ -114,6 +115,9 @@ impl InternalLineRepository {
         ids: Vec<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Line>, DomainError> {
+        if ids.len().is_zero() {
+            return Ok(vec![]);
+        }
         let params = format!("?{}", ", ?".repeat(ids.len() - 1));
         let query_str = format!(
             "SELECT * FROM `lines` WHERE line_cd IN ( {} ) AND e_status = 0",
