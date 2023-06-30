@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, ToPrimitive};
+use fake::Dummy;
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::domain::{
@@ -22,7 +23,7 @@ pub struct CompanyRow {
     pub e_sort: u32,
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Clone, Dummy)]
 pub struct StationRow {
     pub station_cd: u32,
     pub station_g_cd: u32,
@@ -58,6 +59,9 @@ impl From<StationRow> for Station {
             station_name_zh: row.station_name_zh,
             station_name_ko: row.station_name_ko,
             station_numbers: vec![],
+            primary_station_number: row.primary_station_number,
+            secondary_station_number: row.secondary_station_number,
+            extra_station_number: row.extra_station_number,
             three_letter_code: row.three_letter_code,
             line_cd: row.line_cd,
             line: None,
@@ -83,7 +87,7 @@ impl From<StationRow> for Station {
     }
 }
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Clone, Dummy)]
 pub struct StationWithDistanceRow {
     pub station_cd: u32,
     pub station_g_cd: u32,
@@ -120,6 +124,9 @@ impl From<StationWithDistanceRow> for Station {
             station_name_zh: row.station_name_zh,
             station_name_ko: row.station_name_ko,
             station_numbers: vec![],
+            primary_station_number: row.primary_station_number,
+            secondary_station_number: row.secondary_station_number,
+            extra_station_number: row.extra_station_number,
             three_letter_code: row.three_letter_code,
             line_cd: row.line_cd,
             line: None,
@@ -322,5 +329,118 @@ impl InternalStationRepository {
             Ok(rows) => Ok(rows.into_iter().map(|row| row.into()).collect()),
             Err(err) => Err(err.into()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fake::{Fake, Faker};
+
+    #[test]
+    fn from_station_row() {
+        use super::*;
+
+        let row: StationRow = Faker.fake();
+        let StationRow {
+            station_cd,
+            station_g_cd,
+            station_name,
+            station_name_k,
+            station_name_r,
+            station_name_zh,
+            station_name_ko,
+            primary_station_number,
+            secondary_station_number,
+            extra_station_number,
+            three_letter_code,
+            line_cd,
+            pref_cd,
+            post,
+            address,
+            lon,
+            lat,
+            open_ymd,
+            close_ymd,
+            e_status,
+            e_sort,
+        } = row.clone();
+        let actual = Station::from(row);
+
+        assert_eq!(actual.station_cd, station_cd);
+        assert_eq!(actual.station_g_cd, station_g_cd);
+        assert_eq!(actual.station_name, station_name);
+        assert_eq!(actual.station_name_k, station_name_k);
+        assert_eq!(actual.station_name_r, station_name_r);
+        assert_eq!(actual.station_name_zh, station_name_zh);
+        assert_eq!(actual.station_name_ko, station_name_ko);
+        assert_eq!(actual.primary_station_number, primary_station_number);
+        assert_eq!(actual.secondary_station_number, secondary_station_number);
+        assert_eq!(actual.extra_station_number, extra_station_number);
+        assert_eq!(actual.three_letter_code, three_letter_code);
+        assert_eq!(actual.line_cd, line_cd);
+        assert_eq!(actual.pref_cd, pref_cd);
+        assert_eq!(actual.post, post);
+        assert_eq!(actual.address, address);
+        assert_eq!(Some(actual.lon), lon.to_f64());
+        assert_eq!(Some(actual.lat), lat.to_f64());
+        assert_eq!(actual.open_ymd, open_ymd);
+        assert_eq!(actual.close_ymd, close_ymd);
+        assert_eq!(actual.e_status, e_status);
+        assert_eq!(actual.e_sort, e_sort);
+    }
+
+    #[test]
+    fn from_station_with_distance_row() {
+        use super::*;
+
+        let row: StationWithDistanceRow = Faker.fake();
+        let StationWithDistanceRow {
+            station_cd,
+            station_g_cd,
+            station_name,
+            station_name_k,
+            station_name_r,
+            station_name_zh,
+            station_name_ko,
+            primary_station_number,
+            secondary_station_number,
+            extra_station_number,
+            three_letter_code,
+            line_cd,
+            pref_cd,
+            post,
+            address,
+            lon,
+            lat,
+            open_ymd,
+            close_ymd,
+            e_status,
+            e_sort,
+            distance,
+        } = row.clone();
+        let actual = Station::from(row);
+
+        assert_eq!(actual.station_cd, station_cd);
+        assert_eq!(actual.station_g_cd, station_g_cd);
+        assert_eq!(actual.station_name, station_name);
+        assert_eq!(actual.station_name_k, station_name_k);
+        assert_eq!(actual.station_name_r, station_name_r);
+        assert_eq!(actual.station_name_zh, station_name_zh);
+        assert_eq!(actual.station_name_ko, station_name_ko);
+        assert_eq!(actual.primary_station_number, primary_station_number);
+        assert_eq!(actual.secondary_station_number, secondary_station_number);
+        assert_eq!(actual.extra_station_number, extra_station_number);
+        assert_eq!(actual.three_letter_code, three_letter_code);
+        assert_eq!(actual.line_cd, line_cd);
+        assert_eq!(actual.pref_cd, pref_cd);
+        assert_eq!(actual.post, post);
+        assert_eq!(actual.address, address);
+        assert_eq!(Some(actual.lon), lon.to_f64());
+        assert_eq!(Some(actual.lat), lat.to_f64());
+        assert_eq!(actual.open_ymd, open_ymd);
+        assert_eq!(actual.close_ymd, close_ymd);
+        assert_eq!(actual.e_status, e_status);
+        assert_eq!(actual.e_sort, e_sort);
+        assert_eq!(actual.distance, distance);
     }
 }

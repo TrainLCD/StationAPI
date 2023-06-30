@@ -73,7 +73,7 @@ impl StationApi for GrpcRouter {
                     })
                     .collect(),
             })),
-            Err(err) => Err(PresentationalError::from(err).into()),
+            Err(err) => return Err(PresentationalError::from(err).into()),
         }
     }
     async fn get_stations_by_coordinates(
