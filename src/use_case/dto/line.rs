@@ -13,6 +13,7 @@ impl From<Line> for LineResponse {
             color: value.line_color_c,
             line_type: value.line_type as i32,
             company_id: value.company_cd,
+            company: None,
             line_symbols: vec![],
             status: value.e_status as i32,
             station: None,
