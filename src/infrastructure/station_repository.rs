@@ -207,7 +207,7 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Option<Station>, DomainError> {
         let rows: Option<StationRow> =
-            sqlx::query_as("SELECT * FROM stations WHERE station_cd = ? AND e_status = 0")
+            sqlx::query_as("SELECT * FROM stations WHERE station_cd = ? AND e_status = 0 ORDER BY e_sort, station_cd")
                 .bind(id)
                 .fetch_optional(conn)
                 .await?;
@@ -220,11 +220,12 @@ impl InternalStationRepository {
         line_id: u32,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let station_row: Vec<StationRow> =
-            sqlx::query_as("SELECT * FROM stations WHERE line_cd = ? AND e_status = 0")
-                .bind(line_id)
-                .fetch_all(conn)
-                .await?;
+        let station_row: Vec<StationRow> = sqlx::query_as(
+            "SELECT * FROM stations WHERE line_cd = ? AND e_status = 0 ORDER BY e_sort, station_cd",
+        )
+        .bind(line_id)
+        .fetch_all(conn)
+        .await?;
 
         let stations = station_row.into_iter().map(|row| row.into()).collect();
 
@@ -236,7 +237,7 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let rows: Vec<StationRow> =
-            sqlx::query_as("SELECT * FROM stations WHERE station_g_cd = ? AND e_status = 0")
+            sqlx::query_as("SELECT * FROM stations WHERE station_g_cd = ? AND e_status = 0 ORDER BY e_sort, station_cd")
                 .bind(group_id)
                 .fetch_all(conn)
                 .await?;
@@ -273,15 +274,14 @@ impl InternalStationRepository {
           WHERE s1.station_g_cd = s2.station_g_cd
           LIMIT 1
         )
-        ORDER BY
-        distance
+        ORDER BY distance
         LIMIT ?";
 
         let rows = sqlx::query_as::<_, StationRow>(query_str)
             .bind(latitude)
             .bind(longitude)
             .bind(latitude)
-            .bind(limit.unwrap_or(DEFAULT_COLUMN_COUNT)) // TODO: 100 is a magic number
+            .bind(limit.unwrap_or(DEFAULT_COLUMN_COUNT))
             .fetch_all(conn)
             .await?;
 
