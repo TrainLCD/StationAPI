@@ -1,7 +1,7 @@
 use fake::Dummy;
 use getset::{Getters, Setters};
 
-use crate::pb::{CompanyResponse, LineSymbol};
+use crate::pb::{CompanyResponse, LineSymbol, StationResponse};
 
 #[derive(Debug, Dummy, Clone, PartialEq, Getters, Setters)]
 pub struct Line {
@@ -59,6 +59,8 @@ pub struct Line {
     pub e_status: u32,
     #[getset(get = "pub")]
     pub e_sort: u32,
+    #[getset(get = "pub", set = "pub")]
+    pub station: Option<StationResponse>,
 }
 
 impl Line {
@@ -91,6 +93,7 @@ impl Line {
         zoom: u32,
         e_status: u32,
         e_sort: u32,
+        station: Option<StationResponse>,
     ) -> Self {
         Self {
             line_cd,
@@ -120,6 +123,7 @@ impl Line {
             zoom,
             e_status,
             e_sort,
+            station,
         }
     }
 }
@@ -160,6 +164,7 @@ mod tests {
             zoom,
             e_status,
             e_sort,
+            station,
         } = Faker.fake();
 
         let actual_station = Line::new(
@@ -190,6 +195,7 @@ mod tests {
             zoom,
             e_status,
             e_sort,
+            station,
         );
 
         assert_eq!(actual_station.line_cd, line_cd);

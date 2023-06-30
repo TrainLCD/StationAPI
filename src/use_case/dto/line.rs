@@ -1,4 +1,5 @@
 use crate::{domain::entity::line::Line, pb::LineResponse};
+use prost::alloc::boxed::Box;
 
 impl From<Line> for LineResponse {
     fn from(value: Line) -> Self {
@@ -15,7 +16,7 @@ impl From<Line> for LineResponse {
             company_id: value.company_cd,
             line_symbols: value.line_symbols,
             status: value.e_status as i32,
-            station: None,
+            station: value.station.map(Box::new),
             company: value.company,
         }
     }
@@ -57,6 +58,7 @@ mod tests {
             zoom: _,
             e_status,
             e_sort: _,
+            station,
         } = line.clone();
         let actual = LineResponse::from(line);
 
@@ -74,5 +76,6 @@ mod tests {
         assert_eq!(actual.status, e_status as i32);
         assert_eq!(actual.station, None);
         assert_eq!(actual.company, company);
+        assert_eq!(actual.station, station.map(Box::new));
     }
 }

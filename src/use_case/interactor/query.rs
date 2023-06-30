@@ -1,5 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use bigdecimal::Zero;
 use futures::future::try_join_all;
 
 use crate::{
@@ -7,8 +8,7 @@ use crate::{
         entity::{line::Line, station::Station},
         repository::{line_repository::LineRepository, station_repository::StationRepository},
     },
-    pb::{LineSymbol, StationNumber},
-    presentation::utils::option_array::delete_option_from_string_vec,
+    pb::{LineSymbol, StationNumber, StationResponse},
     use_case::{error::UseCaseError, traits::query::QueryUseCase},
 };
 
@@ -93,10 +93,30 @@ where
         let lines: Vec<Line> = self
             .get_lines_by_station_group_id(station.station_g_cd)
             .await?;
+
+        let line_ids: Vec<u32> = lines.iter().map(|line| line.line_cd).collect();
+
+        let stations = self
+            .station_repository
+            .get_by_station_group_id(station.station_g_cd)
+            .await?;
+        let belong_station_vec = self.get_stations_with_attributes(stations).await?;
+
+        let belong_station: Option<StationResponse> = belong_station_vec
+            .into_iter()
+            .enumerate()
+            .find_map(|(index, station)| {
+                if line_ids.get(index) == Some(&station.line_cd) {
+                    Some(station.into())
+                } else {
+                    None
+                }
+            });
         let lines = lines
             .into_iter()
             .map(|line| {
                 let mut line = line;
+                line.set_station(belong_station.clone());
                 line.set_line_symbols(self.get_line_symbols(line.clone()));
                 line
             })
@@ -145,7 +165,7 @@ where
     ) -> Result<Vec<Station>, UseCaseError> {
         let line_ids: Vec<u32> = stations.iter().map(|station| station.line_cd).collect();
 
-        let belong_lines = match self.get_lines_by_ids(line_ids).await {
+        let belong_lines = match self.get_lines_by_ids(line_ids.clone()).await {
             Ok(lines) => lines,
             Err(err) => return Err(UseCaseError::Unexpected(err.to_string())),
         };
@@ -164,26 +184,49 @@ where
             .map(|station| self.get_lines_by_station_group_id(station.station_g_cd));
         let lines = try_join_all(get_lines_futures).await?;
 
+        let get_stations_futures = stations.iter().map(|station| {
+            self.station_repository
+                .get_by_station_group_id(station.station_g_cd)
+        });
+        let belong_stations_vec = try_join_all(get_stations_futures).await?;
+
         let stations = stations
             .into_iter()
             .enumerate()
             .map(|(index, mut station)| {
+                let Some(belong_stations) = belong_stations_vec.get(index).cloned() else {
+                    return station;
+                };
                 let belong_line = belong_lines
                     .clone()
                     .into_iter()
                     .find(|line| station.line_cd == line.line_cd);
 
-                station.set_line(belong_line.clone());
-
                 if let Some(lines) = lines.get(index).cloned() {
                     let lines = lines
                         .into_iter()
-                        .map(|line| {
+                        .enumerate()
+                        .map(|(index, line)| {
                             let mut line = line;
+                            let mut belong_stations = belong_stations.clone();
+                            let station_numbers =
+                                self.get_station_numbers(station.clone(), line.clone());
+                            station.set_station_numbers(station_numbers);
+
                             line.set_line_symbols(self.get_line_symbols(line.clone()));
+                            let Some(station) = belong_stations.get_mut(index) else {
+                                return line;
+                            };
+
+                            let station_numbers =
+                                self.get_station_numbers(station.clone(), line.clone());
+                            station.set_station_numbers(station_numbers);
+
+                            line.set_station(Some(station.clone().into()));
                             line
                         })
                         .collect();
+                    station.set_line(belong_line.clone());
                     station.set_lines(lines);
                 }
 
@@ -208,7 +251,6 @@ where
             line.line_symbol_secondary,
             line.line_symbol_extra,
         ];
-        let line_symbols_raw = delete_option_from_string_vec(line_symbols_raw);
 
         let line_color = &line.line_color_c;
         let line_symbol_colors_raw: Vec<String> = vec![
@@ -226,47 +268,38 @@ where
             cloned_station.secondary_station_number,
             cloned_station.extra_station_number,
         ];
-        let station_numbers_raw = delete_option_from_string_vec(station_numbers_raw);
 
-        let line_symbols_shape_raw: Vec<String> = vec![
+        let line_symbols_shape_raw: Vec<Option<String>> = vec![
             line.line_symbol_primary_shape,
             line.line_symbol_secondary_shape,
             line.line_symbol_extra_shape,
-        ]
-        .into_iter()
-        .filter_map(|sym| {
-            if sym.is_some() {
-                return sym;
-            }
-            None
-        })
-        .collect();
+        ];
+
+        if station_numbers_raw.len().is_zero() {
+            return vec![];
+        }
 
         let mut station_numbers: Vec<StationNumber> = Vec::with_capacity(station_numbers_raw.len());
 
-        for index in 0..station_numbers_raw.len() {
-            let Some(num) = station_numbers_raw.get(index) else {
-                break;
+        (0..station_numbers_raw.len()).for_each(|index| {
+            let Some(Some(num)) = station_numbers_raw.get(index) else {
+                return;
             };
-            if num.is_empty() {
-                break;
+            let Some(sym_color) = line_symbol_colors_raw.get(index) else {
+                return;
+            };
+            let Some(Some(sym_shape)) = line_symbols_shape_raw.get(index) else {
+                return;
+            };
+            let Some(Some(sym)) = line_symbols_raw.get(index) else {
+                return;
+            };
+
+            if sym.is_empty() || num.is_empty() {
+                return;
             }
 
-            let Some(sym_color) = line_symbol_colors_raw.get(index) else {
-                break;
-            };
-            let Some(sym_shape) = line_symbols_shape_raw.get(index) else {
-                break;
-            };
-
-            let Some(sym) = line_symbols_raw.get(index) else {
-                break
-            };
-
-            let station_number_string = match sym.is_empty() {
-                true => num.clone(),
-                false => format!("{}-{}", sym, num),
-            };
+            let station_number_string = format!("{}-{}", sym, num);
 
             let station_number = StationNumber {
                 line_symbol: sym.to_string(),
@@ -276,7 +309,7 @@ where
             };
 
             station_numbers.push(station_number);
-        }
+        });
 
         station_numbers
     }
@@ -287,7 +320,6 @@ where
             line.line_symbol_secondary,
             line.line_symbol_extra,
         ];
-        let line_symbols_raw = delete_option_from_string_vec(line_symbols_raw);
 
         let line_color = &line.line_color_c;
         let line_symbol_colors_raw: Vec<String> = vec![
@@ -304,23 +336,31 @@ where
             line.line_symbol_secondary_shape,
             line.line_symbol_extra_shape,
         ];
-        let line_symbols_shape_raw = delete_option_from_string_vec(line_symbols_shape_raw);
+
+        if line_symbols_raw.len().is_zero() {
+            return vec![];
+        }
 
         let mut line_symbols: Vec<LineSymbol> = Vec::with_capacity(line_symbols_raw.len());
 
-        for index in 0..line_symbols_raw.len() {
+        (0..line_symbols_raw.len()).for_each(|index| {
             let Some(symbol) = line_symbols_raw.get(index) else{
-                break;
+                return;
             };
             let Some(color) = line_symbol_colors_raw.get(index) else{
-                break;
+                return;
             };
             let Some(shape) = line_symbols_shape_raw.get(index) else{
-                break;
+                return;
             };
 
+            let Some(symbol) = symbol else {return;};
+            let Some(shape) = shape else {return;};
             if symbol.is_empty() {
-                break;
+                return;
+            }
+            if shape.is_empty() {
+                return;
             }
 
             line_symbols.push(LineSymbol {
@@ -328,7 +368,7 @@ where
                 color: color.to_string(),
                 shape: shape.to_string(),
             });
-        }
+        });
 
         line_symbols
     }
