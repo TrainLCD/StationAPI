@@ -8,7 +8,7 @@ use crate::{
         entity::{line::Line, station::Station},
         repository::{line_repository::LineRepository, station_repository::StationRepository},
     },
-    pb::{LineSymbol, StationNumber, StationResponse},
+    pb::{LineSymbol, Station as GrpcStation, StationNumber},
     use_case::{error::UseCaseError, traits::query::QueryUseCase},
 };
 
@@ -102,7 +102,7 @@ where
             .await?;
         let belong_station_vec = self.get_stations_with_attributes(stations).await?;
 
-        let belong_station: Option<StationResponse> = belong_station_vec
+        let belong_station: Option<GrpcStation> = belong_station_vec
             .into_iter()
             .enumerate()
             .find_map(|(index, station)| {

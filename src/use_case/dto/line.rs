@@ -1,7 +1,7 @@
-use crate::{domain::entity::line::Line, pb::LineResponse};
+use crate::{domain::entity::line::Line, pb::Line as GrpcLine};
 use prost::alloc::boxed::Box;
 
-impl From<Line> for LineResponse {
+impl From<Line> for GrpcLine {
     fn from(value: Line) -> Self {
         Self {
             id: value.line_cd,
