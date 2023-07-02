@@ -1,9 +1,9 @@
 use crate::{
     domain::entity::station::Station,
-    pb::{LineResponse, StationResponse},
+    pb::{Line as GrpcLine, Station as GrpcStation},
 };
 
-impl From<Station> for StationResponse {
+impl From<Station> for GrpcStation {
     fn from(station: Station) -> Self {
         let Station {
             station_cd,
@@ -63,7 +63,7 @@ impl From<Station> for StationResponse {
             Some(l) => l,
             None => return default_station,
         };
-        let line: Option<Box<LineResponse>> = Some(Box::new(line.into()));
+        let line: Option<Box<GrpcLine>> = Some(Box::new(line.into()));
 
         Self {
             id: station_cd,

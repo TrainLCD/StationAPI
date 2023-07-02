@@ -66,12 +66,7 @@ impl StationApi for GrpcRouter {
             .await
         {
             Ok(stations) => Ok(Response::new(MultipleStationResponse {
-                stations: stations
-                    .into_iter()
-                    .map(|station| SingleStationResponse {
-                        station: Some(station.into()),
-                    })
-                    .collect(),
+                stations: stations.into_iter().map(|station| station.into()).collect(),
             })),
             Err(err) => return Err(PresentationalError::from(err).into()),
         }
@@ -94,13 +89,7 @@ impl StationApi for GrpcRouter {
         };
 
         Ok(tonic::Response::new(MultipleStationResponse {
-            stations: stations
-                .into_iter()
-                .map(|station| {
-                    let res = station.into();
-                    SingleStationResponse { station: Some(res) }
-                })
-                .collect(),
+            stations: stations.into_iter().map(|station| station.into()).collect(),
         }))
     }
     async fn get_stations_by_line_id(
@@ -111,12 +100,7 @@ impl StationApi for GrpcRouter {
 
         match self.query_use_case.get_stations_by_line_id(line_id).await {
             Ok(stations) => Ok(Response::new(MultipleStationResponse {
-                stations: stations
-                    .into_iter()
-                    .map(|station| SingleStationResponse {
-                        station: Some(station.into()),
-                    })
-                    .collect(),
+                stations: stations.into_iter().map(|station| station.into()).collect(),
             })),
             Err(err) => Err(PresentationalError::from(err).into()),
         }
@@ -135,12 +119,7 @@ impl StationApi for GrpcRouter {
             .await
         {
             Ok(stations) => Ok(Response::new(MultipleStationResponse {
-                stations: stations
-                    .into_iter()
-                    .map(|station| SingleStationResponse {
-                        station: Some(station.into()),
-                    })
-                    .collect(),
+                stations: stations.into_iter().map(|station| station.into()).collect(),
             })),
             Err(err) => Err(PresentationalError::from(err).into()),
         }

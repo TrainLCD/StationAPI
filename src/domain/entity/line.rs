@@ -1,7 +1,7 @@
 use fake::Dummy;
 use getset::{Getters, Setters};
 
-use crate::pb::{CompanyResponse, LineSymbol, StationResponse};
+use crate::pb::{Company as GrpcCompany, LineSymbol, Station as GrpcStation};
 
 #[derive(Debug, Dummy, Clone, PartialEq, Getters, Setters)]
 pub struct Line {
@@ -10,7 +10,7 @@ pub struct Line {
     #[getset(get = "pub")]
     pub company_cd: u32,
     #[getset(get = "pub")]
-    pub company: Option<CompanyResponse>,
+    pub company: Option<GrpcCompany>,
     #[getset(get = "pub")]
     pub line_name: String,
     #[getset(get = "pub")]
@@ -60,7 +60,7 @@ pub struct Line {
     #[getset(get = "pub")]
     pub e_sort: u32,
     #[getset(get = "pub", set = "pub")]
-    pub station: Option<StationResponse>,
+    pub station: Option<GrpcStation>,
 }
 
 impl Line {
@@ -68,7 +68,7 @@ impl Line {
     pub fn new(
         line_cd: u32,
         company_cd: u32,
-        company: Option<CompanyResponse>,
+        company: Option<GrpcCompany>,
         line_name: String,
         line_name_k: String,
         line_name_h: String,
@@ -93,7 +93,7 @@ impl Line {
         zoom: u32,
         e_status: u32,
         e_sort: u32,
-        station: Option<StationResponse>,
+        station: Option<GrpcStation>,
     ) -> Self {
         Self {
             line_cd,
