@@ -2,8 +2,9 @@ use async_trait::async_trait;
 use mockall::automock;
 
 use crate::{
-    domain::entity::{line::Line, station::Station},
-    pb::{LineSymbol, StationNumber},
+    domain::entity::{
+        line::Line, line_symbol::LineSymbol, station::Station, station_number::StationNumber,
+    },
     use_case::error::UseCaseError,
 };
 
@@ -28,19 +29,15 @@ pub trait QueryUseCase: Send + Sync + 'static {
         get_stations_by_name: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError>;
-    async fn get_station_with_attributes(
+    async fn update_station_with_attributes(
         &self,
-        mut station: Station,
-    ) -> Result<Station, UseCaseError>;
-    async fn get_stations_with_attributes(
-        &self,
-        stations: Vec<Station>,
-    ) -> Result<Vec<Station>, UseCaseError>;
+        station: &mut Station,
+    ) -> Result<(), UseCaseError>;
     async fn get_lines_by_ids(&self, line_ids: Vec<u32>) -> Result<Vec<Line>, UseCaseError>;
     async fn get_lines_by_station_group_id(
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Line>, UseCaseError>;
-    fn get_station_numbers(&self, station: Station, line: Line) -> Vec<StationNumber>;
-    fn get_line_symbols(&self, line: Line) -> Vec<LineSymbol>;
+    fn get_station_numbers(&self, station: &Station, line: &Line) -> Vec<StationNumber>;
+    fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol>;
 }

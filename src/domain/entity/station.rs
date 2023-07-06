@@ -1,62 +1,34 @@
 use fake::Dummy;
-use getset::{Getters, Setters};
 
-use crate::pb::StationNumber;
+use super::{line::Line, station_number::StationNumber};
 
-use super::line::Line;
-
-#[derive(Debug, Dummy, Clone, PartialEq, Getters, Setters)]
+#[derive(Dummy, Clone, Debug)]
 pub struct Station {
-    #[getset(get = "pub")]
     pub station_cd: u32,
-    #[getset(get = "pub")]
     pub station_g_cd: u32,
-    #[getset(get = "pub")]
     pub station_name: String,
-    #[getset(get = "pub")]
     pub station_name_k: String,
-    #[getset(get = "pub")]
     pub station_name_r: String,
-    #[getset(get = "pub")]
     pub station_name_zh: String,
-    #[getset(get = "pub")]
     pub station_name_ko: String,
-    #[getset(get = "pub", set = "pub")]
     pub station_numbers: Vec<StationNumber>,
-    #[getset(get = "pub")]
     pub primary_station_number: Option<String>,
-    #[getset(get = "pub")]
     pub secondary_station_number: Option<String>,
-    #[getset(get = "pub")]
     pub extra_station_number: Option<String>,
-    #[getset(get = "pub")]
     pub three_letter_code: Option<String>,
-    #[getset(get = "pub")]
     pub line_cd: u32,
-    #[getset(get = "pub", set = "pub")]
-    pub line: Option<Line>,
-    #[getset(get = "pub", set = "pub")]
+    pub line: Option<Box<Line>>,
     pub lines: Vec<Line>,
-    #[getset(get = "pub")]
     pub pref_cd: u32,
-    #[getset(get = "pub")]
     pub post: String,
-    #[getset(get = "pub")]
     pub address: String,
-    #[getset(get = "pub")]
     pub lon: f64,
-    #[getset(get = "pub")]
     pub lat: f64,
     pub open_ymd: String,
-    #[getset(get = "pub")]
     pub close_ymd: String,
-    #[getset(get = "pub")]
     pub e_status: u32,
-    #[getset(get = "pub")]
     pub e_sort: u32,
-    #[getset(get = "pub")]
-    pub stop_condition: i32,
-    #[getset(get = "pub")]
+    pub pass: bool,
     pub distance: Option<f64>,
 }
 
@@ -76,7 +48,7 @@ impl Station {
         extra_station_number: Option<String>,
         three_letter_code: Option<String>,
         line_cd: u32,
-        line: Option<Line>,
+        line: Option<Box<Line>>,
         lines: Vec<Line>,
         pref_cd: u32,
         post: String,
@@ -87,7 +59,8 @@ impl Station {
         close_ymd: String,
         e_status: u32,
         e_sort: u32,
-        stop_condition: i32,
+        _stop_condition: i32,
+        pass: bool,
         distance: Option<f64>,
     ) -> Self {
         Self {
@@ -115,7 +88,7 @@ impl Station {
             close_ymd,
             e_status,
             e_sort,
-            stop_condition,
+            pass,
             distance,
         }
     }
