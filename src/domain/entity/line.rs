@@ -1,66 +1,39 @@
 use fake::Dummy;
-use getset::{Getters, Setters};
 
-use crate::pb::{Company as GrpcCompany, LineSymbol, Station as GrpcStation};
+use crate::pb::Company as GrpcCompany;
 
-#[derive(Debug, Dummy, Clone, PartialEq, Getters, Setters)]
+use super::{line_symbol::LineSymbol, station::Station};
+
+#[derive(Dummy, Clone, Debug)]
 pub struct Line {
-    #[getset(get = "pub")]
     pub line_cd: u32,
-    #[getset(get = "pub")]
     pub company_cd: u32,
-    #[getset(get = "pub")]
     pub company: Option<GrpcCompany>,
-    #[getset(get = "pub")]
     pub line_name: String,
-    #[getset(get = "pub")]
     pub line_name_k: String,
-    #[getset(get = "pub")]
     pub line_name_h: String,
-    #[getset(get = "pub")]
     pub line_name_r: String,
-    #[getset(get = "pub")]
     pub line_name_zh: Option<String>,
-    #[getset(get = "pub")]
     pub line_name_ko: Option<String>,
-    #[getset(get = "pub")]
     pub line_color_c: String,
-    #[getset(get = "pub")]
     pub line_color_t: String,
-    #[getset(get = "pub")]
     pub line_type: u32,
-    #[getset(get = "pub", set = "pub")]
     pub line_symbols: Vec<LineSymbol>,
-    #[getset(get = "pub")]
     pub line_symbol_primary: Option<String>,
-    #[getset(get = "pub")]
     pub line_symbol_secondary: Option<String>,
-    #[getset(get = "pub")]
     pub line_symbol_extra: Option<String>,
-    #[getset(get = "pub")]
     pub line_symbol_primary_color: Option<String>,
-    #[getset(get = "pub")]
     pub line_symbol_secondary_color: Option<String>,
-    #[getset(get = "pub")]
     pub line_symbol_extra_color: Option<String>,
-    #[getset(get = "pub")]
     pub line_symbol_primary_shape: Option<String>,
-    #[getset(get = "pub")]
     pub line_symbol_secondary_shape: Option<String>,
-    #[getset(get = "pub")]
     pub line_symbol_extra_shape: Option<String>,
-    #[getset(get = "pub")]
     pub lon: f64,
-    #[getset(get = "pub")]
     pub lat: f64,
-    #[getset(get = "pub")]
     pub zoom: u32,
-    #[getset(get = "pub")]
     pub e_status: u32,
-    #[getset(get = "pub")]
     pub e_sort: u32,
-    #[getset(get = "pub", set = "pub")]
-    pub station: Option<GrpcStation>,
+    pub station: Option<Station>,
 }
 
 impl Line {
@@ -93,7 +66,7 @@ impl Line {
         zoom: u32,
         e_status: u32,
         e_sort: u32,
-        station: Option<GrpcStation>,
+        station: Option<Station>,
     ) -> Self {
         Self {
             line_cd,

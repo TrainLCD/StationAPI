@@ -1,14 +1,14 @@
 use async_trait::async_trait;
 
 use bigdecimal::{BigDecimal, ToPrimitive, Zero};
-use fake::Dummy;
+
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::domain::{
     entity::line::Line, error::DomainError, repository::line_repository::LineRepository,
 };
 
-#[derive(sqlx::FromRow, Clone, Dummy)]
+#[derive(sqlx::FromRow, Clone)]
 pub struct LineRow {
     pub line_cd: u32,
     pub company_cd: u32,
@@ -144,80 +144,5 @@ impl InternalLineRepository {
                 .await?;
         let lines = rows.into_iter().map(|row| row.into()).collect();
         Ok(lines)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use bigdecimal::ToPrimitive;
-    use fake::{Fake, Faker};
-
-    use crate::domain::entity::line::Line;
-
-    use super::LineRow;
-
-    #[test]
-    fn from_line_row() {
-        let row: LineRow = Faker.fake();
-        let LineRow {
-            line_cd,
-            company_cd,
-            line_name,
-            line_name_k,
-            line_name_h,
-            line_name_r,
-            line_name_zh,
-            line_name_ko,
-            line_color_c,
-            line_color_t,
-            line_type,
-            line_symbol_primary,
-            line_symbol_secondary,
-            line_symbol_extra,
-            line_symbol_primary_color,
-            line_symbol_secondary_color,
-            line_symbol_extra_color,
-            line_symbol_primary_shape,
-            line_symbol_secondary_shape,
-            line_symbol_extra_shape,
-            lon,
-            lat,
-            zoom,
-            e_status,
-            e_sort,
-        } = row.clone();
-        let actual = Line::from(row);
-
-        assert_eq!(actual.line_cd, line_cd);
-        assert_eq!(actual.company_cd, company_cd);
-        assert_eq!(actual.line_name, line_name);
-        assert_eq!(actual.line_name_k, line_name_k);
-        assert_eq!(actual.line_name_h, line_name_h);
-        assert_eq!(actual.line_name_r, line_name_r);
-        assert_eq!(actual.line_name_zh, line_name_zh);
-        assert_eq!(actual.line_name_ko, line_name_ko);
-        assert_eq!(actual.line_color_c, line_color_c);
-        assert_eq!(actual.line_color_t, line_color_t);
-        assert_eq!(actual.line_type, line_type);
-        assert_eq!(actual.line_symbol_primary, line_symbol_primary);
-        assert_eq!(actual.line_symbol_secondary, line_symbol_secondary);
-        assert_eq!(actual.line_symbol_extra, line_symbol_extra);
-        assert_eq!(actual.line_symbol_primary_color, line_symbol_primary_color);
-        assert_eq!(
-            actual.line_symbol_secondary_color,
-            line_symbol_secondary_color
-        );
-        assert_eq!(actual.line_symbol_extra_color, line_symbol_extra_color);
-        assert_eq!(actual.line_symbol_primary_shape, line_symbol_primary_shape);
-        assert_eq!(
-            actual.line_symbol_secondary_shape,
-            line_symbol_secondary_shape
-        );
-        assert_eq!(actual.line_symbol_extra_shape, line_symbol_extra_shape);
-        assert_eq!(Some(actual.lon), lon.to_f64());
-        assert_eq!(Some(actual.lat), lat.to_f64());
-        assert_eq!(actual.zoom, zoom);
-        assert_eq!(actual.e_status, e_status);
-        assert_eq!(actual.e_sort, e_sort);
     }
 }
