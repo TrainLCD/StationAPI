@@ -1,9 +1,12 @@
 use std::sync::Arc;
 
+use bigdecimal::ToPrimitive;
+use moka::sync::Cache;
 use sqlx::{MySql, Pool};
 use tonic::Response;
 
 use crate::{
+    domain::entity::{line::Line, station::Station},
     infrastructure::{line_repository::MyLineRepository, station_repository::MyStationRepository},
     pb::{
         station_api_server::StationApi, GetStationByCoordinatesRequest, GetStationByGroupIdRequest,
@@ -14,14 +17,19 @@ use crate::{
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
 
+const CACHE_SIZE: usize = 10_000;
+
 pub struct GrpcRouter {
     query_use_case: QueryInteractor<MyStationRepository, MyLineRepository>,
 }
 
 impl GrpcRouter {
     pub fn new(pool: Pool<MySql>) -> Self {
-        let station_repository = MyStationRepository::new(pool.clone());
-        let line_repository = MyLineRepository::new(pool);
+        let station_repository_cache =
+            Cache::<String, Vec<Station>>::new(CACHE_SIZE.to_u64().unwrap());
+        let station_repository = MyStationRepository::new(pool.clone(), station_repository_cache);
+        let line_repository_cache = Cache::<String, Vec<Line>>::new(CACHE_SIZE.to_u64().unwrap());
+        let line_repository = MyLineRepository::new(pool, line_repository_cache);
         let query_use_case = QueryInteractor {
             station_repository,
             line_repository,

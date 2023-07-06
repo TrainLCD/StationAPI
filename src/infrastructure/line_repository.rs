@@ -2,6 +2,7 @@ use async_trait::async_trait;
 
 use bigdecimal::{BigDecimal, ToPrimitive, Zero};
 
+use moka::sync::Cache;
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::domain::{
@@ -75,11 +76,12 @@ impl From<LineRow> for Line {
 #[derive(Debug, Clone)]
 pub struct MyLineRepository {
     pool: Pool<MySql>,
+    cache: Cache<String, Vec<Line>>,
 }
 
 impl MyLineRepository {
-    pub fn new(pool: Pool<MySql>) -> Self {
-        Self { pool }
+    pub fn new(pool: Pool<MySql>, cache: Cache<String, Vec<Line>>) -> Self {
+        Self { pool, cache }
     }
 }
 

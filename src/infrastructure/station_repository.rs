@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, ToPrimitive};
+use moka::sync::Cache;
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::domain::{
@@ -138,11 +139,12 @@ impl From<StationWithDistanceRow> for Station {
 #[derive(Debug, Clone)]
 pub struct MyStationRepository {
     pool: Pool<MySql>,
+    cache: Cache<String, Vec<Station>>,
 }
 
 impl MyStationRepository {
-    pub fn new(pool: Pool<MySql>) -> Self {
-        Self { pool }
+    pub fn new(pool: Pool<MySql>, cache: Cache<String, Vec<Station>>) -> Self {
+        Self { pool, cache }
     }
 }
 
