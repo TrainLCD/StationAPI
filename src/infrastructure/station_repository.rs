@@ -3,9 +3,7 @@ use bigdecimal::{BigDecimal, ToPrimitive};
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::domain::{
-    entity::{station::Station, train_type::TrainType},
-    error::DomainError,
-    repository::station_repository::StationRepository,
+    entity::station::Station, error::DomainError, repository::station_repository::StationRepository,
 };
 
 #[derive(sqlx::FromRow, Clone)]
@@ -66,7 +64,6 @@ impl From<StationRow> for Station {
             close_ymd: row.close_ymd,
             e_status: row.e_status,
             e_sort: row.e_sort,
-            train_types: vec![],
             pass: false,
             distance: None,
         }
@@ -96,8 +93,6 @@ struct StationWithDistanceRow {
     close_ymd: String,
     e_status: u32,
     e_sort: u32,
-    train_types: Vec<TrainType>,
-    pass: bool,
     distance: Option<f64>,
 }
 
@@ -134,7 +129,6 @@ impl From<StationWithDistanceRow> for Station {
             close_ymd: row.close_ymd,
             e_status: row.e_status,
             e_sort: row.e_sort,
-            train_types: row.train_types,
             pass: false,
             distance: row.distance,
         }

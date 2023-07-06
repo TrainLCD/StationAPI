@@ -1,6 +1,6 @@
 use fake::Dummy;
 
-use super::{line::Line, station_number::StationNumber, train_type::TrainType};
+use super::{line::Line, station_number::StationNumber};
 
 #[derive(Dummy, Clone, Debug)]
 pub struct Station {
@@ -28,7 +28,6 @@ pub struct Station {
     pub close_ymd: String,
     pub e_status: u32,
     pub e_sort: u32,
-    pub train_types: Vec<TrainType>,
     pub pass: bool,
     pub distance: Option<f64>,
 }
@@ -60,8 +59,7 @@ impl Station {
         close_ymd: String,
         e_status: u32,
         e_sort: u32,
-        stop_condition: i32,
-        train_types: Vec<TrainType>,
+        _stop_condition: i32,
         pass: bool,
         distance: Option<f64>,
     ) -> Self {
@@ -90,7 +88,6 @@ impl Station {
             close_ymd,
             e_status,
             e_sort,
-            train_types,
             pass,
             distance,
         }

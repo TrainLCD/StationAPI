@@ -6,27 +6,22 @@ use crate::{
         entity::{
             line::Line, line_symbol::LineSymbol, station::Station, station_number::StationNumber,
         },
-        repository::{
-            line_repository::LineRepository, station_repository::StationRepository,
-            train_type_repository::TrainTypeRepository,
-        },
+        repository::{line_repository::LineRepository, station_repository::StationRepository},
     },
     use_case::{error::UseCaseError, traits::query::QueryUseCase},
 };
 
 #[derive(Debug, Clone)]
-pub struct QueryInteractor<SR, LR, TR> {
+pub struct QueryInteractor<SR, LR> {
     pub station_repository: SR,
     pub line_repository: LR,
-    pub train_type_repository: TR,
 }
 
 #[async_trait]
-impl<SR, LR, TR> QueryUseCase for QueryInteractor<SR, LR, TR>
+impl<SR, LR> QueryUseCase for QueryInteractor<SR, LR>
 where
     SR: StationRepository,
     LR: LineRepository,
-    TR: TrainTypeRepository,
 {
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
         let Some(mut station) = self.station_repository.find_by_id(station_id).await? else {

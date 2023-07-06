@@ -31,11 +31,7 @@ impl From<Station> for GrpcStation {
                 .collect(),
             stop_condition: StopCondition::All.into(),
             distance: station.distance,
-            train_types: station
-                .train_types
-                .into_iter()
-                .map(|tt| tt.into())
-                .collect(),
+            train_types: vec![],
             pass: station.pass,
         }
     }

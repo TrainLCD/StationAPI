@@ -4,10 +4,7 @@ use sqlx::{MySql, Pool};
 use tonic::Response;
 
 use crate::{
-    infrastructure::{
-        line_repository::MyLineRepository, station_repository::MyStationRepository,
-        train_type_repository::MyTrainTypeRepository,
-    },
+    infrastructure::{line_repository::MyLineRepository, station_repository::MyStationRepository},
     pb::{
         station_api_server::StationApi, GetStationByCoordinatesRequest, GetStationByGroupIdRequest,
         GetStationByIdRequest, GetStationByLineIdRequest, GetStationByNameRequest,
@@ -18,18 +15,16 @@ use crate::{
 };
 
 pub struct GrpcRouter {
-    query_use_case: QueryInteractor<MyStationRepository, MyLineRepository, MyTrainTypeRepository>,
+    query_use_case: QueryInteractor<MyStationRepository, MyLineRepository>,
 }
 
 impl GrpcRouter {
     pub fn new(pool: Pool<MySql>) -> Self {
         let station_repository = MyStationRepository::new(pool.clone());
-        let line_repository = MyLineRepository::new(pool.clone());
-        let train_type_repository = MyTrainTypeRepository::new(pool);
+        let line_repository = MyLineRepository::new(pool);
         let query_use_case = QueryInteractor {
             station_repository,
             line_repository,
-            train_type_repository,
         };
         Self { query_use_case }
     }
