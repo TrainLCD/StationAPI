@@ -154,20 +154,22 @@ const DEFAULT_COLUMN_COUNT: u32 = 1;
 impl StationRepository for MyStationRepository {
     async fn find_by_id(&self, id: u32) -> Result<Option<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::find_by_id(id, &mut conn).await
+        InternalStationRepository::find_by_id(id, &mut conn, &self.cache).await
     }
     async fn get_by_line_id(&self, line_id: u32) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_by_line_id(line_id, &mut conn).await
+        InternalStationRepository::get_by_line_id(line_id, &mut conn, &self.cache).await
     }
     async fn get_by_station_group_id(
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn: sqlx::pool::PoolConnection<MySql> = self.pool.acquire().await?;
-        InternalStationRepository::get_by_station_group_id(station_group_id, &mut conn).await
+        InternalStationRepository::get_by_station_group_id(station_group_id, &mut conn, &self.cache)
+            .await
     }
 
+    // ほぼ確実にキャッシュがヒットしないと思うのでキャッシュを使わない
     async fn get_stations_by_coordinates(
         &self,
         latitude: f64,
@@ -187,7 +189,8 @@ impl StationRepository for MyStationRepository {
         limit: Option<u32>,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_stations_by_name(station_name, limit, &mut conn).await
+        InternalStationRepository::get_stations_by_name(station_name, limit, &mut conn, &self.cache)
+            .await
     }
 }
 
@@ -197,7 +200,15 @@ impl InternalStationRepository {
     async fn find_by_id(
         id: u32,
         conn: &mut MySqlConnection,
+        cache: &Cache<String, Vec<Station>>,
     ) -> Result<Option<Station>, DomainError> {
+        let cache_key = format!("station_repository:find_by_id:{}", id);
+        if let Some(cache_data) = cache.get(&cache_key) {
+            if let Some(cache_data) = cache_data.first() {
+                return Ok(Some(cache_data.clone()));
+            }
+        };
+
         let rows: Option<StationRow> =
             sqlx::query_as("SELECT * FROM stations WHERE station_cd = ? AND e_status = 0 ORDER BY e_sort, station_cd")
                 .bind(id)
@@ -206,12 +217,22 @@ impl InternalStationRepository {
 
         let station = rows.map(|row| row.into());
 
+        if let Some(station) = station.clone() {
+            cache.insert(cache_key, vec![station]);
+        }
+
         Ok(station)
     }
     async fn get_by_line_id(
         line_id: u32,
         conn: &mut MySqlConnection,
+        cache: &Cache<String, Vec<Station>>,
     ) -> Result<Vec<Station>, DomainError> {
+        let cache_key = format!("station_repository:get_by_line_id:{}", line_id);
+        if let Some(cache_data) = cache.get(&cache_key) {
+            return Ok(cache_data);
+        };
+
         let station_row: Vec<StationRow> = sqlx::query_as(
             "SELECT * FROM stations WHERE line_cd = ? AND e_status = 0 ORDER BY e_sort, station_cd",
         )
@@ -219,7 +240,9 @@ impl InternalStationRepository {
         .fetch_all(conn)
         .await?;
 
-        let stations = station_row.into_iter().map(|row| row.into()).collect();
+        let stations: Vec<Station> = station_row.into_iter().map(|row| row.into()).collect();
+
+        cache.insert(cache_key, stations.clone());
 
         Ok(stations)
     }
@@ -227,14 +250,22 @@ impl InternalStationRepository {
     async fn get_by_station_group_id(
         group_id: u32,
         conn: &mut MySqlConnection,
+        cache: &Cache<String, Vec<Station>>,
     ) -> Result<Vec<Station>, DomainError> {
+        let cache_key = format!("station_repository:get_by_station_group_id:{}", group_id);
+        if let Some(cache_data) = cache.get(&cache_key) {
+            return Ok(cache_data);
+        };
+
         let rows: Vec<StationRow> =
             sqlx::query_as("SELECT * FROM stations WHERE station_g_cd = ? AND e_status = 0 ORDER BY e_sort, station_cd")
                 .bind(group_id)
                 .fetch_all(conn)
                 .await?;
 
-        let stations = rows.into_iter().map(|row| row.into()).collect();
+        let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
+
+        cache.insert(cache_key, stations.clone());
 
         Ok(stations)
     }
@@ -286,7 +317,13 @@ impl InternalStationRepository {
         station_name: String,
         limit: Option<u32>,
         conn: &mut MySqlConnection,
+        cache: &Cache<String, Vec<Station>>,
     ) -> Result<Vec<Station>, DomainError> {
+        let cache_key = format!("station_repository:get_stations_by_name:{}", station_name);
+        if let Some(cache_data) = cache.get(&cache_key) {
+            return Ok(cache_data);
+        };
+
         let query_str: String = format!(
             "SELECT * FROM stations
             WHERE (
@@ -307,12 +344,14 @@ impl InternalStationRepository {
             station_name,
             limit.unwrap_or(DEFAULT_COLUMN_COUNT)
         );
-        let result = sqlx::query_as::<_, StationRow>(&query_str)
+        let rows = sqlx::query_as::<_, StationRow>(&query_str)
             .fetch_all(conn)
-            .await;
-        match result {
-            Ok(rows) => Ok(rows.into_iter().map(|row| row.into()).collect()),
-            Err(err) => Err(err.into()),
-        }
+            .await?;
+
+        let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
+
+        cache.insert(cache_key, stations.clone());
+
+        Ok(stations)
     }
 }
