@@ -164,11 +164,6 @@ where
         Ok(())
     }
 
-    async fn get_lines_by_ids(&self, line_ids: Vec<u32>) -> Result<Vec<Line>, UseCaseError> {
-        let lines = self.line_repository.get_by_ids(line_ids).await?;
-        Ok(lines)
-    }
-
     async fn get_lines_by_station_group_id(
         &self,
         station_group_id: u32,
