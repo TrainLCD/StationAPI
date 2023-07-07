@@ -89,37 +89,69 @@ impl MyLineRepository {
 impl LineRepository for MyLineRepository {
     async fn find_by_id(&self, id: u32) -> Result<Option<Line>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalLineRepository::find_by_id(id, &mut conn).await
+        InternalLineRepository::find_by_id(id, &mut conn, &self.cache).await
     }
     async fn get_by_ids(&self, ids: Vec<u32>) -> Result<Vec<Line>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalLineRepository::get_by_ids(ids, &mut conn).await
+        InternalLineRepository::get_by_ids(ids, &mut conn, &self.cache).await
     }
     async fn get_by_station_group_id(&self, id: u32) -> Result<Vec<Line>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalLineRepository::get_by_station_group_id(id, &mut conn).await
+        InternalLineRepository::get_by_station_group_id(id, &mut conn, &self.cache).await
     }
 }
 
 pub struct InternalLineRepository {}
 
 impl InternalLineRepository {
-    async fn find_by_id(id: u32, conn: &mut MySqlConnection) -> Result<Option<Line>, DomainError> {
+    async fn find_by_id(
+        id: u32,
+        conn: &mut MySqlConnection,
+        cache: &Cache<String, Vec<Line>>,
+    ) -> Result<Option<Line>, DomainError> {
+        let cache_key = format!("line_repository:find_by_id:{}", id);
+        if let Some(cache_data) = cache.get(&cache_key) {
+            if let Some(cache_data) = cache_data.first() {
+                return Ok(Some(cache_data.clone()));
+            }
+        };
+
         let rows: Option<LineRow> =
             sqlx::query_as("SELECT * FROM `lines` WHERE line_cd = ? AND e_status = 0")
                 .bind(id)
                 .fetch_optional(conn)
                 .await?;
-        Ok(rows.map(|row| row.into()))
+        let line: Option<Line> = rows.map(|row| row.into());
+
+        if let Some(line) = line.clone() {
+            cache.insert(cache_key, vec![line]);
+        }
+
+        Ok(line)
     }
 
     async fn get_by_ids(
         ids: Vec<u32>,
         conn: &mut MySqlConnection,
+        cache: &Cache<String, Vec<Line>>,
     ) -> Result<Vec<Line>, DomainError> {
         if ids.len().is_zero() {
             return Ok(vec![]);
         }
+
+        let cache_key = format!(
+            "line_repository:get_by_ids:{}",
+            ids.clone()
+                .into_iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<String>>()
+                .join(",")
+        );
+
+        if let Some(cache_data) = cache.get(&cache_key) {
+            return Ok(cache_data);
+        };
+
         let params = format!("?{}", ", ?".repeat(ids.len() - 1));
         let query_str = format!(
             "SELECT * FROM `lines` WHERE line_cd IN ( {} ) AND e_status = 0",
@@ -132,19 +164,33 @@ impl InternalLineRepository {
         }
 
         let rows = query.fetch_all(conn).await?;
-        Ok(rows.into_iter().map(|row| row.into()).collect())
+        let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
+
+        cache.insert(cache_key, lines.clone());
+        Ok(lines)
     }
 
     async fn get_by_station_group_id(
         station_group_id: u32,
         conn: &mut MySqlConnection,
+        cache: &Cache<String, Vec<Line>>,
     ) -> Result<Vec<Line>, DomainError> {
+        let cache_key = format!(
+            "line_repository:get_by_station_group_id:{}",
+            station_group_id
+        );
+        if let Some(cache_data) = cache.get(&cache_key) {
+            return Ok(cache_data);
+        };
+
         let rows: Vec<LineRow> =
             sqlx::query_as("SELECT * FROM `lines` WHERE line_cd IN (SELECT line_cd FROM stations WHERE station_g_cd = ? AND e_status = 0) AND e_status = 0")
                 .bind(station_group_id)
                 .fetch_all(conn)
                 .await?;
-        let lines = rows.into_iter().map(|row| row.into()).collect();
+        let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
+
+        cache.insert(cache_key, lines.clone());
         Ok(lines)
     }
 }
