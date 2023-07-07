@@ -123,18 +123,21 @@ where
         let mut lines_tmp: Vec<Option<Line>> = vec![None; lines.len()];
 
         for (index, ref mut line) in lines.into_iter().enumerate() {
-            if let Some(mut belong_station_for_line) = self
+            if let Ok(mut stations) = self
                 .station_repository
-                .find_by_id(station.station_cd)
-                .await?
+                .get_by_station_group_id(station.station_g_cd)
+                .await
             {
-                let belong_station_numbers = self.get_station_numbers(
-                    Box::new(belong_station_for_line.to_owned()),
-                    Box::new(line.to_owned()),
-                );
-                belong_station_for_line.station_numbers = belong_station_numbers;
-                line.station = Some(belong_station_for_line);
-            }
+                stations.iter_mut().for_each(|station| {
+                    if station.line_cd == line.line_cd {
+                        station.station_numbers = self.get_station_numbers(
+                            Box::new(station.to_owned()),
+                            Box::new(line.to_owned()),
+                        );
+                        line.station = Some(station.to_owned());
+                    }
+                });
+            };
 
             line.line_symbols = self.get_line_symbols(line);
             lines_tmp[index] = Some(line.clone());
