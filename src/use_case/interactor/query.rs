@@ -1,3 +1,5 @@
+use std::vec;
+
 use async_trait::async_trait;
 use bigdecimal::Zero;
 
@@ -110,56 +112,47 @@ where
         &self,
         station: &mut Station,
     ) -> Result<(), UseCaseError> {
-        let belong_lines = match self.find_line_by_id(station.line_cd).await {
+        let belong_line = match self.find_line_by_id(station.line_cd).await {
             Ok(line) => line,
             Err(err) => return Err(UseCaseError::Unexpected(err.to_string())),
         };
 
-        let lines: &mut Vec<Line> = &mut self
+        let lines = self
             .get_lines_by_station_group_id(station.station_g_cd)
             .await?;
-        let mut mut_lines = vec![];
+        let mut lines_tmp: Vec<Option<Line>> = vec![None; lines.len()];
 
-        for line in lines.iter_mut() {
-            let stations = self.station_repository.get_by_line_id(line.line_cd).await?;
-            let belong_station = stations.into_iter().find_map(|station| {
-                if line.line_cd == station.line_cd {
-                    Some(station)
-                } else {
-                    None
-                }
-            });
+        for (index, ref mut line) in lines.into_iter().enumerate() {
+            if let Ok(mut stations) = self
+                .station_repository
+                .get_by_station_group_id(station.station_g_cd)
+                .await
+            {
+                stations.iter_mut().for_each(|station| {
+                    if station.line_cd == line.line_cd {
+                        station.station_numbers = self.get_station_numbers(
+                            Box::new(station.to_owned()),
+                            Box::new(line.to_owned()),
+                        );
+                        line.station = Some(station.to_owned());
+                    }
+                });
+            };
 
-            line.station = belong_station;
             line.line_symbols = self.get_line_symbols(line);
-            mut_lines.push(line);
+            lines_tmp[index] = Some(line.clone());
         }
 
-        // line.station = station;
-        // line.line_symbols = self.get_line_symbols(&line);
-        // });
+        station.lines = lines_tmp.into_iter().flatten().collect();
 
-        // let belong_line = belong_lines.clone().into_iter().find(|line| {
-        //     let Some(station_line) = *station.line;
-        //     station_line.line_cd == line.line_cd
-        // });
-
-        let belong_line = belong_lines
-            .into_iter()
-            .find(|line| line.line_cd == station.line_cd);
-
-        let Some(mut belong_line) = belong_line else {
-            return Err(UseCaseError::Unexpected(
-                "station does not belong to any line".to_string(),
-            ));
-        };
-
-        let line_symbols = self.get_line_symbols(&belong_line);
-        belong_line.line_symbols = line_symbols;
-        let station_numbers: Vec<StationNumber> = self.get_station_numbers(station, &belong_line);
-        station.station_numbers = station_numbers;
-        station.line = Some(Box::new(belong_line));
-        station.lines = mut_lines.into_iter().map(|line| line.to_owned()).collect();
+        if let Some(belong_line) = &belong_line {
+            let station_numbers: Vec<StationNumber> = self.get_station_numbers(
+                Box::new(station.to_owned()),
+                Box::new(belong_line.to_owned()),
+            );
+            station.station_numbers = station_numbers;
+            station.line = Some(Box::new(belong_line.to_owned()));
+        }
 
         Ok(())
     }
@@ -175,84 +168,55 @@ where
         Ok(lines)
     }
 
-    fn get_station_numbers(&self, station: &Station, line: &Line) -> Vec<StationNumber> {
+    fn get_station_numbers(
+        &self,
+        boxed_station: Box<Station>,
+        boxed_line: Box<Line>,
+    ) -> Vec<StationNumber> {
+        let line = *boxed_line;
         let line_symbol_primary = &line.line_symbol_primary;
         let line_symbol_secondary = &line.line_symbol_secondary;
         let line_symbol_extra = &line.line_symbol_extra;
-
         let line_symbols_raw = vec![
             line_symbol_primary,
             line_symbol_secondary,
             line_symbol_extra,
         ];
 
-        let Some(ref line_symbol_primary_color) = line.line_symbol_primary_color else {
-            return vec![];
-        };
-        let Some(ref line_symbol_secondary_color) = line.line_symbol_secondary_color else {
-            return vec![];
-        };
-        let Some(ref line_symbol_extra_color) = line.line_symbol_extra_color else {
-            return vec![];
-        };
-
         let line_symbol_colors_raw: Vec<String> = vec![
-            line_symbol_primary_color.to_string(),
-            line_symbol_secondary_color.to_string(),
-            line_symbol_extra_color.to_string(),
+            line.line_symbol_primary_color.unwrap_or("".to_string()),
+            line.line_symbol_secondary_color.unwrap_or("".to_string()),
+            line.line_symbol_extra_color.unwrap_or("".to_string()),
         ];
 
-        let Some(ref primary_station_number) = station.primary_station_number else {
-            return vec![];
-        };
-        let Some(ref secondary_station_number) = station.secondary_station_number else {
-            return vec![];
-        };
-        let Some(ref extra_station_number) = station.extra_station_number else {
-            return vec![];
-        };
+        let station = *boxed_station;
 
         let station_numbers_raw = vec![
-            primary_station_number,
-            secondary_station_number,
-            extra_station_number,
+            station.primary_station_number.unwrap_or("".to_string()),
+            station.secondary_station_number.unwrap_or("".to_string()),
+            station.extra_station_number.unwrap_or("".to_string()),
         ];
-
-        let Some(ref line_symbol_primary_shape) = line.line_symbol_primary_shape else {
-            return vec![];
-        };
-        let Some(ref line_symbol_secondary_shape) = line.line_symbol_secondary_shape else {
-            return vec![];
-        };
-        let Some(ref line_symbol_extra_shape) = line.line_symbol_extra_shape else {
-        return vec![];
-        };
 
         let line_symbols_shape_raw: Vec<String> = vec![
-            line_symbol_primary_shape.to_string(),
-            line_symbol_secondary_shape.to_string(),
-            line_symbol_extra_shape.to_string(),
+            line.line_symbol_primary_shape.unwrap_or("".to_string()),
+            line.line_symbol_secondary_shape.unwrap_or("".to_string()),
+            line.line_symbol_extra_shape.unwrap_or("".to_string()),
         ];
-
-        if station_numbers_raw.len().is_zero() {
-            return vec![];
-        }
 
         let mut station_numbers: Vec<StationNumber> = Vec::with_capacity(station_numbers_raw.len());
 
-        (0..station_numbers_raw.len()).for_each(|index| {
-            let Some(num) = station_numbers_raw.get(index) else {
-                return;
-            };
+        for (index, station_number) in station_numbers_raw.into_iter().enumerate() {
             let sym_color = line_symbol_colors_raw[index].to_string();
             let sym_shape = line_symbols_shape_raw[index].to_string();
-            let Some(ref sym) = line_symbols_raw[index] else {return};
 
-            if sym.is_empty() || num.is_empty() {
-                return;
+            let Some(sym) = line_symbols_raw[index] else {
+                return station_numbers;
+            };
+            if station_number.is_empty() {
+                return station_numbers;
             }
 
-            let station_number_string = format!("{}-{}", sym, num);
+            let station_number_string = format!("{}-{}", sym, station_number);
 
             let station_number = StationNumber {
                 line_symbol: sym.to_string(),
@@ -262,7 +226,7 @@ where
             };
 
             station_numbers.push(station_number);
-        });
+        }
 
         station_numbers
     }
