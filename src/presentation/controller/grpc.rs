@@ -107,9 +107,11 @@ impl StationApi for GrpcRouter {
         let line_id = request.get_ref().line_id;
 
         match self.query_use_case.get_stations_by_line_id(line_id).await {
-            Ok(stations) => Ok(Response::new(MultipleStationResponse {
-                stations: stations.into_iter().map(|station| station.into()).collect(),
-            })),
+            Ok(stations) => {
+                return Ok(Response::new(MultipleStationResponse {
+                    stations: stations.into_iter().map(|station| station.into()).collect(),
+                }));
+            }
             Err(err) => Err(PresentationalError::from(err).into()),
         }
     }

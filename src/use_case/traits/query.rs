@@ -37,6 +37,10 @@ pub trait QueryUseCase: Send + Sync + 'static {
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Line>, UseCaseError>;
-    fn get_station_numbers(&self, station: &Station, line: &Line) -> Vec<StationNumber>;
+    fn get_station_numbers(
+        &self,
+        boxed_station: Box<Station>,
+        boxed_line: Box<Line>,
+    ) -> Vec<StationNumber>;
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol>;
 }
