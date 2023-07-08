@@ -30,6 +30,7 @@ struct StationRow {
     close_ymd: String,
     e_status: u32,
     e_sort: u32,
+    pass: i64,
     station_types_count: i64,
 }
 
@@ -66,75 +67,8 @@ impl From<StationRow> for Station {
             close_ymd: row.close_ymd,
             e_status: row.e_status,
             e_sort: row.e_sort,
-            pass: false,
+            pass: row.pass,
             distance: None,
-            station_types_count: row.station_types_count,
-        }
-    }
-}
-
-#[derive(sqlx::FromRow, Clone)]
-struct StationWithDistanceRow {
-    station_cd: u32,
-    station_g_cd: u32,
-    station_name: String,
-    station_name_k: String,
-    station_name_r: String,
-    station_name_zh: String,
-    station_name_ko: String,
-    primary_station_number: Option<String>,
-    secondary_station_number: Option<String>,
-    extra_station_number: Option<String>,
-    three_letter_code: Option<String>,
-    line_cd: u32,
-    pref_cd: u32,
-    post: String,
-    address: String,
-    lon: BigDecimal,
-    lat: BigDecimal,
-    open_ymd: String,
-    close_ymd: String,
-    e_status: u32,
-    e_sort: u32,
-    distance: Option<f64>,
-    station_types_count: i64,
-}
-
-impl From<StationWithDistanceRow> for Station {
-    fn from(row: StationWithDistanceRow) -> Self {
-        Self {
-            station_cd: row.station_cd,
-            station_g_cd: row.station_g_cd,
-            station_name: row.station_name,
-            station_name_k: row.station_name_k,
-            station_name_r: row.station_name_r,
-            station_name_zh: row.station_name_zh,
-            station_name_ko: row.station_name_ko,
-            station_numbers: vec![],
-            primary_station_number: row.primary_station_number,
-            secondary_station_number: row.secondary_station_number,
-            extra_station_number: row.extra_station_number,
-            three_letter_code: row.three_letter_code,
-            line_cd: row.line_cd,
-            line: None,
-            lines: vec![],
-            pref_cd: row.pref_cd,
-            post: row.post,
-            address: row.address,
-            lon: row
-                .lon
-                .to_f64()
-                .expect("Failed to convert BigDecimal to f64"),
-            lat: row
-                .lat
-                .to_f64()
-                .expect("Failed to convert BigDecimal to f64"),
-            open_ymd: row.open_ymd,
-            close_ymd: row.close_ymd,
-            e_status: row.e_status,
-            e_sort: row.e_sort,
-            pass: false,
-            distance: row.distance,
             station_types_count: row.station_types_count,
         }
     }
@@ -215,7 +149,8 @@ impl InternalStationRepository {
         };
 
         let rows: Option<StationRow> = sqlx::query_as(
-            "SELECT s.*, (
+            "SELECT s.*, 0 AS pass,
+            (
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
@@ -248,7 +183,7 @@ impl InternalStationRepository {
         };
 
         let station_row: Vec<StationRow> = sqlx::query_as(
-            "SELECT s.*, (
+            "SELECT s.*, 0 AS pass, (
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
@@ -280,7 +215,8 @@ impl InternalStationRepository {
         };
 
         let rows: Vec<StationRow> = sqlx::query_as(
-            "SELECT s.*, (
+            "SELECT s.*, 0 AS pass,
+            (
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
@@ -307,7 +243,7 @@ impl InternalStationRepository {
         limit: Option<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let query_str = "SELECT s1.*,
+        let query_str = "SELECT s1.*, 0 AS pass,
         (
           6371 * acos(
           cos(radians(?))
@@ -361,7 +297,7 @@ impl InternalStationRepository {
         };
 
         let query_str: String = format!(
-            "SELECT s.*,
+            "SELECT s.*, 0 AS pass,
             (
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
@@ -408,17 +344,18 @@ impl InternalStationRepository {
         };
 
         let rows: Vec<StationRow> = sqlx::query_as(
-            "SELECT s.*,
+            "SELECT *,
             (
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
-            ) AS station_types_count
+            ) AS station_types_count,
+            CONVERT(sst.pass, SIGNED) as pass
             FROM station_station_types as sst, stations as s
             WHERE sst.line_group_cd = ?
             AND s.station_cd = sst.station_cd
             AND s.e_status = 0
-            ORDER BY e_sort, station_cd",
+            ORDER BY s.e_sort, s.station_cd",
         )
         .bind(line_group_id)
         .fetch_all(conn)

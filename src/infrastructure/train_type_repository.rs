@@ -53,7 +53,6 @@ impl From<TrainTypeRow> for TrainType {
             type_name_ko,
             color,
             direction,
-            stations: vec![],
             lines: vec![],
         }
     }

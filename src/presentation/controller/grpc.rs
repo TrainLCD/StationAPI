@@ -148,7 +148,7 @@ impl StationApi for GrpcRouter {
         request: tonic::Request<GetStationsByLineGroupIdRequest>,
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let request_ref = request.get_ref();
-        let query_line_group_id = request_ref.line_group_id.clone();
+        let query_line_group_id = request_ref.line_group_id;
 
         match self
             .query_use_case
@@ -167,7 +167,7 @@ impl StationApi for GrpcRouter {
         request: tonic::Request<GetTrainTypesByStationIdRequest>,
     ) -> Result<tonic::Response<MultipleTrainTypeResponse>, tonic::Status> {
         let request_ref: &GetTrainTypesByStationIdRequest = request.get_ref();
-        let query_station_id = request_ref.station_id.clone();
+        let query_station_id = request_ref.station_id;
 
         match self
             .query_use_case

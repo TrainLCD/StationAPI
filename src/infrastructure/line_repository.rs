@@ -99,6 +99,10 @@ impl LineRepository for MyLineRepository {
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_station_group_id(id, &mut conn, &self.cache).await
     }
+    async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Line>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalLineRepository::get_by_line_group_id(line_group_id, &mut conn, &self.cache).await
+    }
 }
 
 pub struct InternalLineRepository {}
@@ -188,6 +192,38 @@ impl InternalLineRepository {
                 .bind(station_group_id)
                 .fetch_all(conn)
                 .await?;
+        let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
+
+        cache.insert(cache_key, lines.clone());
+        Ok(lines)
+    }
+
+    async fn get_by_line_group_id(
+        line_group_id: u32,
+        conn: &mut MySqlConnection,
+        cache: &Cache<String, Vec<Line>>,
+    ) -> Result<Vec<Line>, DomainError> {
+        let cache_key = format!("line_repository:get_by_line_group_id:{}", line_group_id);
+        if let Some(cache_data) = cache.get(&cache_key) {
+            return Ok(cache_data);
+        };
+
+        let rows: Vec<LineRow> = sqlx::query_as(
+            "SELECT l.*
+            FROM `lines` AS l
+            WHERE line_cd
+            IN (
+                SELECT line_cd
+                FROM stations AS s
+                INNER JOIN station_station_types AS sst
+                ON s.station_cd = sst.station_cd
+                AND line_group_cd = ?
+            )
+            AND e_status = 0",
+        )
+        .bind(line_group_id)
+        .fetch_all(conn)
+        .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
 
         cache.insert(cache_key, lines.clone());

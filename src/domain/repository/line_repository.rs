@@ -12,4 +12,5 @@ pub trait LineRepository: Send + Sync + 'static {
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Line>, DomainError>;
+    async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Line>, DomainError>;
 }

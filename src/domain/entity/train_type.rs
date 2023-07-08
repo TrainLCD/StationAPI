@@ -1,6 +1,6 @@
 use fake::Dummy;
 
-use super::{line::Line, station::Station};
+use super::line::Line;
 
 #[derive(Dummy, Clone, Debug)]
 pub struct TrainType {
@@ -16,7 +16,6 @@ pub struct TrainType {
     pub type_name_ko: String,
     pub color: String,
     pub direction: u32,
-    pub stations: Vec<Station>,
     pub lines: Vec<Line>,
 }
 
@@ -49,7 +48,6 @@ impl TrainType {
             type_name_ko,
             color,
             direction,
-            stations: vec![],
             lines: vec![],
         }
     }

@@ -33,6 +33,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
     async fn update_station_with_attributes(
         &self,
         station: &mut Station,
+        shallow: bool,
     ) -> Result<(), UseCaseError>;
     async fn get_lines_by_station_group_id(
         &self,

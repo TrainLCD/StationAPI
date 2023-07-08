@@ -37,7 +37,7 @@ where
         };
         let station = &mut station;
 
-        self.update_station_with_attributes(station).await?;
+        self.update_station_with_attributes(station, false).await?;
         Ok(Some(station.clone()))
     }
 
@@ -53,7 +53,8 @@ where
         let mut result: Vec<Station> = vec![];
 
         for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station, false)
+                .await?;
             result.push(station);
         }
 
@@ -73,7 +74,8 @@ where
         let mut result: Vec<Station> = vec![];
 
         for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station, false)
+                .await?;
             result.push(station);
         }
 
@@ -85,7 +87,8 @@ where
         let mut result: Vec<Station> = vec![];
 
         for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station, false)
+                .await?;
             result.push(station);
         }
 
@@ -103,7 +106,8 @@ where
         let mut result: Vec<Station> = vec![];
 
         for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station, false)
+                .await?;
             result.push(station);
         }
 
@@ -117,6 +121,7 @@ where
     async fn update_station_with_attributes(
         &self,
         station: &mut Station,
+        shallow: bool,
     ) -> Result<(), UseCaseError> {
         let belong_line = match self.find_line_by_id(station.line_cd).await {
             Ok(line) => line,
@@ -129,19 +134,21 @@ where
         let mut lines_tmp: Vec<Option<Line>> = vec![None; lines.len()];
 
         for (index, ref mut line) in lines.into_iter().enumerate() {
-            let mut stations = self
-                .station_repository
-                .get_by_station_group_id(station.station_g_cd)
-                .await?;
+            if !shallow {
+                let mut stations = self
+                    .station_repository
+                    .get_by_station_group_id(station.station_g_cd)
+                    .await?;
 
-            for station in stations.iter_mut() {
-                if station.line_cd == line.line_cd {
-                    station.station_numbers = self.get_station_numbers(
-                        Box::new(station.to_owned()),
-                        Box::new(line.to_owned()),
-                    );
+                for station in stations.iter_mut() {
+                    if station.line_cd == line.line_cd {
+                        station.station_numbers = self.get_station_numbers(
+                            Box::new(station.to_owned()),
+                            Box::new(line.to_owned()),
+                        );
 
-                    line.station = Some(station.to_owned());
+                        line.station = Some(station.to_owned());
+                    }
                 }
             }
 
@@ -185,7 +192,8 @@ where
         let mut result: Vec<Station> = vec![];
 
         for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station, false)
+                .await?;
             result.push(station);
         }
 
@@ -337,10 +345,19 @@ where
         &self,
         station_id: u32,
     ) -> Result<Vec<TrainType>, UseCaseError> {
-        let train_types = self
+        let mut train_types = self
             .train_type_repository
             .get_by_station_id(station_id)
             .await?;
+
+        // TODO: SQL発行しすぎ罪で即死刑になるので神奈川県警に見つかる前にバッチ的にデータを取れるようにする
+        for tt in train_types.iter_mut() {
+            let lines = self
+                .line_repository
+                .get_by_line_group_id(tt.line_group_cd)
+                .await?;
+            tt.lines = lines;
+        }
 
         Ok(train_types)
     }

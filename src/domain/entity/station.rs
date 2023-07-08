@@ -28,7 +28,7 @@ pub struct Station {
     pub close_ymd: String,
     pub e_status: u32,
     pub e_sort: u32,
-    pub pass: bool,
+    pub pass: i64,
     pub distance: Option<f64>,
     pub station_types_count: i64,
 }
@@ -61,7 +61,7 @@ impl Station {
         e_status: u32,
         e_sort: u32,
         _stop_condition: i32,
-        pass: bool,
+        pass: i64,
         distance: Option<f64>,
         station_types_count: i64,
     ) -> Self {
