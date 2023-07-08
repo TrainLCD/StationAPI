@@ -354,8 +354,7 @@ impl InternalStationRepository {
             FROM station_station_types as sst, stations as s
             WHERE sst.line_group_cd = ?
             AND s.station_cd = sst.station_cd
-            AND s.e_status = 0
-            ORDER BY s.e_sort, s.station_cd",
+            AND s.e_status = 0",
         )
         .bind(line_group_id)
         .fetch_all(conn)

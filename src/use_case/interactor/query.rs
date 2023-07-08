@@ -357,6 +357,8 @@ where
                 .get_by_line_group_id(tt.line_group_cd)
                 .await?;
             tt.lines = lines;
+            let line = self.line_repository.find_by_station_id(station_id).await?;
+            tt.line = line;
         }
 
         Ok(train_types)

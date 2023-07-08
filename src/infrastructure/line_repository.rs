@@ -91,6 +91,10 @@ impl LineRepository for MyLineRepository {
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::find_by_id(id, &mut conn, &self.cache).await
     }
+    async fn find_by_station_id(&self, station_id: u32) -> Result<Option<Line>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalLineRepository::find_by_station_id(station_id, &mut conn, &self.cache).await
+    }
     async fn get_by_ids(&self, ids: Vec<u32>) -> Result<Vec<Line>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_ids(ids, &mut conn, &self.cache).await
@@ -125,6 +129,42 @@ impl InternalLineRepository {
                 .bind(id)
                 .fetch_optional(conn)
                 .await?;
+        let line: Option<Line> = rows.map(|row| row.into());
+
+        if let Some(line) = line.clone() {
+            cache.insert(cache_key, vec![line]);
+        }
+
+        Ok(line)
+    }
+
+    async fn find_by_station_id(
+        station_id: u32,
+        conn: &mut MySqlConnection,
+        cache: &Cache<String, Vec<Line>>,
+    ) -> Result<Option<Line>, DomainError> {
+        let cache_key = format!("line_repository:find_by_station_id:{}", station_id);
+        if let Some(cache_data) = cache.get(&cache_key) {
+            if let Some(cache_data) = cache_data.first() {
+                return Ok(Some(cache_data.clone()));
+            }
+        };
+
+        let rows: Option<LineRow> = sqlx::query_as(
+            "SELECT l.*
+            FROM `lines` AS l
+            WHERE line_cd
+            IN (
+                SELECT line_cd
+                FROM stations AS s
+                WHERE s.station_cd = ?
+                AND e_status = 0
+            )
+            AND e_status = 0",
+        )
+        .bind(station_id)
+        .fetch_optional(conn)
+        .await?;
         let line: Option<Line> = rows.map(|row| row.into());
 
         if let Some(line) = line.clone() {

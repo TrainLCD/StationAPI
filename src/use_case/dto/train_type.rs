@@ -15,6 +15,7 @@ impl From<TrainType> for GrpcTrainType {
             type_name_ko,
             color,
             direction,
+            line,
             lines,
         } = train_type;
         Self {
@@ -27,6 +28,7 @@ impl From<TrainType> for GrpcTrainType {
             name_chinese: type_name_zh,
             name_korean: type_name_ko,
             color,
+            line: line.map(|line| line.into()),
             lines: lines.into_iter().map(|line| line.into()).collect(),
             direction: direction as i32,
         }
