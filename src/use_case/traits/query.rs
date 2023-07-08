@@ -4,6 +4,7 @@ use mockall::automock;
 use crate::{
     domain::entity::{
         line::Line, line_symbol::LineSymbol, station::Station, station_number::StationNumber,
+        train_type::TrainType,
     },
     use_case::error::UseCaseError,
 };
@@ -32,6 +33,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
     async fn update_station_with_attributes(
         &self,
         station: &mut Station,
+        shallow: bool,
     ) -> Result<(), UseCaseError>;
     async fn get_lines_by_station_group_id(
         &self,
@@ -43,4 +45,12 @@ pub trait QueryUseCase: Send + Sync + 'static {
         boxed_line: Box<Line>,
     ) -> Vec<StationNumber>;
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol>;
+    async fn get_stations_by_line_group_id(
+        &self,
+        line_group_id: u32,
+    ) -> Result<Vec<Station>, UseCaseError>;
+    async fn get_train_types_by_station_id(
+        &self,
+        station_id: u32,
+    ) -> Result<Vec<TrainType>, UseCaseError>;
 }

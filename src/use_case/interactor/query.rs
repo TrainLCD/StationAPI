@@ -7,23 +7,29 @@ use crate::{
     domain::{
         entity::{
             line::Line, line_symbol::LineSymbol, station::Station, station_number::StationNumber,
+            train_type::TrainType,
         },
-        repository::{line_repository::LineRepository, station_repository::StationRepository},
+        repository::{
+            line_repository::LineRepository, station_repository::StationRepository,
+            train_type_repository::TrainTypeRepository,
+        },
     },
     use_case::{error::UseCaseError, traits::query::QueryUseCase},
 };
 
 #[derive(Debug, Clone)]
-pub struct QueryInteractor<SR, LR> {
+pub struct QueryInteractor<SR, LR, TR> {
     pub station_repository: SR,
     pub line_repository: LR,
+    pub train_type_repository: TR,
 }
 
 #[async_trait]
-impl<SR, LR> QueryUseCase for QueryInteractor<SR, LR>
+impl<SR, LR, TR> QueryUseCase for QueryInteractor<SR, LR, TR>
 where
     SR: StationRepository,
     LR: LineRepository,
+    TR: TrainTypeRepository,
 {
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
         let Some(mut station) = self.station_repository.find_by_id(station_id).await? else {
@@ -31,7 +37,7 @@ where
         };
         let station = &mut station;
 
-        self.update_station_with_attributes(station).await?;
+        self.update_station_with_attributes(station, false).await?;
         Ok(Some(station.clone()))
     }
 
@@ -47,7 +53,8 @@ where
         let mut result: Vec<Station> = vec![];
 
         for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station, false)
+                .await?;
             result.push(station);
         }
 
@@ -61,13 +68,14 @@ where
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
-            .get_stations_by_coordinates(latitude, longitude, limit)
+            .get_by_coordinates(latitude, longitude, limit)
             .await?;
 
         let mut result: Vec<Station> = vec![];
 
         for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station, false)
+                .await?;
             result.push(station);
         }
 
@@ -79,7 +87,8 @@ where
         let mut result: Vec<Station> = vec![];
 
         for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station, false)
+                .await?;
             result.push(station);
         }
 
@@ -92,12 +101,13 @@ where
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
-            .get_stations_by_name(station_name, limit)
+            .get_by_name(station_name, limit)
             .await?;
         let mut result: Vec<Station> = vec![];
 
         for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station, false)
+                .await?;
             result.push(station);
         }
 
@@ -111,6 +121,7 @@ where
     async fn update_station_with_attributes(
         &self,
         station: &mut Station,
+        shallow: bool,
     ) -> Result<(), UseCaseError> {
         let belong_line = match self.find_line_by_id(station.line_cd).await {
             Ok(line) => line,
@@ -123,21 +134,23 @@ where
         let mut lines_tmp: Vec<Option<Line>> = vec![None; lines.len()];
 
         for (index, ref mut line) in lines.into_iter().enumerate() {
-            if let Ok(mut stations) = self
-                .station_repository
-                .get_by_station_group_id(station.station_g_cd)
-                .await
-            {
-                stations.iter_mut().for_each(|station| {
+            if !shallow {
+                let mut stations = self
+                    .station_repository
+                    .get_by_station_group_id(station.station_g_cd)
+                    .await?;
+
+                for station in stations.iter_mut() {
                     if station.line_cd == line.line_cd {
                         station.station_numbers = self.get_station_numbers(
                             Box::new(station.to_owned()),
                             Box::new(line.to_owned()),
                         );
+
                         line.station = Some(station.to_owned());
                     }
-                });
-            };
+                }
+            }
 
             line.line_symbols = self.get_line_symbols(line);
             lines_tmp[index] = Some(line.clone());
@@ -166,6 +179,25 @@ where
             .get_by_station_group_id(station_group_id)
             .await?;
         Ok(lines)
+    }
+    async fn get_stations_by_line_group_id(
+        &self,
+        line_group_id: u32,
+    ) -> Result<Vec<Station>, UseCaseError> {
+        let stations = self
+            .station_repository
+            .get_by_line_group_id(line_group_id)
+            .await?;
+
+        let mut result: Vec<Station> = vec![];
+
+        for mut station in stations.into_iter() {
+            self.update_station_with_attributes(&mut station, false)
+                .await?;
+            result.push(station);
+        }
+
+        Ok(result)
     }
 
     fn get_station_numbers(
@@ -307,5 +339,28 @@ where
         });
 
         line_symbols
+    }
+
+    async fn get_train_types_by_station_id(
+        &self,
+        station_id: u32,
+    ) -> Result<Vec<TrainType>, UseCaseError> {
+        let mut train_types = self
+            .train_type_repository
+            .get_by_station_id(station_id)
+            .await?;
+
+        // TODO: SQL発行しすぎ罪で即死刑になるので神奈川県警に見つかる前にバッチ的にデータを取れるようにする
+        for tt in train_types.iter_mut() {
+            let lines = self
+                .line_repository
+                .get_by_line_group_id(tt.line_group_cd)
+                .await?;
+            tt.lines = lines;
+            let line = self.line_repository.find_by_station_id(station_id).await?;
+            tt.line = line;
+        }
+
+        Ok(train_types)
     }
 }

@@ -30,6 +30,8 @@ struct StationRow {
     close_ymd: String,
     e_status: u32,
     e_sort: u32,
+    pass: i64,
+    station_types_count: i64,
 }
 
 impl From<StationRow> for Station {
@@ -65,73 +67,9 @@ impl From<StationRow> for Station {
             close_ymd: row.close_ymd,
             e_status: row.e_status,
             e_sort: row.e_sort,
-            pass: false,
+            pass: row.pass,
             distance: None,
-        }
-    }
-}
-
-#[derive(sqlx::FromRow, Clone)]
-struct StationWithDistanceRow {
-    station_cd: u32,
-    station_g_cd: u32,
-    station_name: String,
-    station_name_k: String,
-    station_name_r: String,
-    station_name_zh: String,
-    station_name_ko: String,
-    primary_station_number: Option<String>,
-    secondary_station_number: Option<String>,
-    extra_station_number: Option<String>,
-    three_letter_code: Option<String>,
-    line_cd: u32,
-    pref_cd: u32,
-    post: String,
-    address: String,
-    lon: BigDecimal,
-    lat: BigDecimal,
-    open_ymd: String,
-    close_ymd: String,
-    e_status: u32,
-    e_sort: u32,
-    distance: Option<f64>,
-}
-
-impl From<StationWithDistanceRow> for Station {
-    fn from(row: StationWithDistanceRow) -> Self {
-        Self {
-            station_cd: row.station_cd,
-            station_g_cd: row.station_g_cd,
-            station_name: row.station_name,
-            station_name_k: row.station_name_k,
-            station_name_r: row.station_name_r,
-            station_name_zh: row.station_name_zh,
-            station_name_ko: row.station_name_ko,
-            station_numbers: vec![],
-            primary_station_number: row.primary_station_number,
-            secondary_station_number: row.secondary_station_number,
-            extra_station_number: row.extra_station_number,
-            three_letter_code: row.three_letter_code,
-            line_cd: row.line_cd,
-            line: None,
-            lines: vec![],
-            pref_cd: row.pref_cd,
-            post: row.post,
-            address: row.address,
-            lon: row
-                .lon
-                .to_f64()
-                .expect("Failed to convert BigDecimal to f64"),
-            lat: row
-                .lat
-                .to_f64()
-                .expect("Failed to convert BigDecimal to f64"),
-            open_ymd: row.open_ymd,
-            close_ymd: row.close_ymd,
-            e_status: row.e_status,
-            e_sort: row.e_sort,
-            pass: false,
-            distance: row.distance,
+            station_types_count: row.station_types_count,
         }
     }
 }
@@ -170,27 +108,28 @@ impl StationRepository for MyStationRepository {
     }
 
     // ほぼ確実にキャッシュがヒットしないと思うのでキャッシュを使わない
-    async fn get_stations_by_coordinates(
+    async fn get_by_coordinates(
         &self,
         latitude: f64,
         longitude: f64,
         limit: Option<u32>,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_stations_by_coordinates(
-            latitude, longitude, limit, &mut conn,
-        )
-        .await
+        InternalStationRepository::get_by_coordinates(latitude, longitude, limit, &mut conn).await
     }
 
-    async fn get_stations_by_name(
+    async fn get_by_name(
         &self,
         station_name: String,
         limit: Option<u32>,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_stations_by_name(station_name, limit, &mut conn, &self.cache)
-            .await
+        InternalStationRepository::get_by_name(station_name, limit, &mut conn, &self.cache).await
+    }
+
+    async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Station>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalStationRepository::get_by_line_group_id(line_group_id, &mut conn, &self.cache).await
     }
 }
 
@@ -209,11 +148,21 @@ impl InternalStationRepository {
             }
         };
 
-        let rows: Option<StationRow> =
-            sqlx::query_as("SELECT * FROM stations WHERE station_cd = ? AND e_status = 0 ORDER BY e_sort, station_cd")
-                .bind(id)
-                .fetch_optional(conn)
-                .await?;
+        let rows: Option<StationRow> = sqlx::query_as(
+            "SELECT s.*, 0 AS pass,
+            (
+                SELECT COUNT(line_group_cd)
+                FROM station_station_types AS sst
+                WHERE s.station_cd = sst.station_cd
+            ) as station_types_count
+            FROM stations AS s
+            WHERE s.station_cd = ?
+            AND e_status = 0
+            ORDER BY e_sort, station_cd",
+        )
+        .bind(id)
+        .fetch_optional(conn)
+        .await?;
 
         let station = rows.map(|row| row.into());
 
@@ -234,7 +183,15 @@ impl InternalStationRepository {
         };
 
         let station_row: Vec<StationRow> = sqlx::query_as(
-            "SELECT * FROM stations WHERE line_cd = ? AND e_status = 0 ORDER BY e_sort, station_cd",
+            "SELECT s.*, 0 AS pass, (
+                SELECT COUNT(line_group_cd)
+                FROM station_station_types AS sst
+                WHERE s.station_cd = sst.station_cd
+            ) AS station_types_count
+            FROM stations as s
+            WHERE line_cd = ?
+            AND e_status = 0
+            ORDER BY e_sort, station_cd",
         )
         .bind(line_id)
         .fetch_all(conn)
@@ -257,11 +214,21 @@ impl InternalStationRepository {
             return Ok(cache_data);
         };
 
-        let rows: Vec<StationRow> =
-            sqlx::query_as("SELECT * FROM stations WHERE station_g_cd = ? AND e_status = 0 ORDER BY e_sort, station_cd")
-                .bind(group_id)
-                .fetch_all(conn)
-                .await?;
+        let rows: Vec<StationRow> = sqlx::query_as(
+            "SELECT s.*, 0 AS pass,
+            (
+                SELECT COUNT(line_group_cd)
+                FROM station_station_types AS sst
+                WHERE s.station_cd = sst.station_cd
+            ) as station_types_count
+            FROM stations AS s
+            WHERE s.station_g_cd = ?
+            AND e_status = 0
+            ORDER BY e_sort, station_cd",
+        )
+        .bind(group_id)
+        .fetch_all(conn)
+        .await?;
 
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
@@ -270,13 +237,13 @@ impl InternalStationRepository {
         Ok(stations)
     }
 
-    async fn get_stations_by_coordinates(
+    async fn get_by_coordinates(
         latitude: f64,
         longitude: f64,
         limit: Option<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let query_str = "SELECT *,
+        let query_str = "SELECT s1.*, 0 AS pass,
         (
           6371 * acos(
           cos(radians(?))
@@ -285,7 +252,12 @@ impl InternalStationRepository {
           + sin(radians(?))
           * sin(radians(lat))
           )
-        ) AS distance
+        ) AS distance,
+        (
+            SELECT COUNT(line_group_cd)
+            FROM station_station_types AS sst
+            WHERE s1.station_cd = sst.station_cd
+        ) AS station_types_count
         FROM
         stations as s1
         WHERE
@@ -313,19 +285,25 @@ impl InternalStationRepository {
         Ok(stations)
     }
 
-    async fn get_stations_by_name(
+    async fn get_by_name(
         station_name: String,
         limit: Option<u32>,
         conn: &mut MySqlConnection,
         cache: &Cache<String, Vec<Station>>,
     ) -> Result<Vec<Station>, DomainError> {
-        let cache_key = format!("station_repository:get_stations_by_name:{}", station_name);
+        let cache_key = format!("station_repository:get_by_name:{}", station_name);
         if let Some(cache_data) = cache.get(&cache_key) {
             return Ok(cache_data);
         };
 
         let query_str: String = format!(
-            "SELECT * FROM stations
+            "SELECT s.*, 0 AS pass,
+            (
+                SELECT COUNT(line_group_cd)
+                FROM station_station_types AS sst
+                WHERE s.station_cd = sst.station_cd
+            ) AS station_types_count
+            FROM stations AS s
             WHERE (
                 station_name LIKE '%{}%'
                 OR station_name_r LIKE '%{}%'
@@ -347,6 +325,40 @@ impl InternalStationRepository {
         let rows = sqlx::query_as::<_, StationRow>(&query_str)
             .fetch_all(conn)
             .await?;
+
+        let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
+
+        cache.insert(cache_key, stations.clone());
+
+        Ok(stations)
+    }
+
+    async fn get_by_line_group_id(
+        line_group_id: u32,
+        conn: &mut MySqlConnection,
+        cache: &Cache<String, Vec<Station>>,
+    ) -> Result<Vec<Station>, DomainError> {
+        let cache_key = format!("station_repository:get_by_line_group_id:{}", line_group_id);
+        if let Some(cache_data) = cache.get(&cache_key) {
+            return Ok(cache_data);
+        };
+
+        let rows: Vec<StationRow> = sqlx::query_as(
+            "SELECT *,
+            (
+                SELECT COUNT(line_group_cd)
+                FROM station_station_types AS sst
+                WHERE s.station_cd = sst.station_cd
+            ) AS station_types_count,
+            CONVERT(sst.pass, SIGNED) as pass
+            FROM station_station_types as sst, stations as s
+            WHERE sst.line_group_cd = ?
+            AND s.station_cd = sst.station_cd
+            AND s.e_status = 0",
+        )
+        .bind(line_group_id)
+        .fetch_all(conn)
+        .await?;
 
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
