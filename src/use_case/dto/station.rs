@@ -31,8 +31,8 @@ impl From<Station> for GrpcStation {
                 .collect(),
             stop_condition: StopCondition::All.into(),
             distance: station.distance,
-            train_types: vec![],
             pass: station.pass,
+            has_train_types: station.station_types_count > 0,
         }
     }
 }

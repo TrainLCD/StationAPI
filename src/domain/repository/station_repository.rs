@@ -12,15 +12,16 @@ pub trait StationRepository: Send + Sync + 'static {
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Station>, DomainError>;
-    async fn get_stations_by_coordinates(
+    async fn get_by_coordinates(
         &self,
         latitude: f64,
         longitude: f64,
         limit: Option<u32>,
     ) -> Result<Vec<Station>, DomainError>;
-    async fn get_stations_by_name(
+    async fn get_by_name(
         &self,
         station_name: String,
         limit: Option<u32>,
     ) -> Result<Vec<Station>, DomainError>;
+    async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Station>, DomainError>;
 }
