@@ -1,4 +1,3 @@
-use bigdecimal::num_bigint::BigInt;
 use fake::Dummy;
 
 use super::{line::Line, station_number::StationNumber};
@@ -31,7 +30,7 @@ pub struct Station {
     pub e_sort: u32,
     pub pass: bool,
     pub distance: Option<f64>,
-    pub station_types_count: BigInt,
+    pub station_types_count: i64,
 }
 
 impl Station {
@@ -64,7 +63,7 @@ impl Station {
         _stop_condition: i32,
         pass: bool,
         distance: Option<f64>,
-        station_types_count: BigInt,
+        station_types_count: i64,
     ) -> Self {
         Self {
             station_cd,

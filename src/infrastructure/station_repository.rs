@@ -30,7 +30,7 @@ struct StationRow {
     close_ymd: String,
     e_status: u32,
     e_sort: u32,
-    station_types_count: u32,
+    station_types_count: i64,
 }
 
 impl From<StationRow> for Station {
@@ -68,7 +68,7 @@ impl From<StationRow> for Station {
             e_sort: row.e_sort,
             pass: false,
             distance: None,
-            station_types_count: row.station_types_count.into(),
+            station_types_count: row.station_types_count,
         }
     }
 }
@@ -97,7 +97,7 @@ struct StationWithDistanceRow {
     e_status: u32,
     e_sort: u32,
     distance: Option<f64>,
-    station_types_count: u32,
+    station_types_count: i64,
 }
 
 impl From<StationWithDistanceRow> for Station {
@@ -135,7 +135,7 @@ impl From<StationWithDistanceRow> for Station {
             e_sort: row.e_sort,
             pass: false,
             distance: row.distance,
-            station_types_count: row.station_types_count.into(),
+            station_types_count: row.station_types_count,
         }
     }
 }
