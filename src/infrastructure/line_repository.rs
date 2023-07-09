@@ -69,6 +69,7 @@ impl From<LineRow> for Line {
             e_status: row.e_status,
             e_sort: row.e_sort,
             station: None,
+            train_type: None,
         }
     }
 }

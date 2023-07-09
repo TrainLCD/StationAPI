@@ -86,6 +86,21 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_by_station_id(station_id, &mut conn, &self.cache).await
     }
+
+    async fn find_by_line_group_id_and_line_id(
+        &self,
+        line_group_id: u32,
+        line_id: u32,
+    ) -> Result<Option<TrainType>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalTrainTypeRepository::get_by_line_group_id_and_line_id(
+            line_group_id,
+            line_id,
+            &mut conn,
+            &self.cache,
+        )
+        .await
+    }
 }
 
 pub struct InternalTrainTypeRepository {}
@@ -145,5 +160,45 @@ impl InternalTrainTypeRepository {
         cache.insert(cache_key, train_types.clone());
 
         Ok(train_types)
+    }
+    async fn get_by_line_group_id_and_line_id(
+        line_group_id: u32,
+        line_id: u32,
+        conn: &mut MySqlConnection,
+        cache: &Cache<String, Vec<TrainType>>,
+    ) -> Result<Option<TrainType>, DomainError> {
+        let cache_key = format!(
+            "train_type_repository:get_by_line_group_id_and_line_id:{}:{}",
+            line_group_id, line_id
+        );
+        if let Some(cache_data) = cache.get(&cache_key) {
+            if let Some(cache_data) = cache_data.first() {
+                return Ok(Some(cache_data.clone()));
+            }
+        };
+
+        let rows: Option<TrainTypeRow> = sqlx::query_as(
+            "SELECT t.*, sst.*
+            FROM types as t, station_station_types as sst
+            WHERE sst.line_group_cd = ?
+            AND sst.station_cd IN (
+                SELECT station_cd
+                FROM stations as s
+                WHERE line_cd =?
+            )
+            AND t.type_cd = sst.type_cd",
+        )
+        .bind(line_group_id)
+        .bind(line_id)
+        .fetch_optional(conn)
+        .await?;
+
+        let train_type = rows.map(|row| row.into());
+
+        if let Some(train_type) = train_type.clone() {
+            cache.insert(cache_key, vec![train_type]);
+        }
+
+        Ok(train_type)
     }
 }
