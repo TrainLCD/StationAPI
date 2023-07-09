@@ -42,7 +42,10 @@ impl From<Station> for GrpcStation {
             stop_condition,
             distance: station.distance,
             pass: station.pass == 1,
-            has_train_types: station.station_types_count > 0,
+            has_train_types: Some(station.station_types_count > 0),
+            train_type: station
+                .train_type
+                .map(|train_type| Box::new(train_type.into())),
         }
     }
 }

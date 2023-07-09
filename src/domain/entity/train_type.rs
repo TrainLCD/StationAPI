@@ -16,7 +16,7 @@ pub struct TrainType {
     pub type_name_ko: String,
     pub color: String,
     pub direction: u32,
-    pub line: Option<Line>,
+    pub line: Option<Box<Line>>,
     pub lines: Vec<Line>,
 }
 

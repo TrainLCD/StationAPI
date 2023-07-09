@@ -70,6 +70,7 @@ impl From<StationRow> for Station {
             pass: row.pass,
             distance: None,
             station_types_count: row.station_types_count,
+            train_type: None,
         }
     }
 }

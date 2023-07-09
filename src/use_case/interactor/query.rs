@@ -191,9 +191,20 @@ where
 
         let mut result: Vec<Station> = vec![];
 
+        let train_types = self
+            .train_type_repository
+            .get_by_line_group_id(line_group_id)
+            .await?;
+
         for mut station in stations.into_iter() {
             self.update_station_with_attributes(&mut station, false)
                 .await?;
+
+            let train_type = train_types
+                .iter()
+                .find(|train_type| train_type.station_cd == station.station_cd);
+            station.train_type = train_type.map(|train_type| train_type.to_owned());
+
             result.push(station);
         }
 
@@ -356,9 +367,11 @@ where
                 .line_repository
                 .get_by_line_group_id(tt.line_group_cd)
                 .await?;
+
             tt.lines = lines;
-            let line = self.line_repository.find_by_station_id(station_id).await?;
-            tt.line = line;
+            if let Some(line) = self.line_repository.find_by_station_id(station_id).await? {
+                tt.line = Some(Box::new(line));
+            };
         }
 
         Ok(train_types)

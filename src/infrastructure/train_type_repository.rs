@@ -73,12 +73,12 @@ impl MyTrainTypeRepository {
 
 #[async_trait]
 impl TrainTypeRepository for MyTrainTypeRepository {
-    async fn find_by_line_group_id(
+    async fn get_by_line_group_id(
         &self,
         line_group_id: u32,
-    ) -> Result<Option<TrainType>, DomainError> {
+    ) -> Result<Vec<TrainType>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalTrainTypeRepository::find_by_line_group_id(line_group_id, &mut conn, &self.cache)
+        InternalTrainTypeRepository::get_by_line_group_id(line_group_id, &mut conn, &self.cache)
             .await
     }
 
@@ -91,38 +91,33 @@ impl TrainTypeRepository for MyTrainTypeRepository {
 pub struct InternalTrainTypeRepository {}
 
 impl InternalTrainTypeRepository {
-    async fn find_by_line_group_id(
+    async fn get_by_line_group_id(
         line_group_id: u32,
         conn: &mut MySqlConnection,
         cache: &Cache<String, Vec<TrainType>>,
-    ) -> Result<Option<TrainType>, DomainError> {
+    ) -> Result<Vec<TrainType>, DomainError> {
         let cache_key = format!(
-            "train_type_repository:find_by_line_group_id:{}",
+            "train_type_repository:get_by_line_group_id:{}",
             line_group_id
         );
         if let Some(cache_data) = cache.get(&cache_key) {
-            if let Some(cache_data) = cache_data.first() {
-                return Ok(Some(cache_data.clone()));
-            }
+            return Ok(cache_data);
         };
 
-        let rows: Option<TrainTypeRow> = sqlx::query_as(
+        let rows: Vec<TrainTypeRow> = sqlx::query_as(
             "SELECT t.*, sst.*
             FROM types as t, station_station_types as sst
             WHERE sst.line_group_cd = ?
-              AND t.type_cd = sst.type_cd
-            LIMIT 1",
+              AND t.type_cd = sst.type_cd",
         )
         .bind(line_group_id)
-        .fetch_optional(conn)
+        .fetch_all(conn)
         .await?;
-        let train_type: Option<TrainType> = rows.map(|row| row.into());
+        let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
-        if let Some(train_type) = train_type.clone() {
-            cache.insert(cache_key, vec![train_type]);
-        }
+        cache.insert(cache_key, train_types.clone());
 
-        Ok(train_type)
+        Ok(train_types)
     }
     async fn get_by_station_id(
         station_id: u32,
