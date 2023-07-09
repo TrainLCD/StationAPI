@@ -352,13 +352,22 @@ where
 
         // TODO: SQL発行しすぎ罪で即死刑になるので神奈川県警に見つかる前にバッチ的にデータを取れるようにする
         for tt in train_types.iter_mut() {
-            let lines = self
+            let mut lines = self
                 .line_repository
                 .get_by_line_group_id(tt.line_group_cd)
                 .await?;
+            for line in lines.iter_mut() {
+                let train_type: Option<TrainType> = self
+                    .train_type_repository
+                    .find_by_line_group_id_and_line_id(tt.line_group_cd, line.line_cd)
+                    .await?;
+                line.train_type = train_type;
+            }
+
             tt.lines = lines;
-            let line = self.line_repository.find_by_station_id(station_id).await?;
-            tt.line = line;
+            if let Some(line) = self.line_repository.find_by_station_id(station_id).await? {
+                tt.line = Some(Box::new(line));
+            };
         }
 
         Ok(train_types)

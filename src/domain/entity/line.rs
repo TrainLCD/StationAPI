@@ -2,7 +2,7 @@ use fake::Dummy;
 
 use crate::pb::Company as GrpcCompany;
 
-use super::{line_symbol::LineSymbol, station::Station};
+use super::{line_symbol::LineSymbol, station::Station, train_type::TrainType};
 
 #[derive(Dummy, Clone, Debug)]
 pub struct Line {
@@ -34,6 +34,7 @@ pub struct Line {
     pub e_status: u32,
     pub e_sort: u32,
     pub station: Option<Station>,
+    pub train_type: Option<TrainType>,
 }
 
 impl Line {
@@ -67,6 +68,7 @@ impl Line {
         e_status: u32,
         e_sort: u32,
         station: Option<Station>,
+        train_type: Option<TrainType>,
     ) -> Self {
         Self {
             line_cd,
@@ -97,6 +99,7 @@ impl Line {
             e_status,
             e_sort,
             station,
+            train_type,
         }
     }
 }

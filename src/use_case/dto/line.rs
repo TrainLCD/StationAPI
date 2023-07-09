@@ -16,6 +16,9 @@ impl From<Line> for GrpcLine {
             status: line.e_status as i32,
             station: line.station.map(|s| Box::new(s.into())),
             company: line.company,
+            train_type: line
+                .train_type
+                .map(|train_type| Box::new(train_type.into())),
         }
     }
 }
