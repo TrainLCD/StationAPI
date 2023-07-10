@@ -256,23 +256,22 @@ where
             let sym_color = line_symbol_colors_raw[index].to_string();
             let sym_shape = line_symbols_shape_raw[index].to_string();
 
-            let Some(sym) = line_symbols_raw[index] else {
-                return station_numbers;
-            };
             if station_number.is_empty() {
-                return station_numbers;
+                continue;
             }
 
-            let station_number_string = format!("{}-{}", sym, station_number);
+            if let Some(sym) = line_symbols_raw[index] {
+                let station_number_string = format!("{}-{}", sym, station_number);
 
-            let station_number = StationNumber {
-                line_symbol: sym.to_string(),
-                line_symbol_color: sym_color,
-                line_symbol_shape: sym_shape,
-                station_number: station_number_string,
+                let station_number = StationNumber {
+                    line_symbol: sym.to_string(),
+                    line_symbol_color: sym_color,
+                    line_symbol_shape: sym_shape,
+                    station_number: station_number_string,
+                };
+
+                station_numbers.push(station_number);
             };
-
-            station_numbers.push(station_number);
         }
 
         station_numbers
