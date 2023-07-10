@@ -5,7 +5,7 @@ impl From<Company> for GrpcCompany {
         Self {
             id: company.company_cd,
             railroad_id: company.rr_cd,
-            name: company.company_name,
+            name_short: company.company_name,
             name_katakana: company.company_name_k,
             name_full: company.company_name_h,
             name_english_short: company.company_name_en,
