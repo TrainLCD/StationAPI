@@ -6,10 +6,10 @@ use sqlx::{MySql, Pool};
 use tonic::Response;
 
 use crate::{
-    domain::entity::{line::Line, station::Station, train_type::TrainType},
+    domain::entity::{company::Company, line::Line, station::Station, train_type::TrainType},
     infrastructure::{
-        line_repository::MyLineRepository, station_repository::MyStationRepository,
-        train_type_repository::MyTrainTypeRepository,
+        company_repository::MyCompanyRepository, line_repository::MyLineRepository,
+        station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
     },
     pb::{
         station_api_server::StationApi, GetStationByCoordinatesRequest, GetStationByGroupIdRequest,
@@ -24,7 +24,12 @@ use crate::{
 const CACHE_SIZE: usize = 10_000;
 
 pub struct GrpcRouter {
-    query_use_case: QueryInteractor<MyStationRepository, MyLineRepository, MyTrainTypeRepository>,
+    query_use_case: QueryInteractor<
+        MyStationRepository,
+        MyLineRepository,
+        MyTrainTypeRepository,
+        MyCompanyRepository,
+    >,
 }
 
 impl GrpcRouter {
@@ -32,15 +37,24 @@ impl GrpcRouter {
         let station_repository_cache =
             Cache::<String, Vec<Station>>::new(CACHE_SIZE.to_u64().unwrap());
         let station_repository = MyStationRepository::new(pool.clone(), station_repository_cache);
+
         let line_repository_cache = Cache::<String, Vec<Line>>::new(CACHE_SIZE.to_u64().unwrap());
         let line_repository = MyLineRepository::new(pool.clone(), line_repository_cache);
+
         let train_type_repository_cache =
             Cache::<String, Vec<TrainType>>::new(CACHE_SIZE.to_u64().unwrap());
-        let train_type_repository = MyTrainTypeRepository::new(pool, train_type_repository_cache);
+        let train_type_repository =
+            MyTrainTypeRepository::new(pool.clone(), train_type_repository_cache);
+
+        let company_repository_cache: Cache<String, Vec<Company>> =
+            Cache::<String, Vec<Company>>::new(CACHE_SIZE.to_u64().unwrap());
+        let company_repository = MyCompanyRepository::new(pool, company_repository_cache);
+
         let query_use_case = QueryInteractor {
             station_repository,
             line_repository,
             train_type_repository,
+            company_repository,
         };
         Self { query_use_case }
     }

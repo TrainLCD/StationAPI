@@ -1,14 +1,12 @@
 use fake::Dummy;
 
-use crate::pb::Company as GrpcCompany;
-
-use super::{line_symbol::LineSymbol, station::Station, train_type::TrainType};
+use super::{company::Company, line_symbol::LineSymbol, station::Station, train_type::TrainType};
 
 #[derive(Dummy, Clone, Debug)]
 pub struct Line {
     pub line_cd: u32,
     pub company_cd: u32,
-    pub company: Option<GrpcCompany>,
+    pub company: Option<Company>,
     pub line_name: String,
     pub line_name_k: String,
     pub line_name_h: String,
@@ -42,7 +40,7 @@ impl Line {
     pub fn new(
         line_cd: u32,
         company_cd: u32,
-        company: Option<GrpcCompany>,
+        company: Option<Company>,
         line_name: String,
         line_name_k: String,
         line_name_h: String,

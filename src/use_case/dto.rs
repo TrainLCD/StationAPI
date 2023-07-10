@@ -1,3 +1,4 @@
+pub mod company;
 pub mod line;
 pub mod line_symbol;
 pub mod station;
