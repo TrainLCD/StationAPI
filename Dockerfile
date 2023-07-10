@@ -7,9 +7,9 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef as builder
-RUN apt-get update
-RUN apt-get install -y protobuf-compiler libprotobuf-dev
-RUN rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y protobuf-compiler libprotobuf-dev && \
+    rm -rf /var/lib/apt/lists/*
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
@@ -31,9 +31,9 @@ COPY --from=migration /app/scripts/start.sh ./scripts
 COPY --from=migration /app/scripts/migration.sh ./scripts
 COPY --from=migration /app/migrations/create_table.sql ./migrations
 COPY --from=builder /app/target/release/stationapi /usr/local/bin/stationapi
-RUN apt-get update
-RUN apt-get install -y --quiet default-mysql-client
-RUN rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --quiet default-mysql-client && \
+    rm -rf /var/lib/apt/lists/*
 
 ENV PORT 50051
 
