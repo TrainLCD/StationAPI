@@ -175,9 +175,8 @@ where
 
             station.station_numbers = station_numbers;
 
-            if let Some(company) = self.find_company_by_id(belong_line.company_cd).await? {
-                belong_line.company = Some(company);
-            };
+            let company = self.find_company_by_id(belong_line.company_cd).await?;
+            belong_line.company = company;
 
             station.line = Some(Box::new(belong_line.to_owned()));
         }
@@ -381,9 +380,8 @@ where
             }
 
             tt.lines = lines;
-            if let Some(line) = self.line_repository.find_by_station_id(station_id).await? {
-                tt.line = Some(Box::new(line));
-            };
+            let line = self.line_repository.find_by_station_id(station_id).await?;
+            tt.line = line.map(Box::new);
         }
 
         Ok(train_types)
