@@ -155,7 +155,7 @@ impl InternalStationRepository {
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
-            ) as station_types_count
+            ) AS station_types_count
             FROM stations AS s
             WHERE s.station_cd = ?
             AND e_status = 0
@@ -221,7 +221,7 @@ impl InternalStationRepository {
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
-            ) as station_types_count
+            ) AS station_types_count
             FROM stations AS s
             WHERE s.station_g_cd = ?
             AND e_status = 0
@@ -244,7 +244,7 @@ impl InternalStationRepository {
         limit: Option<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let query_str = "SELECT s1.*, 0 AS pass,
+        let query_str = "SELECT *, 0 AS pass,
         (
           6371 * acos(
           cos(radians(?))
@@ -257,19 +257,12 @@ impl InternalStationRepository {
         (
             SELECT COUNT(line_group_cd)
             FROM station_station_types AS sst
-            WHERE s1.station_cd = sst.station_cd
+            WHERE station_cd = sst.station_cd
         ) AS station_types_count
         FROM
-        stations as s1
+        stations
         WHERE
         e_status = 0
-        AND
-        station_cd = (
-          SELECT station_cd
-          FROM stations as s2
-          WHERE s1.station_g_cd = s2.station_g_cd
-          LIMIT 1
-        )
         ORDER BY distance
         LIMIT ?";
 
