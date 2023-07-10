@@ -376,6 +376,8 @@ where
                     .find_by_line_group_id_and_line_id(tt.line_group_cd, line.line_cd)
                     .await?;
                 line.train_type = train_type;
+                let company = self.find_company_by_id(line.company_cd).await?;
+                line.company = company;
             }
 
             tt.lines = lines;
