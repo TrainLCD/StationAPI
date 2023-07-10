@@ -156,6 +156,9 @@ where
                             Box::new(line.to_owned()),
                         );
 
+                        let company = self.find_company_by_id(line.company_cd).await?;
+                        line.company = company;
+
                         line.station = Some(station.to_owned());
                     }
                 }
@@ -175,9 +178,8 @@ where
 
             station.station_numbers = station_numbers;
 
-            if let Some(company) = self.find_company_by_id(belong_line.company_cd).await? {
-                belong_line.company = Some(company);
-            };
+            let company = self.find_company_by_id(belong_line.company_cd).await?;
+            belong_line.company = company;
 
             station.line = Some(Box::new(belong_line.to_owned()));
         }
@@ -256,23 +258,22 @@ where
             let sym_color = line_symbol_colors_raw[index].to_string();
             let sym_shape = line_symbols_shape_raw[index].to_string();
 
-            let Some(sym) = line_symbols_raw[index] else {
-                return station_numbers;
-            };
             if station_number.is_empty() {
-                return station_numbers;
+                continue;
             }
 
-            let station_number_string = format!("{}-{}", sym, station_number);
+            if let Some(sym) = line_symbols_raw[index] {
+                let station_number_string = format!("{}-{}", sym, station_number);
 
-            let station_number = StationNumber {
-                line_symbol: sym.to_string(),
-                line_symbol_color: sym_color,
-                line_symbol_shape: sym_shape,
-                station_number: station_number_string,
+                let station_number = StationNumber {
+                    line_symbol: sym.to_string(),
+                    line_symbol_color: sym_color,
+                    line_symbol_shape: sym_shape,
+                    station_number: station_number_string,
+                };
+
+                station_numbers.push(station_number);
             };
-
-            station_numbers.push(station_number);
         }
 
         station_numbers
@@ -377,12 +378,13 @@ where
                     .find_by_line_group_id_and_line_id(tt.line_group_cd, line.line_cd)
                     .await?;
                 line.train_type = train_type;
+                let company = self.find_company_by_id(line.company_cd).await?;
+                line.company = company;
             }
 
             tt.lines = lines;
-            if let Some(line) = self.line_repository.find_by_station_id(station_id).await? {
-                tt.line = Some(Box::new(line));
-            };
+            let line = self.line_repository.find_by_station_id(station_id).await?;
+            tt.line = line.map(Box::new);
         }
 
         Ok(train_types)
