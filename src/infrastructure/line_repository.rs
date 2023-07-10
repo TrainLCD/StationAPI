@@ -1,8 +1,6 @@
 use async_trait::async_trait;
-
 use bigdecimal::{BigDecimal, ToPrimitive, Zero};
-
-use moka::sync::Cache;
+use moka::future::Cache;
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::domain::{
@@ -133,7 +131,7 @@ impl InternalLineRepository {
         let line: Option<Line> = rows.map(|row| row.into());
 
         if let Some(line) = line.clone() {
-            cache.insert(cache_key, vec![line]);
+            cache.insert(cache_key, vec![line]).await;
         }
 
         Ok(line)
@@ -169,7 +167,7 @@ impl InternalLineRepository {
         let line: Option<Line> = rows.map(|row| row.into());
 
         if let Some(line) = line.clone() {
-            cache.insert(cache_key, vec![line]);
+            cache.insert(cache_key, vec![line]).await;
         }
 
         Ok(line)
@@ -211,7 +209,7 @@ impl InternalLineRepository {
         let rows = query.fetch_all(conn).await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, lines.clone());
+        cache.insert(cache_key, lines.clone()).await;
         Ok(lines)
     }
 
@@ -235,7 +233,7 @@ impl InternalLineRepository {
                 .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, lines.clone());
+        cache.insert(cache_key, lines.clone()).await;
         Ok(lines)
     }
 
@@ -267,7 +265,7 @@ impl InternalLineRepository {
         .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, lines.clone());
+        cache.insert(cache_key, lines.clone()).await;
         Ok(lines)
     }
 }

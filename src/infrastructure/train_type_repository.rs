@@ -1,12 +1,11 @@
-use async_trait::async_trait;
-use fake::Dummy;
-use moka::sync::Cache;
-use sqlx::{MySql, MySqlConnection, Pool};
-
 use crate::domain::{
     entity::train_type::TrainType, error::DomainError,
     repository::train_type_repository::TrainTypeRepository,
 };
+use async_trait::async_trait;
+use fake::Dummy;
+use moka::future::Cache;
+use sqlx::{MySql, MySqlConnection, Pool};
 
 #[derive(sqlx::FromRow, Clone, Dummy)]
 pub struct TrainTypeRow {
@@ -130,7 +129,7 @@ impl InternalTrainTypeRepository {
         .await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, train_types.clone());
+        cache.insert(cache_key, train_types.clone()).await;
 
         Ok(train_types)
     }
@@ -157,7 +156,7 @@ impl InternalTrainTypeRepository {
         .await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, train_types.clone());
+        cache.insert(cache_key, train_types.clone()).await;
 
         Ok(train_types)
     }
@@ -196,7 +195,7 @@ impl InternalTrainTypeRepository {
         let train_type = rows.map(|row| row.into());
 
         if let Some(train_type) = train_type.clone() {
-            cache.insert(cache_key, vec![train_type]);
+            cache.insert(cache_key, vec![train_type]).await;
         }
 
         Ok(train_type)
