@@ -156,6 +156,9 @@ where
                             Box::new(line.to_owned()),
                         );
 
+                        let company = self.find_company_by_id(line.company_cd).await?;
+                        line.company = company;
+
                         line.station = Some(station.to_owned());
                     }
                 }
