@@ -17,6 +17,7 @@ FROM chef as builder
 RUN apt-get update && \
     apt-get install -y protobuf-compiler libprotobuf-dev && \
     rm -rf /var/lib/apt/lists/*
+COPY . .
 COPY --from=build-recipe . .
 RUN SQLX_OFFLINE=true cargo build --release
 
