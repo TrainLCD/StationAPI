@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use moka::sync::Cache;
+use moka::future::Cache;
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::domain::{
@@ -84,7 +84,7 @@ impl InternalCompanyRepository {
         let company: Option<Company> = rows.map(|row| row.into());
 
         if let Some(company) = company.clone() {
-            cache.insert(cache_key, vec![company]);
+            cache.insert(cache_key, vec![company]).await;
         }
 
         Ok(company)

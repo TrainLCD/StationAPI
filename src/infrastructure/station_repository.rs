@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, ToPrimitive};
-use moka::sync::Cache;
+use moka::future::Cache;
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::domain::{
@@ -168,7 +168,7 @@ impl InternalStationRepository {
         let station = rows.map(|row| row.into());
 
         if let Some(station) = station.clone() {
-            cache.insert(cache_key, vec![station]);
+            cache.insert(cache_key, vec![station]).await;
         }
 
         Ok(station)
@@ -200,7 +200,7 @@ impl InternalStationRepository {
 
         let stations: Vec<Station> = station_row.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, stations.clone());
+        cache.insert(cache_key, stations.clone()).await;
 
         Ok(stations)
     }
@@ -233,7 +233,7 @@ impl InternalStationRepository {
 
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, stations.clone());
+        cache.insert(cache_key, stations.clone()).await;
 
         Ok(stations)
     }
@@ -329,7 +329,7 @@ impl InternalStationRepository {
 
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, stations.clone());
+        cache.insert(cache_key, stations.clone()).await;
 
         Ok(stations)
     }
@@ -363,7 +363,7 @@ impl InternalStationRepository {
 
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, stations.clone());
+        cache.insert(cache_key, stations.clone()).await;
 
         Ok(stations)
     }
