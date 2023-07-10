@@ -15,7 +15,7 @@ impl From<Line> for GrpcLine {
             line_symbols: line.line_symbols.into_iter().map(|s| s.into()).collect(),
             status: line.e_status as i32,
             station: line.station.map(|s| Box::new(s.into())),
-            company: line.company,
+            company: line.company.map(|c| c.into()),
             train_type: line
                 .train_type
                 .map(|train_type| Box::new(train_type.into())),

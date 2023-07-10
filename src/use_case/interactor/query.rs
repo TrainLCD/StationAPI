@@ -6,30 +6,32 @@ use bigdecimal::Zero;
 use crate::{
     domain::{
         entity::{
-            line::Line, line_symbol::LineSymbol, station::Station, station_number::StationNumber,
-            train_type::TrainType,
+            company::Company, line::Line, line_symbol::LineSymbol, station::Station,
+            station_number::StationNumber, train_type::TrainType,
         },
         repository::{
-            line_repository::LineRepository, station_repository::StationRepository,
-            train_type_repository::TrainTypeRepository,
+            company_repository::CompanyRepository, line_repository::LineRepository,
+            station_repository::StationRepository, train_type_repository::TrainTypeRepository,
         },
     },
     use_case::{error::UseCaseError, traits::query::QueryUseCase},
 };
 
 #[derive(Debug, Clone)]
-pub struct QueryInteractor<SR, LR, TR> {
+pub struct QueryInteractor<SR, LR, TR, CR> {
     pub station_repository: SR,
     pub line_repository: LR,
     pub train_type_repository: TR,
+    pub company_repository: CR,
 }
 
 #[async_trait]
-impl<SR, LR, TR> QueryUseCase for QueryInteractor<SR, LR, TR>
+impl<SR, LR, TR, CR> QueryUseCase for QueryInteractor<SR, LR, TR, CR>
 where
     SR: StationRepository,
     LR: LineRepository,
     TR: TrainTypeRepository,
+    CR: CompanyRepository,
 {
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
         let Some(mut station) = self.station_repository.find_by_id(station_id).await? else {
@@ -117,13 +119,20 @@ where
         let line = self.line_repository.find_by_id(line_id).await?;
         Ok(line)
     }
+    async fn find_company_by_id(&self, company_id: u32) -> Result<Option<Company>, UseCaseError> {
+        let Some(company) = self.company_repository.find_by_id(company_id).await? else {
+            return Ok(None);
+        };
+
+        Ok(Some(company))
+    }
 
     async fn update_station_with_attributes(
         &self,
         station: &mut Station,
         shallow: bool,
     ) -> Result<(), UseCaseError> {
-        let belong_line = match self.find_line_by_id(station.line_cd).await {
+        let mut belong_line = match self.find_line_by_id(station.line_cd).await {
             Ok(line) => line,
             Err(err) => return Err(UseCaseError::Unexpected(err.to_string())),
         };
@@ -158,12 +167,18 @@ where
 
         station.lines = lines_tmp.into_iter().flatten().collect();
 
-        if let Some(belong_line) = &belong_line {
+        if let Some(ref mut belong_line) = belong_line {
             let station_numbers: Vec<StationNumber> = self.get_station_numbers(
                 Box::new(station.to_owned()),
                 Box::new(belong_line.to_owned()),
             );
+
             station.station_numbers = station_numbers;
+
+            if let Some(company) = self.find_company_by_id(belong_line.company_cd).await? {
+                belong_line.company = Some(company);
+            };
+
             station.line = Some(Box::new(belong_line.to_owned()));
         }
 
