@@ -32,7 +32,7 @@ CREATE TABLE `companies` (
   `company_name_en` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `company_name_full_en` text NOT NULL,
   `company_url` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `company_type` int NOT NULL,
+  `company_type` int unsigned NOT NULL,
   `e_status` int unsigned NOT NULL,
   `e_sort` int unsigned NOT NULL,
   PRIMARY KEY (`company_cd`)
