@@ -14,6 +14,9 @@ COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 
 FROM chef as builder
+RUN apt-get update && \
+    apt-get install -y protobuf-compiler libprotobuf-dev && \
+    rm -rf /var/lib/apt/lists/*
 COPY --from=build-recipe . .
 RUN SQLX_OFFLINE=true cargo build --release
 
