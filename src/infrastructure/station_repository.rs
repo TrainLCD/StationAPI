@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use moka::future::Cache;
@@ -78,11 +80,11 @@ impl From<StationRow> for Station {
 #[derive(Debug, Clone)]
 pub struct MyStationRepository {
     pool: Pool<MySql>,
-    cache: Cache<String, Vec<Station>>,
+    cache: Cache<String, Arc<Vec<Station>>>,
 }
 
 impl MyStationRepository {
-    pub fn new(pool: Pool<MySql>, cache: Cache<String, Vec<Station>>) -> Self {
+    pub fn new(pool: Pool<MySql>, cache: Cache<String, Arc<Vec<Station>>>) -> Self {
         Self { pool, cache }
     }
 }
@@ -140,13 +142,11 @@ impl InternalStationRepository {
     async fn find_by_id(
         id: u32,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Vec<Station>>,
+        cache: &Cache<String, Arc<Vec<Station>>>,
     ) -> Result<Option<Station>, DomainError> {
         let cache_key = format!("station_repository:find_by_id:{}", id);
         if let Some(cache_data) = cache.get(&cache_key) {
-            if let Some(cache_data) = cache_data.first() {
-                return Ok(Some(cache_data.clone()));
-            }
+            return Ok(Arc::clone(&cache_data).first().cloned());
         };
 
         let rows: Option<StationRow> = sqlx::query_as(
@@ -168,7 +168,7 @@ impl InternalStationRepository {
         let station = rows.map(|row| row.into());
 
         if let Some(station) = station.clone() {
-            cache.insert(cache_key, vec![station]).await;
+            cache.insert(cache_key, Arc::new(vec![station])).await;
         }
 
         Ok(station)
@@ -176,11 +176,11 @@ impl InternalStationRepository {
     async fn get_by_line_id(
         line_id: u32,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Vec<Station>>,
+        cache: &Cache<String, Arc<Vec<Station>>>,
     ) -> Result<Vec<Station>, DomainError> {
         let cache_key = format!("station_repository:get_by_line_id:{}", line_id);
         if let Some(cache_data) = cache.get(&cache_key) {
-            return Ok(cache_data);
+            return Ok(Arc::clone(&cache_data).to_vec());
         };
 
         let station_row: Vec<StationRow> = sqlx::query_as(
@@ -200,19 +200,25 @@ impl InternalStationRepository {
 
         let stations: Vec<Station> = station_row.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, stations.clone()).await;
+        let stations_with_arc = Arc::new(stations);
+        cache.insert(cache_key.clone(), stations_with_arc).await;
 
-        Ok(stations)
+        cache
+            .get(&cache_key)
+            .map(|station| Arc::clone(&station).to_vec())
+            .ok_or(DomainError::Unexpected(
+                "Failed to caching for response.".to_string(),
+            ))
     }
 
     async fn get_by_station_group_id(
         group_id: u32,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Vec<Station>>,
+        cache: &Cache<String, Arc<Vec<Station>>>,
     ) -> Result<Vec<Station>, DomainError> {
         let cache_key = format!("station_repository:get_by_station_group_id:{}", group_id);
         if let Some(cache_data) = cache.get(&cache_key) {
-            return Ok(cache_data);
+            return Ok(Arc::clone(&cache_data).to_vec());
         };
 
         let rows: Vec<StationRow> = sqlx::query_as(
@@ -231,11 +237,17 @@ impl InternalStationRepository {
         .fetch_all(conn)
         .await?;
 
-        let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
+        let stations = rows.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, stations.clone()).await;
+        let stations_with_arc = Arc::new(stations);
+        cache.insert(cache_key.clone(), stations_with_arc).await;
 
-        Ok(stations)
+        cache
+            .get(&cache_key)
+            .map(|station| Arc::clone(&station).to_vec())
+            .ok_or(DomainError::Unexpected(
+                "Failed to caching for response.".to_string(),
+            ))
     }
 
     async fn get_by_coordinates(
@@ -283,11 +295,11 @@ impl InternalStationRepository {
         station_name: String,
         limit: Option<u32>,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Vec<Station>>,
+        cache: &Cache<String, Arc<Vec<Station>>>,
     ) -> Result<Vec<Station>, DomainError> {
         let cache_key = format!("station_repository:get_by_name:{}", station_name);
         if let Some(cache_data) = cache.get(&cache_key) {
-            return Ok(cache_data);
+            return Ok(Arc::clone(&cache_data).to_vec());
         };
 
         let query_str: String = format!(
@@ -322,19 +334,25 @@ impl InternalStationRepository {
 
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, stations.clone()).await;
+        let stations_with_arc = Arc::new(stations);
+        cache.insert(cache_key.clone(), stations_with_arc).await;
 
-        Ok(stations)
+        cache
+            .get(&cache_key)
+            .map(|station| Arc::clone(&station).to_vec())
+            .ok_or(DomainError::Unexpected(
+                "Failed to caching for response.".to_string(),
+            ))
     }
 
     async fn get_by_line_group_id(
         line_group_id: u32,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Vec<Station>>,
+        cache: &Cache<String, Arc<Vec<Station>>>,
     ) -> Result<Vec<Station>, DomainError> {
         let cache_key = format!("station_repository:get_by_line_group_id:{}", line_group_id);
         if let Some(cache_data) = cache.get(&cache_key) {
-            return Ok(cache_data);
+            return Ok(Arc::clone(&cache_data).to_vec());
         };
 
         let rows: Vec<StationRow> = sqlx::query_as(
@@ -356,8 +374,14 @@ impl InternalStationRepository {
 
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, stations.clone()).await;
+        let stations_with_arc = Arc::new(stations);
+        cache.insert(cache_key.clone(), stations_with_arc).await;
 
-        Ok(stations)
+        cache
+            .get(&cache_key)
+            .map(|station| Arc::clone(&station).to_vec())
+            .ok_or(DomainError::Unexpected(
+                "Failed to caching for response.".to_string(),
+            ))
     }
 }

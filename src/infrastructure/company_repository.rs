@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use moka::future::Cache;
 use sqlx::{MySql, MySqlConnection, Pool};
@@ -44,11 +46,11 @@ impl From<CompanyRow> for Company {
 #[derive(Debug, Clone)]
 pub struct MyCompanyRepository {
     pool: Pool<MySql>,
-    cache: Cache<String, Vec<Company>>,
+    cache: Cache<String, Arc<Vec<Company>>>,
 }
 
 impl MyCompanyRepository {
-    pub fn new(pool: Pool<MySql>, cache: Cache<String, Vec<Company>>) -> Self {
+    pub fn new(pool: Pool<MySql>, cache: Cache<String, Arc<Vec<Company>>>) -> Self {
         Self { pool, cache }
     }
 }
@@ -67,13 +69,11 @@ impl InternalCompanyRepository {
     async fn find_by_id(
         id: u32,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Vec<Company>>,
+        cache: &Cache<String, Arc<Vec<Company>>>,
     ) -> Result<Option<Company>, DomainError> {
         let cache_key = format!("company_repository:find_by_id:{}", id);
         if let Some(cache_data) = cache.get(&cache_key) {
-            if let Some(cache_data) = cache_data.first() {
-                return Ok(Some(cache_data.clone()));
-            }
+            return Ok(Arc::clone(&cache_data).first().cloned());
         };
 
         let rows: Option<CompanyRow> =
@@ -84,7 +84,7 @@ impl InternalCompanyRepository {
         let company: Option<Company> = rows.map(|row| row.into());
 
         if let Some(company) = company.clone() {
-            cache.insert(cache_key, vec![company]).await;
+            cache.insert(cache_key, Arc::new(vec![company])).await;
         }
 
         Ok(company)

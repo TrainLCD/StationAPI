@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::domain::{
     entity::train_type::TrainType, error::DomainError,
     repository::train_type_repository::TrainTypeRepository,
@@ -61,11 +63,11 @@ impl From<TrainTypeRow> for TrainType {
 #[derive(Debug, Clone)]
 pub struct MyTrainTypeRepository {
     pool: Pool<MySql>,
-    cache: Cache<String, Vec<TrainType>>,
+    cache: Cache<String, Arc<Vec<TrainType>>>,
 }
 
 impl MyTrainTypeRepository {
-    pub fn new(pool: Pool<MySql>, cache: Cache<String, Vec<TrainType>>) -> Self {
+    pub fn new(pool: Pool<MySql>, cache: Cache<String, Arc<Vec<TrainType>>>) -> Self {
         Self { pool, cache }
     }
 }
@@ -108,14 +110,14 @@ impl InternalTrainTypeRepository {
     async fn get_by_line_group_id(
         line_group_id: u32,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Vec<TrainType>>,
+        cache: &Cache<String, Arc<Vec<TrainType>>>,
     ) -> Result<Vec<TrainType>, DomainError> {
         let cache_key = format!(
             "train_type_repository:get_by_line_group_id:{}",
             line_group_id
         );
         if let Some(cache_data) = cache.get(&cache_key) {
-            return Ok(cache_data);
+            return Ok(Arc::clone(&cache_data).to_vec());
         };
 
         let rows: Vec<TrainTypeRow> = sqlx::query_as(
@@ -129,18 +131,24 @@ impl InternalTrainTypeRepository {
         .await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, train_types.clone()).await;
+        let train_types_with_arc = Arc::new(train_types);
+        cache.insert(cache_key.clone(), train_types_with_arc).await;
 
-        Ok(train_types)
+        cache
+            .get(&cache_key)
+            .map(|train_type| Arc::clone(&train_type).to_vec())
+            .ok_or(DomainError::Unexpected(
+                "Failed to caching for response.".to_string(),
+            ))
     }
     async fn get_by_station_id(
         station_id: u32,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Vec<TrainType>>,
+        cache: &Cache<String, Arc<Vec<TrainType>>>,
     ) -> Result<Vec<TrainType>, DomainError> {
         let cache_key = format!("train_type_repository:get_by_station_id:{}", station_id);
         if let Some(cache_data) = cache.get(&cache_key) {
-            return Ok(cache_data);
+            return Ok(Arc::clone(&cache_data).to_vec());
         };
 
         let rows: Vec<TrainTypeRow> = sqlx::query_as(
@@ -156,24 +164,28 @@ impl InternalTrainTypeRepository {
         .await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
-        cache.insert(cache_key, train_types.clone()).await;
+        let train_types_with_arc = Arc::new(train_types);
+        cache.insert(cache_key.clone(), train_types_with_arc).await;
 
-        Ok(train_types)
+        cache
+            .get(&cache_key)
+            .map(|train_type| Arc::clone(&train_type).to_vec())
+            .ok_or(DomainError::Unexpected(
+                "Failed to caching for response.".to_string(),
+            ))
     }
     async fn get_by_line_group_id_and_line_id(
         line_group_id: u32,
         line_id: u32,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Vec<TrainType>>,
+        cache: &Cache<String, Arc<Vec<TrainType>>>,
     ) -> Result<Option<TrainType>, DomainError> {
         let cache_key = format!(
             "train_type_repository:get_by_line_group_id_and_line_id:{}:{}",
             line_group_id, line_id
         );
         if let Some(cache_data) = cache.get(&cache_key) {
-            if let Some(cache_data) = cache_data.first() {
-                return Ok(Some(cache_data.clone()));
-            }
+            return Ok(Arc::clone(&cache_data).first().cloned());
         };
 
         let rows: Option<TrainTypeRow> = sqlx::query_as(
@@ -194,10 +206,19 @@ impl InternalTrainTypeRepository {
 
         let train_type = rows.map(|row| row.into());
 
-        if let Some(train_type) = train_type.clone() {
-            cache.insert(cache_key, vec![train_type]).await;
-        }
+        let Some(train_type) = train_type else {
+            return Ok(None);
+        };
 
-        Ok(train_type)
+        let train_type_with_arc = Arc::new(vec![train_type]);
+
+        cache.insert(cache_key.clone(), train_type_with_arc).await;
+
+        if let Some(cache_data) = cache.get(&cache_key) {
+            if let Some(cache_data) = cache_data.first() {
+                return Ok(Some(cache_data.clone()));
+            }
+        };
+        Ok(None)
     }
 }
