@@ -6,19 +6,17 @@ FROM chef AS planner
 COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
-FROM chef as build-recipe
+FROM chef as builder
+COPY . .
 RUN apt-get update && \
-    apt-get install -y protobuf-compiler libprotobuf-dev && \
+    apt-get install -y protobuf-compiler libprotobuf-dev rsync && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
+COPY --from=planner . original
+RUN rsync --recursive --checksum --itemize-changes --verbose original/ .
+RUN rm -r original
 
-FROM chef as builder
-RUN apt-get update && \
-    apt-get install -y protobuf-compiler libprotobuf-dev && \
-    rm -rf /var/lib/apt/lists/*
-COPY . .
-COPY --from=build-recipe . .
 RUN SQLX_OFFLINE=true cargo build --release
 
 FROM node:18-slim as migration
