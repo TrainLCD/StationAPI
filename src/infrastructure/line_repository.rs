@@ -134,16 +134,10 @@ impl InternalLineRepository {
             return Ok(None);
         };
 
-        let lines_with_arc = Arc::new(vec![line]);
+        let cloned_line = line.clone();
+        cache.insert(cache_key.clone(), Arc::new(vec![line])).await;
 
-        cache.insert(cache_key.clone(), lines_with_arc).await;
-
-        if let Some(cache_data) = cache.get(&cache_key) {
-            if let Some(cache_data) = cache_data.first() {
-                return Ok(Some(cache_data.clone()));
-            }
-        };
-        Ok(None)
+        Ok(Some(cloned_line))
     }
 
     async fn find_by_station_id(
@@ -177,16 +171,10 @@ impl InternalLineRepository {
             return Ok(None);
         };
 
-        let lines_with_arc = Arc::new(vec![line]);
+        let cloned_line = line.clone();
+        cache.insert(cache_key.clone(), Arc::new(vec![line])).await;
 
-        cache.insert(cache_key.clone(), lines_with_arc).await;
-
-        if let Some(cache_data) = cache.get(&cache_key) {
-            if let Some(cache_data) = cache_data.first() {
-                return Ok(Some(cache_data.clone()));
-            }
-        };
-        Ok(None)
+        Ok(Some(cloned_line))
     }
 
     async fn get_by_ids(
@@ -224,15 +212,10 @@ impl InternalLineRepository {
         let rows = query.fetch_all(conn).await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
 
-        let lines_with_arc = Arc::new(lines);
-        cache.insert(cache_key.clone(), lines_with_arc).await;
+        let cloned_lines = lines.clone();
+        cache.insert(cache_key.clone(), Arc::new(lines)).await;
 
-        cache
-            .get(&cache_key)
-            .map(|line| Arc::clone(&line).to_vec())
-            .ok_or(DomainError::Unexpected(
-                "Failed to caching for response.".to_string(),
-            ))
+        Ok(cloned_lines)
     }
 
     async fn get_by_station_group_id(
@@ -254,15 +237,11 @@ impl InternalLineRepository {
                 .fetch_all(conn)
                 .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
-        let lines_with_arc = Arc::new(lines);
-        cache.insert(cache_key.clone(), lines_with_arc).await;
 
-        cache
-            .get(&cache_key)
-            .map(|line| Arc::clone(&line).to_vec())
-            .ok_or(DomainError::Unexpected(
-                "Failed to caching for response.".to_string(),
-            ))
+        let cloned_lines = lines.clone();
+        cache.insert(cache_key.clone(), Arc::new(lines)).await;
+
+        Ok(cloned_lines)
     }
 
     async fn get_by_line_group_id(
@@ -292,14 +271,10 @@ impl InternalLineRepository {
         .fetch_all(conn)
         .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
-        let lines_with_arc = Arc::new(lines);
-        cache.insert(cache_key.clone(), lines_with_arc).await;
 
-        cache
-            .get(&cache_key)
-            .map(|line| Arc::clone(&line).to_vec())
-            .ok_or(DomainError::Unexpected(
-                "Failed to caching for response.".to_string(),
-            ))
+        let cloned_lines = lines.clone();
+        cache.insert(cache_key.clone(), Arc::new(lines)).await;
+
+        Ok(cloned_lines)
     }
 }

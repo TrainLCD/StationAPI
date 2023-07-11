@@ -131,15 +131,10 @@ impl InternalTrainTypeRepository {
         .await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
-        let train_types_with_arc = Arc::new(train_types);
-        cache.insert(cache_key.clone(), train_types_with_arc).await;
+        let cloned_train_types = train_types.clone();
+        cache.insert(cache_key.clone(), Arc::new(train_types)).await;
 
-        cache
-            .get(&cache_key)
-            .map(|train_type| Arc::clone(&train_type).to_vec())
-            .ok_or(DomainError::Unexpected(
-                "Failed to caching for response.".to_string(),
-            ))
+        Ok(cloned_train_types)
     }
     async fn get_by_station_id(
         station_id: u32,
@@ -164,15 +159,10 @@ impl InternalTrainTypeRepository {
         .await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
-        let train_types_with_arc = Arc::new(train_types);
-        cache.insert(cache_key.clone(), train_types_with_arc).await;
+        let cloned_train_types = train_types.clone();
+        cache.insert(cache_key.clone(), Arc::new(train_types)).await;
 
-        cache
-            .get(&cache_key)
-            .map(|train_type| Arc::clone(&train_type).to_vec())
-            .ok_or(DomainError::Unexpected(
-                "Failed to caching for response.".to_string(),
-            ))
+        Ok(cloned_train_types)
     }
     async fn get_by_line_group_id_and_line_id(
         line_group_id: u32,
@@ -204,21 +194,17 @@ impl InternalTrainTypeRepository {
         .fetch_optional(conn)
         .await?;
 
-        let train_type = rows.map(|row| row.into());
+        let train_type: Option<TrainType> = rows.map(|row| row.into());
 
         let Some(train_type) = train_type else {
             return Ok(None);
         };
 
-        let train_type_with_arc = Arc::new(vec![train_type]);
+        let cloned_train_type = train_type.clone();
+        cache
+            .insert(cache_key.clone(), Arc::new(vec![cloned_train_type]))
+            .await;
 
-        cache.insert(cache_key.clone(), train_type_with_arc).await;
-
-        if let Some(cache_data) = cache.get(&cache_key) {
-            if let Some(cache_data) = cache_data.first() {
-                return Ok(Some(cache_data.clone()));
-            }
-        };
-        Ok(None)
+        Ok(Some(train_type))
     }
 }
