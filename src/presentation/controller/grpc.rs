@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tonic::Response;
 
 use crate::{
-    domain::entity::{company::Company, line::Line, station::Station, train_type::TrainType},
+    domain::entity::{line::Line, train_type::TrainType},
     infrastructure::{
         company_repository::MyCompanyRepository, line_repository::MyLineRepository,
         station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
@@ -33,20 +33,19 @@ pub struct GrpcRouter {
 
 impl GrpcRouter {
     pub fn new(pool: Pool<MySql>) -> Self {
-        let station_repository_cache =
-            Cache::<String, Vec<Station>>::new(CACHE_SIZE.to_u64().unwrap());
+        let station_repository_cache = Cache::new(CACHE_SIZE.to_u64().unwrap());
         let station_repository = MyStationRepository::new(pool.clone(), station_repository_cache);
 
-        let line_repository_cache = Cache::<String, Vec<Line>>::new(CACHE_SIZE.to_u64().unwrap());
+        let line_repository_cache =
+            Cache::<String, Arc<Vec<Line>>>::new(CACHE_SIZE.to_u64().unwrap());
         let line_repository = MyLineRepository::new(pool.clone(), line_repository_cache);
 
         let train_type_repository_cache =
-            Cache::<String, Vec<TrainType>>::new(CACHE_SIZE.to_u64().unwrap());
+            Cache::<String, Arc<Vec<TrainType>>>::new(CACHE_SIZE.to_u64().unwrap());
         let train_type_repository =
             MyTrainTypeRepository::new(pool.clone(), train_type_repository_cache);
 
-        let company_repository_cache: Cache<String, Vec<Company>> =
-            Cache::<String, Vec<Company>>::new(CACHE_SIZE.to_u64().unwrap());
+        let company_repository_cache = Cache::new(CACHE_SIZE.to_u64().unwrap());
         let company_repository = MyCompanyRepository::new(pool, company_repository_cache);
 
         let query_use_case = QueryInteractor {
