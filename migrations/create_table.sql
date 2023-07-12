@@ -25,18 +25,18 @@ DROP TABLE IF EXISTS `companies`;
 CREATE TABLE `companies` (
   `company_cd` int unsigned NOT NULL,
   `rr_cd` int unsigned NOT NULL,
-  `company_name` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
-  `company_name_k` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
-  `company_name_h` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
-  `company_name_r` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
-  `company_name_en` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `company_name` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `company_name_k` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `company_name_h` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `company_name_r` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `company_name_en` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `company_name_full_en` text NOT NULL,
-  `company_url` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
-  `company_type` int NOT NULL,
+  `company_url` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `company_type` int unsigned NOT NULL,
   `e_status` int unsigned NOT NULL,
   `e_sort` int unsigned NOT NULL,
   PRIMARY KEY (`company_cd`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -58,22 +58,22 @@ DROP TABLE IF EXISTS `lines`;
 CREATE TABLE `lines` (
   `line_cd` int unsigned NOT NULL,
   `company_cd` int unsigned NOT NULL,
-  `line_name` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
-  `line_name_k` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
-  `line_name_h` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
-  `line_name_r` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
-  `line_name_zh` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
-  `line_name_ko` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
-  `line_color_c` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
-  `line_color_t` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+  `line_name` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `line_name_k` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `line_name_h` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `line_name_r` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `line_name_zh` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_name_ko` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_color_c` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `line_color_t` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `line_type` int unsigned NOT NULL,
-  `line_symbol_primary` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
+  `line_symbol_primary` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `line_symbol_secondary` text,
   `line_symbol_extra` text,
   `line_symbol_primary_color` text,
   `line_symbol_secondary_color` text,
   `line_symbol_extra_color` text,
-  `line_symbol_primary_shape` text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
+  `line_symbol_primary_shape` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `line_symbol_secondary_shape` text,
   `line_symbol_extra_shape` text,
   `lon` decimal(18,14) unsigned NOT NULL,
@@ -85,7 +85,7 @@ CREATE TABLE `lines` (
   KEY `company_cd` (`company_cd`),
   KEY `e_sort` (`e_sort`),
   CONSTRAINT `lines_ibfk_1` FOREIGN KEY (`company_cd`) REFERENCES `companies` (`company_cd`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -116,7 +116,7 @@ CREATE TABLE `station_station_types` (
   KEY `line_group_cd` (`line_group_cd`),
   CONSTRAINT `station_station_types_ibfk_1` FOREIGN KEY (`station_cd`) REFERENCES `stations` (`station_cd`),
   CONSTRAINT `station_station_types_ibfk_2` FOREIGN KEY (`type_cd`) REFERENCES `types` (`type_cd`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB AUTO_INCREMENT=14645 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -162,6 +162,7 @@ CREATE TABLE `stations` (
   KEY `station_g_cd` (`station_g_cd`),
   KEY `e_status` (`e_status`),
   KEY `e_sort` (`e_sort`),
+  KEY `station_g_cd_2` (`station_g_cd`,`e_status`),
   CONSTRAINT `stations_ibfk_1` FOREIGN KEY (`line_cd`) REFERENCES `lines` (`line_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -184,15 +185,15 @@ DROP TABLE IF EXISTS `types`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `types` (
   `type_cd` int unsigned NOT NULL AUTO_INCREMENT,
-  `type_name` varchar(20) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
-  `type_name_k` varchar(14) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
-  `type_name_r` varchar(53) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
-  `type_name_zh` varchar(19) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
-  `type_name_ko` varchar(25) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
-  `color` varchar(7) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL DEFAULT '',
+  `type_name` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type_name_k` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type_name_r` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type_name_zh` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type_name_ko` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `color` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `direction` int unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`type_cd`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -213,4 +214,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-04-30  9:11:26
+-- Dump completed on 2023-05-09 16:31:53

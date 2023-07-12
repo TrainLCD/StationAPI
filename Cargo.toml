@@ -1,0 +1,45 @@
+[package]
+name = "stationapi"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "stationapi"
+path = "src/main.rs"
+
+[dependencies]
+async-trait = "0.1.68"
+dotenv = "0.15.0"
+prost = "0.11.9"
+sqlx = { version = "0.6", features = [
+    "runtime-tokio-native-tls",
+    "mysql",
+    "macros",
+    "bigdecimal",
+    "offline",
+] }
+tokio = { version = "1.28.0", features = ["full"] }
+tonic = { version = "0.9.2", features = ["gzip"] }
+tonic-web = "0.9.2"
+tracing = "0.1.37"
+tracing-subscriber = "0.3.17"
+mockall = "0.11.2"
+bigdecimal = { version = "0.3.0", features = ["serde"] }
+serde = { version = "1.0.162", features = ["derive"] }
+serde_json = "1.0.96"
+percent-encoding = "2.2.0"
+url = "2.3.1"
+futures = "0.3.28"
+log = "0.4.17"
+anyhow = "1.0.71"
+thiserror = "1.0.40"
+fake = { version = "2.6.1", features = ["derive", "bigdecimal"] }
+rand = "0.8.5"
+moka = { version = "0.11", features = ["future"] }
+
+[build-dependencies]
+tonic-build = "0.9.2"
+prost-build = "0.11.9"
