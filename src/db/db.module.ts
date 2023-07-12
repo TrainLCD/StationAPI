@@ -7,8 +7,7 @@ export const DB_CONNECTION = 'DB_CONNECTION';
 const dbProvider = {
   provide: DB_CONNECTION,
   useValue: mysql.createPool({
-    connectionLimit: 10,
-    host: process.env.MYSQL_HOST,
+    socketPath: process.env.MYSQL_SOCKET,
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASSWORD,
     database: process.env.MYSQL_DATABASE,
