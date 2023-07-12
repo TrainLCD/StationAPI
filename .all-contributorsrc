@@ -11,7 +11,9 @@
       "avatar_url": "https://avatars.githubusercontent.com/u/20313668?v=4",
       "profile": "https://sw-saturn.dev",
       "contributions": [
-        "data"
+        "data",
+        "infra",
+        "code"
       ]
     },
     {
@@ -30,5 +32,7 @@
   "projectOwner": "TrainLCD",
   "repoType": "github",
   "repoHost": "https://github.com",
-  "skipCi": true
+  "skipCi": true,
+  "commitType": "docs",
+  "commitConvention": "angular"
 }
