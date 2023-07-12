@@ -2,17 +2,11 @@ FROM rust:1 AS builder
 
 WORKDIR /app
 
-COPY Cargo.lock Cargo.toml ./
-RUN mkdir src && echo "fn main() {}" > src/main.rs
-COPY build.rs .
-COPY proto/stationapi.proto proto/stationapi.proto
 RUN apt-get update && \
     apt-get install -y protobuf-compiler libprotobuf-dev rsync && \
     rm -rf /var/lib/apt/lists/*
-RUN cargo build --release
-
 COPY . .
-RUN SQLX_OFFLINE=true cargo build --release
+RUN SQLX_OFFLINE=true cargo build --release --quiet
 
 FROM node:18-slim as migration
 WORKDIR /app
