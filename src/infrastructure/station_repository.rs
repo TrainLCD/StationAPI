@@ -1,8 +1,5 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, ToPrimitive};
-use moka::future::Cache;
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::domain::{
@@ -80,12 +77,11 @@ impl From<StationRow> for Station {
 #[derive(Debug, Clone)]
 pub struct MyStationRepository {
     pool: Pool<MySql>,
-    cache: Cache<String, Arc<Vec<Station>>>,
 }
 
 impl MyStationRepository {
-    pub fn new(pool: Pool<MySql>, cache: Cache<String, Arc<Vec<Station>>>) -> Self {
-        Self { pool, cache }
+    pub fn new(pool: Pool<MySql>) -> Self {
+        Self { pool }
     }
 }
 
@@ -95,19 +91,18 @@ const DEFAULT_COLUMN_COUNT: u32 = 1;
 impl StationRepository for MyStationRepository {
     async fn find_by_id(&self, id: u32) -> Result<Option<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::find_by_id(id, &mut conn, &self.cache).await
+        InternalStationRepository::find_by_id(id, &mut conn).await
     }
     async fn get_by_line_id(&self, line_id: u32) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_by_line_id(line_id, &mut conn, &self.cache).await
+        InternalStationRepository::get_by_line_id(line_id, &mut conn).await
     }
     async fn get_by_station_group_id(
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn: sqlx::pool::PoolConnection<MySql> = self.pool.acquire().await?;
-        InternalStationRepository::get_by_station_group_id(station_group_id, &mut conn, &self.cache)
-            .await
+        InternalStationRepository::get_by_station_group_id(station_group_id, &mut conn).await
     }
 
     // ほぼ確実にキャッシュがヒットしないと思うのでキャッシュを使わない
@@ -127,12 +122,12 @@ impl StationRepository for MyStationRepository {
         limit: Option<u32>,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_by_name(station_name, limit, &mut conn, &self.cache).await
+        InternalStationRepository::get_by_name(station_name, limit, &mut conn).await
     }
 
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_by_line_group_id(line_group_id, &mut conn, &self.cache).await
+        InternalStationRepository::get_by_line_group_id(line_group_id, &mut conn).await
     }
 }
 
@@ -142,13 +137,7 @@ impl InternalStationRepository {
     async fn find_by_id(
         id: u32,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Arc<Vec<Station>>>,
     ) -> Result<Option<Station>, DomainError> {
-        let cache_key = format!("station_repository:find_by_id:{}", id);
-        if let Some(cache_data) = cache.get(&cache_key) {
-            return Ok(Arc::clone(&cache_data).first().cloned());
-        };
-
         let rows: Option<StationRow> = sqlx::query_as(
             "SELECT s.*, 0 AS pass,
             (
@@ -170,21 +159,12 @@ impl InternalStationRepository {
             return Ok(None);
         };
 
-        let cloned_station = station.clone();
-        cache.insert(cache_key, Arc::new(vec![station])).await;
-
-        Ok(Some(cloned_station))
+        Ok(Some(station))
     }
     async fn get_by_line_id(
         line_id: u32,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Arc<Vec<Station>>>,
     ) -> Result<Vec<Station>, DomainError> {
-        let cache_key = format!("station_repository:get_by_line_id:{}", line_id);
-        if let Some(cache_data) = cache.get(&cache_key) {
-            return Ok(Arc::clone(&cache_data).to_vec());
-        };
-
         let station_row: Vec<StationRow> = sqlx::query_as(
             "SELECT s.*, 0 AS pass, (
                 SELECT COUNT(line_group_cd)
@@ -202,22 +182,13 @@ impl InternalStationRepository {
 
         let stations: Vec<Station> = station_row.into_iter().map(|row| row.into()).collect();
 
-        let cloned_stations = stations.clone();
-        cache.insert(cache_key, Arc::new(stations)).await;
-
-        Ok(cloned_stations)
+        Ok(stations)
     }
 
     async fn get_by_station_group_id(
         group_id: u32,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Arc<Vec<Station>>>,
     ) -> Result<Vec<Station>, DomainError> {
-        let cache_key = format!("station_repository:get_by_station_group_id:{}", group_id);
-        if let Some(cache_data) = cache.get(&cache_key) {
-            return Ok(Arc::clone(&cache_data).to_vec());
-        };
-
         let rows: Vec<StationRow> = sqlx::query_as(
             "SELECT s.*, 0 AS pass,
             (
@@ -236,10 +207,7 @@ impl InternalStationRepository {
 
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
-        let cloned_stations = stations.clone();
-        cache.insert(cache_key.clone(), Arc::new(stations)).await;
-
-        Ok(cloned_stations)
+        Ok(stations)
     }
 
     async fn get_by_coordinates(
@@ -287,13 +255,7 @@ impl InternalStationRepository {
         station_name: String,
         limit: Option<u32>,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Arc<Vec<Station>>>,
     ) -> Result<Vec<Station>, DomainError> {
-        let cache_key = format!("station_repository:get_by_name:{}", station_name);
-        if let Some(cache_data) = cache.get(&cache_key) {
-            return Ok(Arc::clone(&cache_data).to_vec());
-        };
-
         let query_str: String = format!(
             "SELECT s.*, 0 AS pass,
             (
@@ -326,22 +288,13 @@ impl InternalStationRepository {
 
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
-        let cloned_stations = stations.clone();
-        cache.insert(cache_key.clone(), Arc::new(stations)).await;
-
-        Ok(cloned_stations)
+        Ok(stations)
     }
 
     async fn get_by_line_group_id(
         line_group_id: u32,
         conn: &mut MySqlConnection,
-        cache: &Cache<String, Arc<Vec<Station>>>,
     ) -> Result<Vec<Station>, DomainError> {
-        let cache_key = format!("station_repository:get_by_line_group_id:{}", line_group_id);
-        if let Some(cache_data) = cache.get(&cache_key) {
-            return Ok(Arc::clone(&cache_data).to_vec());
-        };
-
         let rows: Vec<StationRow> = sqlx::query_as(
             "SELECT *,
             (
@@ -360,9 +313,7 @@ impl InternalStationRepository {
         .await?;
 
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
-        let cloned_stations = stations.clone();
-        cache.insert(cache_key.clone(), Arc::new(stations)).await;
 
-        Ok(cloned_stations)
+        Ok(stations)
     }
 }

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tonic::Response;
 
 use crate::{
-    domain::entity::{line::Line, train_type::TrainType},
+    domain::entity::{station::Station as StationEntity, train_type::TrainType as TrainTypeEntity},
     infrastructure::{
         company_repository::MyCompanyRepository, line_repository::MyLineRepository,
         station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
@@ -14,7 +14,8 @@ use crate::{
         station_api_server::StationApi, GetStationByCoordinatesRequest, GetStationByGroupIdRequest,
         GetStationByIdRequest, GetStationByLineIdRequest, GetStationsByLineGroupIdRequest,
         GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleStationResponse,
-        MultipleTrainTypeResponse, SingleStationResponse,
+        MultipleTrainTypeResponse, SingleStationResponse, Station as PbStation,
+        TrainType as PbTrainType,
     },
     presentation::error::PresentationalError,
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
@@ -23,6 +24,8 @@ use crate::{
 const CACHE_SIZE: usize = 10_000;
 
 pub struct GrpcRouter {
+    station_list_cache: Cache<String, Arc<Vec<StationEntity>>>,
+    train_types_cache: Cache<String, Arc<Vec<TrainTypeEntity>>>,
     query_use_case: QueryInteractor<
         MyStationRepository,
         MyLineRepository,
@@ -33,28 +36,24 @@ pub struct GrpcRouter {
 
 impl GrpcRouter {
     pub fn new(pool: Pool<MySql>) -> Self {
-        let station_repository_cache = Cache::new(CACHE_SIZE.to_u64().unwrap());
-        let station_repository = MyStationRepository::new(pool.clone(), station_repository_cache);
-
-        let line_repository_cache =
-            Cache::<String, Arc<Vec<Line>>>::new(CACHE_SIZE.to_u64().unwrap());
-        let line_repository = MyLineRepository::new(pool.clone(), line_repository_cache);
-
-        let train_type_repository_cache =
-            Cache::<String, Arc<Vec<TrainType>>>::new(CACHE_SIZE.to_u64().unwrap());
-        let train_type_repository =
-            MyTrainTypeRepository::new(pool.clone(), train_type_repository_cache);
-
-        let company_repository_cache = Cache::new(CACHE_SIZE.to_u64().unwrap());
-        let company_repository = MyCompanyRepository::new(pool, company_repository_cache);
+        let station_repository = MyStationRepository::new(pool.clone());
+        let line_repository = MyLineRepository::new(pool.clone());
+        let train_type_repository = MyTrainTypeRepository::new(pool.clone());
+        let company_repository = MyCompanyRepository::new(pool);
 
         let query_use_case = QueryInteractor {
             station_repository,
             line_repository,
             train_type_repository,
             company_repository,
+            attributes_cache: Cache::new(CACHE_SIZE.to_u64().unwrap()),
         };
-        Self { query_use_case }
+
+        Self {
+            query_use_case,
+            station_list_cache: Cache::new(CACHE_SIZE.to_u64().unwrap()),
+            train_types_cache: Cache::new(CACHE_SIZE.to_u64().unwrap()),
+        }
     }
 }
 
@@ -65,6 +64,19 @@ impl StationApi for GrpcRouter {
         request: tonic::Request<GetStationByIdRequest>,
     ) -> Result<tonic::Response<SingleStationResponse>, tonic::Status> {
         let station_id = request.get_ref().id;
+
+        let cache = self.station_list_cache.clone();
+        let cache_key = format!("station:get_station_by_id:{}", station_id);
+        if let Some(cache_data) = cache.get(&cache_key) {
+            return Ok(Response::new(SingleStationResponse {
+                station: Some(
+                    cache_data
+                        .first()
+                        .map(|station| station.clone().into())
+                        .unwrap(),
+                ),
+            }));
+        };
 
         let station = match self.query_use_case.find_station_by_id(station_id).await {
             Ok(Some(station)) => station,
@@ -80,6 +92,10 @@ impl StationApi for GrpcRouter {
             }
         };
 
+        self.station_list_cache
+            .insert(cache_key, Arc::new(vec![station.clone()]))
+            .await;
+
         Ok(Response::new(SingleStationResponse {
             station: Some(station.into()),
         }))
@@ -88,14 +104,27 @@ impl StationApi for GrpcRouter {
         &self,
         request: tonic::Request<GetStationByGroupIdRequest>,
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
-        match self
-            .query_use_case
-            .get_stations_by_group_id(request.get_ref().group_id)
-            .await
-        {
-            Ok(stations) => Ok(Response::new(MultipleStationResponse {
-                stations: stations.into_iter().map(|station| station.into()).collect(),
-            })),
+        let group_id = request.get_ref().group_id;
+
+        let cache_key = format!("stations:group_id:{}", group_id);
+        if let Some(cache_data) = self.station_list_cache.get(&cache_key) {
+            if let Some(stations) = Arc::into_inner(Arc::clone(&cache_data)) {
+                let stations: Vec<PbStation> =
+                    stations.into_iter().map(|station| station.into()).collect();
+                return Ok(Response::new(MultipleStationResponse { stations }));
+            }
+        };
+
+        match self.query_use_case.get_stations_by_group_id(group_id).await {
+            Ok(stations) => {
+                self.station_list_cache
+                    .insert(cache_key, Arc::new(stations.clone()))
+                    .await;
+
+                return Ok(Response::new(MultipleStationResponse {
+                    stations: stations.into_iter().map(|station| station.into()).collect(),
+                }));
+            }
             Err(err) => return Err(PresentationalError::from(err).into()),
         }
     }
@@ -126,8 +155,22 @@ impl StationApi for GrpcRouter {
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let line_id = request.get_ref().line_id;
 
+        let cache = self.station_list_cache.clone();
+
+        let cache_key = format!("stations:line_id:{}", line_id);
+        if let Some(stations) = cache.get(&cache_key) {
+            let stations = stations.to_vec();
+            return Ok(Response::new(MultipleStationResponse {
+                stations: stations.into_iter().map(|station| station.into()).collect(),
+            }));
+        };
+
         match self.query_use_case.get_stations_by_line_id(line_id).await {
             Ok(stations) => {
+                self.station_list_cache
+                    .insert(cache_key, Arc::new(stations.clone()))
+                    .await;
+
                 return Ok(Response::new(MultipleStationResponse {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
                 }));
@@ -141,16 +184,34 @@ impl StationApi for GrpcRouter {
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let request_ref = request.get_ref();
         let query_station_name = request_ref.station_name.clone();
-        let limit = request_ref.limit;
+        let query_limit = request_ref.limit;
+
+        let cache_key = format!(
+            "stations:station_name:{}:limit:{:?}",
+            query_station_name,
+            query_limit.to_owned()
+        );
+        if let Some(cache_data) = self.station_list_cache.get(&cache_key) {
+            let stations = cache_data.to_vec();
+            let stations: Vec<PbStation> =
+                stations.into_iter().map(|station| station.into()).collect();
+            return Ok(Response::new(MultipleStationResponse { stations }));
+        };
 
         match self
             .query_use_case
-            .get_stations_by_name(query_station_name, limit)
+            .get_stations_by_name(query_station_name, query_limit)
             .await
         {
-            Ok(stations) => Ok(Response::new(MultipleStationResponse {
-                stations: stations.into_iter().map(|station| station.into()).collect(),
-            })),
+            Ok(stations) => {
+                self.station_list_cache
+                    .insert(cache_key, Arc::new(stations.clone()))
+                    .await;
+
+                return Ok(Response::new(MultipleStationResponse {
+                    stations: stations.into_iter().map(|station| station.into()).collect(),
+                }));
+            }
             Err(err) => Err(PresentationalError::from(err).into()),
         }
     }
@@ -162,14 +223,30 @@ impl StationApi for GrpcRouter {
         let request_ref = request.get_ref();
         let query_line_group_id = request_ref.line_group_id;
 
+        let cache = self.station_list_cache.clone();
+
+        let cache_key = format!("stations:line_group_id:{}", query_line_group_id);
+        if let Some(cache_data) = cache.get(&cache_key) {
+            let stations = cache_data.to_vec();
+            let stations: Vec<PbStation> =
+                stations.into_iter().map(|station| station.into()).collect();
+            return Ok(Response::new(MultipleStationResponse { stations }));
+        };
+
         match self
             .query_use_case
             .get_stations_by_line_group_id(query_line_group_id)
             .await
         {
-            Ok(stations) => Ok(Response::new(MultipleStationResponse {
-                stations: stations.into_iter().map(|station| station.into()).collect(),
-            })),
+            Ok(stations) => {
+                self.station_list_cache
+                    .insert(cache_key, Arc::new(stations.clone()))
+                    .await;
+
+                return Ok(Response::new(MultipleStationResponse {
+                    stations: stations.into_iter().map(|station| station.into()).collect(),
+                }));
+            }
             Err(err) => Err(PresentationalError::from(err).into()),
         }
     }
@@ -181,14 +258,30 @@ impl StationApi for GrpcRouter {
         let request_ref: &GetTrainTypesByStationIdRequest = request.get_ref();
         let query_station_id = request_ref.station_id;
 
+        let cache_key = format!("train_types:station_id:{:?}", query_station_id);
+        if let Some(cache_data) = self.train_types_cache.get(&cache_key) {
+            let train_types = cache_data.to_vec();
+            let train_types: Vec<PbTrainType> = train_types
+                .into_iter()
+                .map(|station| station.into())
+                .collect();
+            return Ok(Response::new(MultipleTrainTypeResponse { train_types }));
+        };
+
         match self
             .query_use_case
             .get_train_types_by_station_id(query_station_id)
             .await
         {
-            Ok(train_types) => Ok(Response::new(MultipleTrainTypeResponse {
-                train_types: train_types.into_iter().map(|tt| tt.into()).collect(),
-            })),
+            Ok(train_types) => {
+                self.train_types_cache
+                    .insert(cache_key, Arc::new(train_types.clone()))
+                    .await;
+
+                Ok(Response::new(MultipleTrainTypeResponse {
+                    train_types: train_types.into_iter().map(|tt| tt.into()).collect(),
+                }))
+            }
             Err(err) => Err(PresentationalError::from(err).into()),
         }
     }
