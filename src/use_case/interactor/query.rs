@@ -52,7 +52,7 @@ where
             .get_by_station_group_id(station_group_id)
             .await?;
 
-        let mut result: Vec<Station> = vec![];
+        let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for mut station in stations.into_iter() {
             self.update_station_with_attributes(&mut station, false)
@@ -73,7 +73,7 @@ where
             .get_by_coordinates(latitude, longitude, limit)
             .await?;
 
-        let mut result: Vec<Station> = vec![];
+        let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for mut station in stations.into_iter() {
             self.update_station_with_attributes(&mut station, false)
@@ -86,7 +86,7 @@ where
 
     async fn get_stations_by_line_id(&self, line_id: u32) -> Result<Vec<Station>, UseCaseError> {
         let stations = self.station_repository.get_by_line_id(line_id).await?;
-        let mut result: Vec<Station> = vec![];
+        let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for mut station in stations.into_iter() {
             self.update_station_with_attributes(&mut station, false)
@@ -105,7 +105,7 @@ where
             .station_repository
             .get_by_name(station_name, limit)
             .await?;
-        let mut result: Vec<Station> = vec![];
+        let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for mut station in stations.into_iter() {
             self.update_station_with_attributes(&mut station, false)
@@ -140,9 +140,10 @@ where
         let lines = self
             .get_lines_by_station_group_id(station.station_g_cd)
             .await?;
-        let mut lines_tmp: Vec<Option<Line>> = vec![None; lines.len()];
 
-        for (index, ref mut line) in lines.into_iter().enumerate() {
+        let mut lines_tmp: Vec<Option<Line>> = Vec::with_capacity(lines.len());
+
+        for ref mut line in lines.into_iter() {
             if !shallow {
                 let mut stations = self
                     .station_repository
@@ -165,7 +166,7 @@ where
             }
 
             line.line_symbols = self.get_line_symbols(line);
-            lines_tmp[index] = Some(line.clone());
+            lines_tmp.push(Some(line.clone()));
         }
 
         station.lines = lines_tmp.into_iter().flatten().collect();
@@ -206,7 +207,7 @@ where
             .get_by_line_group_id(line_group_id)
             .await?;
 
-        let mut result: Vec<Station> = vec![];
+        let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for mut station in stations.into_iter() {
             self.update_station_with_attributes(&mut station, false)
