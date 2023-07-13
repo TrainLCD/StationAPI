@@ -20,7 +20,7 @@ use crate::{
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
 
-const CACHE_SIZE: usize = 10_000;
+const CACHE_SIZE: usize = 100_000;
 
 pub struct GrpcRouter {
     query_use_case: QueryInteractor<
