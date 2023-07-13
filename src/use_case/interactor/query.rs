@@ -143,13 +143,13 @@ where
 
         let mut lines_tmp: Vec<Option<Line>> = Vec::with_capacity(lines.len());
 
+        let mut stations = self
+            .station_repository
+            .get_by_station_group_id(station.station_g_cd)
+            .await?;
+
         for ref mut line in lines.into_iter() {
             if !shallow {
-                let mut stations = self
-                    .station_repository
-                    .get_by_station_group_id(station.station_g_cd)
-                    .await?;
-
                 for station in stations.iter_mut() {
                     if station.line_cd == line.line_cd {
                         station.station_numbers = self.get_station_numbers(
