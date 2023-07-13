@@ -128,7 +128,10 @@ where
         let mut mutable_station = station;
 
         let cache = self.attributes_cache.clone();
-        let cache_key = format!("station_with_attributes:id:{}", cloned_station.station_cd);
+        let cache_key = format!(
+            "station_with_attributes:id:{}:pass:{}",
+            cloned_station.station_cd, cloned_station.pass
+        );
         if let Some(ref mut cache_data) = cache.get(&cache_key) {
             return Ok(cache_data.clone());
         }
