@@ -21,7 +21,7 @@ use crate::{
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
 
-const CACHE_SIZE: usize = 100_000;
+const CACHE_SIZE: usize = 10_000;
 
 pub struct GrpcRouter {
     station_list_cache: Cache<String, Arc<Vec<StationEntity>>>,
@@ -46,6 +46,7 @@ impl GrpcRouter {
             line_repository,
             train_type_repository,
             company_repository,
+            attributes_cache: Cache::new(CACHE_SIZE.to_u64().unwrap()),
         };
 
         Self {
