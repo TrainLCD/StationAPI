@@ -1,10 +1,12 @@
 # StationAPI
 
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+
 [![All Contributors](https://img.shields.io/badge/all_contributors-2-orange.svg?style=flat-square)](#contributors-)
+
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
-The GraphQL Web API for provides nearest station.
+The gRPC-Web API for provides nearby japanese train station.
 
 ## Contributors ✨
 
@@ -32,4 +34,4 @@ This project follows the [all-contributors](https://github.com/all-contributors/
 ## Join our community(Japanese only)
 
 Do you like this project? Join our Discord community!
-[https://discord.gg/7sQhQhnvvw](https://discord.gg/7sQhQhnvvw)
+[https://discord.gg/qKT7zSGQre](https://discord.gg/qKT7zSGQre)
