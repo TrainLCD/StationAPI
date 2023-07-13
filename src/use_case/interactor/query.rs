@@ -39,7 +39,7 @@ where
         let Some( station) = self.station_repository.find_by_id(station_id).await? else {
             return Ok(None);
         };
-        let station = self.get_station_with_attributes(station, false).await?;
+        let station = self.get_station_with_attributes(station).await?;
         Ok(Some(station))
     }
 
@@ -55,7 +55,7 @@ where
         let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for station in stations.into_iter() {
-            let station = self.get_station_with_attributes(station, false).await?;
+            let station = self.get_station_with_attributes(station).await?;
             result.push(station);
         }
 
@@ -75,7 +75,7 @@ where
         let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for station in stations.into_iter() {
-            let station = self.get_station_with_attributes(station, false).await?;
+            let station = self.get_station_with_attributes(station).await?;
             result.push(station);
         }
 
@@ -87,7 +87,7 @@ where
         let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for station in stations.into_iter() {
-            let station = self.get_station_with_attributes(station, false).await?;
+            let station = self.get_station_with_attributes(station).await?;
             result.push(station);
         }
 
@@ -105,7 +105,7 @@ where
         let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for station in stations.into_iter() {
-            let station = self.get_station_with_attributes(station, false).await?;
+            let station = self.get_station_with_attributes(station).await?;
             result.push(station);
         }
 
@@ -123,11 +123,7 @@ where
         Ok(Some(company))
     }
 
-    async fn get_station_with_attributes(
-        &self,
-        station: Station,
-        shallow: bool,
-    ) -> Result<Station, UseCaseError> {
+    async fn get_station_with_attributes(&self, station: Station) -> Result<Station, UseCaseError> {
         let cloned_station = station.clone();
         let mut mutable_station = station;
 
@@ -154,19 +150,17 @@ where
             .await?;
 
         for ref mut line in lines.into_iter() {
-            if !shallow {
-                for station in stations.iter_mut() {
-                    if station.line_cd == line.line_cd {
-                        station.station_numbers = self.get_station_numbers(
-                            Box::new(station.to_owned()),
-                            Box::new(line.to_owned()),
-                        );
+            for station in stations.iter_mut() {
+                if station.line_cd == line.line_cd {
+                    station.station_numbers = self.get_station_numbers(
+                        Box::new(station.to_owned()),
+                        Box::new(line.to_owned()),
+                    );
 
-                        let company = self.find_company_by_id(line.company_cd).await?;
-                        line.company = company;
+                    let company = self.find_company_by_id(line.company_cd).await?;
+                    line.company = company;
 
-                        line.station = Some(station.to_owned());
-                    }
+                    line.station = Some(station.to_owned());
                 }
             }
 
@@ -217,7 +211,7 @@ where
         let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for station in stations.into_iter() {
-            let station = self.get_station_with_attributes(station, false).await?;
+            let station = self.get_station_with_attributes(station).await?;
             result.push(station);
         }
 
