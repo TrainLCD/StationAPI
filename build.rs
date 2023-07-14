@@ -10,6 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .type_attribute("Line", "#[derive(fake::Dummy)]")
         .type_attribute("Station", "#[derive(fake::Dummy)]")
         .type_attribute("TrainType", "#[derive(fake::Dummy)]")
+        .type_attribute("StopCondition", "#[derive(fake::Dummy)]")
         .compile_with_config(prost_build_config, &["proto/stationapi.proto"], &["proto"])
         .unwrap();
 

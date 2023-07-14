@@ -129,8 +129,8 @@ where
 
         let cache = self.attributes_cache.clone();
         let cache_key = format!(
-            "station_with_attributes:id:{}:pass:{}",
-            cloned_station.station_cd, cloned_station.pass
+            "station_with_attributes:id:{}:stop_condition:{:?}",
+            cloned_station.station_cd, cloned_station.stop_condition
         );
         if let Some(ref mut cache_data) = cache.get(&cache_key) {
             return Ok(cache_data.clone());

@@ -2,8 +2,12 @@ use async_trait::async_trait;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use sqlx::{MySql, MySqlConnection, Pool};
 
-use crate::domain::{
-    entity::station::Station, error::DomainError, repository::station_repository::StationRepository,
+use crate::{
+    domain::{
+        entity::station::Station, error::DomainError,
+        repository::station_repository::StationRepository,
+    },
+    pb::StopCondition,
 };
 
 #[derive(sqlx::FromRow, Clone)]
@@ -35,6 +39,16 @@ struct StationRow {
 
 impl From<StationRow> for Station {
     fn from(row: StationRow) -> Self {
+        let stop_condition = match row.pass {
+            0 => StopCondition::All,
+            1 => StopCondition::Not,
+            2 => StopCondition::Partial,
+            3 => StopCondition::Weekday,
+            4 => StopCondition::Holiday,
+            5 => StopCondition::PartialStop,
+            _ => StopCondition::All,
+        };
+
         Self {
             station_cd: row.station_cd,
             station_g_cd: row.station_g_cd,
@@ -66,7 +80,7 @@ impl From<StationRow> for Station {
             close_ymd: row.close_ymd,
             e_status: row.e_status,
             e_sort: row.e_sort,
-            pass: row.pass,
+            stop_condition,
             distance: None,
             station_types_count: row.station_types_count,
             train_type: None,
