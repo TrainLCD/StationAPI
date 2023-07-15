@@ -1,20 +1,7 @@
-use crate::{
-    domain::entity::station::Station,
-    pb::{Station as GrpcStation, StopCondition},
-};
+use crate::{domain::entity::station::Station, pb::Station as GrpcStation};
 
 impl From<Station> for GrpcStation {
     fn from(station: Station) -> Self {
-        let stop_condition: i32 = match station.pass {
-            0 => StopCondition::All.into(),
-            1 => StopCondition::Not.into(),
-            2 => StopCondition::Partial.into(),
-            3 => StopCondition::Weekday.into(),
-            4 => StopCondition::Holiday.into(),
-            5 => StopCondition::PartialStop.into(),
-            _ => StopCondition::All.into(),
-        };
-
         Self {
             id: station.station_cd,
             group_id: station.station_g_cd,
@@ -39,10 +26,9 @@ impl From<Station> for GrpcStation {
                 .into_iter()
                 .map(|num| num.into())
                 .collect(),
-            stop_condition,
+            stop_condition: station.stop_condition.into(),
             distance: station.distance,
-            pass: station.pass == 1,
-            has_train_types: Some(station.station_types_count > 0),
+            has_train_types: Some(station.station_types_count != 0),
         }
     }
 }
