@@ -158,6 +158,7 @@ impl InternalStationRepository {
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
+                AND sst.pass <> 1
             ) AS station_types_count
             FROM stations AS s
             WHERE s.station_cd = ?
@@ -184,6 +185,7 @@ impl InternalStationRepository {
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
+                AND sst.pass <> 1
             ) AS station_types_count
             FROM stations as s
             WHERE line_cd = ?
@@ -209,6 +211,7 @@ impl InternalStationRepository {
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
+                AND sst.pass <> 1
             ) AS station_types_count
             FROM stations AS s
             WHERE s.station_g_cd = ?
@@ -244,6 +247,7 @@ impl InternalStationRepository {
             SELECT COUNT(line_group_cd)
             FROM station_station_types AS sst
             WHERE station_cd = sst.station_cd
+            AND sst.pass <> 1
         ) AS station_types_count
         FROM
         stations
@@ -276,6 +280,7 @@ impl InternalStationRepository {
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
+                AND sst.pass <> 1
             ) AS station_types_count
             FROM stations AS s
             WHERE (
@@ -315,6 +320,7 @@ impl InternalStationRepository {
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
+                AND sst.pass <> 1
             ) AS station_types_count,
             CONVERT(sst.pass, SIGNED) as pass
             FROM station_station_types as sst, stations as s

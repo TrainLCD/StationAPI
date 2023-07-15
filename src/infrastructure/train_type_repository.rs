@@ -129,7 +129,7 @@ impl InternalTrainTypeRepository {
             AND s.station_cd = sst.station_cd
             AND sst.type_cd = t.type_cd
             AND s.e_status = 0
-            AND pass <> 1",
+            AND sst.pass <> 1",
         )
         .bind(station_id)
         .fetch_all(conn)
