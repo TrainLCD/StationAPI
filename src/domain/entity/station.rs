@@ -1,5 +1,7 @@
 use fake::Dummy;
 
+use crate::pb::StopCondition;
+
 use super::{line::Line, station_number::StationNumber, train_type::TrainType};
 
 #[derive(Dummy, Clone, Debug)]
@@ -28,7 +30,7 @@ pub struct Station {
     pub close_ymd: String,
     pub e_status: u32,
     pub e_sort: u32,
-    pub pass: i64,
+    pub stop_condition: StopCondition,
     pub distance: Option<f64>,
     pub station_types_count: i64,
     pub train_type: Option<TrainType>,
@@ -61,8 +63,7 @@ impl Station {
         close_ymd: String,
         e_status: u32,
         e_sort: u32,
-        _stop_condition: i32,
-        pass: i64,
+        stop_condition: StopCondition,
         distance: Option<f64>,
         station_types_count: i64,
         train_type: Option<TrainType>,
@@ -92,7 +93,7 @@ impl Station {
             close_ymd,
             e_status,
             e_sort,
-            pass,
+            stop_condition,
             distance,
             station_types_count,
             train_type,
