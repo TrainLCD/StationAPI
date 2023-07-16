@@ -144,6 +144,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 335,区間快速,クカンカイソク,Semi Rapid,区间快速,구간쾌속,#000084,0,TX用,COMPLETE
 336,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#FFA500,0,,COMPLETE
 337,準特急,ジュントッキュウ,Semi-Limited Express,准特急,준특급,#FF6E00,0,,COMPLETE
+338,区間急行,クカンキュウコウ,Sub Express,区间快速,구간급행,#009A41,0,南海電車用,COMPLETE
 400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,,COMPLETE
 401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,,COMPLETE
 402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,,COMPLETE
@@ -154,6 +155,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 407,TJライナー(上り),TJライナー,TJ Liner(Ogawamachi to Ikebukuro),TJ Liner,TJ Liner,#008CD6,1,,COMPLETE
 408,支線,シセン,Branch Line,支線,경로,#9686BD,0,ポートアイランド線用,COMPLETE
 409,各駅停車(田園都市線経由),カクエキテイシャ,Local,每站停车,각역정차,#1F63C7,0,大井町線用,COMPLETE
+410,泉北ライナー,センボクライナー,Semboku Liner,泉北Liner,센보쿠라이너,#E6B422,0,,COMPLETE
 500,りょうもう(浅草〜伊勢崎),リョウモウ,Ryomo(Asakusa to Isesaki),Ryomo,료이제,#FF0000,0,,COMPLETE
 501,りょうもう(浅草〜葛生),リョウモウ,Ryomo(Asakusa to Kuzū),Ryomo,료이제,#FF0000,0,,COMPLETE
 502,りょうもう(浅草〜赤城),リョウモウ,Ryomo(Asakusa to Akagi),Ryomo,료이제,#FF0000,0,,COMPLETE
