@@ -157,39 +157,35 @@ where
         for ref mut line in lines.into_iter() {
             for station in stations.iter_mut() {
                 if station.line_cd == line.line_cd {
-                    station.station_numbers = self.get_station_numbers(
-                        Box::new(station.to_owned()),
-                        Box::new(line.to_owned()),
-                    );
+                    station.station_numbers =
+                        self.get_station_numbers(Box::new(station.clone()), Box::new(line.clone()));
 
                     let company = self.find_company_by_id(line.company_cd).await?;
                     line.company = company;
 
-                    line.station = Some(station.to_owned());
+                    line.station = Some(station.clone());
                 }
             }
 
             line.line_symbols = self.get_line_symbols(line);
-            lines_tmp.push(Some(line.to_owned()));
+            lines_tmp.push(Some(line.clone()));
         }
 
         station.lines = lines_tmp.into_iter().flatten().collect();
 
         if let Some(ref mut belong_line) = belong_line {
-            let station_numbers: Vec<StationNumber> = self.get_station_numbers(
-                Box::new(station.to_owned()),
-                Box::new(belong_line.to_owned()),
-            );
+            let station_numbers: Vec<StationNumber> =
+                self.get_station_numbers(Box::new(station.clone()), Box::new(belong_line.clone()));
 
             station.station_numbers = station_numbers;
 
             let company = self.find_company_by_id(belong_line.company_cd).await?;
             belong_line.company = company;
 
-            station.line = Some(Box::new(belong_line.to_owned()));
+            station.line = Some(Box::new(belong_line.clone()));
         }
 
-        cache.insert(cache_key, Arc::new(station.to_owned())).await;
+        cache.insert(cache_key, Arc::new(station.clone())).await;
 
         Ok(station.clone())
     }
