@@ -39,7 +39,7 @@ where
         let Some(mut station) = self.station_repository.find_by_id(station_id).await? else {
             return Ok(None);
         };
-        let station = self.get_station_with_attributes(&mut station).await?;
+        self.update_station_with_attributes(&mut station).await?;
         Ok(Some(station))
     }
 
@@ -55,7 +55,7 @@ where
         let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for mut station in stations.into_iter() {
-            let station = self.get_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station).await?;
             result.push(station);
         }
 
@@ -75,7 +75,7 @@ where
         let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for mut station in stations.into_iter() {
-            let station = self.get_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station).await?;
             result.push(station);
         }
 
@@ -87,7 +87,7 @@ where
         let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for mut station in stations.into_iter() {
-            let station = self.get_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station).await?;
             result.push(station);
         }
 
@@ -105,7 +105,7 @@ where
         let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for mut station in stations.into_iter() {
-            let station = self.get_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station).await?;
             result.push(station);
         }
 
@@ -123,18 +123,19 @@ where
         Ok(Some(company))
     }
 
-    async fn get_station_with_attributes(
+    async fn update_station_with_attributes(
         &self,
         station: &mut Station,
-    ) -> Result<Station, UseCaseError> {
+    ) -> Result<(), UseCaseError> {
         let cache = self.attributes_cache.clone();
         let cache_key = format!(
             "station_with_attributes:id:{}:stop_condition:{:?}",
             station.station_cd, station.stop_condition
         );
         if let Some(cache_data) = self.attributes_cache.get(&cache_key) {
-            if let Some(station) = Arc::into_inner(Arc::clone(&cache_data)) {
-                return Ok(station);
+            if let Some(station_from_cache) = Arc::into_inner(Arc::clone(&cache_data)) {
+                *station = station_from_cache;
+                return Ok(());
             }
         };
 
@@ -187,7 +188,7 @@ where
 
         cache.insert(cache_key, Arc::new(station.clone())).await;
 
-        Ok(station.clone())
+        Ok(())
     }
 
     async fn get_lines_by_station_group_id(
@@ -212,7 +213,7 @@ where
         let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
         for mut station in stations.into_iter() {
-            let station = self.get_station_with_attributes(&mut station).await?;
+            self.update_station_with_attributes(&mut station).await?;
             result.push(station);
         }
 
