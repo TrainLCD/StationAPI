@@ -66,7 +66,7 @@ impl StationApi for GrpcRouter {
         let station_id = request.get_ref().id;
 
         let cache = self.station_list_cache.clone();
-        let cache_key = format!("station:get_station_by_id:{}", station_id);
+        let cache_key = format!("station:id:{}", station_id);
         if let Some(cache_data) = cache.get(&cache_key) {
             return Ok(Response::new(SingleStationResponse {
                 station: Some(
