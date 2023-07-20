@@ -222,13 +222,13 @@ impl InternalLineRepository {
     ) -> Result<Vec<Line>, DomainError> {
         let rows: Vec<LineRow> = sqlx::query_as(
             "SELECT l.*,
-                COALESCE(la.line_name, l.line_name) AS line_name,
-                COALESCE(la.line_name_k, l.line_name_k) AS line_name_k,
-                COALESCE(la.line_name_h, l.line_name_h) AS line_name_h,
-                COALESCE(la.line_name_r, l.line_name_r) AS line_name_r,
-                COALESCE(la.line_name_zh,l.line_name_zh) AS line_name_zh,
-                COALESCE(la.line_name_ko, l.line_name_ko) AS line_name_ko,
-                COALESCE(la.line_color_c, l.line_color_c) AS line_color_c
+                COALESCE(a.line_name, l.line_name) AS line_name,
+                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+                COALESCE(a.line_name_zh,l.line_name_zh) AS line_name_zh,
+                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
                 FROM `lines` AS l
                     LEFT OUTER JOIN `line_aliases` AS la
                 ON
