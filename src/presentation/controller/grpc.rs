@@ -66,7 +66,7 @@ impl StationApi for GrpcRouter {
         let station_id = request.get_ref().id;
 
         let cache = self.station_list_cache.clone();
-        let cache_key = format!("station:get_station_by_id:{}", station_id);
+        let cache_key = format!("station:id:{}", station_id);
         if let Some(cache_data) = cache.get(&cache_key) {
             return Ok(Response::new(SingleStationResponse {
                 station: Some(
@@ -189,7 +189,7 @@ impl StationApi for GrpcRouter {
         let cache_key = format!(
             "stations:station_name:{}:limit:{:?}",
             query_station_name,
-            query_limit.to_owned()
+            query_limit.clone()
         );
         if let Some(cache_data) = self.station_list_cache.get(&cache_key) {
             let stations = cache_data.to_vec();

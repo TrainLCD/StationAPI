@@ -31,7 +31,10 @@ pub trait QueryUseCase: Send + Sync + 'static {
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError>;
     async fn find_company_by_id(&self, company_id: u32) -> Result<Option<Company>, UseCaseError>;
-    async fn get_station_with_attributes(&self, station: Station) -> Result<Station, UseCaseError>;
+    async fn update_station_with_attributes(
+        &self,
+        station: &mut Station,
+    ) -> Result<(), UseCaseError>;
     async fn get_lines_by_station_group_id(
         &self,
         station_group_id: u32,
