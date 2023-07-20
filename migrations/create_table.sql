@@ -16,6 +16,35 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Table structure for table `aliases`
+--
+
+DROP TABLE IF EXISTS `aliases`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `aliases` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `line_name` text COLLATE utf8mb4_unicode_ci,
+  `line_name_k` text COLLATE utf8mb4_unicode_ci,
+  `line_name_h` text COLLATE utf8mb4_unicode_ci,
+  `line_name_r` text COLLATE utf8mb4_unicode_ci,
+  `line_name_zh` text COLLATE utf8mb4_unicode_ci,
+  `line_name_ko` text COLLATE utf8mb4_unicode_ci,
+  `line_color_c` text COLLATE utf8mb4_unicode_ci,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `aliases`
+--
+
+LOCK TABLES `aliases` WRITE;
+/*!40000 ALTER TABLE `aliases` DISABLE KEYS */;
+/*!40000 ALTER TABLE `aliases` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `companies`
 --
 
@@ -59,18 +88,14 @@ CREATE TABLE `line_aliases` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `station_g_cd` int unsigned NOT NULL,
   `line_cd` int unsigned NOT NULL,
-  `line_name` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_name_k` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_name_h` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_name_r` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_name_zh` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_name_ko` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_color_c` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `alias_cd` int unsigned NOT NULL,
   PRIMARY KEY (`id`),
   KEY `station_g_cd` (`station_g_cd`),
   KEY `line_cd` (`line_cd`),
+  KEY `alias_cd` (`alias_cd`),
   CONSTRAINT `line_aliases_ibfk_1` FOREIGN KEY (`station_g_cd`) REFERENCES `stations` (`station_g_cd`),
-  CONSTRAINT `line_aliases_ibfk_2` FOREIGN KEY (`line_cd`) REFERENCES `lines` (`line_cd`)
+  CONSTRAINT `line_aliases_ibfk_2` FOREIGN KEY (`line_cd`) REFERENCES `lines` (`line_cd`),
+  CONSTRAINT `line_aliases_ibfk_3` FOREIGN KEY (`alias_cd`) REFERENCES `aliases` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -249,4 +274,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-07-20 17:57:28
+-- Dump completed on 2023-07-20 22:24:08
