@@ -181,11 +181,33 @@ impl InternalLineRepository {
         station_group_id: u32,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Line>, DomainError> {
-        let rows: Vec<LineRow> =
-            sqlx::query_as("SELECT * FROM `lines` WHERE line_cd IN (SELECT line_cd FROM stations WHERE station_g_cd = ? AND e_status = 0) AND e_status = 0")
-                .bind(station_group_id)
-                .fetch_all(conn)
-                .await?;
+        let rows: Vec<LineRow> = sqlx::query_as(
+            "SELECT l.*,
+                    COALESCE(la.line_name, l.line_name) AS line_name,
+                    COALESCE(la.line_name_k, l.line_name_k) AS line_name_k,
+                    COALESCE(la.line_name_h, l.line_name_h) AS line_name_h,
+                    COALESCE(la.line_name_r, l.line_name_r) AS line_name_r,
+                    COALESCE(la.line_name_zh,l.line_name_zh) AS line_name_zh,
+                    COALESCE(la.line_name_ko, l.line_name_ko) AS line_name_ko,
+                    COALESCE(la.line_color_c, l.line_color_c) AS line_color_c
+                FROM `lines` AS l
+                LEFT OUTER JOIN `line_aliases` AS la
+                ON
+                    l.line_cd = la.line_cd
+                    AND la.station_g_cd = ?
+                    WHERE  l.line_cd
+                IN (
+                    SELECT line_cd
+                    FROM stations AS s
+                    WHERE s.station_g_cd = ?
+                    AND e_status = 0
+                )
+                AND l.e_status = 0",
+        )
+        .bind(station_group_id)
+        .bind(station_group_id)
+        .fetch_all(conn)
+        .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(lines)
@@ -196,18 +218,39 @@ impl InternalLineRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Line>, DomainError> {
         let rows: Vec<LineRow> = sqlx::query_as(
-            "SELECT l.*
+            "SELECT l.*,
+                COALESCE(la.line_name, l.line_name) AS line_name,
+                COALESCE(la.line_name_k, l.line_name_k) AS line_name_k,
+                COALESCE(la.line_name_h, l.line_name_h) AS line_name_h,
+                COALESCE(la.line_name_r, l.line_name_r) AS line_name_r,
+                COALESCE(la.line_name_zh,l.line_name_zh) AS line_name_zh,
+                COALESCE(la.line_name_ko, l.line_name_ko) AS line_name_ko,
+                COALESCE(la.line_color_c, l.line_color_c) AS line_color_c
             FROM `lines` AS l
-            WHERE line_cd
-            IN (
-                SELECT line_cd
-                FROM stations AS s
-                INNER JOIN station_station_types AS sst
-                ON s.station_cd = sst.station_cd
-                AND line_group_cd = ?
-            )
+                LEFT OUTER JOIN `line_aliases` AS la
+            ON
+                l.line_cd = la.line_cd
+                AND la.station_g_cd IN 
+                (
+                    SELECT station_g_cd
+                    FROM stations AS s
+                    INNER JOIN station_station_types AS sst
+                    ON s.station_cd = sst.station_cd
+                    AND line_group_cd = ?
+                    AND s.e_status = 0
+                )
+                WHERE l.line_cd
+                IN (
+                    SELECT line_cd
+                    FROM stations AS s
+                    INNER JOIN station_station_types AS sst
+                    ON s.station_cd = sst.station_cd
+                    AND line_group_cd = ?
+                    AND s.e_status = 0
+                )
             AND e_status = 0",
         )
+        .bind(line_group_id)
         .bind(line_group_id)
         .fetch_all(conn)
         .await?;

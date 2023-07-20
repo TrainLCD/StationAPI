@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.0.32, for macos13.0 (arm64)
+-- MySQL dump 10.13  Distrib 8.0.33, for macos13.3 (arm64)
 --
 -- Host: localhost    Database: stationapi
 -- ------------------------------------------------------
--- Server version	8.0.32
+-- Server version	8.0.33
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -30,13 +30,13 @@ CREATE TABLE `companies` (
   `company_name_h` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `company_name_r` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `company_name_en` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `company_name_full_en` text NOT NULL,
-  `company_url` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `company_name_full_en` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `company_url` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `company_type` int unsigned NOT NULL,
   `e_status` int unsigned NOT NULL,
   `e_sort` int unsigned NOT NULL,
   PRIMARY KEY (`company_cd`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -46,6 +46,41 @@ CREATE TABLE `companies` (
 LOCK TABLES `companies` WRITE;
 /*!40000 ALTER TABLE `companies` DISABLE KEYS */;
 /*!40000 ALTER TABLE `companies` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `line_aliases`
+--
+
+DROP TABLE IF EXISTS `line_aliases`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `line_aliases` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `station_g_cd` int unsigned NOT NULL,
+  `line_cd` int unsigned NOT NULL,
+  `line_name` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_name_k` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_name_h` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_name_r` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_name_zh` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_name_ko` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_color_c` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  PRIMARY KEY (`id`),
+  KEY `station_g_cd` (`station_g_cd`),
+  KEY `line_cd` (`line_cd`),
+  CONSTRAINT `line_aliases_ibfk_1` FOREIGN KEY (`station_g_cd`) REFERENCES `stations` (`station_g_cd`),
+  CONSTRAINT `line_aliases_ibfk_2` FOREIGN KEY (`line_cd`) REFERENCES `lines` (`line_cd`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `line_aliases`
+--
+
+LOCK TABLES `line_aliases` WRITE;
+/*!40000 ALTER TABLE `line_aliases` DISABLE KEYS */;
+/*!40000 ALTER TABLE `line_aliases` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -68,14 +103,14 @@ CREATE TABLE `lines` (
   `line_color_t` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `line_type` int unsigned NOT NULL,
   `line_symbol_primary` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_symbol_secondary` text,
-  `line_symbol_extra` text,
-  `line_symbol_primary_color` text,
-  `line_symbol_secondary_color` text,
-  `line_symbol_extra_color` text,
+  `line_symbol_secondary` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_symbol_extra` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_symbol_primary_color` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_symbol_secondary_color` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_symbol_extra_color` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `line_symbol_primary_shape` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_symbol_secondary_shape` text,
-  `line_symbol_extra_shape` text,
+  `line_symbol_secondary_shape` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_symbol_extra_shape` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `lon` decimal(18,14) unsigned NOT NULL,
   `lat` decimal(18,15) unsigned NOT NULL,
   `zoom` int unsigned NOT NULL,
@@ -140,9 +175,9 @@ CREATE TABLE `stations` (
   `station_g_cd` int unsigned NOT NULL,
   `station_name` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `station_name_k` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `station_name_r` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `station_name_zh` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `station_name_ko` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `station_name_r` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `station_name_zh` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `station_name_ko` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `primary_station_number` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `secondary_station_number` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `extra_station_number` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
@@ -214,4 +249,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-05-09 16:31:53
+-- Dump completed on 2023-07-20 17:57:28
