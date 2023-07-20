@@ -29,7 +29,6 @@ pub trait QueryUseCase: Send + Sync + 'static {
         station_name: String,
         get_stations_by_name: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError>;
-    async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError>;
     async fn find_company_by_id(&self, company_id: u32) -> Result<Option<Company>, UseCaseError>;
     async fn update_station_with_attributes(
         &self,

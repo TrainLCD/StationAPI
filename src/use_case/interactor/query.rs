@@ -111,10 +111,6 @@ where
 
         Ok(result)
     }
-    async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError> {
-        let line = self.line_repository.find_by_id(line_id).await?;
-        Ok(line)
-    }
     async fn find_company_by_id(&self, company_id: u32) -> Result<Option<Company>, UseCaseError> {
         let Some(company) = self.company_repository.find_by_id(company_id).await? else {
             return Ok(None);
@@ -139,16 +135,19 @@ where
             }
         };
 
-        let mut belong_line = match self.find_line_by_id(station.line_cd).await {
-            Ok(line) => line,
-            Err(err) => return Err(UseCaseError::Unexpected(err.to_string())),
-        };
-
         let lines = self
             .get_lines_by_station_group_id(station.station_g_cd)
             .await?;
 
         let mut lines_tmp: Vec<Option<Line>> = Vec::with_capacity(lines.len());
+
+        let belong_line = &mut lines.clone().into_iter().find(|line| {
+            if line.line_cd == station.line_cd {
+                return true;
+            }
+
+            false
+        });
 
         let mut stations = self
             .station_repository
