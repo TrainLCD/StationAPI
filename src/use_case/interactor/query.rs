@@ -162,12 +162,11 @@ where
 
                     let company = self.find_company_by_id(line.company_cd).await?;
                     line.company = company;
-
+                    line.line_symbols = self.get_line_symbols(line);
                     line.station = Some(station.clone());
                 }
             }
 
-            line.line_symbols = self.get_line_symbols(line);
             lines_tmp.push(Some(line.clone()));
         }
 
@@ -181,6 +180,8 @@ where
 
             let company = self.find_company_by_id(belong_line.company_cd).await?;
             belong_line.company = company;
+
+            belong_line.line_symbols = self.get_line_symbols(&belong_line);
 
             station.line = Some(Box::new(belong_line.clone()));
         }
@@ -382,6 +383,7 @@ where
                 line.train_type = train_type;
                 let company = self.find_company_by_id(line.company_cd).await?;
                 line.company = company;
+                line.line_symbols = self.get_line_symbols(line);
             }
 
             tt.lines = lines;
