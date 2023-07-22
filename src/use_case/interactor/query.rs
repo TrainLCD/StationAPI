@@ -181,7 +181,7 @@ where
             let company = self.find_company_by_id(belong_line.company_cd).await?;
             belong_line.company = company;
 
-            belong_line.line_symbols = self.get_line_symbols(&belong_line);
+            belong_line.line_symbols = self.get_line_symbols(belong_line);
 
             station.line = Some(Box::new(belong_line.clone()));
         }
