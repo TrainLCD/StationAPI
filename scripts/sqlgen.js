@@ -28,8 +28,17 @@ fs.readdir("./migrations", (err, files) => {
         let sqlLinesInner = [
           `INSERT INTO \`${fileName.split("!")[1].split(".")[0]}\` VALUES `,
         ];
+
         csvData[index].forEach((data, idx) => {
           if (idx === 0) return;
+
+          const latIndex = csvData[index][0].findIndex((col) => col === "lat");
+          const lonIndex = csvData[index][0].findIndex((col) => col === "lon");
+          const geomText =
+            (latIndex !== -1 &&
+              lonIndex !== -1 &&
+              `ST_GeomFromText('POINT(${data[lonIndex]} ${data[latIndex]})')`) ||
+            null;
           const cols = data
             .map((col, idx) => {
               if (csvData[index][0][idx]?.startsWith("#")) {
@@ -42,8 +51,16 @@ fs.readdir("./migrations", (err, files) => {
             })
             .filter((col) => col !== null);
           if (csvData[index].length === idx + 1) {
+            if (geomText) {
+              sqlLinesInner.push(`(${cols},${geomText})`);
+              return;
+            }
             sqlLinesInner.push(`(${cols})`);
           } else {
+            if (geomText) {
+              sqlLinesInner.push(`(${cols},${geomText}),`);
+              return;
+            }
             sqlLinesInner.push(`(${cols}),`);
           }
         });
