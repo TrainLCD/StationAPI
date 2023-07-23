@@ -44,13 +44,6 @@ fs.readdir("./migrations", (err, files) => {
               if (csvData[index][0][idx]?.startsWith("#")) {
                 return null;
               }
-
-              if (csvData[index][0][idx] === "lat") {
-                return null;
-              }
-              if (csvData[index][0][idx] === "lon") {
-                return null;
-              }
               if (!col.length) {
                 return "NULL";
               }
