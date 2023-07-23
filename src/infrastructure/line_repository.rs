@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use bigdecimal::{BigDecimal, ToPrimitive, Zero};
+use bigdecimal::Zero;
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::domain::{
@@ -28,8 +28,6 @@ pub struct LineRow {
     pub line_symbol_primary_shape: Option<String>,
     pub line_symbol_secondary_shape: Option<String>,
     pub line_symbol_extra_shape: Option<String>,
-    pub lon: BigDecimal,
-    pub lat: BigDecimal,
     pub zoom: u32,
     pub e_status: u32,
     pub e_sort: u32,
@@ -60,8 +58,6 @@ impl From<LineRow> for Line {
             line_symbol_primary_shape: row.line_symbol_primary_shape,
             line_symbol_secondary_shape: row.line_symbol_secondary_shape,
             line_symbol_extra_shape: row.line_symbol_extra_shape,
-            lon: row.lon.to_f64().unwrap_or(0.0),
-            lat: row.lat.to_f64().unwrap_or(0.0),
             zoom: row.zoom,
             e_status: row.e_status,
             e_sort: row.e_sort,

@@ -24,13 +24,13 @@ DROP TABLE IF EXISTS `aliases`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `aliases` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `line_name` text COLLATE utf8mb4_unicode_ci,
-  `line_name_k` text COLLATE utf8mb4_unicode_ci,
-  `line_name_h` text COLLATE utf8mb4_unicode_ci,
-  `line_name_r` text COLLATE utf8mb4_unicode_ci,
-  `line_name_zh` text COLLATE utf8mb4_unicode_ci,
-  `line_name_ko` text COLLATE utf8mb4_unicode_ci,
-  `line_color_c` text COLLATE utf8mb4_unicode_ci,
+  `line_name` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_name_k` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_name_h` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_name_r` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_name_zh` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_name_ko` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_color_c` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -136,14 +136,14 @@ CREATE TABLE `lines` (
   `line_symbol_primary_shape` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `line_symbol_secondary_shape` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `line_symbol_extra_shape` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `lon` decimal(18,14) unsigned NOT NULL,
-  `lat` decimal(18,15) unsigned NOT NULL,
   `zoom` int unsigned NOT NULL,
   `e_status` int unsigned NOT NULL,
   `e_sort` int unsigned NOT NULL,
+  `location` geometry NOT NULL,
   PRIMARY KEY (`line_cd`),
   KEY `company_cd` (`company_cd`),
   KEY `e_sort` (`e_sort`),
+  SPATIAL KEY `location` (`location`),
   CONSTRAINT `lines_ibfk_1` FOREIGN KEY (`company_cd`) REFERENCES `companies` (`company_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -211,18 +211,18 @@ CREATE TABLE `stations` (
   `pref_cd` int unsigned NOT NULL,
   `post` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `address` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `lon` decimal(11,7) unsigned NOT NULL,
-  `lat` decimal(11,8) unsigned NOT NULL,
   `open_ymd` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `close_ymd` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `e_status` int unsigned NOT NULL,
   `e_sort` int unsigned NOT NULL,
+  `location` geometry NOT NULL,
   PRIMARY KEY (`station_cd`),
   KEY `line_cd` (`line_cd`),
   KEY `station_g_cd` (`station_g_cd`),
   KEY `e_status` (`e_status`),
   KEY `e_sort` (`e_sort`),
   KEY `station_g_cd_2` (`station_g_cd`,`e_status`),
+  SPATIAL KEY `location` (`location`),
   CONSTRAINT `stations_ibfk_1` FOREIGN KEY (`line_cd`) REFERENCES `lines` (`line_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -274,4 +274,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-07-20 22:24:08
+-- Dump completed on 2023-07-23 14:56:11
