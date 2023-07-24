@@ -41,7 +41,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 120,中央特快,チュウオウトッカイ,Chūō Special Rapid,中央特快,중앙특쾌,#F15A23,0,,COMPLETE
 121,通勤特快,ツウキントッカイ,Commuter Special Rapid,通勤特快,통근특쾌,#F15A24,0,,COMPLETE
 122,サンライナー,サンライナー,Sun Liner,Sun Liner,산 라이너,#DC143C,0,,COMPLETE
-123,マリンライナー,マリンライナー,Marine Liner,Marine Liner,마린라이나,#DC143C,0,,NOT
+123,マリンライナー,マリンライナー,Marine Liner,Marine Liner,마린라이나,#DC143C,0,,COMPLETE
 124,快速ことぶき,カイソクコトブキ,Rapid Kotobuki,快速寿,쾌속 축수,#DC143C,0,,NOT
 125,シティライナー,シティライナー,City Liner,City Liner,시티 라이너,#DC143C,0,,NOT
 126,通勤ライナー,ツウキンライナー,Commuter Liner,通勤Liner,통근 라이너,#DC143C,0,,NOT
