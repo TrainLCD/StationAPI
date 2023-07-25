@@ -142,7 +142,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 11603,4,JR神戸線(大阪～神戸),コウベセン,東海道本線(大阪～神戸),JR Kobe Line(Osaka to Kobe),JR神户线,JR 고베선,#0072BC,青,2,A,,,#0072BC,,,REVERSED_SQUARE_WEST,,,135.3347285,34.72876179,11,0,11603
 11605,4,湖西線,コセイセン,湖西線,Kosei Line,湖西线,고세이선,#576290,紺,2,B,,,#00ACD1,,,REVERSED_SQUARE_WEST,,,135.9648814,35.24644583,10,0,11605
 11607,4,大和路線,ヤマトジセン,関西本線(加茂～ＪＲ難波),Yamatoji Line,大和路线,야마토지선,#009933,緑,2,Q,,,#009933,,,REVERSED_SQUARE_WEST,,,135.6774159,34.65043379,11,0,11607
-11608,4,JR神戸線(神戸～姫路),コウベセン,山陽本線(神戸～姫路),JR Kobe Line(Kobe to Himeji),JR神户线,JR 고베선,#009966,常磐緑,2,A,,,#0072BC,,,REVERSED_SQUARE_WEST,,,134.9283387,34.71997139,10,0,11608
+11608,4,JR神戸線(神戸～姫路),コウベセン,山陽本線(神戸～姫路),JR Kobe Line(Kobe to Himeji),JR神户线,JR 고베선,#0072BC,青,2,A,,,#0072BC,,,REVERSED_SQUARE_WEST,,,134.9283387,34.71997139,10,0,11608
 11609,4,山陽本線(姫路～岡山),サンヨウホンセン,山陽本線(姫路～岡山),San’yo Main Line(Himeji to Okayama),山阳本线,산요 본선,#009966,常磐緑,2,S,,,,,,REVERSED_SQUARE_WEST,,,134.2462107,34.81352156,10,0,11609
 11610,4,山陽本線(岡山～三原),サンヨウホンセン,山陽本線(岡山～三原),San’yo Main Line(Okayama to Mihara),山阳本线,산요 본선,#009966,常磐緑,2,W,X,,,,,REVERSED_SQUARE_WEST,REVERSED_SQUARE_WEST,,133.5637577,34.5230414,10,0,11610
 11611,4,山陽本線(三原～岩国),サンヨウホンセン,山陽本線(三原～岩国),San’yo Main Line(Mihara to Iwakuni),山阳本线,산요 본선,#0072BC,青,2,G,R,,,,,REVERSED_SQUARE_WEST,REVERSED_SQUARE_WEST,,132.5497997,34.3865014,10,0,11611
