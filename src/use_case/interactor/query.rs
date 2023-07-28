@@ -1,4 +1,4 @@
-use std::vec;
+use std::{cell::RefCell, rc::Rc, vec};
 
 use async_trait::async_trait;
 use bigdecimal::Zero;
@@ -131,7 +131,7 @@ where
             let mut lines = self
                 .get_lines_by_station_group_id(station.station_g_cd)
                 .await?;
-            let mut lines_tmp: Vec<Line> = Vec::with_capacity(lines.len());
+            let mut lines_tmp: Vec<&Line> = Vec::with_capacity(lines.len());
 
             for line in lines.iter_mut() {
                 let companies = self.find_company_by_id_vec(vec![line.company_cd]).await?;
@@ -150,9 +150,9 @@ where
                 line.line_symbols = self.get_line_symbols(line);
                 line.company = companies.get(index).cloned();
 
-                lines_tmp.push(line.clone());
+                lines_tmp.push(&*line);
             }
-            station.lines = lines_tmp;
+            station.lines = lines_tmp.into_iter().cloned().collect();
         }
 
         Ok(())
@@ -183,8 +183,6 @@ where
         Ok(stations)
     }
     fn get_station_numbers(&self, station: &Station) -> Vec<StationNumber> {
-        let station = station.clone();
-
         let line_symbol_primary = &station.line_symbol_primary;
         let line_symbol_secondary = &station.line_symbol_secondary;
         let line_symbol_extra = &station.line_symbol_extra;
@@ -194,33 +192,47 @@ where
             line_symbol_extra,
         ];
 
-        let line_symbol_colors_raw: Vec<String> = vec![
-            station.line_symbol_primary_color.unwrap_or("".to_string()),
-            station
-                .line_symbol_secondary_color
-                .unwrap_or("".to_string()),
-            station.line_symbol_extra_color.unwrap_or("".to_string()),
+        let station_rc = Rc::new(RefCell::new(station));
+        let station_rc = Rc::clone(&station_rc);
+        let station = station_rc.borrow();
+
+        let line_symbol_colors_raw: Vec<Option<String>> = vec![
+            station.clone().line_symbol_primary_color,
+            station.clone().line_symbol_secondary_color,
+            station.clone().line_symbol_extra_color,
         ];
+
+        let station_rc = Rc::clone(&station_rc);
+        let station = station_rc.borrow();
 
         let station_numbers_raw = vec![
-            station.primary_station_number.unwrap_or("".to_string()),
-            station.secondary_station_number.unwrap_or("".to_string()),
-            station.extra_station_number.unwrap_or("".to_string()),
+            station
+                .clone()
+                .primary_station_number
+                .unwrap_or("".to_string()),
+            station
+                .clone()
+                .secondary_station_number
+                .unwrap_or("".to_string()),
+            station
+                .clone()
+                .extra_station_number
+                .unwrap_or("".to_string()),
         ];
 
-        let line_symbols_shape_raw: Vec<String> = vec![
-            station.line_symbol_primary_shape.unwrap_or("".to_string()),
-            station
-                .line_symbol_secondary_shape
-                .unwrap_or("".to_string()),
-            station.line_symbol_extra_shape.unwrap_or("".to_string()),
+        let station_rc = Rc::clone(&station_rc);
+        let station = station_rc.borrow();
+        let line_symbols_shape_raw: Vec<Option<String>> = vec![
+            station.clone().line_symbol_primary_shape,
+            station.clone().line_symbol_secondary_shape,
+            station.clone().line_symbol_extra_shape,
         ];
 
         let mut station_numbers: Vec<StationNumber> = Vec::with_capacity(station_numbers_raw.len());
 
         for (index, station_number) in station_numbers_raw.into_iter().enumerate() {
-            let sym_color = line_symbol_colors_raw[index].to_string();
-            let sym_shape = line_symbols_shape_raw[index].to_string();
+            let sym_color = &line_symbol_colors_raw[index];
+            let sym_shape = &line_symbols_shape_raw[index];
 
             if station_number.is_empty() {
                 continue;
@@ -229,10 +241,17 @@ where
             if let Some(sym) = line_symbols_raw[index] {
                 let station_number_string = format!("{}-{}", sym, station_number);
 
+                let Some(sym_color) = sym_color else {
+                    return station_numbers;
+                };
+                let Some(sym_shape) = sym_shape else {
+                    return station_numbers;
+                };
+
                 let station_number = StationNumber {
                     line_symbol: sym.to_string(),
-                    line_symbol_color: sym_color,
-                    line_symbol_shape: sym_shape,
+                    line_symbol_color: sym_color.to_string(),
+                    line_symbol_shape: sym_shape.to_string(),
                     station_number: station_number_string,
                 };
 
@@ -244,30 +263,33 @@ where
     }
 
     fn extract_line_from_station(&self, station: &Station) -> Line {
-        let station = station.clone();
+        let station = Rc::new(RefCell::new(station));
+        let station = Rc::clone(&station);
+        let station = station.borrow();
+
         Line {
-            line_cd: station.line_cd,
-            company_cd: station.company_cd,
+            line_cd: station.clone().line_cd,
+            company_cd: station.clone().company_cd,
             company: None,
-            line_name: station.line_name,
-            line_name_k: station.line_name_k,
-            line_name_h: station.line_name_h,
-            line_name_r: station.line_name_r,
-            line_name_zh: station.line_name_zh,
-            line_name_ko: station.line_name_ko,
-            line_color_c: station.line_color_c,
-            line_color_t: station.line_color_t,
-            line_type: station.line_type,
+            line_name: station.clone().line_name,
+            line_name_k: station.clone().line_name_k,
+            line_name_h: station.clone().line_name_h,
+            line_name_r: station.clone().line_name_r,
+            line_name_zh: station.clone().line_name_zh,
+            line_name_ko: station.clone().line_name_ko,
+            line_color_c: station.clone().line_color_c,
+            line_color_t: station.clone().line_color_t,
+            line_type: station.clone().line_type,
             line_symbols: vec![],
-            line_symbol_primary: station.line_symbol_primary,
-            line_symbol_secondary: station.line_symbol_secondary,
-            line_symbol_extra: station.line_symbol_extra,
-            line_symbol_primary_color: station.line_symbol_primary_color,
-            line_symbol_secondary_color: station.line_symbol_secondary_color,
-            line_symbol_extra_color: station.line_symbol_extra_color,
-            line_symbol_primary_shape: station.line_symbol_primary_shape,
-            line_symbol_secondary_shape: station.line_symbol_secondary_shape,
-            line_symbol_extra_shape: station.line_symbol_extra_shape,
+            line_symbol_primary: station.clone().line_symbol_primary,
+            line_symbol_secondary: station.clone().line_symbol_secondary,
+            line_symbol_extra: station.clone().line_symbol_extra,
+            line_symbol_primary_color: station.clone().line_symbol_primary_color,
+            line_symbol_secondary_color: station.clone().line_symbol_secondary_color,
+            line_symbol_extra_color: station.clone().line_symbol_extra_color,
+            line_symbol_primary_shape: station.clone().line_symbol_primary_shape,
+            line_symbol_secondary_shape: station.clone().line_symbol_secondary_shape,
+            line_symbol_extra_shape: station.clone().line_symbol_extra_shape,
             lon: 0.0,
             lat: 0.0,
             zoom: 0,
@@ -382,11 +404,10 @@ where
                 line.train_type = train_type;
                 line.company = companies.get(index).cloned();
                 line.line_symbols = self.get_line_symbols(line);
+                tt.line = Some(Box::new(line.clone()));
             }
 
             tt.lines = lines;
-            let line = self.line_repository.find_by_station_id(station_id).await?;
-            tt.line = line.map(Box::new);
         }
 
         Ok(train_types)
