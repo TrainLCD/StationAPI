@@ -206,8 +206,8 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Option<Station>, DomainError> {
         let rows: Option<StationRow> = sqlx::query_as(
-            "SELECT s.*,
-            l.*,
+            "SELECT l.*,
+            s.*,
             0 AS pass,
             (
                 SELECT COUNT(line_group_cd)
@@ -238,8 +238,8 @@ impl InternalStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let station_row: Vec<StationRow> = sqlx::query_as(
             "SELECT
-            s.*,
             l.*,
+            s.*,
             0 AS pass,
             (
             SELECT COUNT(line_group_cd)
@@ -267,8 +267,8 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let rows: Vec<StationRow> = sqlx::query_as(
-            "SELECT s.*,
-            l.*,
+            "SELECT l.*,
+            s.*,
             0 AS pass,
             (
                 SELECT COUNT(line_group_cd)
@@ -297,8 +297,8 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Option<Station>, DomainError> {
         let rows: Option<StationRow> = sqlx::query_as(
-            "SELECT s.*,
-            l.*,
+            "SELECT l.*,
+            s.*,
             0 AS pass,
             (
                 SELECT COUNT(line_group_cd)
@@ -332,8 +332,8 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let rows = sqlx::query_as::<_, StationRow>(
-            "SELECT s.*,
-            l.*,
+            "SELECT l.*,
+            s.*,
             0 AS pass,
         ST_Distance(s.location, ST_GeomFromText(?)) AS `distance`,
         (
@@ -364,8 +364,8 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let query_str: String = format!(
-            "SELECT s.*,
-            l.*,
+            "SELECT l.*,
+            s.*,
             0 AS pass,
             (
                 SELECT COUNT(line_group_cd)
