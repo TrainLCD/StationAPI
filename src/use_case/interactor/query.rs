@@ -193,8 +193,8 @@ where
         ];
 
         let station_rc = Rc::new(RefCell::new(station));
-        let station_rc = Rc::clone(&station_rc);
-        let station = station_rc.borrow();
+        let station = Rc::clone(&station_rc);
+        let station = station.borrow();
         let station = station.clone();
 
         let line_symbol_colors_raw: Vec<Option<String>> = vec![
@@ -203,7 +203,6 @@ where
             station.line_symbol_extra_color,
         ];
 
-        let station_rc = Rc::clone(&station_rc);
         let station = station_rc.borrow();
         let station = station.clone();
 
@@ -213,7 +212,6 @@ where
             station.extra_station_number.unwrap_or("".to_string()),
         ];
 
-        let station_rc = Rc::clone(&station_rc);
         let station = station_rc.borrow();
         let station = station.clone();
 
