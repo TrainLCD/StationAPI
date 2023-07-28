@@ -233,9 +233,9 @@ impl InternalStationRepository {
         limit: Option<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let query_str = &format!(
+        let rows = sqlx::query_as::<_, StationRow>(
             "SELECT *, 0 AS pass,
-        ST_Distance_Sphere(`location`, ST_GeomFromText('POINT({} {})')) AS `distance`,
+        ST_Distance_Sphere(`location`, ST_GeomFromText(?)) AS `distance`,
         (
             SELECT COUNT(line_group_cd)
             FROM station_station_types AS sst
@@ -248,13 +248,11 @@ impl InternalStationRepository {
         e_status = 0
         ORDER BY distance
         LIMIT ?",
-            longitude, latitude
-        );
-
-        let rows = sqlx::query_as::<_, StationRow>(query_str)
-            .bind(limit.unwrap_or(DEFAULT_COLUMN_COUNT))
-            .fetch_all(conn)
-            .await?;
+        )
+        .bind(format!("POINT({} {})", longitude, latitude))
+        .bind(limit.unwrap_or(DEFAULT_COLUMN_COUNT))
+        .fetch_all(conn)
+        .await?;
 
         let stations = rows.into_iter().map(|row| row.into()).collect();
 
