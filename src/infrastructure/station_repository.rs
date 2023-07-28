@@ -35,6 +35,26 @@ struct StationRow {
     e_sort: u32,
     pass: i64,
     station_types_count: i64,
+    // linesからJOIN
+    pub company_cd: u32,
+    pub line_name: String,
+    pub line_name_k: String,
+    pub line_name_h: String,
+    pub line_name_r: String,
+    pub line_name_zh: Option<String>,
+    pub line_name_ko: Option<String>,
+    pub line_color_c: String,
+    pub line_color_t: String,
+    pub line_type: u32,
+    pub line_symbol_primary: Option<String>,
+    pub line_symbol_secondary: Option<String>,
+    pub line_symbol_extra: Option<String>,
+    pub line_symbol_primary_color: Option<String>,
+    pub line_symbol_secondary_color: Option<String>,
+    pub line_symbol_extra_color: Option<String>,
+    pub line_symbol_primary_shape: Option<String>,
+    pub line_symbol_secondary_shape: Option<String>,
+    pub line_symbol_extra_shape: Option<String>,
 }
 
 impl From<StationRow> for Station {
@@ -84,6 +104,25 @@ impl From<StationRow> for Station {
             distance: None,
             station_types_count: row.station_types_count,
             train_type: None,
+            company_cd: row.company_cd,
+            line_name: row.line_name,
+            line_name_k: row.line_name_k,
+            line_name_h: row.line_name_h,
+            line_name_r: row.line_name_r,
+            line_name_zh: row.line_name_zh,
+            line_name_ko: row.line_name_ko,
+            line_color_c: row.line_color_c,
+            line_color_t: row.line_color_t,
+            line_type: row.line_type,
+            line_symbol_primary: row.line_symbol_primary,
+            line_symbol_secondary: row.line_symbol_secondary,
+            line_symbol_extra: row.line_symbol_extra,
+            line_symbol_primary_color: row.line_symbol_primary_color,
+            line_symbol_secondary_color: row.line_symbol_secondary_color,
+            line_symbol_extra_color: row.line_symbol_extra_color,
+            line_symbol_primary_shape: row.line_symbol_primary_shape,
+            line_symbol_secondary_shape: row.line_symbol_secondary_shape,
+            line_symbol_extra_shape: row.line_symbol_extra_shape,
         }
     }
 }
@@ -117,6 +156,20 @@ impl StationRepository for MyStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn: sqlx::pool::PoolConnection<MySql> = self.pool.acquire().await?;
         InternalStationRepository::get_by_station_group_id(station_group_id, &mut conn).await
+    }
+
+    async fn get_by_station_group_and_line_id(
+        &self,
+        station_group_id: u32,
+        line_id: u32,
+    ) -> Result<Option<Station>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalStationRepository::get_by_station_group_and_line_id(
+            station_group_id,
+            line_id,
+            &mut conn,
+        )
+        .await
     }
 
     // ほぼ確実にキャッシュがヒットしないと思うのでキャッシュを使わない
@@ -153,17 +206,20 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Option<Station>, DomainError> {
         let rows: Option<StationRow> = sqlx::query_as(
-            "SELECT s.*, 0 AS pass,
+            "SELECT s.*,
+            l.*,
+            0 AS pass,
             (
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
                 AND sst.pass <> 1
             ) AS station_types_count
-            FROM stations AS s
-            WHERE s.station_cd = ?
-            AND e_status = 0
-            ORDER BY e_sort, station_cd",
+            FROM `stations` AS s, `lines` AS l
+            WHERE s.line_cd = l.line_cd
+            AND s.station_cd = ?
+            AND s.e_status = 0
+            ORDER BY s.e_sort, s.station_cd",
         )
         .bind(id)
         .fetch_optional(conn)
@@ -181,16 +237,21 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let station_row: Vec<StationRow> = sqlx::query_as(
-            "SELECT s.*, 0 AS pass, (
-                SELECT COUNT(line_group_cd)
-                FROM station_station_types AS sst
-                WHERE s.station_cd = sst.station_cd
-                AND sst.pass <> 1
+            "SELECT
+            s.*,
+            l.*,
+            0 AS pass,
+            (
+            SELECT COUNT(line_group_cd)
+            FROM station_station_types AS sst
+            WHERE s.station_cd = sst.station_cd
+            AND sst.pass <> 1
             ) AS station_types_count
-            FROM stations as s
-            WHERE line_cd = ?
-            AND e_status = 0
-            ORDER BY e_sort, station_cd",
+            FROM stations AS s, `lines` AS l
+            WHERE s.line_cd = ?
+            AND s.e_status = 0
+            AND l.line_cd = s.line_cd
+            ORDER BY s.e_sort, s.station_cd",
         )
         .bind(line_id)
         .fetch_all(conn)
@@ -206,17 +267,20 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let rows: Vec<StationRow> = sqlx::query_as(
-            "SELECT s.*, 0 AS pass,
+            "SELECT s.*,
+            l.*,
+            0 AS pass,
             (
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
                 AND sst.pass <> 1
             ) AS station_types_count
-            FROM stations AS s
+            FROM stations AS s, `lines` AS l
             WHERE s.station_g_cd = ?
-            AND e_status = 0
-            ORDER BY e_sort, station_cd",
+            AND s.e_status = 0
+            AND l.line_cd = s.line_cd
+            ORDER BY s.e_sort, s.station_cd",
         )
         .bind(group_id)
         .fetch_all(conn)
@@ -227,6 +291,40 @@ impl InternalStationRepository {
         Ok(stations)
     }
 
+    async fn get_by_station_group_and_line_id(
+        station_group_id: u32,
+        line_id: u32,
+        conn: &mut MySqlConnection,
+    ) -> Result<Option<Station>, DomainError> {
+        let rows: Option<StationRow> = sqlx::query_as(
+            "SELECT s.*,
+            l.*,
+            0 AS pass,
+            (
+                SELECT COUNT(line_group_cd)
+                FROM station_station_types AS sst
+                WHERE s.station_cd = sst.station_cd
+                AND sst.pass <> 1
+            ) AS station_types_count
+            FROM stations AS s, `lines` AS l
+            WHERE s.station_g_cd = ?
+            AND s.line_cd = ?
+            AND s.e_status = 0
+            AND l.line_cd = s.line_cd
+            ORDER BY s.e_sort, s.station_cd",
+        )
+        .bind(station_group_id)
+        .bind(line_id)
+        .fetch_optional(conn)
+        .await?;
+
+        let station: Option<Station> = rows.map(|row| row.into());
+        let Some(station) = station else {
+            return Ok(None);
+        };
+        Ok(Some(station))
+    }
+
     async fn get_by_coordinates(
         latitude: f64,
         longitude: f64,
@@ -234,18 +332,19 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let rows = sqlx::query_as::<_, StationRow>(
-            "SELECT *, 0 AS pass,
-        ST_Distance_Sphere(`location`, ST_GeomFromText(?)) AS `distance`,
+            "SELECT s.*,
+            l.*,
+            0 AS pass,
+        ST_Distance(s.location, ST_GeomFromText(?)) AS `distance`,
         (
             SELECT COUNT(line_group_cd)
             FROM station_station_types AS sst
             WHERE station_cd = sst.station_cd
             AND sst.pass <> 1
         ) AS station_types_count
-        FROM
-        stations
-        WHERE
-        e_status = 0
+        FROM `stations` AS s, `lines` AS l
+        WHERE s.line_cd = l.line_cd
+        AND s.e_status = 0
         ORDER BY distance
         LIMIT ?",
         )
@@ -265,23 +364,26 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let query_str: String = format!(
-            "SELECT s.*, 0 AS pass,
+            "SELECT s.*,
+            l.*,
+            0 AS pass,
             (
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
                 WHERE s.station_cd = sst.station_cd
                 AND sst.pass <> 1
             ) AS station_types_count
-            FROM stations AS s
-            WHERE (
+            FROM `stations` AS s, `lines` AS l
+            WHERE s.line_cd = l.line_cd
+            AND (
                 station_name LIKE '%{}%'
                 OR station_name_r LIKE '%{}%'
                 OR station_name_k LIKE '%{}%'
                 OR station_name_zh LIKE '%{}%'
                 OR station_name_ko LIKE '%{}%'
         )
-            AND e_status = 0
-            ORDER BY e_sort, station_cd
+            AND s.e_status = 0
+            ORDER BY s.e_sort, s.station_cd
             LIMIT {}
         ",
             station_name,
@@ -312,9 +414,10 @@ impl InternalStationRepository {
                 WHERE s.station_cd = sst.station_cd
                 AND sst.pass <> 1
             ) AS station_types_count,
-            CONVERT(sst.pass, SIGNED) as pass
-            FROM station_station_types as sst, stations as s
-            WHERE sst.line_group_cd = ?
+            CONVERT(sst.pass, SIGNED) AS pass
+            FROM `station_station_types` AS sst, `stations` AS s, `lines` AS l
+            WHERE s.line_cd = l.line_cd
+            AND sst.line_group_cd = ?
             AND s.station_cd = sst.station_cd
             AND s.e_status = 0",
         )

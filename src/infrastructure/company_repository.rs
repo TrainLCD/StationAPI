@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use bigdecimal::Zero;
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::domain::{
@@ -53,26 +54,37 @@ impl MyCompanyRepository {
 
 #[async_trait]
 impl CompanyRepository for MyCompanyRepository {
-    async fn find_by_id(&self, id: u32) -> Result<Option<Company>, DomainError> {
+    async fn find_by_id_vec(&self, id_vec: Vec<u32>) -> Result<Vec<Company>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalCompanyRepository::find_by_id(id, &mut conn).await
+        InternalCompanyRepository::find_by_id_vec(id_vec, &mut conn).await
     }
 }
 
 pub struct InternalCompanyRepository {}
 
 impl InternalCompanyRepository {
-    async fn find_by_id(
-        id: u32,
+    async fn find_by_id_vec(
+        id_vec: Vec<u32>,
         conn: &mut MySqlConnection,
-    ) -> Result<Option<Company>, DomainError> {
-        let rows: Option<CompanyRow> =
-            sqlx::query_as("SELECT * FROM `companies` WHERE company_cd = ?")
-                .bind(id)
-                .fetch_optional(conn)
-                .await?;
-        let company: Option<Company> = rows.map(|row| row.into());
+    ) -> Result<Vec<Company>, DomainError> {
+        if id_vec.len().is_zero() {
+            return Ok(vec![]);
+        }
 
-        Ok(company)
+        let params = format!("?{}", ", ?".repeat(id_vec.len() - 1));
+        let query_str = format!(
+            "SELECT * FROM `companies` WHERE company_cd IN ( {} )",
+            params
+        );
+
+        let mut query = sqlx::query_as::<_, CompanyRow>(&query_str);
+        for id in id_vec {
+            query = query.bind(id);
+        }
+
+        let rows = query.fetch_all(conn).await?;
+        let companies: Vec<Company> = rows.into_iter().map(|row| row.into()).collect();
+
+        Ok(companies)
     }
 }
