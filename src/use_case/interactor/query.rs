@@ -133,7 +133,7 @@ where
                 .await?;
             let mut lines_tmp: Vec<Line> = Vec::with_capacity(lines.len());
 
-            for mut line in lines.iter_mut() {
+            for line in lines.iter_mut() {
                 let companies = self.find_company_by_id_vec(vec![line.company_cd]).await?;
                 line.line_symbols = self.get_line_symbols(line);
                 line.company = companies.get(0).cloned();
