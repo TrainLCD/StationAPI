@@ -100,6 +100,13 @@ impl LineRepository for MyLineRepository {
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_station_group_id(id, &mut conn).await
     }
+    async fn get_by_station_group_id_vec(
+        &self,
+        station_group_id_vec: Vec<u32>,
+    ) -> Result<Vec<Line>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalLineRepository::get_by_station_group_id_vec(station_group_id_vec, &mut conn).await
+    }
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Line>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_line_group_id(line_group_id, &mut conn).await
@@ -211,6 +218,57 @@ impl InternalLineRepository {
         .bind(station_group_id)
         .fetch_all(conn)
         .await?;
+        let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
+
+        Ok(lines)
+    }
+
+    async fn get_by_station_group_id_vec(
+        station_group_id_vec: Vec<u32>,
+        conn: &mut MySqlConnection,
+    ) -> Result<Vec<Line>, DomainError> {
+        if station_group_id_vec.len().is_zero() {
+            return Ok(vec![]);
+        }
+
+        let params = format!("?{}", ", ?".repeat(station_group_id_vec.len() - 1));
+        let query_str = format!(
+            "SELECT l.*,
+            COALESCE(a.line_name, l.line_name) AS line_name,
+            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+            COALESCE(a.line_name_zh,l.line_name_zh) AS line_name_zh,
+            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
+            FROM `lines` AS l
+            LEFT OUTER JOIN `line_aliases` AS la
+            ON
+                l.line_cd = la.line_cd
+                AND la.station_g_cd IN ( {} )
+            LEFT OUTER JOIN `aliases` AS a
+            ON
+                la.alias_cd = a.id                    
+            WHERE l.line_cd
+            IN (
+                SELECT line_cd
+                FROM stations AS s
+                WHERE s.station_g_cd IN ( {} )
+                AND e_status = 0
+            )
+            AND l.e_status = 0",
+            params, params
+        );
+
+        let mut query = sqlx::query_as::<_, LineRow>(&query_str);
+        for id in &station_group_id_vec {
+            query = query.bind(id);
+        }
+        for id in &station_group_id_vec {
+            query = query.bind(id);
+        }
+
+        let rows = query.fetch_all(conn).await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(lines)
