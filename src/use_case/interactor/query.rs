@@ -1,8 +1,7 @@
-use std::{sync::Arc, vec};
+use std::vec;
 
 use async_trait::async_trait;
 use bigdecimal::Zero;
-use moka::future::Cache;
 
 use crate::{
     domain::{
@@ -24,7 +23,6 @@ pub struct QueryInteractor<SR, LR, TR, CR> {
     pub line_repository: LR,
     pub train_type_repository: TR,
     pub company_repository: CR,
-    pub attributes_cache: Cache<String, Arc<Station>>,
 }
 
 #[async_trait]
@@ -36,30 +34,27 @@ where
     CR: CompanyRepository,
 {
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
-        let Some(mut station) = self.station_repository.find_by_id(station_id).await? else {
+        let Some(station) = self.station_repository.find_by_id(station_id).await? else {
             return Ok(None);
         };
-        self.update_station_with_attributes(&mut station).await?;
-        Ok(Some(station))
+        let result_vec = &mut vec![station];
+        self.update_station_vec_with_attributes(result_vec).await?;
+        Ok(result_vec.get(0).cloned())
     }
 
     async fn get_stations_by_group_id(
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let stations = self
+        let mut stations = self
             .station_repository
             .get_by_station_group_id(station_group_id)
             .await?;
 
-        let mut result: Vec<Station> = Vec::with_capacity(stations.len());
+        self.update_station_vec_with_attributes(&mut stations)
+            .await?;
 
-        for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
-            result.push(station);
-        }
-
-        Ok(result)
+        Ok(stations)
     }
     async fn get_stations_by_coordinates(
         &self,
@@ -67,126 +62,98 @@ where
         longitude: f64,
         limit: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let stations = self
+        let mut stations = self
             .station_repository
             .get_by_coordinates(latitude, longitude, limit)
             .await?;
 
-        let mut result: Vec<Station> = Vec::with_capacity(stations.len());
+        self.update_station_vec_with_attributes(&mut stations)
+            .await?;
 
-        for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
-            result.push(station);
-        }
-
-        Ok(result)
+        Ok(stations)
     }
 
     async fn get_stations_by_line_id(&self, line_id: u32) -> Result<Vec<Station>, UseCaseError> {
-        let stations = self.station_repository.get_by_line_id(line_id).await?;
-        let mut result: Vec<Station> = Vec::with_capacity(stations.len());
+        let mut stations = self.station_repository.get_by_line_id(line_id).await?;
 
-        for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
-            result.push(station);
-        }
+        self.update_station_vec_with_attributes(&mut stations)
+            .await?;
 
-        Ok(result)
+        Ok(stations)
     }
     async fn get_stations_by_name(
         &self,
         station_name: String,
         limit: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let stations = self
+        let mut stations = self
             .station_repository
             .get_by_name(station_name, limit)
             .await?;
-        let mut result: Vec<Station> = Vec::with_capacity(stations.len());
 
-        for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
-            result.push(station);
-        }
+        self.update_station_vec_with_attributes(&mut stations)
+            .await?;
 
-        Ok(result)
+        Ok(stations)
     }
-    async fn find_company_by_id(&self, company_id: u32) -> Result<Option<Company>, UseCaseError> {
-        let Some(company) = self.company_repository.find_by_id(company_id).await? else {
-            return Ok(None);
-        };
-
-        Ok(Some(company))
-    }
-
-    async fn update_station_with_attributes(
+    async fn find_company_by_id_vec(
         &self,
-        station: &mut Station,
+        company_id_vec: Vec<u32>,
+    ) -> Result<Vec<Company>, UseCaseError> {
+        let companies = self
+            .company_repository
+            .find_by_id_vec(company_id_vec)
+            .await?;
+
+        Ok(companies)
+    }
+
+    async fn update_station_vec_with_attributes(
+        &self,
+        stations: &mut Vec<Station>,
     ) -> Result<(), UseCaseError> {
-        let cache = self.attributes_cache.clone();
-        let cache_key = format!(
-            "station_with_attributes:id:{}:stop_condition:{:?}",
-            station.station_cd, station.stop_condition
-        );
-        if let Some(cache_data) = self.attributes_cache.get(&cache_key) {
-            if let Some(station_from_cache) = Arc::into_inner(Arc::clone(&cache_data)) {
-                *station = station_from_cache;
-                return Ok(());
-            }
-        };
+        let company_ids = stations
+            .iter()
+            .map(|station| station.company_cd)
+            .collect::<Vec<u32>>();
+        let companies = self.find_company_by_id_vec(company_ids).await?;
 
-        let lines = self
-            .get_lines_by_station_group_id(station.station_g_cd)
-            .await?;
-
-        let mut lines_tmp: Vec<Option<Line>> = Vec::with_capacity(lines.len());
-
-        let belong_line = &mut lines.clone().into_iter().find(|line| {
-            if line.line_cd == station.line_cd {
-                return true;
-            }
-
-            false
-        });
-
-        let mut stations = self
-            .station_repository
-            .get_by_station_group_id(station.station_g_cd)
-            .await?;
-
-        for ref mut line in lines.into_iter() {
-            for station in stations.iter_mut() {
-                if station.line_cd == line.line_cd {
-                    station.station_numbers =
-                        self.get_station_numbers(Box::new(station.clone()), Box::new(line.clone()));
-
-                    let company = self.find_company_by_id(line.company_cd).await?;
-                    line.company = company;
-                    line.line_symbols = self.get_line_symbols(line);
-                    line.station = Some(station.clone());
-                }
-            }
-
-            lines_tmp.push(Some(line.clone()));
-        }
-
-        station.lines = lines_tmp.into_iter().flatten().collect();
-
-        if let Some(ref mut belong_line) = belong_line {
-            let station_numbers: Vec<StationNumber> =
-                self.get_station_numbers(Box::new(station.clone()), Box::new(belong_line.clone()));
-
+        for (index, station) in stations.iter_mut().enumerate() {
+            let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
             station.station_numbers = station_numbers;
+            let mut line = self.extract_line_from_station(station);
+            line.line_symbols = self.get_line_symbols(&line);
+            line.company = companies.get(index).cloned();
+            line.station = Some(station.clone());
+            station.station_numbers = self.get_station_numbers(station);
+            station.line = Some(Box::new(line.clone()));
 
-            let company = self.find_company_by_id(belong_line.company_cd).await?;
-            belong_line.company = company;
+            let mut lines = self
+                .get_lines_by_station_group_id(station.station_g_cd)
+                .await?;
+            let mut lines_tmp: Vec<Line> = Vec::with_capacity(lines.len());
 
-            belong_line.line_symbols = self.get_line_symbols(belong_line);
+            for line in lines.iter_mut() {
+                let companies = self.find_company_by_id_vec(vec![line.company_cd]).await?;
+                line.line_symbols = self.get_line_symbols(line);
+                line.company = companies.get(0).cloned();
 
-            station.line = Some(Box::new(belong_line.clone()));
+                if let Some(mut station) = self
+                    .station_repository
+                    .get_by_station_group_and_line_id(station.station_g_cd, line.line_cd)
+                    .await?
+                {
+                    let station_numbers: Vec<StationNumber> = self.get_station_numbers(&station);
+                    station.station_numbers = station_numbers;
+                    line.station = Some(station);
+                }
+                line.line_symbols = self.get_line_symbols(line);
+                line.company = companies.get(index).cloned();
+
+                lines_tmp.push(line.clone());
+            }
+            station.lines = lines_tmp;
         }
-
-        cache.insert(cache_key, Arc::new(station.clone())).await;
 
         Ok(())
     }
@@ -205,30 +172,22 @@ where
         &self,
         line_group_id: u32,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let stations = self
+        let mut stations = self
             .station_repository
             .get_by_line_group_id(line_group_id)
             .await?;
 
-        let mut result: Vec<Station> = Vec::with_capacity(stations.len());
+        self.update_station_vec_with_attributes(&mut stations)
+            .await?;
 
-        for mut station in stations.into_iter() {
-            self.update_station_with_attributes(&mut station).await?;
-            result.push(station);
-        }
-
-        Ok(result)
+        Ok(stations)
     }
+    fn get_station_numbers(&self, station: &Station) -> Vec<StationNumber> {
+        let station = station.clone();
 
-    fn get_station_numbers(
-        &self,
-        boxed_station: Box<Station>,
-        boxed_line: Box<Line>,
-    ) -> Vec<StationNumber> {
-        let line = *boxed_line;
-        let line_symbol_primary = &line.line_symbol_primary;
-        let line_symbol_secondary = &line.line_symbol_secondary;
-        let line_symbol_extra = &line.line_symbol_extra;
+        let line_symbol_primary = &station.line_symbol_primary;
+        let line_symbol_secondary = &station.line_symbol_secondary;
+        let line_symbol_extra = &station.line_symbol_extra;
         let line_symbols_raw = vec![
             line_symbol_primary,
             line_symbol_secondary,
@@ -236,12 +195,12 @@ where
         ];
 
         let line_symbol_colors_raw: Vec<String> = vec![
-            line.line_symbol_primary_color.unwrap_or("".to_string()),
-            line.line_symbol_secondary_color.unwrap_or("".to_string()),
-            line.line_symbol_extra_color.unwrap_or("".to_string()),
+            station.line_symbol_primary_color.unwrap_or("".to_string()),
+            station
+                .line_symbol_secondary_color
+                .unwrap_or("".to_string()),
+            station.line_symbol_extra_color.unwrap_or("".to_string()),
         ];
-
-        let station = *boxed_station;
 
         let station_numbers_raw = vec![
             station.primary_station_number.unwrap_or("".to_string()),
@@ -250,9 +209,11 @@ where
         ];
 
         let line_symbols_shape_raw: Vec<String> = vec![
-            line.line_symbol_primary_shape.unwrap_or("".to_string()),
-            line.line_symbol_secondary_shape.unwrap_or("".to_string()),
-            line.line_symbol_extra_shape.unwrap_or("".to_string()),
+            station.line_symbol_primary_shape.unwrap_or("".to_string()),
+            station
+                .line_symbol_secondary_shape
+                .unwrap_or("".to_string()),
+            station.line_symbol_extra_shape.unwrap_or("".to_string()),
         ];
 
         let mut station_numbers: Vec<StationNumber> = Vec::with_capacity(station_numbers_raw.len());
@@ -280,6 +241,41 @@ where
         }
 
         station_numbers
+    }
+
+    fn extract_line_from_station(&self, station: &Station) -> Line {
+        let station = station.clone();
+        Line {
+            line_cd: station.line_cd,
+            company_cd: station.company_cd,
+            company: None,
+            line_name: station.line_name,
+            line_name_k: station.line_name_k,
+            line_name_h: station.line_name_h,
+            line_name_r: station.line_name_r,
+            line_name_zh: station.line_name_zh,
+            line_name_ko: station.line_name_ko,
+            line_color_c: station.line_color_c,
+            line_color_t: station.line_color_t,
+            line_type: station.line_type,
+            line_symbols: vec![],
+            line_symbol_primary: station.line_symbol_primary,
+            line_symbol_secondary: station.line_symbol_secondary,
+            line_symbol_extra: station.line_symbol_extra,
+            line_symbol_primary_color: station.line_symbol_primary_color,
+            line_symbol_secondary_color: station.line_symbol_secondary_color,
+            line_symbol_extra_color: station.line_symbol_extra_color,
+            line_symbol_primary_shape: station.line_symbol_primary_shape,
+            line_symbol_secondary_shape: station.line_symbol_secondary_shape,
+            line_symbol_extra_shape: station.line_symbol_extra_shape,
+            lon: 0.0,
+            lat: 0.0,
+            zoom: 0,
+            e_status: 0,
+            e_sort: 0,
+            station: None,
+            train_type: None,
+        }
     }
 
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol> {
@@ -369,20 +365,22 @@ where
             .get_by_station_id(station_id)
             .await?;
 
-        // TODO: SQL発行しすぎ罪で即死刑になるので神奈川県警に見つかる前にバッチ的にデータを取れるようにする
         for tt in train_types.iter_mut() {
             let mut lines = self
                 .line_repository
                 .get_by_line_group_id(tt.line_group_cd)
                 .await?;
-            for line in lines.iter_mut() {
+
+            let company_ids = lines.iter().map(|l| l.company_cd).collect();
+            let companies = self.company_repository.find_by_id_vec(company_ids).await?;
+
+            for (index, line) in lines.iter_mut().enumerate() {
                 let train_type: Option<TrainType> = self
                     .train_type_repository
                     .find_by_line_group_id_and_line_id(tt.line_group_cd, line.line_cd)
                     .await?;
                 line.train_type = train_type;
-                let company = self.find_company_by_id(line.company_cd).await?;
-                line.company = company;
+                line.company = companies.get(index).cloned();
                 line.line_symbols = self.get_line_symbols(line);
             }
 

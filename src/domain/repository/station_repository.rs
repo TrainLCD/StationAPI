@@ -12,6 +12,11 @@ pub trait StationRepository: Send + Sync + 'static {
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Station>, DomainError>;
+    async fn get_by_station_group_and_line_id(
+        &self,
+        station_group_id: u32,
+        line_id: u32,
+    ) -> Result<Option<Station>, DomainError>;
     async fn get_by_coordinates(
         &self,
         latitude: f64,

@@ -29,21 +29,21 @@ pub trait QueryUseCase: Send + Sync + 'static {
         station_name: String,
         get_stations_by_name: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError>;
-    async fn find_company_by_id(&self, company_id: u32) -> Result<Option<Company>, UseCaseError>;
-    async fn update_station_with_attributes(
+    async fn find_company_by_id_vec(
         &self,
-        station: &mut Station,
+        company_id_vec: Vec<u32>,
+    ) -> Result<Vec<Company>, UseCaseError>;
+    async fn update_station_vec_with_attributes(
+        &self,
+        station: &mut Vec<Station>,
     ) -> Result<(), UseCaseError>;
     async fn get_lines_by_station_group_id(
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Line>, UseCaseError>;
-    fn get_station_numbers(
-        &self,
-        boxed_station: Box<Station>,
-        boxed_line: Box<Line>,
-    ) -> Vec<StationNumber>;
+    fn get_station_numbers(&self, station: &Station) -> Vec<StationNumber>;
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol>;
+    fn extract_line_from_station(&self, station: &Station) -> Line;
     async fn get_stations_by_line_group_id(
         &self,
         line_group_id: u32,

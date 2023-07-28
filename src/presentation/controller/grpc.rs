@@ -46,7 +46,6 @@ impl GrpcRouter {
             line_repository,
             train_type_repository,
             company_repository,
-            attributes_cache: Cache::new(CACHE_SIZE.to_u64().unwrap()),
         };
 
         Self {
@@ -92,7 +91,7 @@ impl StationApi for GrpcRouter {
             }
         };
 
-        self.station_list_cache
+        cache
             .insert(cache_key, Arc::new(vec![station.clone()]))
             .await;
 
@@ -106,8 +105,9 @@ impl StationApi for GrpcRouter {
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let group_id = request.get_ref().group_id;
 
+        let cache = self.station_list_cache.clone();
         let cache_key = format!("stations:group_id:{}", group_id);
-        if let Some(cache_data) = self.station_list_cache.get(&cache_key) {
+        if let Some(cache_data) = cache.get(&cache_key) {
             if let Some(stations) = Arc::into_inner(Arc::clone(&cache_data)) {
                 let stations: Vec<PbStation> =
                     stations.into_iter().map(|station| station.into()).collect();
@@ -117,9 +117,7 @@ impl StationApi for GrpcRouter {
 
         match self.query_use_case.get_stations_by_group_id(group_id).await {
             Ok(stations) => {
-                self.station_list_cache
-                    .insert(cache_key, Arc::new(stations.clone()))
-                    .await;
+                cache.insert(cache_key, Arc::new(stations.clone())).await;
 
                 return Ok(Response::new(MultipleStationResponse {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
@@ -156,7 +154,6 @@ impl StationApi for GrpcRouter {
         let line_id = request.get_ref().line_id;
 
         let cache = self.station_list_cache.clone();
-
         let cache_key = format!("stations:line_id:{}", line_id);
         if let Some(stations) = cache.get(&cache_key) {
             let stations = stations.to_vec();
@@ -167,9 +164,7 @@ impl StationApi for GrpcRouter {
 
         match self.query_use_case.get_stations_by_line_id(line_id).await {
             Ok(stations) => {
-                self.station_list_cache
-                    .insert(cache_key, Arc::new(stations.clone()))
-                    .await;
+                cache.insert(cache_key, Arc::new(stations.clone())).await;
 
                 return Ok(Response::new(MultipleStationResponse {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
@@ -186,12 +181,13 @@ impl StationApi for GrpcRouter {
         let query_station_name = request_ref.station_name.clone();
         let query_limit = request_ref.limit;
 
+        let cache: Cache<String, Arc<Vec<StationEntity>>> = self.station_list_cache.clone();
         let cache_key = format!(
             "stations:station_name:{}:limit:{:?}",
             query_station_name,
             query_limit.clone()
         );
-        if let Some(cache_data) = self.station_list_cache.get(&cache_key) {
+        if let Some(cache_data) = cache.get(&cache_key) {
             let stations = cache_data.to_vec();
             let stations: Vec<PbStation> =
                 stations.into_iter().map(|station| station.into()).collect();
@@ -204,9 +200,7 @@ impl StationApi for GrpcRouter {
             .await
         {
             Ok(stations) => {
-                self.station_list_cache
-                    .insert(cache_key, Arc::new(stations.clone()))
-                    .await;
+                cache.insert(cache_key, Arc::new(stations.clone())).await;
 
                 return Ok(Response::new(MultipleStationResponse {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
@@ -224,7 +218,6 @@ impl StationApi for GrpcRouter {
         let query_line_group_id = request_ref.line_group_id;
 
         let cache = self.station_list_cache.clone();
-
         let cache_key = format!("stations:line_group_id:{}", query_line_group_id);
         if let Some(cache_data) = cache.get(&cache_key) {
             let stations = cache_data.to_vec();
@@ -239,9 +232,7 @@ impl StationApi for GrpcRouter {
             .await
         {
             Ok(stations) => {
-                self.station_list_cache
-                    .insert(cache_key, Arc::new(stations.clone()))
-                    .await;
+                cache.insert(cache_key, Arc::new(stations.clone())).await;
 
                 return Ok(Response::new(MultipleStationResponse {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
@@ -258,8 +249,9 @@ impl StationApi for GrpcRouter {
         let request_ref: &GetTrainTypesByStationIdRequest = request.get_ref();
         let query_station_id = request_ref.station_id;
 
+        let cache = self.train_types_cache.clone();
         let cache_key = format!("train_types:station_id:{:?}", query_station_id);
-        if let Some(cache_data) = self.train_types_cache.get(&cache_key) {
+        if let Some(cache_data) = cache.get(&cache_key) {
             let train_types = cache_data.to_vec();
             let train_types: Vec<PbTrainType> = train_types
                 .into_iter()
@@ -274,9 +266,7 @@ impl StationApi for GrpcRouter {
             .await
         {
             Ok(train_types) => {
-                self.train_types_cache
-                    .insert(cache_key, Arc::new(train_types.clone()))
-                    .await;
+                cache.insert(cache_key, Arc::new(train_types.clone())).await;
 
                 Ok(Response::new(MultipleTrainTypeResponse {
                     train_types: train_types.into_iter().map(|tt| tt.into()).collect(),
