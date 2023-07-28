@@ -195,37 +195,32 @@ where
         let station_rc = Rc::new(RefCell::new(station));
         let station_rc = Rc::clone(&station_rc);
         let station = station_rc.borrow();
+        let station = station.clone();
 
         let line_symbol_colors_raw: Vec<Option<String>> = vec![
-            station.clone().line_symbol_primary_color,
-            station.clone().line_symbol_secondary_color,
-            station.clone().line_symbol_extra_color,
+            station.line_symbol_primary_color,
+            station.line_symbol_secondary_color,
+            station.line_symbol_extra_color,
         ];
 
         let station_rc = Rc::clone(&station_rc);
         let station = station_rc.borrow();
+        let station = station.clone();
 
         let station_numbers_raw = vec![
-            station
-                .clone()
-                .primary_station_number
-                .unwrap_or("".to_string()),
-            station
-                .clone()
-                .secondary_station_number
-                .unwrap_or("".to_string()),
-            station
-                .clone()
-                .extra_station_number
-                .unwrap_or("".to_string()),
+            station.primary_station_number.unwrap_or("".to_string()),
+            station.secondary_station_number.unwrap_or("".to_string()),
+            station.extra_station_number.unwrap_or("".to_string()),
         ];
 
         let station_rc = Rc::clone(&station_rc);
         let station = station_rc.borrow();
+        let station = station.clone();
+
         let line_symbols_shape_raw: Vec<Option<String>> = vec![
-            station.clone().line_symbol_primary_shape,
-            station.clone().line_symbol_secondary_shape,
-            station.clone().line_symbol_extra_shape,
+            station.line_symbol_primary_shape,
+            station.line_symbol_secondary_shape,
+            station.line_symbol_extra_shape,
         ];
 
         let mut station_numbers: Vec<StationNumber> = Vec::with_capacity(station_numbers_raw.len());
@@ -266,30 +261,31 @@ where
         let station = Rc::new(RefCell::new(station));
         let station = Rc::clone(&station);
         let station = station.borrow();
+        let station = station.clone();
 
         Line {
-            line_cd: station.clone().line_cd,
-            company_cd: station.clone().company_cd,
+            line_cd: station.line_cd,
+            company_cd: station.company_cd,
             company: None,
-            line_name: station.clone().line_name,
-            line_name_k: station.clone().line_name_k,
-            line_name_h: station.clone().line_name_h,
-            line_name_r: station.clone().line_name_r,
-            line_name_zh: station.clone().line_name_zh,
-            line_name_ko: station.clone().line_name_ko,
-            line_color_c: station.clone().line_color_c,
-            line_color_t: station.clone().line_color_t,
-            line_type: station.clone().line_type,
+            line_name: station.line_name,
+            line_name_k: station.line_name_k,
+            line_name_h: station.line_name_h,
+            line_name_r: station.line_name_r,
+            line_name_zh: station.line_name_zh,
+            line_name_ko: station.line_name_ko,
+            line_color_c: station.line_color_c,
+            line_color_t: station.line_color_t,
+            line_type: station.line_type,
             line_symbols: vec![],
-            line_symbol_primary: station.clone().line_symbol_primary,
-            line_symbol_secondary: station.clone().line_symbol_secondary,
-            line_symbol_extra: station.clone().line_symbol_extra,
-            line_symbol_primary_color: station.clone().line_symbol_primary_color,
-            line_symbol_secondary_color: station.clone().line_symbol_secondary_color,
-            line_symbol_extra_color: station.clone().line_symbol_extra_color,
-            line_symbol_primary_shape: station.clone().line_symbol_primary_shape,
-            line_symbol_secondary_shape: station.clone().line_symbol_secondary_shape,
-            line_symbol_extra_shape: station.clone().line_symbol_extra_shape,
+            line_symbol_primary: station.line_symbol_primary,
+            line_symbol_secondary: station.line_symbol_secondary,
+            line_symbol_extra: station.line_symbol_extra,
+            line_symbol_primary_color: station.line_symbol_primary_color,
+            line_symbol_secondary_color: station.line_symbol_secondary_color,
+            line_symbol_extra_color: station.line_symbol_extra_color,
+            line_symbol_primary_shape: station.line_symbol_primary_shape,
+            line_symbol_secondary_shape: station.line_symbol_secondary_shape,
+            line_symbol_extra_shape: station.line_symbol_extra_shape,
             lon: 0.0,
             lat: 0.0,
             zoom: 0,
