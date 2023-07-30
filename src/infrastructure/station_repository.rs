@@ -237,8 +237,7 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let station_row: Vec<StationRow> = sqlx::query_as(
-            "SELECT
-            l.*,
+            "SELECT l.*,
             s.*,
             0 AS pass,
             (
@@ -407,7 +406,7 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let rows: Vec<StationRow> = sqlx::query_as(
-            "SELECT *,
+            "SELECT l.*, s.*,
             (
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
