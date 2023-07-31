@@ -125,7 +125,6 @@ CREATE TABLE `lines` (
   `line_name_zh` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `line_name_ko` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `line_color_c` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `line_color_t` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `line_type` int unsigned NOT NULL,
   `line_symbol_primary` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `line_symbol_secondary` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
@@ -136,16 +135,11 @@ CREATE TABLE `lines` (
   `line_symbol_primary_shape` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `line_symbol_secondary_shape` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `line_symbol_extra_shape` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `lon` decimal(18,14) unsigned NOT NULL,
-  `lat` decimal(18,15) unsigned NOT NULL,
-  `zoom` int unsigned NOT NULL,
   `e_status` int unsigned NOT NULL,
   `e_sort` int unsigned NOT NULL,
-  `location` geometry NOT NULL,
   PRIMARY KEY (`line_cd`),
   KEY `company_cd` (`company_cd`),
   KEY `e_sort` (`e_sort`),
-  SPATIAL KEY `location` (`location`),
   CONSTRAINT `lines_ibfk_1` FOREIGN KEY (`company_cd`) REFERENCES `companies` (`company_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
