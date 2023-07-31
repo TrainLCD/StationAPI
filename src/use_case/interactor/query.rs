@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc, vec};
+use std::vec;
 
 use async_trait::async_trait;
 use bigdecimal::Zero;
@@ -131,7 +131,7 @@ where
             let mut lines = self
                 .get_lines_by_station_group_id(station.station_g_cd)
                 .await?;
-            let mut lines_tmp: Vec<&Line> = Vec::with_capacity(lines.len());
+            let mut lines_tmp: Vec<Line> = Vec::with_capacity(lines.len());
 
             for line in lines.iter_mut() {
                 let companies = self.find_company_by_id_vec(vec![line.company_cd]).await?;
@@ -150,9 +150,9 @@ where
                 line.line_symbols = self.get_line_symbols(line);
                 line.company = companies.get(index).cloned();
 
-                lines_tmp.push(&*line);
+                lines_tmp.push(line.clone());
             }
-            station.lines = lines_tmp.into_iter().cloned().collect();
+            station.lines = lines_tmp;
         }
 
         Ok(())
@@ -183,6 +183,8 @@ where
         Ok(stations)
     }
     fn get_station_numbers(&self, station: &Station) -> Vec<StationNumber> {
+        let station = station.clone();
+
         let line_symbol_primary = &station.line_symbol_primary;
         let line_symbol_secondary = &station.line_symbol_secondary;
         let line_symbol_extra = &station.line_symbol_extra;
@@ -192,19 +194,13 @@ where
             line_symbol_extra,
         ];
 
-        let station_rc = Rc::new(RefCell::new(station));
-        let station = Rc::clone(&station_rc);
-        let station = station.borrow();
-        let station = station.clone();
-
-        let line_symbol_colors_raw: Vec<Option<String>> = vec![
-            station.line_symbol_primary_color,
-            station.line_symbol_secondary_color,
-            station.line_symbol_extra_color,
+        let line_symbol_colors_raw: Vec<String> = vec![
+            station.line_symbol_primary_color.unwrap_or("".to_string()),
+            station
+                .line_symbol_secondary_color
+                .unwrap_or("".to_string()),
+            station.line_symbol_extra_color.unwrap_or("".to_string()),
         ];
-
-        let station = station_rc.borrow();
-        let station = station.clone();
 
         let station_numbers_raw = vec![
             station.primary_station_number.unwrap_or("".to_string()),
@@ -212,20 +208,19 @@ where
             station.extra_station_number.unwrap_or("".to_string()),
         ];
 
-        let station = station_rc.borrow();
-        let station = station.clone();
-
-        let line_symbols_shape_raw: Vec<Option<String>> = vec![
-            station.line_symbol_primary_shape,
-            station.line_symbol_secondary_shape,
-            station.line_symbol_extra_shape,
+        let line_symbols_shape_raw: Vec<String> = vec![
+            station.line_symbol_primary_shape.unwrap_or("".to_string()),
+            station
+                .line_symbol_secondary_shape
+                .unwrap_or("".to_string()),
+            station.line_symbol_extra_shape.unwrap_or("".to_string()),
         ];
 
         let mut station_numbers: Vec<StationNumber> = Vec::with_capacity(station_numbers_raw.len());
 
         for (index, station_number) in station_numbers_raw.into_iter().enumerate() {
-            let sym_color = &line_symbol_colors_raw[index];
-            let sym_shape = &line_symbols_shape_raw[index];
+            let sym_color = line_symbol_colors_raw[index].to_string();
+            let sym_shape = line_symbols_shape_raw[index].to_string();
 
             if station_number.is_empty() {
                 continue;
@@ -234,17 +229,10 @@ where
             if let Some(sym) = line_symbols_raw[index] {
                 let station_number_string = format!("{}-{}", sym, station_number);
 
-                let Some(sym_color) = sym_color else {
-                    return station_numbers;
-                };
-                let Some(sym_shape) = sym_shape else {
-                    return station_numbers;
-                };
-
                 let station_number = StationNumber {
                     line_symbol: sym.to_string(),
-                    line_symbol_color: sym_color.to_string(),
-                    line_symbol_shape: sym_shape.to_string(),
+                    line_symbol_color: sym_color,
+                    line_symbol_shape: sym_shape,
                     station_number: station_number_string,
                 };
 
@@ -256,11 +244,7 @@ where
     }
 
     fn extract_line_from_station(&self, station: &Station) -> Line {
-        let station = Rc::new(RefCell::new(station));
-        let station = Rc::clone(&station);
-        let station = station.borrow();
         let station = station.clone();
-
         Line {
             line_cd: station.line_cd,
             company_cd: station.company_cd,
@@ -394,10 +378,11 @@ where
                 line.train_type = train_type;
                 line.company = companies.get(index).cloned();
                 line.line_symbols = self.get_line_symbols(line);
-                tt.line = Some(Box::new(line.clone()));
             }
 
             tt.lines = lines;
+            let line = self.line_repository.find_by_station_id(station_id).await?;
+            tt.line = line.map(Box::new);
         }
 
         Ok(train_types)
