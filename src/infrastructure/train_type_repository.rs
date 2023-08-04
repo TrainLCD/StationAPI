@@ -107,9 +107,9 @@ impl InternalTrainTypeRepository {
     ) -> Result<Vec<TrainType>, DomainError> {
         let rows: Vec<TrainTypeRow> = sqlx::query_as(
             "SELECT t.*, sst.*
-            FROM types as t, station_station_types as sst
-            WHERE sst.line_group_cd = ?
-              AND t.type_cd = sst.type_cd",
+                FROM types as t, station_station_types as sst
+                WHERE sst.line_group_cd = ?
+                AND t.type_cd = sst.type_cd",
         )
         .bind(line_group_id)
         .fetch_all(conn)
@@ -150,7 +150,7 @@ impl InternalTrainTypeRepository {
             AND sst.station_cd IN (
                 SELECT station_cd
                 FROM stations as s
-                WHERE line_cd =?
+                WHERE line_cd = ?
             )
             AND t.type_cd = sst.type_cd",
         )

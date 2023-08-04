@@ -128,10 +128,28 @@ impl InternalLineRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Option<Line>, DomainError> {
         let rows: Option<LineRow> = sqlx::query_as(
-            "SELECT l.*
+            "SELECT l.*,
+            COALESCE(a.line_name, l.line_name) AS line_name,
+            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+            COALESCE(a.line_name_zh,l.line_name_zh) AS line_name_zh,
+            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
             FROM `lines` AS l
-            WHERE line_cd
-            IN (
+            LEFT OUTER JOIN `line_aliases` AS la
+            ON
+                l.line_cd = la.line_cd
+                AND la.station_g_cd = (
+                    SELECT station_g_cd
+                    FROM stations AS s
+                    WHERE s.station_cd = ?
+                    AND e_status = 0
+                )
+            LEFT OUTER JOIN `aliases` AS a
+            ON
+                la.alias_cd = a.id                    
+            WHERE l.line_cd IN (
                 SELECT line_cd
                 FROM stations AS s
                 WHERE s.station_cd = ?
@@ -139,6 +157,7 @@ impl InternalLineRepository {
             )
             AND e_status = 0",
         )
+        .bind(station_id)
         .bind(station_id)
         .fetch_optional(conn)
         .await?;
@@ -271,39 +290,29 @@ impl InternalLineRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Line>, DomainError> {
         let rows: Vec<LineRow> = sqlx::query_as(
-            "SELECT l.*,
-                COALESCE(a.line_name, l.line_name) AS line_name,
-                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-                COALESCE(a.line_name_zh,l.line_name_zh) AS line_name_zh,
-                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
-                FROM `lines` AS l
-                    LEFT OUTER JOIN `line_aliases` AS la
-                ON
+            "SELECT DISTINCT l.*,
+            COALESCE(a.line_name, l.line_name) AS line_name,
+            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+            COALESCE(a.line_name_zh,l.line_name_zh) AS line_name_zh,
+            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
+            FROM (`lines` AS l, `station_station_types` AS sst)
+            LEFT OUTER JOIN `line_aliases` AS la
+            ON
                 l.line_cd = la.line_cd
-                AND la.station_g_cd IN
-                (
+                AND la.station_g_cd IN (
                     SELECT station_g_cd
-                    FROM stations AS s
-                    INNER JOIN station_station_types AS sst
-                    ON s.station_cd = sst.station_cd
-                    AND line_group_cd = ?
-                    AND s.e_status = 0
+                    FROM `stations` AS s
+                    WHERE s.station_cd = sst.station_cd
                 )
-                LEFT OUTER JOIN `aliases` AS a
-                ON
-                    la.alias_cd = a.id
-                WHERE l.line_cd
-                IN (
-                    SELECT line_cd
-                    FROM stations AS s
-                    INNER JOIN station_station_types AS sst
-                    ON s.station_cd = sst.station_cd
-                    AND line_group_cd = ?
-                    AND s.e_status = 0
-                )
+            LEFT OUTER JOIN `aliases` AS a
+            ON
+                la.alias_cd = a.id                    
+            WHERE
+            sst.line_group_cd = ?
+            AND l.line_cd = la.line_cd
             AND e_status = 0",
         )
         .bind(line_group_id)
