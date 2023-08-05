@@ -106,10 +106,15 @@ impl InternalTrainTypeRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         let rows: Vec<TrainTypeRow> = sqlx::query_as(
-            "SELECT t.*, sst.*
-                FROM types as t, station_station_types as sst
-                WHERE sst.line_group_cd = ?
-                AND t.type_cd = sst.type_cd",
+            "SELECT 
+            t.*, 
+            sst.* 
+          FROM 
+            types as t, 
+            station_station_types as sst 
+          WHERE 
+            sst.line_group_cd = ? 
+            AND t.type_cd = sst.type_cd",
         )
         .bind(line_group_id)
         .fetch_all(conn)
