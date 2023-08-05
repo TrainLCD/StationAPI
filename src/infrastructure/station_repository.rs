@@ -256,7 +256,8 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let station_row: Vec<StationRow> = sqlx::query_as(
-            "SELECT DISTINCT s.*, 
+            "SELECT 
+            DISTINCT s.*, 
             l.*, 
             COALESCE(a.line_name, l.line_name) AS line_name, 
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
@@ -276,17 +277,12 @@ impl InternalStationRepository {
                 AND sst.pass <> 1
             ) AS station_types_count 
           FROM 
-            (`stations` AS s,
-            `lines` AS l)
-            LEFT OUTER JOIN `line_aliases` AS la
-                ON
-                    la.station_cd = s.station_cd
-            LEFT OUTER JOIN `aliases` AS a
-                ON
-                    la.alias_cd = a.id                    
-            WHERE 
-            s.line_cd = l.line_cd 
-            AND s.line_cd = ?
+            (`stations` AS s, `lines` AS l) 
+            LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
+            LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id 
+          WHERE 
+            s.line_cd = ? 
+            AND s.line_cd = l.line_cd 
             AND s.e_status = 0 
           ORDER BY 
             s.e_sort, 
@@ -306,20 +302,34 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let rows: Vec<StationRow> = sqlx::query_as(
-            "SELECT
-            s.*,
-            0 AS pass,
+            "SELECT 
+            s.*, 
+            l.*, 
+            COALESCE(a.line_name, l.line_name) AS line_name, 
+            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
+            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
+            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r, 
+            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh, 
+            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko, 
+            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c, 
+            0 AS pass, 
             (
-                SELECT COUNT(line_group_cd)
-                FROM station_station_types AS sst
-                WHERE s.station_cd = sst.station_cd
+              SELECT 
+                COUNT(line_group_cd) 
+              FROM 
+                station_station_types AS sst 
+              WHERE 
+                s.station_cd = sst.station_cd 
                 AND sst.pass <> 1
-            ) AS station_types_count
-            FROM stations AS s, `lines` AS l
-            WHERE s.station_g_cd = ?
-            AND s.e_status = 0
-            AND l.line_cd = s.line_cd
-            ORDER BY s.e_sort, s.station_cd",
+            ) AS station_types_count 
+          FROM 
+            (`stations` AS s, `lines` AS l) 
+            LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
+            LEFT OUTER JOIN `aliases` AS a ON a.id = la.alias_cd 
+          WHERE 
+            s.station_g_cd = ? 
+            AND s.line_cd = l.line_cd 
+            AND s.e_status = 0",
         )
         .bind(group_id)
         .fetch_all(conn)
@@ -336,32 +346,30 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Option<Station>, DomainError> {
         let rows: Option<StationRow> = sqlx::query_as(
-            "SELECT s.*,
-            l.*,
-            0 AS pass,
+            "SELECT 
+            s.*, 
+            l.*, 
+            0 AS pass, 
             (
-                SELECT COUNT(line_group_cd)
-                FROM station_station_types AS sst
-                WHERE s.station_cd = sst.station_cd
+              SELECT 
+                COUNT(line_group_cd) 
+              FROM 
+                station_station_types AS sst 
+              WHERE 
+                s.station_cd = sst.station_cd 
                 AND sst.pass <> 1
-            ) AS station_types_count
-            FROM stations AS s,
-            (
-				SElECT *
-                FROM `lines` AS l
-				WHERE l.line_cd
-                IN (
-                    SELECT line_cd
-                    FROM stations AS s
-                    WHERE s.station_g_cd = ?
-                )
-                AND l.e_status = 0  
-            ) AS l
-            WHERE s.station_g_cd = ?
-            AND s.line_cd = ?
-            AND s.e_status = 0
-            AND l.line_cd = s.line_cd
-            ORDER BY s.e_sort, s.station_cd",
+            ) AS station_types_count 
+          FROM 
+            `stations` AS s, 
+            `lines` AS l 
+          WHERE 
+            s.station_g_cd = ? 
+            AND s.line_cd = ? 
+            AND s.e_status = 0 
+            AND l.line_cd = s.line_cd 
+          ORDER BY 
+            s.e_sort, 
+            s.station_cd",
         )
         .bind(station_group_id)
         .bind(station_group_id)
@@ -507,7 +515,7 @@ impl InternalStationRepository {
               SELECT 
                 COUNT(line_group_cd) 
               FROM 
-                station_station_types AS sst 
+                `station_station_types` AS sst 
               WHERE 
                 s.station_cd = sst.station_cd 
                 AND sst.pass <> 1
