@@ -204,7 +204,6 @@ impl InternalLineRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh, 
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko, 
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c, 
-            0 AS pass, 
             (
               SELECT 
                 COUNT(line_group_cd) 
@@ -251,7 +250,6 @@ impl InternalLineRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh, 
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko, 
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c, 
-            0 AS pass, 
             (
               SELECT 
                 COUNT(line_group_cd) 
@@ -303,7 +301,6 @@ impl InternalLineRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh, 
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko, 
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c, 
-            0 AS pass, 
             (
               SELECT 
                 COUNT(line_group_cd) 

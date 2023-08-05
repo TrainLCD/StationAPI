@@ -204,8 +204,8 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Option<Station>, DomainError> {
         let rows: Option<StationRow> = sqlx::query_as(
-            "SELECT s.*, 
-            l.*, 
+            "SELECT l.*, 
+            s.*,
             COALESCE(a.line_name, l.line_name) AS line_name, 
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
@@ -256,9 +256,8 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let station_row: Vec<StationRow> = sqlx::query_as(
-            "SELECT 
-            DISTINCT s.*, 
-            l.*, 
+            "SELECT DISTINCT l.*, 
+            s.*,
             COALESCE(a.line_name, l.line_name) AS line_name, 
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
@@ -302,9 +301,8 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let rows: Vec<StationRow> = sqlx::query_as(
-            "SELECT 
-            s.*, 
-            l.*, 
+            "SELECT l.*, 
+            s.*,
             COALESCE(a.line_name, l.line_name) AS line_name, 
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
@@ -346,9 +344,8 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Option<Station>, DomainError> {
         let rows: Option<StationRow> = sqlx::query_as(
-            "SELECT 
-            s.*, 
-            l.*, 
+            "SELECT l.*, 
+            s.*,
             0 AS pass, 
             (
               SELECT 
@@ -390,9 +387,8 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let rows = sqlx::query_as::<_, StationRow>(
-            "SELECT 
-            s.*, 
-            l.*, 
+            "SELECT l.*, 
+            s.*,
             COALESCE(a.line_name, l.line_name) AS line_name, 
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
@@ -442,8 +438,8 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let query_str: String = format!(
-            "SELECT s.*,
-            l.*,
+            "SELECT l.*, 
+            s.*,
             COALESCE(a.line_name, l.line_name) AS line_name, 
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
@@ -518,7 +514,8 @@ impl InternalStationRepository {
               WHERE 
                 s.station_cd = sst.station_cd 
                 AND sst.pass <> 1
-            ) AS station_types_count 
+            ) AS station_types_count, 
+            CONVERT(sst.pass, SIGNED) AS pass 
           FROM 
             (
               `lines` AS l, `stations` AS s, `station_station_types` AS sst
