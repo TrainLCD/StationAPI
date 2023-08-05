@@ -372,7 +372,6 @@ impl InternalStationRepository {
             s.station_cd",
         )
         .bind(station_group_id)
-        .bind(station_group_id)
         .bind(line_id)
         .fetch_optional(conn)
         .await?;

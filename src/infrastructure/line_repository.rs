@@ -320,7 +320,8 @@ impl InternalLineRepository {
             LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
             LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id 
           WHERE 
-            sst.line_group_cd = ? 
+            sst.line_group_cd = ?
+            AND sst.station_cd = s.station_cd 
             AND s.line_cd = l.line_cd 
             AND s.e_status = 0",
         )
