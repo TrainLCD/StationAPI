@@ -326,7 +326,6 @@ impl InternalLineRepository {
             AND s.e_status = 0",
         )
         .bind(line_group_id)
-        .bind(line_group_id)
         .fetch_all(conn)
         .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
