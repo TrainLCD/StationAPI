@@ -16,7 +16,7 @@ pub struct CompanyRow {
     pub company_name_r: String,
     pub company_name_en: String,
     pub company_name_full_en: String,
-    pub company_url: Option<String>,
+    pub company_url: String,
     pub company_type: u32,
     pub e_status: u32,
     pub e_sort: u32,
