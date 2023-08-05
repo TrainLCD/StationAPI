@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.1.0, for macos13 (arm64)
+-- MySQL dump 10.13  Distrib 8.0.33, for macos13.3 (arm64)
 --
 -- Host: localhost    Database: stationapi
 -- ------------------------------------------------------
--- Server version	8.1.0
+-- Server version	8.0.33
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -86,13 +86,16 @@ DROP TABLE IF EXISTS `line_aliases`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `line_aliases` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `station_cd` int unsigned NOT NULL,
+  `station_g_cd` int unsigned NOT NULL,
+  `line_cd` int unsigned NOT NULL,
   `alias_cd` int unsigned NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `station_g_cd` (`station_cd`),
+  KEY `station_g_cd` (`station_g_cd`),
+  KEY `line_cd` (`line_cd`),
   KEY `alias_cd` (`alias_cd`),
-  CONSTRAINT `line_aliases_ibfk_1` FOREIGN KEY (`station_cd`) REFERENCES `stations` (`station_cd`),
-  CONSTRAINT `line_aliases_ibfk_2` FOREIGN KEY (`alias_cd`) REFERENCES `aliases` (`id`)
+  CONSTRAINT `line_aliases_ibfk_1` FOREIGN KEY (`station_g_cd`) REFERENCES `stations` (`station_g_cd`),
+  CONSTRAINT `line_aliases_ibfk_2` FOREIGN KEY (`line_cd`) REFERENCES `lines` (`line_cd`),
+  CONSTRAINT `line_aliases_ibfk_3` FOREIGN KEY (`alias_cd`) REFERENCES `aliases` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -269,4 +272,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-08-05  9:37:26
+-- Dump completed on 2023-07-23 14:56:11
