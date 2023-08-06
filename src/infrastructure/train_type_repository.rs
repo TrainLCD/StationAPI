@@ -128,12 +128,18 @@ impl InternalTrainTypeRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         let rows: Vec<TrainTypeRow> = sqlx::query_as(
-            "SELECT t.*, sst.*
-            FROM station_station_types as sst, stations as s, types as t
-            WHERE s.station_cd = ?
-            AND s.station_cd = sst.station_cd
-            AND sst.type_cd = t.type_cd
-            AND s.e_status = 0
+            "SELECT 
+            t.*, 
+            sst.* 
+          FROM 
+            station_station_types as sst, 
+            stations as s, 
+            types as t 
+          WHERE 
+            s.station_cd = ? 
+            AND s.station_cd = sst.station_cd 
+            AND sst.type_cd = t.type_cd 
+            AND s.e_status = 0 
             AND sst.pass <> 1",
         )
         .bind(station_id)
@@ -149,14 +155,22 @@ impl InternalTrainTypeRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Option<TrainType>, DomainError> {
         let rows: Option<TrainTypeRow> = sqlx::query_as(
-            "SELECT t.*, sst.*
-            FROM types as t, station_station_types as sst
-            WHERE sst.line_group_cd = ?
+            "SELECT 
+            t.*, 
+            sst.* 
+          FROM 
+            types as t, 
+            station_station_types as sst 
+          WHERE 
+            sst.line_group_cd = ? 
             AND sst.station_cd IN (
-                SELECT station_cd
-                FROM stations as s
-                WHERE line_cd = ?
-            )
+              SELECT 
+                station_cd 
+              FROM 
+                stations as s 
+              WHERE 
+                line_cd = ?
+            ) 
             AND t.type_cd = sst.type_cd",
         )
         .bind(line_group_id)
