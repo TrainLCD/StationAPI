@@ -196,7 +196,6 @@ impl InternalLineRepository {
         let rows: Vec<LineRow> = sqlx::query_as(
             "SELECT 
             DISTINCT l.*, 
-            s.*, 
             COALESCE(a.line_name, l.line_name) AS line_name, 
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
@@ -242,7 +241,6 @@ impl InternalLineRepository {
         let query_str = format!(
             "SELECT 
             DISTINCT l.*, 
-            s.*, 
             COALESCE(a.line_name, l.line_name) AS line_name, 
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
@@ -293,23 +291,13 @@ impl InternalLineRepository {
         let rows: Vec<LineRow> = sqlx::query_as(
             "SELECT 
             DISTINCT l.*, 
-            s.*, 
             COALESCE(a.line_name, l.line_name) AS line_name, 
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
             COALESCE(a.line_name_r, l.line_name_r) AS line_name_r, 
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh, 
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko, 
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c, 
-            (
-              SELECT 
-                COUNT(line_group_cd) 
-              FROM 
-                station_station_types AS sst 
-              WHERE 
-                s.station_cd = sst.station_cd 
-                AND sst.pass <> 1
-            ) AS station_types_count 
+            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
           FROM 
             (
               `lines` AS l, `stations` AS s, `station_station_types` AS sst
@@ -317,7 +305,7 @@ impl InternalLineRepository {
             LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
             LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id 
           WHERE 
-            sst.line_group_cd = ?
+            sst.line_group_cd = ? 
             AND sst.station_cd = s.station_cd 
             AND s.line_cd = l.line_cd 
             AND s.e_status = 0",
