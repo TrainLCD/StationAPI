@@ -195,15 +195,14 @@ impl InternalLineRepository {
     ) -> Result<Vec<Line>, DomainError> {
         let rows: Vec<LineRow> = sqlx::query_as(
             "SELECT 
-            DISTINCT l.*, 
-            s.*, 
-            COALESCE(a.line_name, l.line_name) AS line_name, 
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r, 
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh, 
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko, 
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c, 
+            DISTINCT l.*,
+            COALESCE(a.line_name, l.line_name) AS line_name,
+            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             (
               SELECT 
                 COUNT(line_group_cd) 
@@ -241,15 +240,14 @@ impl InternalLineRepository {
         let params = format!("?{}", ", ?".repeat(station_group_id_vec.len() - 1));
         let query_str = format!(
             "SELECT 
-            DISTINCT l.*, 
-            s.*, 
-            COALESCE(a.line_name, l.line_name) AS line_name, 
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r, 
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh, 
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko, 
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c, 
+            DISTINCT l.*,
+            COALESCE(a.line_name, l.line_name) AS line_name,
+            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             (
               SELECT 
                 COUNT(line_group_cd) 
@@ -292,24 +290,14 @@ impl InternalLineRepository {
     ) -> Result<Vec<Line>, DomainError> {
         let rows: Vec<LineRow> = sqlx::query_as(
             "SELECT 
-            DISTINCT l.*, 
-            s.*, 
-            COALESCE(a.line_name, l.line_name) AS line_name, 
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r, 
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh, 
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko, 
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c, 
-            (
-              SELECT 
-                COUNT(line_group_cd) 
-              FROM 
-                station_station_types AS sst 
-              WHERE 
-                s.station_cd = sst.station_cd 
-                AND sst.pass <> 1
-            ) AS station_types_count 
+            DISTINCT l.*,
+            COALESCE(a.line_name, l.line_name) AS line_name,
+            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
           FROM 
             (
               `lines` AS l, `stations` AS s, `station_station_types` AS sst
