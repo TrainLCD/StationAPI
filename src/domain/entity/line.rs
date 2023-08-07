@@ -1,8 +1,6 @@
-use fake::Dummy;
-
 use super::{company::Company, line_symbol::LineSymbol, station::Station, train_type::TrainType};
 
-#[derive(Dummy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Line {
     pub line_cd: u32,
     pub company_cd: u32,

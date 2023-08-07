@@ -1,10 +1,8 @@
-use fake::Dummy;
-
 use crate::pb::StopCondition;
 
 use super::{line::Line, station_number::StationNumber, train_type::TrainType};
 
-#[derive(Dummy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Station {
     pub station_cd: u32,
     pub station_g_cd: u32,

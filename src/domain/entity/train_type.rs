@@ -1,8 +1,6 @@
-use fake::Dummy;
-
 use super::line::Line;
 
-#[derive(Dummy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct TrainType {
     pub id: u32,
     pub station_cd: u32,
