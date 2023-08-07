@@ -1,3 +1,6 @@
 [submodule "proto"]
 	path = proto
 	url = https://github.com/TrainLCD/gRPCProto.git
+[submodule "sqlgen"]
+	path = sqlgen
+	url = https://github.com/TrainLCD/sqlgen.git

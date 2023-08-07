@@ -35,28 +35,3 @@ impl From<PresentationalError> for tonic::Status {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use fake::{Fake, Faker};
-
-    #[test]
-    fn from_use_case_error() {
-        use super::*;
-
-        let err = UseCaseError::NotFound {
-            entity_id: Faker.fake(),
-            entity_type: "entity_type",
-        };
-        let err = PresentationalError::from(err);
-        assert!(matches!(err, PresentationalError::NotFound(_)));
-
-        let err = UseCaseError::Other(anyhow::Error::msg(Faker.fake::<String>()));
-        let err = PresentationalError::from(err);
-        assert!(matches!(err, PresentationalError::OtherError(_)));
-
-        let err = UseCaseError::Unexpected(Faker.fake());
-        let err = PresentationalError::from(err);
-        assert!(matches!(err, PresentationalError::Unexpected(_)));
-    }
-}

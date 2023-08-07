@@ -1,6 +1,4 @@
-use fake::Dummy;
-
-#[derive(Dummy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct LineSymbol {
     pub symbol: String,
     pub color: String,
