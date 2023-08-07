@@ -34,4 +34,4 @@ ENV PORT 50051
 
 EXPOSE $PORT
 
-CMD ["sh", "/app/scripts/start.sh"]
+CMD ["sh", "./scripts/start.sh"]
