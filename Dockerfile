@@ -10,10 +10,8 @@ RUN SQLX_OFFLINE=true cargo build --release --quiet
 
 FROM rust:1 as migration
 WORKDIR /app
-RUN mkdir /app/scripts
 COPY ./migrations /app/migrations
-COPY ./scripts/start.sh /app/scripts
-COPY ./scripts/migration.sh /app/scripts
+COPY ./scripts /app/scripts
 COPY ./sqlgen /app/sqlgen
 RUN cd /app/sqlgen && cargo run /app/migrations /app/tmp.sql
 
