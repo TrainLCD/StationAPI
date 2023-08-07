@@ -8,12 +8,14 @@ RUN apt-get update && \
 COPY . .
 RUN SQLX_OFFLINE=true cargo build --release --quiet
 
-FROM node:18-slim as migration
+FROM rust:1 as migration
 WORKDIR /app
+RUN mkdir /app/scripts
 COPY ./migrations /app/migrations
-COPY ./scripts /app/scripts
-RUN cd ./scripts && npm install
-RUN node ./scripts/sqlgen.js
+COPY ./scripts/start.sh /app/scripts
+COPY ./scripts/migration.sh /app/scripts
+COPY ./sqlgen /app/sqlgen
+RUN cd /app/sqlgen && cargo run /app/migrations /app/tmp.sql
 
 FROM debian:bullseye-slim as runtime
 WORKDIR /app
@@ -32,4 +34,4 @@ ENV PORT 50051
 
 EXPOSE $PORT
 
-CMD ["sh", "./scripts/start.sh"]
+CMD ["sh", "/app/scripts/start.sh"]
