@@ -1,6 +1,4 @@
-use fake::Dummy;
-
-#[derive(Dummy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct StationNumber {
     pub line_symbol: String,
     pub line_symbol_color: String,

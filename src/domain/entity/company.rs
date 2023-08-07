@@ -1,6 +1,4 @@
-use fake::Dummy;
-
-#[derive(Dummy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Company {
     pub company_cd: u32,
     pub rr_cd: u32,

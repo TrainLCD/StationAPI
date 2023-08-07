@@ -3,10 +3,9 @@ use crate::domain::{
     repository::train_type_repository::TrainTypeRepository,
 };
 use async_trait::async_trait;
-use fake::Dummy;
 use sqlx::{MySql, MySqlConnection, Pool};
 
-#[derive(sqlx::FromRow, Clone, Dummy)]
+#[derive(sqlx::FromRow, Clone)]
 pub struct TrainTypeRow {
     id: u32,
     station_cd: u32,
