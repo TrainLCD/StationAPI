@@ -4,7 +4,7 @@ RUN apt-get update && \
     apt-get install -y protobuf-compiler libprotobuf-dev && \
     rm -rf /var/lib/apt/lists/*
 COPY . .
-RUN cd ./sqlgen && cargo run ../migrations ./tmp.sql
+RUN cd ./sqlgen && cargo run ../migrations ../tmp.sql
 RUN SQLX_OFFLINE=true cargo build --release
 
 FROM debian:bullseye-slim as runtime
