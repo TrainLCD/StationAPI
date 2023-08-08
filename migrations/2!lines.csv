@@ -146,7 +146,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 11609,4,山陽本線(姫路～岡山),サンヨウホンセン,山陽本線(姫路～岡山),San’yo Main Line(Himeji to Okayama),山阳本线,산요 본선,#009966,2,S,,,,,,REVERSED_SQUARE_WEST,,,0,11609
 11610,4,山陽本線(岡山～三原),サンヨウホンセン,山陽本線(岡山～三原),San’yo Main Line(Okayama to Mihara),山阳本线,산요 본선,#009966,2,W,X,,,,,REVERSED_SQUARE_WEST,REVERSED_SQUARE_WEST,,0,11610
 11611,4,山陽本線(三原～岩国),サンヨウホンセン,山陽本線(三原～岩国),San’yo Main Line(Mihara to Iwakuni),山阳本线,산요 본선,#0072BC,2,G,R,,,,,REVERSED_SQUARE_WEST,REVERSED_SQUARE_WEST,,0,11611
-11612,4,山陽本線(岩国～門司),サンヨウホンセン,山陽本線(岩国～門司),San'yo Main Line(Iwakuni to Moji),山阳本线,산요 본선,#0072BC,2,,,,,,,,,,0,11612
+11612,4,山陽本線(岩国～門司),サンヨウホンセン,山陽本線(岩国～門司),San'yo Main Line(Iwakuni to Moji),山阳本线,산요 본선,#0072BC,2,JA,,,#E24148,,,HALF_SQUARE,,,0,11612
 11613,4,山陽本線(兵庫～和田岬),サンヨウホンセン,山陽本線(兵庫～和田岬),San’yo Main Line(Hyogo to Wadamisaki),山阳本线,산요 본선,#0072BC,2,,,,,,,,,,0,11613
 11614,4,嵯峨野線,サガノセン,山陰本線(京都～園部),Sagano Line,嵯峨野线,사가노선,#9370DB,2,E,,,#9370DB,,,REVERSED_SQUARE_WEST,,,0,11614
 11615,4,山陰本線(園部～豊岡),サンインホンセン,山陰本線(園部～豊岡),San'in Main Line(Sonobe to Toyooka),山阴本线,산인 본선,#669933,2,E,,,#669933,,,REVERSED_SQUARE_WEST,,,0,11615
@@ -209,7 +209,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 11907,6,日豊本線(佐伯～鹿児島中央),ニッポウホンセン,日豊本線(佐伯～鹿児島中央),Nippo Main Line(Saiki to Kagoshima-Chuo),日丰本线,닛포 본선,#4ABACD,2,,,,,,,,,,0,11907
 11908,6,福北ゆたか線,フクホクユタカセン,篠栗線,Fukuhoku Yutaka Line,福北丰线,후쿠호쿠유타카선,#FAAF18,2,JC,,,#FAAF18,,,HALF_SQUARE_DARK_TEXT,,,0,11908
 11909,6,筑肥線(姪浜～西唐津),チクヒセン,筑肥線(姪浜～西唐津),Chikuhi Line(Meinohama to Nishi-Karatsu),筑肥线,지쿠히선,#8F3E97,2,JK,,,#8F3E97,,,HALF_SQUARE,,,0,11909
-11910,6,若松線,チクホウセン,筑豊本線(若松～折尾),Wakamatsu Line,若松线,와카마쓰선,#88878C,2,JE,,,#88878C,,,HALF_SQUARE,,,0,11910
+11910,6,若松線,チクホウセン,筑豊本線(若松～折尾),Wakamatsu Line,若松线,와카마쓰선,#0095D9,2,JE,,,#88878C,,,HALF_SQUARE,,,0,11910
 11911,6,福北ゆたか線(折尾～桂川),フクホクユタカセン,筑豊本線(折尾～桂川),Fukuhoku Yutaka Line(Orio to Keisen),福北丰线,후쿠호쿠유타카선,#FAAF18,2,JC,,,#FAAF18,,,HALF_SQUARE_DARK_TEXT,,,0,11911
 11912,6,原田線,ハルダセン,筑豊本線(桂川～原田),Haruda Line,原田线,하루다선,#4F439A,2,JG,,,#4F439A,,,HALF_SQUARE,,,0,11912
 11913,6,ゆふ高原線,ユフコウゲンセン,久大本線,Yufu Kogen Line,由布高原线,유후 고원선,#D78CAC,2,,,,,,,,,,0,11913
