@@ -107,12 +107,11 @@ impl StationApi for GrpcRouter {
 
         let cache = self.station_list_cache.clone();
         let cache_key = format!("stations:group_id:{}", group_id);
-        if let Some(cache_data) = cache.get(&cache_key) {
-            if let Some(stations) = Arc::into_inner(Arc::clone(&cache_data)) {
-                let stations: Vec<PbStation> =
-                    stations.into_iter().map(|station| station.into()).collect();
-                return Ok(Response::new(MultipleStationResponse { stations }));
-            }
+        if let Some(stations) = cache.get(&cache_key) {
+            let stations = stations.to_vec();
+            return Ok(Response::new(MultipleStationResponse {
+                stations: stations.into_iter().map(|station| station.into()).collect(),
+            }));
         };
 
         match self.query_use_case.get_stations_by_group_id(group_id).await {
