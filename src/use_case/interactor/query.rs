@@ -148,7 +148,6 @@ where
                     line.station = Some(station);
                 }
                 line.line_symbols = self.get_line_symbols(line);
-                line.company = companies.get(index).cloned();
 
                 lines_tmp.push(line.clone());
             }
