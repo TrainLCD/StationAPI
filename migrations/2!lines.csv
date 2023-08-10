@@ -408,7 +408,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99304,119,都営新宿線,トエイシンジュクセン,都営新宿線,Toei Shinjuku Line,都营新宿线,도에이 신주쿠선,#6CBB5A,3,S,,,#6CBB5A,,,ROUND,,,0,99304
 99305,119,都電荒川線,トデンアラカワセン,都営都電荒川線,Tokyo Sakura Tram(Toden Arakawa Line),都电荒川线,도덴 아라카와선,#B6007A,4,SA,,,#B6007A,,,REVERSED_ROUND,,,0,99305
 99342,119,日暮里・舎人ライナー,ニッポリ・トネリライナー,日暮里・舎人ライナー,Nippori-Toneri Liner,日暮里-舍人线,닛포리·도네리 라이너,#19681A,5,NT,,,#19681A,,,NTL,,,0,99305
-99306,120,秩父鉄道秩父本線,チチブテツドウチチブホンセン,秩父鉄道秩父本線,Chichibu Railway Chichibu Main Line,秩父铁道秩父本线,지치부 철도 지치부 본선,#5F67C8,2,CR,,,#0054A6,,,ROUND,,,0,99306
+99306,120,秩父鉄道秩父本線,チチブテツドウチチブホンセン,秩父鉄道秩父本線,Chichibu Railway Chichibu Main Line,秩父铁道秩父本线,지치부 철도 지치부 본선,#0054A6,2,CR,,,#0054A6,,,ROUND,,,0,99306
 99307,121,埼玉高速鉄道線,サイタマコウソクテツドウセン,埼玉高速鉄道線,Saitama Rapid Railway Line,埼玉高速铁道线,사이타마 고속 철도선,#3565AD,2,SR,,,#3565AD,,,ROUND,,,0,99307
 99308,122,いすみ線,イスミセン,いすみ鉄道いすみ線,Isumi Line,夷隅线,이스미선,#FFDC00,2,,,,,,,,,,0,99308
 99309,123,つくばエクスプレス,ツクバエクスプレス,首都圏新都市鉄道つくばエクスプレス,Tsukuba Express,筑波快线,쓰쿠바 익스프레스,#273E6C,2,TX,,,#273E6C,,,REVERSED_SQUARE,,,0,99309
