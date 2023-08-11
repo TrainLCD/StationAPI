@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use bigdecimal::{BigDecimal, ToPrimitive};
+use bigdecimal::{BigDecimal, ToPrimitive, Zero};
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::{
@@ -33,7 +33,9 @@ struct StationRow {
     close_ymd: String,
     e_status: u32,
     e_sort: u32,
+    #[sqlx(default)]
     pass: i64,
+    #[sqlx(default)]
     station_types_count: i64,
     // linesからJOIN
     pub company_cd: u32,
@@ -155,6 +157,14 @@ impl StationRepository for MyStationRepository {
         let mut conn: sqlx::pool::PoolConnection<MySql> = self.pool.acquire().await?;
         InternalStationRepository::get_by_station_group_id(station_group_id, &mut conn).await
     }
+    async fn get_by_station_group_id_vec(
+        &self,
+        station_group_id_vec: Vec<u32>,
+    ) -> Result<Vec<Station>, DomainError> {
+        let mut conn: sqlx::pool::PoolConnection<MySql> = self.pool.acquire().await?;
+        InternalStationRepository::get_by_station_group_id_vec(station_group_id_vec, &mut conn)
+            .await
+    }
 
     async fn get_by_station_group_and_line_id(
         &self,
@@ -213,7 +223,6 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            0 AS pass,
             (
               SELECT
                 COUNT(line_group_cd)
@@ -265,7 +274,6 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            0 AS pass,
             (
               SELECT
                 COUNT(line_group_cd)
@@ -310,7 +318,6 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            0 AS pass,
             (
               SELECT
                 COUNT(line_group_cd)
@@ -338,6 +345,56 @@ impl InternalStationRepository {
         Ok(stations)
     }
 
+    async fn get_by_station_group_id_vec(
+        group_id_vec: Vec<u32>,
+        conn: &mut MySqlConnection,
+    ) -> Result<Vec<Station>, DomainError> {
+        if group_id_vec.len().is_zero() {
+            return Ok(vec![]);
+        }
+
+        let params = format!("?{}", ", ?".repeat(group_id_vec.len() - 1));
+        let query_str = format!(
+            "SELECT l.*,
+            s.*,
+            COALESCE(a.line_name, l.line_name) AS line_name,
+            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+            (
+              SELECT
+                COUNT(line_group_cd)
+              FROM
+                station_station_types AS sst
+              WHERE
+                s.station_cd = sst.station_cd
+                AND sst.pass <> 1
+            ) AS station_types_count
+          FROM
+            (`stations` AS s, `lines` AS l)
+            LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+            LEFT OUTER JOIN `aliases` AS a ON a.id = la.alias_cd
+          WHERE
+            s.station_g_cd IN ( {} )
+            AND s.line_cd = l.line_cd
+            AND s.e_status = 0",
+            params
+        );
+
+        let mut query = sqlx::query_as::<_, StationRow>(&query_str);
+        for id in group_id_vec {
+            query = query.bind(id);
+        }
+
+        let rows = query.fetch_all(conn).await?;
+        let lines: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
+
+        Ok(lines)
+    }
+
     async fn get_by_station_group_and_line_id(
         station_group_id: u32,
         line_id: u32,
@@ -346,7 +403,6 @@ impl InternalStationRepository {
         let rows: Option<StationRow> = sqlx::query_as(
             "SELECT l.*,
             s.*,
-            0 AS pass,
             (
               SELECT
                 COUNT(line_group_cd)
@@ -396,7 +452,6 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            0 AS pass,
             ST_Distance(
               s.location,
               ST_GeomFromText(?)
@@ -447,7 +502,6 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            0 AS pass,
             (
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
@@ -505,7 +559,6 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            0 AS pass,
             (
               SELECT
                 COUNT(line_group_cd)

@@ -29,6 +29,10 @@ pub struct LineRow {
     pub line_symbol_extra_shape: Option<String>,
     pub e_status: u32,
     pub e_sort: u32,
+    #[sqlx(default)]
+    pub line_group_cd: Option<u32>,
+    #[sqlx(default)]
+    pub station_g_cd: Option<u32>,
 }
 
 impl From<LineRow> for Line {
@@ -59,6 +63,8 @@ impl From<LineRow> for Line {
             e_sort: row.e_sort,
             station: None,
             train_type: None,
+            line_group_cd: row.line_group_cd,
+            station_g_cd: row.station_g_cd,
         }
     }
 }
@@ -102,6 +108,13 @@ impl LineRepository for MyLineRepository {
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Line>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_line_group_id(line_group_id, &mut conn).await
+    }
+    async fn get_by_line_group_id_vec(
+        &self,
+        line_group_id_vec: Vec<u32>,
+    ) -> Result<Vec<Line>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalLineRepository::get_by_line_group_id_vec(line_group_id_vec, &mut conn).await
     }
 }
 
@@ -240,7 +253,8 @@ impl InternalLineRepository {
         let params = format!("?{}", ", ?".repeat(station_group_id_vec.len() - 1));
         let query_str = format!(
             "SELECT 
-            DISTINCT l.*,
+            l.*,
+            s.station_g_cd,
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -250,7 +264,7 @@ impl InternalLineRepository {
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             (
               SELECT 
-                COUNT(line_group_cd) 
+                COUNT(line_group_cd)
               FROM 
                 station_station_types AS sst 
               WHERE 
@@ -259,21 +273,18 @@ impl InternalLineRepository {
             ) AS station_types_count 
           FROM 
             (
-              `lines` AS l, `stations` AS s, `station_station_types` AS sst
+              `lines` AS l, `stations` AS s
             ) 
             LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
             LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id 
           WHERE 
-            s.station_g_cd IN ({}) 
+            s.station_g_cd IN ( {} ) 
             AND s.line_cd = l.line_cd 
             AND s.e_status = 0",
             params
         );
 
         let mut query = sqlx::query_as::<_, LineRow>(&query_str);
-        for id in &station_group_id_vec {
-            query = query.bind(id);
-        }
         for id in &station_group_id_vec {
             query = query.bind(id);
         }
@@ -291,6 +302,7 @@ impl InternalLineRepository {
         let rows: Vec<LineRow> = sqlx::query_as(
             "SELECT 
             DISTINCT l.*,
+            sst.line_group_cd,
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -314,6 +326,51 @@ impl InternalLineRepository {
         .fetch_all(conn)
         .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
+        Ok(lines)
+    }
+
+    async fn get_by_line_group_id_vec(
+        line_group_id_vec: Vec<u32>,
+        conn: &mut MySqlConnection,
+    ) -> Result<Vec<Line>, DomainError> {
+        if line_group_id_vec.len().is_zero() {
+            return Ok(vec![]);
+        }
+
+        let params = format!("?{}", ", ?".repeat(line_group_id_vec.len() - 1));
+        let query_str = format!(
+            "SELECT
+            DISTINCT l.*,
+            sst.line_group_cd,
+            COALESCE(a.line_name, l.line_name) AS line_name,
+            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
+          FROM
+            (
+              `lines` AS l, `stations` AS s, `station_station_types` AS sst
+            )
+            LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+            LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
+          WHERE
+            sst.line_group_cd IN ( {} )
+            AND sst.station_cd = s.station_cd
+            AND s.line_cd = l.line_cd
+            AND s.e_status = 0",
+            params
+        );
+
+        let mut query = sqlx::query_as::<_, LineRow>(&query_str);
+        for id in line_group_id_vec {
+            query = query.bind(id);
+        }
+
+        let rows = query.fetch_all(conn).await?;
+        let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
+
         Ok(lines)
     }
 }
