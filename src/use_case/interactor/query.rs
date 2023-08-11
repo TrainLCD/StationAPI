@@ -56,6 +56,27 @@ where
 
         Ok(stations)
     }
+    async fn get_stations_by_group_id_vec(
+        &self,
+        station_group_id_vec: Vec<u32>,
+    ) -> Result<Vec<Station>, UseCaseError> {
+        let stations = self
+            .station_repository
+            .get_by_station_group_id_vec(station_group_id_vec)
+            .await?;
+
+        Ok(stations)
+    }
+    async fn get_lines_by_station_group_id_vec(
+        &self,
+        station_group_id_vec: Vec<u32>,
+    ) -> Result<Vec<Line>, UseCaseError> {
+        let lines = self
+            .line_repository
+            .get_by_station_group_id_vec(station_group_id_vec)
+            .await?;
+        Ok(lines)
+    }
     async fn get_stations_by_coordinates(
         &self,
         latitude: f64,
@@ -110,50 +131,67 @@ where
 
     async fn update_station_vec_with_attributes(
         &self,
-        stations: &mut Vec<Station>,
+        stations_ref: &mut Vec<Station>,
     ) -> Result<(), UseCaseError> {
-        let company_ids = stations
+        let station_group_ids = stations_ref
+            .iter()
+            .map(|station| station.station_g_cd)
+            .collect::<Vec<u32>>();
+
+        let stations_by_group_ids = self
+            .get_stations_by_group_id_vec(station_group_ids.clone())
+            .await?;
+
+        let lines = self
+            .get_lines_by_station_group_id_vec(station_group_ids.clone())
+            .await?;
+
+        let company_ids = lines
             .iter()
             .map(|station| station.company_cd)
             .collect::<Vec<u32>>();
         let companies = self.find_company_by_id_vec(company_ids).await?;
 
-        for (index, station) in stations.iter_mut().enumerate() {
-            let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
-            station.station_numbers = station_numbers;
+        for station in stations_ref.iter_mut() {
             let mut line = self.extract_line_from_station(station);
             line.line_symbols = self.get_line_symbols(&line);
-            line.company = companies.get(index).cloned();
+            line.company = companies
+                .iter()
+                .find(|c| c.company_cd == line.company_cd)
+                .cloned();
             line.station = Some(station.clone());
-            station.station_numbers = self.get_station_numbers(station);
+
+            let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
+            station.station_numbers = station_numbers;
             station.line = Some(Box::new(line.clone()));
 
-            let mut lines = self
-                .get_lines_by_station_group_id(station.station_g_cd)
-                .await?;
-            let mut lines_tmp: Vec<Line> = Vec::with_capacity(lines.len());
-
-            let company_ids = lines.iter().map(|l| l.company_cd).collect::<Vec<u32>>();
-            let companies = self.find_company_by_id_vec(company_ids).await?;
-
-            for (index, line) in lines.iter_mut().enumerate() {
+            let mut lines: Vec<Line> = lines
+                .iter()
+                .cloned()
+                .filter(|l| l.station_g_cd.is_some())
+                .filter(|l| l.station_g_cd.unwrap() == station.station_g_cd)
+                .collect();
+            for line in lines.iter_mut() {
+                line.company = companies
+                    .iter()
+                    .find(|c| c.company_cd == line.company_cd)
+                    .cloned();
                 line.line_symbols = self.get_line_symbols(line);
-                line.company = companies.get(index).cloned();
-
-                if let Some(mut station) = self
-                    .station_repository
-                    .get_by_station_group_and_line_id(station.station_g_cd, line.line_cd)
-                    .await?
+                if let Some(station) = stations_by_group_ids
+                    .clone()
+                    .iter_mut()
+                    .filter(|s| s.line_cd == line.line_cd)
+                    .find(|s| s.station_g_cd == station.station_g_cd)
                 {
-                    let station_numbers: Vec<StationNumber> = self.get_station_numbers(&station);
+                    let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
                     station.station_numbers = station_numbers;
-                    line.station = Some(station);
+                    line.station = Some(station.clone());
                 }
-                line.line_symbols = self.get_line_symbols(line);
-
-                lines_tmp.push(line.clone());
             }
-            station.lines = lines_tmp;
+            let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
+            station.station_numbers = station_numbers;
+
+            station.lines = lines;
         }
 
         Ok(())
@@ -273,6 +311,7 @@ where
             station: None,
             train_type: None,
             line_group_cd: None,
+            station_g_cd: None,
         }
     }
 

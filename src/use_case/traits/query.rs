@@ -17,6 +17,10 @@ pub trait QueryUseCase: Send + Sync + 'static {
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Station>, UseCaseError>;
+    async fn get_stations_by_group_id_vec(
+        &self,
+        station_group_id_vec: Vec<u32>,
+    ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_coordinates(
         &self,
         latitude: f64,
@@ -40,6 +44,10 @@ pub trait QueryUseCase: Send + Sync + 'static {
     async fn get_lines_by_station_group_id(
         &self,
         station_group_id: u32,
+    ) -> Result<Vec<Line>, UseCaseError>;
+    async fn get_lines_by_station_group_id_vec(
+        &self,
+        station_group_id_vec: Vec<u32>,
     ) -> Result<Vec<Line>, UseCaseError>;
     fn get_station_numbers(&self, station: &Station) -> Vec<StationNumber>;
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol>;

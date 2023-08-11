@@ -31,6 +31,8 @@ pub struct LineRow {
     pub e_sort: u32,
     #[sqlx(default)]
     pub line_group_cd: Option<u32>,
+    #[sqlx(default)]
+    pub station_g_cd: Option<u32>,
 }
 
 impl From<LineRow> for Line {
@@ -62,6 +64,7 @@ impl From<LineRow> for Line {
             station: None,
             train_type: None,
             line_group_cd: row.line_group_cd,
+            station_g_cd: row.station_g_cd,
         }
     }
 }
@@ -250,7 +253,8 @@ impl InternalLineRepository {
         let params = format!("?{}", ", ?".repeat(station_group_id_vec.len() - 1));
         let query_str = format!(
             "SELECT 
-            DISTINCT l.*,
+            l.*,
+            s.station_g_cd,
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -260,7 +264,7 @@ impl InternalLineRepository {
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             (
               SELECT 
-                COUNT(line_group_cd) 
+                COUNT(line_group_cd)
               FROM 
                 station_station_types AS sst 
               WHERE 
@@ -269,21 +273,18 @@ impl InternalLineRepository {
             ) AS station_types_count 
           FROM 
             (
-              `lines` AS l, `stations` AS s, `station_station_types` AS sst
+              `lines` AS l, `stations` AS s
             ) 
             LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
             LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id 
           WHERE 
-            s.station_g_cd IN ({}) 
+            s.station_g_cd IN ( {} ) 
             AND s.line_cd = l.line_cd 
             AND s.e_status = 0",
             params
         );
 
         let mut query = sqlx::query_as::<_, LineRow>(&query_str);
-        for id in &station_group_id_vec {
-            query = query.bind(id);
-        }
         for id in &station_group_id_vec {
             query = query.bind(id);
         }
