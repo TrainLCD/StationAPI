@@ -33,7 +33,9 @@ struct StationRow {
     close_ymd: String,
     e_status: u32,
     e_sort: u32,
+    #[sqlx(default)]
     pass: i64,
+    #[sqlx(default)]
     station_types_count: i64,
     // linesからJOIN
     pub company_cd: u32,
@@ -213,7 +215,6 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            0 AS pass,
             (
               SELECT
                 COUNT(line_group_cd)
@@ -265,7 +266,6 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            0 AS pass,
             (
               SELECT
                 COUNT(line_group_cd)
@@ -310,7 +310,6 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            0 AS pass,
             (
               SELECT
                 COUNT(line_group_cd)
@@ -346,7 +345,6 @@ impl InternalStationRepository {
         let rows: Option<StationRow> = sqlx::query_as(
             "SELECT l.*,
             s.*,
-            0 AS pass,
             (
               SELECT
                 COUNT(line_group_cd)
@@ -396,7 +394,6 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            0 AS pass,
             ST_Distance(
               s.location,
               ST_GeomFromText(?)
@@ -447,7 +444,6 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            0 AS pass,
             (
                 SELECT COUNT(line_group_cd)
                 FROM station_station_types AS sst
@@ -505,7 +501,6 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            0 AS pass,
             (
               SELECT
                 COUNT(line_group_cd)

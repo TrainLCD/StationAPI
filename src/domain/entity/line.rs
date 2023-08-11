@@ -27,6 +27,7 @@ pub struct Line {
     pub e_sort: u32,
     pub station: Option<Station>,
     pub train_type: Option<TrainType>,
+    pub line_group_cd: Option<u32>,
 }
 
 impl Line {
@@ -57,6 +58,7 @@ impl Line {
         e_sort: u32,
         station: Option<Station>,
         train_type: Option<TrainType>,
+        line_group_cd: Option<u32>,
     ) -> Self {
         Self {
             line_cd,
@@ -84,6 +86,7 @@ impl Line {
             e_sort,
             station,
             train_type,
+            line_group_cd,
         }
     }
 }
