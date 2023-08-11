@@ -28,6 +28,7 @@ pub struct Line {
     pub station: Option<Station>,
     pub train_type: Option<TrainType>,
     pub line_group_cd: Option<u32>,
+    pub station_g_cd: Option<u32>,
 }
 
 impl Line {
@@ -59,6 +60,7 @@ impl Line {
         station: Option<Station>,
         train_type: Option<TrainType>,
         line_group_cd: Option<u32>,
+        station_g_cd: Option<u32>,
     ) -> Self {
         Self {
             line_cd,
@@ -87,6 +89,7 @@ impl Line {
             station,
             train_type,
             line_group_cd,
+            station_g_cd,
         }
     }
 }

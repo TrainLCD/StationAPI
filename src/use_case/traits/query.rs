@@ -17,6 +17,10 @@ pub trait QueryUseCase: Send + Sync + 'static {
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Station>, UseCaseError>;
+    async fn get_stations_by_group_id_vec(
+        &self,
+        station_group_id_vec: Vec<u32>,
+    ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_coordinates(
         &self,
         latitude: f64,

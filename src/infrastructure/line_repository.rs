@@ -31,6 +31,8 @@ pub struct LineRow {
     pub e_sort: u32,
     #[sqlx(default)]
     pub line_group_cd: Option<u32>,
+    #[sqlx(default)]
+    pub station_g_cd: Option<u32>,
 }
 
 impl From<LineRow> for Line {
@@ -62,6 +64,7 @@ impl From<LineRow> for Line {
             station: None,
             train_type: None,
             line_group_cd: row.line_group_cd,
+            station_g_cd: row.station_g_cd,
         }
     }
 }
@@ -250,7 +253,8 @@ impl InternalLineRepository {
         let params = format!("?{}", ", ?".repeat(station_group_id_vec.len() - 1));
         let query_str = format!(
             "SELECT 
-            DISTINCT l.*,
+            l.*,
+            s.station_g_cd,
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -260,7 +264,7 @@ impl InternalLineRepository {
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             (
               SELECT 
-                COUNT(line_group_cd) 
+                COUNT(line_group_cd)
               FROM 
                 station_station_types AS sst 
               WHERE 
