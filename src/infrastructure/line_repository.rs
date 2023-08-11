@@ -269,21 +269,18 @@ impl InternalLineRepository {
             ) AS station_types_count 
           FROM 
             (
-              `lines` AS l, `stations` AS s, `station_station_types` AS sst
+              `lines` AS l, `stations` AS s
             ) 
             LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
             LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id 
           WHERE 
-            s.station_g_cd IN ({}) 
+            s.station_g_cd IN ( {} ) 
             AND s.line_cd = l.line_cd 
             AND s.e_status = 0",
             params
         );
 
         let mut query = sqlx::query_as::<_, LineRow>(&query_str);
-        for id in &station_group_id_vec {
-            query = query.bind(id);
-        }
         for id in &station_group_id_vec {
             query = query.bind(id);
         }

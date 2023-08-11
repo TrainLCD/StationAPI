@@ -56,6 +56,16 @@ where
 
         Ok(stations)
     }
+    async fn get_lines_by_station_group_id_vec(
+        &self,
+        station_group_id_vec: Vec<u32>,
+    ) -> Result<Vec<Line>, UseCaseError> {
+        let lines = self
+            .line_repository
+            .get_by_station_group_id_vec(station_group_id_vec)
+            .await?;
+        Ok(lines)
+    }
     async fn get_stations_by_coordinates(
         &self,
         latitude: f64,
@@ -117,6 +127,13 @@ where
             .map(|station| station.company_cd)
             .collect::<Vec<u32>>();
         let companies = self.find_company_by_id_vec(company_ids).await?;
+        let station_group_ids = stations
+            .iter()
+            .map(|station| station.station_g_cd)
+            .collect::<Vec<u32>>();
+        let mut lines = self
+            .get_lines_by_station_group_id_vec(station_group_ids)
+            .await?;
 
         for (index, station) in stations.iter_mut().enumerate() {
             let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
@@ -128,9 +145,11 @@ where
             station.station_numbers = self.get_station_numbers(station);
             station.line = Some(Box::new(line.clone()));
 
-            let mut lines = self
-                .get_lines_by_station_group_id(station.station_g_cd)
-                .await?;
+            let mut lines: Vec<Line> = lines
+                .iter_mut()
+                .map(|l| l.clone())
+                .filter(|l| l.line_cd == line.line_cd)
+                .collect::<Vec<Line>>();
             let mut lines_tmp: Vec<Line> = Vec::with_capacity(lines.len());
 
             let company_ids = lines.iter().map(|l| l.company_cd).collect::<Vec<u32>>();
