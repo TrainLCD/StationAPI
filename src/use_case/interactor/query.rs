@@ -133,10 +133,12 @@ where
                 .await?;
             let mut lines_tmp: Vec<Line> = Vec::with_capacity(lines.len());
 
-            for line in lines.iter_mut() {
-                let companies = self.find_company_by_id_vec(vec![line.company_cd]).await?;
+            let company_ids = lines.iter().map(|l| l.company_cd).collect::<Vec<u32>>();
+            let companies = self.find_company_by_id_vec(company_ids).await?;
+
+            for (index, line) in lines.iter_mut().enumerate() {
                 line.line_symbols = self.get_line_symbols(line);
-                line.company = companies.get(0).cloned();
+                line.company = companies.get(index).cloned();
 
                 if let Some(mut station) = self
                     .station_repository
@@ -381,7 +383,13 @@ where
 
             tt.lines = lines;
             let line = self.line_repository.find_by_station_id(station_id).await?;
-            tt.line = line.map(Box::new);
+            let Some(mut line) = line else {
+                continue;
+            };
+            let line_companies = self.find_company_by_id_vec(vec![line.company_cd]).await?;
+            let line_company = line_companies.get(0).cloned();
+            line.company = line_company;
+            tt.line = Some(Box::new(line));
         }
 
         Ok(train_types)
