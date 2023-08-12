@@ -613,8 +613,8 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99919,238,高森線,タカモリセン,南阿蘇鉄道高森線,Takamori Line,,,#138068,2,,,,,,,,,,0,99919
 99920,239,湯前線,ユノマエセン,くま川鉄道湯前線,Yunomae Line,,,#153C36,2,,,,,,,,,,0,99920
 99921,240,肥薩おれんじ鉄道線,ヒサツオレンジテツドウセン,肥薩おれんじ鉄道線,Hisatsu Orange Railway,,,#FFA500,2,OR,,,#FFA500,,,ROUND,,,0,99921
-99922,241,熊本市電Ａ系統,クマモトシデンエーライン,熊本市電Ａ系統,Kumamoto City Tram Route A,,,#FF0000,4,A,,,#FF0000,,,SQUARE,,,0,99922
-99923,241,熊本市電Ｂ系統,クマモトシデンビーライン,熊本市電Ｂ系統,Kumamoto City Tram Route B,,,#0000FF,4,B,,,#0000FF,,,SQUARE,,,0,99923
+99922,241,熊本市電Ａ系統,クマモトシデンエーライン,熊本市電Ａ系統,Kumamoto City Tram Route A,,,#FF0000,4,A,,,#FF0000,,,REVERSED_SQUARE,,,0,99922
+99923,241,熊本市電Ｂ系統,クマモトシデンビーライン,熊本市電Ｂ系統,Kumamoto City Tram Route B,,,#0000FF,4,B,,,#0000FF,,,REVERSED_SQUARE,,,0,99923
 99925,242,鹿児島市電１系統,カゴシマシデンイチケイトウ,鹿児島市電１系統,Kagoshima City Tram Route 1,,,#4243BE,4,I,,,#4243BE,,,REVERSED_ROUND,,,0,99925
 99926,242,鹿児島市電２系統,カゴシマシデンニケイトウ,鹿児島市電２系統,Kagoshima City Tram Route 2,,,#EF1731,4,N,,,#EF1731,,,REVERSED_ROUND,,,0,99926
 99927,243,ゆいレール,ユイレール,沖縄都市モノレール線,Yui Rail,,,#CC0000,5,,,,,,,,,,0,99927
