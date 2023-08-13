@@ -492,7 +492,9 @@ impl InternalStationRepository {
         limit: Option<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let query_str: String = format!(
+        let station_name = format!("%{}%", station_name);
+
+        let rows = sqlx::query_as::<_, StationRow>(
             "SELECT l.*,
             s.*,
             COALESCE(a.line_name, l.line_name) AS line_name,
@@ -516,28 +518,27 @@ impl InternalStationRepository {
                     la.station_cd = s.station_cd
             LEFT OUTER JOIN `aliases` AS a
                 ON
-                    la.alias_cd = a.id                   
+                    la.alias_cd = a.id
             WHERE s.line_cd = l.line_cd
             AND (
-                station_name LIKE '%{}%'
-                OR station_name_r LIKE '%{}%'
-                OR station_name_k LIKE '%{}%'
-                OR station_name_zh LIKE '%{}%'
-                OR station_name_ko LIKE '%{}%'
+                station_name LIKE ?
+                OR station_name_r LIKE ?
+                OR station_name_k LIKE ?
+                OR station_name_zh LIKE ?
+                OR station_name_ko LIKE ?
         )
             AND s.e_status = 0
             ORDER BY s.e_sort, s.station_cd
-            LIMIT {}",
-            station_name,
-            station_name,
-            station_name,
-            station_name,
-            station_name,
-            limit.unwrap_or(DEFAULT_COLUMN_COUNT)
-        );
-        let rows = sqlx::query_as::<_, StationRow>(&query_str)
-            .fetch_all(conn)
-            .await?;
+            LIMIT ?",
+        )
+        .bind(&station_name)
+        .bind(&station_name)
+        .bind(&station_name)
+        .bind(&station_name)
+        .bind(&station_name)
+        .bind(limit.unwrap_or(DEFAULT_COLUMN_COUNT))
+        .fetch_all(conn)
+        .await?;
 
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
