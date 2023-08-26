@@ -274,9 +274,17 @@ where
                     line_symbol_shape: sym_shape,
                     station_number: station_number_string,
                 };
-
                 station_numbers.push(station_number);
+                return station_numbers;
             };
+
+            let station_number = StationNumber {
+                line_symbol: "".to_string(),
+                line_symbol_color: sym_color,
+                line_symbol_shape: sym_shape,
+                station_number: station_number.to_string(),
+            };
+            station_numbers.push(station_number);
         }
 
         station_numbers
