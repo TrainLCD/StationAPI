@@ -5,7 +5,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 COPY . .
 RUN cd ./sqlgen && cargo run ../migrations ../tmp.sql
-RUN SQLX_OFFLINE=true cargo build --release
+RUN cargo build --release
 
 FROM debian:bullseye-slim as runtime
 WORKDIR /app
