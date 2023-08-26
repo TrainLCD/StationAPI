@@ -370,7 +370,7 @@ where
         let mut line_symbols: Vec<LineSymbol> = Vec::with_capacity(line_symbols_raw.len());
 
         (0..line_symbols_raw.len()).for_each(|index| {
-            let Some(symbol) = line_symbols_raw[index] else{
+            let Some(symbol) = line_symbols_raw[index] else {
                 return;
             };
             let color = &line_symbol_colors_raw[index];
@@ -413,7 +413,7 @@ where
         let companies = self.company_repository.find_by_id_vec(company_ids).await?;
 
         let line = self.line_repository.find_by_station_id(station_id).await?;
-        let Some(mut line)= line else {
+        let Some(mut line) = line else {
             return Ok(vec![]);
         };
 
