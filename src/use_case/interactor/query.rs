@@ -227,7 +227,7 @@ where
         let line_symbol_primary = &station.line_symbol_primary;
         let line_symbol_secondary = &station.line_symbol_secondary;
         let line_symbol_extra = &station.line_symbol_extra;
-        let line_symbols_raw = vec![
+        let line_symbols_raw = [
             line_symbol_primary,
             line_symbol_secondary,
             line_symbol_extra,
@@ -319,7 +319,7 @@ where
         let line_symbol_primary = &line.line_symbol_primary;
         let line_symbol_secondary = &line.line_symbol_secondary;
         let line_symbol_extra = &line.line_symbol_extra;
-        let line_symbols_raw = vec![
+        let line_symbols_raw = [
             line_symbol_primary,
             line_symbol_secondary,
             line_symbol_extra,
