@@ -5,9 +5,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 COPY . .
 RUN cd ./sqlgen && cargo run ../migrations ../tmp.sql
-RUN SQLX_OFFLINE=true cargo build --release
+RUN cargo build --release
 
-FROM debian:bullseye-slim as runtime
+FROM ubuntu:22.04 as runtime
 WORKDIR /app
 RUN mkdir /app/scripts
 RUN mkdir /app/migrations
@@ -17,7 +17,7 @@ COPY --from=builder /app/scripts/migration.sh ./scripts
 COPY --from=builder /app/migrations/create_table.sql ./migrations
 COPY --from=builder /app/target/release/stationapi /usr/local/bin/stationapi
 RUN apt-get update && \
-    apt-get install -y --quiet default-mysql-client && \
+    apt-get install -y --quiet mysql-client && \
     rm -rf /var/lib/apt/lists/*
 
 ENV PORT 50051
