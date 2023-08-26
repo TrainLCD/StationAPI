@@ -227,7 +227,7 @@ where
         let line_symbol_primary = &station.line_symbol_primary;
         let line_symbol_secondary = &station.line_symbol_secondary;
         let line_symbol_extra = &station.line_symbol_extra;
-        let line_symbols_raw = vec![
+        let line_symbols_raw = [
             line_symbol_primary,
             line_symbol_secondary,
             line_symbol_extra,
@@ -274,9 +274,17 @@ where
                     line_symbol_shape: sym_shape,
                     station_number: station_number_string,
                 };
-
                 station_numbers.push(station_number);
+                return station_numbers;
             };
+
+            let station_number = StationNumber {
+                line_symbol: "".to_string(),
+                line_symbol_color: sym_color,
+                line_symbol_shape: sym_shape,
+                station_number: station_number.to_string(),
+            };
+            station_numbers.push(station_number);
         }
 
         station_numbers
@@ -319,7 +327,7 @@ where
         let line_symbol_primary = &line.line_symbol_primary;
         let line_symbol_secondary = &line.line_symbol_secondary;
         let line_symbol_extra = &line.line_symbol_extra;
-        let line_symbols_raw = vec![
+        let line_symbols_raw = [
             line_symbol_primary,
             line_symbol_secondary,
             line_symbol_extra,
@@ -370,7 +378,7 @@ where
         let mut line_symbols: Vec<LineSymbol> = Vec::with_capacity(line_symbols_raw.len());
 
         (0..line_symbols_raw.len()).for_each(|index| {
-            let Some(symbol) = line_symbols_raw[index] else{
+            let Some(symbol) = line_symbols_raw[index] else {
                 return;
             };
             let color = &line_symbol_colors_raw[index];
@@ -413,7 +421,7 @@ where
         let companies = self.company_repository.find_by_id_vec(company_ids).await?;
 
         let line = self.line_repository.find_by_station_id(station_id).await?;
-        let Some(mut line)= line else {
+        let Some(mut line) = line else {
             return Ok(vec![]);
         };
 
