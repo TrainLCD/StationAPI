@@ -210,10 +210,11 @@ where
     async fn get_stations_by_line_group_id(
         &self,
         line_group_id: u32,
+        include_all_stations: bool,
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut stations = self
             .station_repository
-            .get_by_line_group_id(line_group_id)
+            .get_by_line_group_id(line_group_id, include_all_stations)
             .await?;
 
         self.update_station_vec_with_attributes(&mut stations)

@@ -215,6 +215,7 @@ impl StationApi for GrpcRouter {
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let request_ref = request.get_ref();
         let query_line_group_id = request_ref.line_group_id;
+        let include_all_stations = request_ref.include_all_stations;
 
         let cache = self.station_list_cache.clone();
         let cache_key = format!("stations:line_group_id:{}", query_line_group_id);
@@ -227,7 +228,7 @@ impl StationApi for GrpcRouter {
 
         match self
             .query_use_case
-            .get_stations_by_line_group_id(query_line_group_id)
+            .get_stations_by_line_group_id(query_line_group_id, include_all_stations)
             .await
         {
             Ok(stations) => {
