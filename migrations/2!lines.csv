@@ -254,7 +254,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 22011,12,西武多摩湖線,セイブタマコセン,西武多摩湖線,Seibu Tamako Line,西武多摩湖线,세이부 다마코선,#FFA500,2,ST,,,#FFA500,,,HALF_SQUARE_DARK_TEXT,,,0,22011
 22012,12,西武多摩川線,セイブタマガワセン,西武多摩川線,Seibu Tamagawa Line,西武多摩川线,세이부 다마가와선,#F17900,2,SW,,,#F17900,,,HALF_SQUARE_DARK_TEXT,,,0,22012
 23001,13,京成本線,ケイセイホンセン,京成本線,Keisei Main Line,京成本线,게이세이 본선,#005AAA,2,KS,,,#005AAA,,,KEISEI,,,0,23001
-23002,13,京成押上線,ケイセイオシアゲセン,京成押上線,Keisei Oshiage Line,京成押上线,게이세이 오시아게선,#F172AC,2,KS,A,,#005AAA,#E85298,,KEISEI,ROUND,,0,23002
+23002,13,京成押上線,ケイセイオシアゲセン,京成押上線,Keisei Oshiage Line,京成押上线,게이세이 오시아게선,#005AAA,2,KS,A,,#005AAA,#E85298,,KEISEI,ROUND,,0,23002
 23003,13,京成金町線,ケイセイカナマチセン,京成金町線,Keisei Kanamachi Line,京成金町线,게이세이 가나마치선,#005AAA,2,KS,,,#005AAA,,,KEISEI,,,0,23003
 23004,13,京成千葉線,ケイセイチバセン,京成千葉線,Keisei Chiba Line,京成千叶线,게이세이 지바선,#AA5E51,2,KS,,,#005AAA,,,KEISEI,,,0,23004
 23005,13,京成千原線,ケイセイチハラセン,京成千原線,Keisei Chihara Line,京成千原线,게이세이 지하라선,#AA5E51,2,KS,,,#005AAA,,,KEISEI,,,0,23005
@@ -279,10 +279,10 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 26008,16,東急こどもの国線,トウキュウコドモノクニセン,東急こどもの国線,Tokyu Kodomonokuni Line,东急子供之国线,도큐 고도모노쿠니선,#0068B7,2,KD,,,#0068B7,,,REVERSED_SQUARE,,,0,26008
 26009,16,東急新横浜線,トウキュウシンヨコハマセン,東急新横浜線,Tokyu Shin-yokohama Line,东急新横滨线,도큐 신요코하마선,#890D84,2,SH,,,#890D84,,,REVERSED_SQUARE,,,0,26009
 27001,17,京急本線,ケイキュウホンセン,京急本線,Keikyu Main Line,京急本线,게이큐 본선,#00CCFF,2,KK,A,,#00CCFF,#E85298,,KEIKYU,,,0,27001
-27002,17,京急空港線,ケイキュウクウコウセン,京急空港線,Keikyu Airport Line,京急机场线,게이큐 공항선,#00A53D,2,KK,,,#00CCFF,,,KEIKYU,,,0,27002
-27003,17,京急大師線,ケイキュウダイシセン,京急大師線,Keikyu Daishi Line,京急大师线,게이큐 다이시선,#716F70,2,KK,,,#00CCFF,,,KEIKYU,,,0,27003
-27004,17,京急逗子線,ケイキュウズシセン,京急逗子線,Keikyu Zushi Line,京急逗子线,게이큐 즈시선,#716F70,2,KK,,,#00CCFF,,,KEIKYU,,,0,27004
-27005,17,京急久里浜線,ケイキュウクリハマセン,京急久里浜線,Keikyu Kurihama Line,京急久里滨线,게이큐 구리하마선,#716F70,2,KK,,,#00CCFF,,,KEIKYU,,,0,27005
+27002,17,京急空港線,ケイキュウクウコウセン,京急空港線,Keikyu Airport Line,京急机场线,게이큐 공항선,#00CCFF,2,KK,,,#00CCFF,,,KEIKYU,,,0,27002
+27003,17,京急大師線,ケイキュウダイシセン,京急大師線,Keikyu Daishi Line,京急大师线,게이큐 다이시선,#00CCFF,2,KK,,,#00CCFF,,,KEIKYU,,,0,27003
+27004,17,京急逗子線,ケイキュウズシセン,京急逗子線,Keikyu Zushi Line,京急逗子线,게이큐 즈시선,#00CCFF,2,KK,,,#00CCFF,,,KEIKYU,,,0,27004
+27005,17,京急久里浜線,ケイキュウクリハマセン,京急久里浜線,Keikyu Kurihama Line,京急久里滨线,게이큐 구리하마선,#00CCFF,2,KK,,,#00CCFF,,,KEIKYU,,,0,27005
 28001,18,東京メトロ銀座線,トウキョウメトロギンザセン,東京メトロ銀座線,Tokyo Metro Ginza Line,银座线,긴자선,#F39700,3,G,,,#F39700,,,ROUND,,,0,28001
 28002,18,東京メトロ丸ノ内線,トウキョウメトロマルノウチセン,東京メトロ丸ノ内線,Tokyo Metro Marunouchi Line,丸之内线,마루노우치선,#E60012,3,M,Mb,,#E60012,#E60012,,ROUND,ROUND,,0,28002
 28003,18,東京メトロ日比谷線,トウキョウメトロヒビヤセン,東京メトロ日比谷線,Tokyo Metro Hibiya Line,日比谷线,히비야선,#9CAEB7,3,H,,,#9CAEB7,,,ROUND,,,0,28003
