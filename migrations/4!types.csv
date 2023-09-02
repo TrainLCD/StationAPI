@@ -108,6 +108,8 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 233,草津・四万,クサツ・シマ,Kusatsu/Shima,草津・四万,구사쓰・시마,#008000,0,,COMPLETE
 234,湘南(新宿発着),ショウナン,Shōnan(for Shinjuku or Odawara),湘南,쇼난,#F68B1E,0,,COMPLETE
 235,湘南(東京発着),ショウナン,Shōnan(for Tokyo or Odawara),湘南,쇼난,#F68B1E,0,,COMPLETE
+236,SLぐんま 水上,SLグンマ ミナカミ,SL Gunma Minakami,SL群马 水上,SL군마 미나카미,#0D0C09,0,,COMPLETE
+237,SLぐんま 横川,SLグンマ ヨコカワ,SL Gunma Yokokawa,SL群马 横川,SL군마 요코카와,#0D0C09,0,,COMPLETE
 300,普通,フツウ,Local,慢车,보통,#1F63C6,0,,PARTIAL
 301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C7,0,,PARTIAL
 302,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,,PARTIAL
