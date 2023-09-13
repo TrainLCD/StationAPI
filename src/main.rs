@@ -21,6 +21,11 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     dotenv::from_filename(".env.local").ok();
 
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter
+        .set_serving::<StationApiServer<GrpcRouter>>()
+        .await;
+
     let addr = fetch_addr().unwrap();
 
     let db_url = fetch_database_url();
@@ -34,6 +39,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     Server::builder()
         .accept_http1(true)
+        .add_service(health_service)
         .add_service(tonic_web::enable(api_server))
         .serve(addr)
         .await?;
