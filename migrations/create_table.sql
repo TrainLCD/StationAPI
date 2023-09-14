@@ -169,7 +169,7 @@ CREATE TABLE `station_station_types` (
   KEY `line_group_cd` (`line_group_cd`),
   CONSTRAINT `station_station_types_ibfk_1` FOREIGN KEY (`station_cd`) REFERENCES `stations` (`station_cd`),
   CONSTRAINT `station_station_types_ibfk_2` FOREIGN KEY (`type_cd`) REFERENCES `types` (`type_cd`)
-) ENGINE=InnoDB AUTO_INCREMENT=14645 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
