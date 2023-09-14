@@ -454,7 +454,7 @@ impl InternalStationRepository {
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             ST_Distance(
               s.location,
-              ST_GeomFromText(?)
+              ST_GeomFromText(?, 4326)
             ) AS `distance`,
             (
               SELECT
@@ -477,7 +477,7 @@ impl InternalStationRepository {
           LIMIT
             ?",
         )
-        .bind(format!("POINT({} {})", longitude, latitude))
+        .bind(format!("POINT({} {})", latitude, longitude))
         .bind(limit.unwrap_or(DEFAULT_COLUMN_COUNT))
         .fetch_all(conn)
         .await?;
