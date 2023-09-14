@@ -218,6 +218,7 @@ CREATE TABLE `stations` (
   KEY `e_sort` (`e_sort`),
   KEY `station_g_cd_and_e_status` (`station_g_cd`,`e_status`),
   SPATIAL KEY `location` (`location`),
+  KEY `station_cd` (`station_cd`,`line_cd`,`e_status`),
   CONSTRAINT `stations_ibfk_1` FOREIGN KEY (`line_cd`) REFERENCES `lines` (`line_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -269,4 +270,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-08-05  9:37:26
+-- Dump completed on 2023-09-14 10:24:49
