@@ -452,10 +452,21 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            ST_Distance(
-              s.location,
-              ST_GeomFromText(?, 4326)
-            ) AS `distance`,
+            (
+              6371 * acos(
+                cos(
+                  radians(s.lat)
+                ) * cos(
+                  radians(?)
+                ) * cos(
+                  radians(?) - radians(s.lon)
+                ) + sin(
+                  radians(s.lat)
+                ) * sin(
+                  radians(?)
+                )
+              )
+            ) AS distance,
             (
               SELECT
                 COUNT(line_group_cd)
@@ -477,7 +488,9 @@ impl InternalStationRepository {
           LIMIT
             ?",
         )
-        .bind(format!("POINT({} {})", latitude, longitude))
+        .bind(latitude)
+        .bind(longitude)
+        .bind(latitude)
         .bind(limit.unwrap_or(DEFAULT_COLUMN_COUNT))
         .fetch_all(conn)
         .await?;
