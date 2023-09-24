@@ -474,7 +474,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99419,167,えちぜん鉄道勝山永平寺線,エチゼンテツドウカツヤマエイヘイジセン,えちぜん鉄道勝山永平寺線,Echizen Railway Katsuyama Eiheiji Line,,,#FD6802,2,E,,,,,,,,,0,99419
 99420,167,えちぜん鉄道三国芦原線,エチゼンテツドウミクニアワラセン,えちぜん鉄道三国芦原線,Echizen Railway Mikuni Ashihara Line,,,#0069FF,2,E,,,,,,,,,0,99420
 99421,168,福井鉄道福武線,フクイテツドウフクブセン,福井鉄道福武線,Fukui Railway Fukutake Line,,,#197A3D,4,,,,,,,,,,0,99421
-99501,169,伊豆急行線,イズキュウコウセン,伊豆急行線,Izu Kyuko Line,,,#0085CD,2,,,,,,,,,,0,99501
+99501,169,伊豆急行線,イズキュウコウセン,伊豆急行線,Izu Kyuko Line,,,#0085CD,2,IZ,,,#000000,,,SQUARE,,,0,99501
 99502,128,伊豆箱根鉄道駿豆線,イズハコネテツドウスンズセン,伊豆箱根鉄道駿豆線,Izuhakone Railway Sunzu Line,,,#08746F,2,,,,,,,,,,0,99502
 99503,170,岳南鉄道線,ガクナンテツドウセン,岳南鉄道線,Gakunan Railway Line,,,#6B0102,2,GD,,,,,,,,,0,99503
 99504,171,静岡鉄道静岡清水線,シズオカテツドウシズオカシミズセン,静岡鉄道静岡清水線,Shizuoka Railway Shizuoka Shimizu Line,,,#0063B5,2,S,,,,,,,,,0,99504
