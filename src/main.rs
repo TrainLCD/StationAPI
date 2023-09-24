@@ -7,7 +7,6 @@ use sqlx::MySqlPool;
 use stationapi::{
     pb::station_api_server::StationApiServer, presentation::controller::grpc::GrpcRouter,
 };
-use tonic::codec::CompressionEncoding;
 use tonic::transport::Server;
 use tracing::info;
 
@@ -21,26 +20,16 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     dotenv::from_filename(".env.local").ok();
 
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-    health_reporter
-        .set_serving::<StationApiServer<GrpcRouter>>()
-        .await;
-
     let addr = fetch_addr().unwrap();
 
     let db_url = fetch_database_url();
     let pool = MySqlPool::connect(db_url.as_str()).await?;
     let api_server = GrpcRouter::new(pool);
-    let api_server = StationApiServer::new(api_server)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
 
     info!("StationAPI Server listening on {}", addr);
 
     Server::builder()
-        .accept_http1(true)
-        .add_service(health_service)
-        .add_service(tonic_web::enable(api_server))
+        .add_service(StationApiServer::new(api_server))
         .serve(addr)
         .await?;
 
