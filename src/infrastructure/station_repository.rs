@@ -505,7 +505,7 @@ impl InternalStationRepository {
         limit: Option<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let station_name = format!("%{}%", station_name);
+        let station_name = format!("{}%", station_name);
 
         let rows = sqlx::query_as::<_, StationRow>(
             "SELECT l.*,
