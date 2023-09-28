@@ -13,7 +13,7 @@ pub struct LineRow {
     pub line_name: String,
     pub line_name_k: String,
     pub line_name_h: String,
-    pub line_name_r: String,
+    pub line_name_r: Option<String>,
     pub line_name_zh: Option<String>,
     pub line_name_ko: Option<String>,
     pub line_color_c: String,
