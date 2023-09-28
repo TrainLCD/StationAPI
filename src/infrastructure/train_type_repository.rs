@@ -14,9 +14,9 @@ pub struct TrainTypeRow {
     pass: u32,
     type_name: String,
     type_name_k: String,
-    type_name_r: String,
-    type_name_zh: String,
-    type_name_ko: String,
+    type_name_r: Option<String>,
+    type_name_zh: Option<String>,
+    type_name_ko: Option<String>,
     color: String,
     direction: u32,
 }
