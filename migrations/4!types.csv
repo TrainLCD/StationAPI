@@ -149,7 +149,7 @@ Yokokawa","SL群马
 330,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,,COMPLETE
 331,快速特急,カイソクトッキュウ,Limited Express,快速特快,쾌속특쾌,#049C5E,0,,COMPLETE
 332,アクセス特急,アクセストッキュウ,Access Express,访问特快,액세스 특급,#ED7D00,0,,PARTIAL
-333,準急,ジュンキュウ,Semi Rapid,准急,준급,#2A9B50,0,堺筋準急,PARTIAL
+333,準急,ジュンキュウ,Semi-Express,准急,준급,#2A9B50,0,堺筋準急,PARTIAL
 334,直通特急,チョクツウトッキュウ,Limited Express,直通特急,직통특급,#DD2E1E,0,山陽電車,COMPLETE
 335,区間快速,クカンカイソク,Semi Rapid,区间快速,구간쾌속,#000084,0,TX用,COMPLETE
 336,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#FFA500,0,,COMPLETE
