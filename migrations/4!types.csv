@@ -133,7 +133,7 @@ Yokokawa","SL群马
 313,特急(泉岳寺〜浦賀),トッキュウ,Limited Express(Sengakuji to Uraga),特快,특급,#EA0104,0,,PARTIAL
 314,通勤急行,ツウキンキュウコウ,Commuter Express,通勤快车,통근급행,#EEAA66,0,,PARTIAL
 315,準急,ジュンキュウ,Semi Express,准急,준급,#2EAB8D,0,,PARTIAL
-316,S-TRAIN,エストレイン,S-TRAIN,S-TRAIN,S-TRAIN,#8EC21F,0,,PARTIAL
+316,S-TRAIN(平日運行),エストレイン,S-TRAIN(Weekday),S-TRAIN,S-TRAIN,#8EC21F,0,,COMPLETE
 317,通勤特急,ツウキントッキュウ,Commuter Express,通勤特快,통근특급,#DC143C,0,,PARTIAL
 318,区間準急,クカンジュンキュウ,Section Semi Express,区间准急,구간준급,#00FF00,0,,PARTIAL
 319,区間急行,クカンキュウコウ,Section Express,区间快速,구간급행,#FF99FF,0,,PARTIAL
@@ -155,6 +155,7 @@ Yokokawa","SL群马
 336,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#FFA500,0,,COMPLETE
 337,準特急,ジュントッキュウ,Semi-Limited Express,准特急,준특급,#FF6E00,0,,COMPLETE
 338,区間急行,クカンキュウコウ,Sub Express,区间快速,구간급행,#009A41,0,南海電車用,COMPLETE
+339,S-TRAIN(土休日運行),エストレイン,S-TRAIN(Holiday),S-TRAIN,S-TRAIN,#8EC21F,0,,COMPLETE
 400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,,COMPLETE
 401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,,COMPLETE
 402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,,COMPLETE
