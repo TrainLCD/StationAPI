@@ -498,7 +498,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99522,181,豊橋鉄道運動公園前線,トヨハシテツドウウンドウコウエンマエセン,豊橋鉄道運動公園前線,Toyohashi Railroad Yagyu-bashi Branch Line,,,#1A9B96,4,,,,,,,,,,2,99522
 99523,182,ゆとりーとライン,ユトリートライン,ガイドウェイバス志段味線,Yutorito Line,,,#3C459A,5,Y,,,#3C459A,,,ROUND,,,0,99523
 99524,183,明知鉄道明知線,アケチテツドウアケチセン,明知鉄道明知線,Akechi Railway Akechi Line,,,#EFEFEF,2,,,,,,,,,,0,99524
-99525,184,長良川鉄道越美南線,ナガラガワテツドウエツミナンセン,長良川鉄道越美南線,Nagaragawa Railway Etsumi-Nan Line,,,#FF1493,2,,,,,,,,,,0,99525
+99525,184,長良川鉄道越美南線,ナガラガワテツドウエツミナンセン,長良川鉄道越美南線,Nagaragawa Railway Etsumi-Nan Line,,,#FF1493,2,,,,#1C4A9A,,,REVERSED_ROUND,,,0,99525
 99526,185,樽見鉄道樽見線,タルミテツドウタルミセン,樽見鉄道樽見線,Tarumi Railway Tarumi Line,,,#097AD6,2,TR,,,,,,,,,0,99526
 99528,186,三岐鉄道三岐線,サンギテツドウサンギセン,三岐鉄道三岐線,Sangi Railway Sanki Line,,,#0D287C,2,,,,,,,,,,0,99528
 99529,186,三岐鉄道北勢線,サンギテツドウホクセイセン,三岐鉄道北勢線,Sangi Railway Hokusei Line,,,#0D287C,2,,,,,,,,,,0,99529
