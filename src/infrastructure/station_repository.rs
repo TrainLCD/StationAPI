@@ -34,8 +34,6 @@ struct StationRow {
     e_status: u32,
     e_sort: u32,
     #[sqlx(default)]
-    pass: i64,
-    #[sqlx(default)]
     station_types_count: i64,
     // linesからJOIN
     pub company_cd: u32,
@@ -56,11 +54,33 @@ struct StationRow {
     pub line_symbol_primary_shape: Option<String>,
     pub line_symbol_secondary_shape: Option<String>,
     pub line_symbol_extra_shape: Option<String>,
+    // station_station_typesからJOIN
+    #[sqlx(default)]
+    pub type_cd: Option<u32>,
+    #[sqlx(default)]
+    pub line_group_cd: Option<u32>,
+    #[sqlx(default)]
+    pub pass: Option<u32>,
+    // typesからJOIN
+    #[sqlx(default)]
+    pub type_name: Option<String>,
+    #[sqlx(default)]
+    pub type_name_k: Option<String>,
+    #[sqlx(default)]
+    pub type_name_r: Option<String>,
+    #[sqlx(default)]
+    pub type_name_zh: Option<String>,
+    #[sqlx(default)]
+    pub type_name_ko: Option<String>,
+    #[sqlx(default)]
+    pub color: Option<String>,
+    #[sqlx(default)]
+    pub direction: Option<u32>,
 }
 
 impl From<StationRow> for Station {
     fn from(row: StationRow) -> Self {
-        let stop_condition = match row.pass {
+        let stop_condition = match row.pass.unwrap_or(0) {
             0 => StopCondition::All,
             1 => StopCondition::Not,
             2 => StopCondition::Partial,
@@ -123,6 +143,16 @@ impl From<StationRow> for Station {
             line_symbol_primary_shape: row.line_symbol_primary_shape,
             line_symbol_secondary_shape: row.line_symbol_secondary_shape,
             line_symbol_extra_shape: row.line_symbol_extra_shape,
+            type_cd: row.type_cd,
+            line_group_cd: row.line_group_cd,
+            pass: row.pass,
+            type_name: row.type_name,
+            type_name_k: row.type_name_k,
+            type_name_r: row.type_name_r,
+            type_name_zh: row.type_name_zh,
+            type_name_ko: row.type_name_ko,
+            color: row.color,
+            direction: row.direction,
         }
     }
 }
@@ -316,6 +346,7 @@ impl InternalStationRepository {
                   s.e_sort,
                   s.station_cd",
         )
+        .bind(line_id)
         .bind(line_id)
         .fetch_all(conn)
         .await?;
@@ -606,6 +637,8 @@ impl InternalStationRepository {
             "SELECT
             DISTINCT l.*,
             s.*,
+            sst.id AS sst_cd,
+            sst.pass,
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -621,8 +654,7 @@ impl InternalStationRepository {
               WHERE
                 s.station_cd = sst.station_cd
                 AND sst.pass <> 1
-            ) AS station_types_count,
-            CONVERT(sst.pass, SIGNED) AS pass
+            ) AS station_types_count
           FROM
             (
               `lines` AS l, `stations` AS s, `station_station_types` AS sst

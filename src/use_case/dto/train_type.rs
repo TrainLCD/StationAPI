@@ -3,7 +3,7 @@ use crate::{domain::entity::train_type::TrainType, pb::TrainType as GrpcTrainTyp
 impl From<TrainType> for GrpcTrainType {
     fn from(train_type: TrainType) -> Self {
         let TrainType {
-            id,
+            sst_cd,
             station_cd: _,
             type_cd,
             line_group_cd,
@@ -19,7 +19,7 @@ impl From<TrainType> for GrpcTrainType {
             lines,
         } = train_type;
         Self {
-            id,
+            id: sst_cd,
             type_id: type_cd,
             group_id: line_group_cd,
             name: type_name,
