@@ -11,8 +11,8 @@ use crate::{
         station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
     },
     pb::{
-        station_api_server::StationApi, GetStationByCoordinatesRequest, GetStationByGroupIdRequest,
-        GetStationByIdRequest, GetStationByLineIdRequest, GetStationsByLineGroupIdRequest,
+        station_api_server::StationApi, GetStationByIdRequest, GetStationsByCoordinatesRequest,
+        GetStationsByGroupIdRequest, GetStationsByLineGroupIdRequest, GetStationsByLineIdRequest,
         GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleStationResponse,
         MultipleTrainTypeResponse, SingleStationResponse, Station as PbStation,
         TrainType as PbTrainType,
@@ -101,7 +101,7 @@ impl StationApi for GrpcRouter {
     }
     async fn get_stations_by_group_id(
         &self,
-        request: tonic::Request<GetStationByGroupIdRequest>,
+        request: tonic::Request<GetStationsByGroupIdRequest>,
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let group_id = request.get_ref().group_id;
 
@@ -127,9 +127,9 @@ impl StationApi for GrpcRouter {
     }
     async fn get_stations_by_coordinates(
         &self,
-        request: tonic::Request<GetStationByCoordinatesRequest>,
+        request: tonic::Request<GetStationsByCoordinatesRequest>,
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
-        let request_ref: &GetStationByCoordinatesRequest = request.get_ref();
+        let request_ref: &GetStationsByCoordinatesRequest = request.get_ref();
         let latitude = request_ref.latitude;
         let longitude = request_ref.longitude;
         let limit = request_ref.limit;
@@ -148,7 +148,7 @@ impl StationApi for GrpcRouter {
     }
     async fn get_stations_by_line_id(
         &self,
-        request: tonic::Request<GetStationByLineIdRequest>,
+        request: tonic::Request<GetStationsByLineIdRequest>,
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let line_id = request.get_ref().line_id;
 
