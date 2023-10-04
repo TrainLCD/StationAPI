@@ -7,7 +7,7 @@ use sqlx::{MySql, MySqlConnection, Pool};
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct TrainTypeRow {
-    id: u32,
+    sst_cd: u32,
     station_cd: u32,
     type_cd: u32,
     line_group_cd: u32,
@@ -24,7 +24,7 @@ pub struct TrainTypeRow {
 impl From<TrainTypeRow> for TrainType {
     fn from(row: TrainTypeRow) -> Self {
         let TrainTypeRow {
-            id,
+            sst_cd,
             station_cd,
             type_cd,
             line_group_cd,
@@ -38,7 +38,7 @@ impl From<TrainTypeRow> for TrainType {
             direction,
         } = row;
         Self {
-            id,
+            sst_cd,
             station_cd,
             type_cd,
             line_group_cd,
@@ -107,7 +107,8 @@ impl InternalTrainTypeRepository {
         let rows: Vec<TrainTypeRow> = sqlx::query_as(
             "SELECT 
             t.*, 
-            sst.* 
+            sst.*,
+            sst.id AS sst_cd
           FROM 
             types as t, 
             station_station_types as sst 
@@ -129,7 +130,8 @@ impl InternalTrainTypeRepository {
         let rows: Vec<TrainTypeRow> = sqlx::query_as(
             "SELECT 
             t.*, 
-            sst.* 
+            sst.*,
+            sst.id AS sst_cd
           FROM 
             station_station_types as sst, 
             stations as s, 
@@ -156,7 +158,8 @@ impl InternalTrainTypeRepository {
         let rows: Option<TrainTypeRow> = sqlx::query_as(
             "SELECT 
             t.*, 
-            sst.* 
+            sst.*,
+            sst.id AS sst_cd
           FROM 
             types as t, 
             station_station_types as sst 
