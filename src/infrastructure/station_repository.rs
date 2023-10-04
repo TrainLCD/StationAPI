@@ -225,7 +225,7 @@ impl InternalStationRepository {
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             (
               SELECT
-                COUNT(line_group_cd)
+                COUNT(sst.line_group_cd) 
               FROM
                 station_station_types AS sst
               WHERE
@@ -341,7 +341,7 @@ impl InternalStationRepository {
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             (
               SELECT
-                COUNT(line_group_cd)
+                COUNT(sst.line_group_cd) 
               FROM
                 station_station_types AS sst
               WHERE
@@ -387,7 +387,7 @@ impl InternalStationRepository {
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             (
               SELECT
-                COUNT(line_group_cd)
+                COUNT(sst.line_group_cd) 
               FROM
                 station_station_types AS sst
               WHERE
@@ -426,7 +426,7 @@ impl InternalStationRepository {
             s.*,
             (
               SELECT
-                COUNT(line_group_cd)
+                COUNT(sst.line_group_cd) 
               FROM
                 station_station_types AS sst
               WHERE
@@ -490,7 +490,7 @@ impl InternalStationRepository {
             ) AS distance,
             (
               SELECT
-                COUNT(line_group_cd)
+                COUNT(sst.line_group_cd) 
               FROM
                 station_station_types AS sst
               WHERE
@@ -615,7 +615,7 @@ impl InternalStationRepository {
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             (
               SELECT
-                COUNT(line_group_cd)
+                COUNT(sst.line_group_cd) 
               FROM
                 `station_station_types` AS sst
               WHERE
