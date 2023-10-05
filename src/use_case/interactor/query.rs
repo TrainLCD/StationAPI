@@ -337,14 +337,9 @@ where
             Some(ref color) => color.to_string(),
             None => line.line_color_c.to_string(),
         };
-        let line_symbol_secondary_color = line
-            .line_symbol_secondary_color
-            .clone()
-            .unwrap_or(String::new());
-        let line_symbol_extra_color = line
-            .line_symbol_extra_color
-            .clone()
-            .unwrap_or(String::new());
+        let line_symbol_secondary_color =
+            line.line_symbol_secondary_color.clone().unwrap_or_default();
+        let line_symbol_extra_color = line.line_symbol_extra_color.clone().unwrap_or_default();
 
         let line_symbol_colors_raw: Vec<String> = vec![
             line_symbol_primary_color,
@@ -352,18 +347,10 @@ where
             line_symbol_extra_color,
         ];
 
-        let line_symbol_primary_shape = line
-            .line_symbol_primary_shape
-            .clone()
-            .unwrap_or(String::new());
-        let line_symbol_secondary_shape = line
-            .line_symbol_secondary_shape
-            .clone()
-            .unwrap_or(String::new());
-        let line_symbol_extra_shape = line
-            .line_symbol_extra_shape
-            .clone()
-            .unwrap_or(String::new());
+        let line_symbol_primary_shape = line.line_symbol_primary_shape.clone().unwrap_or_default();
+        let line_symbol_secondary_shape =
+            line.line_symbol_secondary_shape.clone().unwrap_or_default();
+        let line_symbol_extra_shape = line.line_symbol_extra_shape.clone().unwrap_or_default();
 
         let line_symbols_shape_raw = vec![
             line_symbol_primary_shape,
