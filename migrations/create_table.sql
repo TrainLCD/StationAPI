@@ -1,3 +1,5 @@
+BEGIN;
+
 -- MySQL dump 10.13  Distrib 8.1.0, for macos13 (arm64)
 --
 -- Host: localhost    Database: stationapi
@@ -24,25 +26,16 @@ DROP TABLE IF EXISTS `aliases`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `aliases` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `line_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_name_k` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_name_h` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_name_r` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_name_zh` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_name_ko` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_color_c` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_name_k` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_name_h` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_name_r` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_name_zh` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_name_ko` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_color_c` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `aliases`
---
-
-LOCK TABLES `aliases` WRITE;
-/*!40000 ALTER TABLE `aliases` DISABLE KEYS */;
-/*!40000 ALTER TABLE `aliases` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `companies`
@@ -60,22 +53,13 @@ CREATE TABLE `companies` (
   `company_name_r` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `company_name_en` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `company_name_full_en` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `company_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `company_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `company_type` int unsigned NOT NULL,
   `e_status` int unsigned NOT NULL,
   `e_sort` int unsigned NOT NULL,
   PRIMARY KEY (`company_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `companies`
---
-
-LOCK TABLES `companies` WRITE;
-/*!40000 ALTER TABLE `companies` DISABLE KEYS */;
-/*!40000 ALTER TABLE `companies` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `line_aliases`
@@ -96,14 +80,6 @@ CREATE TABLE `line_aliases` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
---
--- Dumping data for table `line_aliases`
---
-
-LOCK TABLES `line_aliases` WRITE;
-/*!40000 ALTER TABLE `line_aliases` DISABLE KEYS */;
-/*!40000 ALTER TABLE `line_aliases` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `lines`
@@ -119,19 +95,19 @@ CREATE TABLE `lines` (
   `line_name_k` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `line_name_h` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `line_name_r` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `line_name_zh` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_name_ko` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_name_zh` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_name_ko` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `line_color_c` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `line_type` int unsigned NOT NULL,
-  `line_symbol_primary` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_symbol_secondary` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_symbol_extra` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_symbol_primary_color` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_symbol_secondary_color` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_symbol_extra_color` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_symbol_primary_shape` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_symbol_secondary_shape` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `line_symbol_extra_shape` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `line_symbol_primary` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_symbol_secondary` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_symbol_extra` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_symbol_primary_color` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_symbol_secondary_color` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_symbol_extra_color` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_symbol_primary_shape` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_symbol_secondary_shape` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `line_symbol_extra_shape` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `e_status` int unsigned NOT NULL,
   `e_sort` int unsigned NOT NULL,
   PRIMARY KEY (`line_cd`),
@@ -140,15 +116,6 @@ CREATE TABLE `lines` (
   CONSTRAINT `lines_ibfk_1` FOREIGN KEY (`company_cd`) REFERENCES `companies` (`company_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `lines`
---
-
-LOCK TABLES `lines` WRITE;
-/*!40000 ALTER TABLE `lines` DISABLE KEYS */;
-/*!40000 ALTER TABLE `lines` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `station_station_types`
@@ -172,14 +139,6 @@ CREATE TABLE `station_station_types` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
---
--- Dumping data for table `station_station_types`
---
-
-LOCK TABLES `station_station_types` WRITE;
-/*!40000 ALTER TABLE `station_station_types` DISABLE KEYS */;
-/*!40000 ALTER TABLE `station_station_types` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `stations`
@@ -193,13 +152,13 @@ CREATE TABLE `stations` (
   `station_g_cd` int unsigned NOT NULL,
   `station_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `station_name_k` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `station_name_r` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `station_name_zh` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `station_name_ko` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `primary_station_number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `secondary_station_number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `extra_station_number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `three_letter_code` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `station_name_r` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `station_name_zh` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `station_name_ko` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `primary_station_number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `secondary_station_number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `extra_station_number` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `three_letter_code` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `line_cd` int unsigned NOT NULL,
   `pref_cd` int unsigned NOT NULL,
   `post` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -222,15 +181,6 @@ CREATE TABLE `stations` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `stations`
---
-
-LOCK TABLES `stations` WRITE;
-/*!40000 ALTER TABLE `stations` DISABLE KEYS */;
-/*!40000 ALTER TABLE `stations` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
 -- Table structure for table `types`
 --
 
@@ -250,15 +200,6 @@ CREATE TABLE `types` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
---
--- Dumping data for table `types`
---
-
-LOCK TABLES `types` WRITE;
-/*!40000 ALTER TABLE `types` DISABLE KEYS */;
-/*!40000 ALTER TABLE `types` ENABLE KEYS */;
-UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
@@ -268,4 +209,6 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-09-14 10:24:49
+-- Dump completed on 2023-10-06  9:53:34
+
+COMMIT;
