@@ -295,27 +295,27 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 29001,19,相鉄本線,ソウテツホンセン,相鉄本線,Sotetsu Main Line,相铁本线,소테쓰 본선,#000080,2,SO,,,#0967B4,,,REVERSED_SQUARE,,,0,29001
 29002,19,相鉄いずみ野線,ソウテツイズミノセン,相鉄いずみ野線,Sotetsu Izumino Line,相铁泉野线,소테쓰 이즈미노선,#000080,2,SO,,,#0967B4,,,REVERSED_SQUARE,,,0,29002
 29003,19,相鉄・JR直通線,ソウテツ・ジェイアールチョクツウセン,相鉄・JR直通線,Sotetsu-JR Link Line,相铁·JR直通线,소테츠·JR직통선,#000080,2,SO,JS,JA,#0967B4,#E31F26,#00B48D,REVERSED_SQUARE,SQUARE,SQUARE,0,29003
-30001,20,名鉄名古屋本線,メイテツナゴヤホンセン,名鉄名古屋本線,Meitetsu Nagoya Main Line,名古屋本线,나고야 본선,#FF0000,2,NH,,,#D12027,,,HALF_SQUARE,,,0,30001
-30002,20,名鉄豊川線,メイテツトヨカワセン,名鉄豊川線,Meitetsu Toyokawa Line,丰川线,도요카와 선,#FF0000,2,TK,NH,,#D12027,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30002
-30003,20,名鉄西尾線,メイテツニシオセン,名鉄西尾線,Meitetsu Nishio Line,西尾线,니시오 선,#339999,2,GN,NH,,#654E9E,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30003
-30004,20,名鉄蒲郡線,メイテツガマゴオリセン,名鉄蒲郡線,Meitetsu Gamagori Line,蒲郡线,가마고리 선,#339999,2,GN,NH,,#654E9E,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30004
-30005,20,名鉄三河線,メイテツミカワセン,名鉄三河線,Meitetsu Mikawa Line,三河线,미카와 선,#000066,2,MY,NH,MU,#9EB03A,#D12027,#654E9E,HALF_SQUARE,HALF_SQUARE,HALF_SQUARE,0,30005
-30006,20,名鉄豊田線,メイテツトヨタセン,名鉄豊田線,Meitetsu Toyota Line,丰田线,도요타 선,#00FF00,2,TT,MY,,#9EB03A,#9EB03A,,HALF_SQUARE,HALF_SQUARE,,0,30006
-30007,20,名鉄空港線,メイテツクウコウセン,名鉄空港線,Meitetsu Airport Line,机场线,쿠코 선,#0033FF,2,TA,NH,,#1065AB,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30007
-30008,20,名鉄常滑線,メイテツトコナメセン,名鉄常滑線,Meitetsu Tokoname Line,常滑线,도코나메 선,#0033FF,2,TA,NH,,#1065AB,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30008
+30001,20,名鉄名古屋本線,メイテツナゴヤホンセン,名鉄名古屋本線,Meitetsu Nagoya Main Line,名古屋本线,나고야 본선,#D12027,2,NH,,,#D12027,,,HALF_SQUARE,,,0,30001
+30002,20,名鉄豊川線,メイテツトヨカワセン,名鉄豊川線,Meitetsu Toyokawa Line,丰川线,도요카와 선,#D12027,2,TK,NH,,#D12027,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30002
+30003,20,名鉄西尾線,メイテツニシオセン,名鉄西尾線,Meitetsu Nishio Line,西尾线,니시오 선,#654E9E,2,GN,NH,,#654E9E,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30003
+30004,20,名鉄蒲郡線,メイテツガマゴオリセン,名鉄蒲郡線,Meitetsu Gamagori Line,蒲郡线,가마고리 선,#654E9E,2,GN,NH,,#654E9E,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30004
+30005,20,名鉄三河線,メイテツミカワセン,名鉄三河線,Meitetsu Mikawa Line,三河线,미카와 선,#9EB03A,2,MY,NH,MU,#9EB03A,#D12027,#654E9E,HALF_SQUARE,HALF_SQUARE,HALF_SQUARE,0,30005
+30006,20,名鉄豊田線,メイテツトヨタセン,名鉄豊田線,Meitetsu Toyota Line,丰田线,도요타 선,#9EB03A,2,TT,MY,,#9EB03A,#9EB03A,,HALF_SQUARE,HALF_SQUARE,,0,30006
+30007,20,名鉄空港線,メイテツクウコウセン,名鉄空港線,Meitetsu Airport Line,机场线,쿠코 선,#1065AB,2,TA,NH,,#1065AB,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30007
+30008,20,名鉄常滑線,メイテツトコナメセン,名鉄常滑線,Meitetsu Tokoname Line,常滑线,도코나메 선,#1065AB,2,TA,NH,,#1065AB,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30008
 30009,20,名鉄河和線,メイテツコウワセン,名鉄河和線,Meitetsu Kowa Line,河和线,고와 선,#2A9DD8,2,KC,TA,,#2A9DD8,#1065AB,,HALF_SQUARE,HALF_SQUARE,,0,30009
 30010,20,名鉄知多新線,メイテツチタシンセン,名鉄知多新線,Meitetsu Chitashin Line,知多新线,지타 신선,#2A9DD8,2,KC,TA,,#2A9DD8,#1065AB,,HALF_SQUARE,HALF_SQUARE,,0,30010
 30011,20,名鉄築港線,メイテツチッコウセン,名鉄築港線,Meitetsu Chikko Line,筑港线,짓코 선,#727171,2,CH,TA,,#727171,#1065AB,,HALF_SQUARE,HALF_SQUARE,,0,30011
-30012,20,名鉄瀬戸線,メイテツセトセン,名鉄瀬戸線,Meitetsu Seto Line,濑户线,세토 선,#990099,2,ST,,,#990099,,,HALF_SQUARE,,,0,30012
-30013,20,名鉄津島線,メイテツツシマセン,名鉄津島線,Meitetsu Shima Line,津岛线,쓰시마 선,#FF9933,2,TB,NH,,#E85624,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30013
-30014,20,名鉄尾西線,メイテツビサイセン,名鉄尾西線,Meitetsu Bisai Line,尾西线,비사이 선,#FF9933,2,TB,BS,NH,#E85624,#E85624,#D12027,HALF_SQUARE,HALF_SQUARE,HALF_SQUARE,0,30014
-30015,20,名鉄犬山線,メイテツイヌヤマセン,名鉄犬山線,Meitetsu Inuyama Line,犬山线,이누야마 선,#006633,2,IY,NH,,#018B44,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30015
-30016,20,名鉄各務原線,メイテツカカミガハラセン,名鉄各務原線,Meitetsu Kagamihara Line,各务原线,가카미가하라 선,#006633,2,KG,IY,,#018B44,#018B44,,HALF_SQUARE,HALF_SQUARE,,0,30016
-30017,20,名鉄広見線,メイテツヒロミセン,名鉄広見線,Meitetsu Hiromi Line,广见线,히로미 선,#006633,2,HM,IY,,#018B44,#018B44,,HALF_SQUARE,HALF_SQUARE,,0,30017
-30018,20,名鉄小牧線,メイテツコマキセン,名鉄小牧線,Meitetsu Komaki Line,小牧线,고마키 선,#FFCCFF,2,KM,IY,,#DA5290,#018B44,,HALF_SQUARE,HALF_SQUARE,,0,30018
+30012,20,名鉄瀬戸線,メイテツセトセン,名鉄瀬戸線,Meitetsu Seto Line,濑户线,세토 선,#990099,2,ST,,,#7C2982,,,HALF_SQUARE,,,0,30012
+30013,20,名鉄津島線,メイテツツシマセン,名鉄津島線,Meitetsu Shima Line,津岛线,쓰시마 선,#E85624,2,TB,NH,,#E85624,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30013
+30014,20,名鉄尾西線,メイテツビサイセン,名鉄尾西線,Meitetsu Bisai Line,尾西线,비사이 선,#E85624,2,TB,BS,NH,#E85624,#E85624,#D12027,HALF_SQUARE,HALF_SQUARE,HALF_SQUARE,0,30014
+30015,20,名鉄犬山線,メイテツイヌヤマセン,名鉄犬山線,Meitetsu Inuyama Line,犬山线,이누야마 선,#018B44,2,IY,NH,,#018B44,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30015
+30016,20,名鉄各務原線,メイテツカカミガハラセン,名鉄各務原線,Meitetsu Kagamihara Line,各务原线,가카미가하라 선,#018B44,2,KG,IY,,#018B44,#018B44,,HALF_SQUARE,HALF_SQUARE,,0,30016
+30017,20,名鉄広見線,メイテツヒロミセン,名鉄広見線,Meitetsu Hiromi Line,广见线,히로미 선,#018B44,2,HM,IY,,#018B44,#018B44,,HALF_SQUARE,HALF_SQUARE,,0,30017
+30018,20,名鉄小牧線,メイテツコマキセン,名鉄小牧線,Meitetsu Komaki Line,小牧线,고마키 선,#DA5290,2,KM,IY,,#DA5290,#018B44,,HALF_SQUARE,HALF_SQUARE,,0,30018
 30019,20,犬山モノレール,イヌヤマモノレール,名鉄モンキーパークモノレール線,Inuyama Monorail,,,#808080,5,,,,,,,,,,2,30019
-30020,20,名鉄竹鼻線,メイテツタケハナセン,名鉄竹鼻線,Meitetsu Takehana Line,竹鼻线,다케하나 선,#CC6633,2,TH,NH,,#D7A629,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30020
-30021,20,名鉄羽島線,メイテツハシマセン,名鉄羽島線,Meitetsu Hashima Line,羽岛线,하시마 선,#CC6633,2,TH,NH,,#D7A629,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30021
+30020,20,名鉄竹鼻線,メイテツタケハナセン,名鉄竹鼻線,Meitetsu Takehana Line,竹鼻线,다케하나 선,#D7A629,2,TH,NH,,#D7A629,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30020
+30021,20,名鉄羽島線,メイテツハシマセン,名鉄羽島線,Meitetsu Hashima Line,羽岛线,하시마 선,#D7A629,2,TH,NH,,#D7A629,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30021
 31001,21,近鉄難波線,キンテツナンバセン,近鉄難波線,Kintetsu Namba Line,,,#008000,2,A,,,#D21644,,,KINTETSU,,,0,31001
 31002,21,近鉄橿原線,キンテツカシハラセン,近鉄橿原線,Kintetsu Kashihara Line,,,#DEA83F,2,B,,,#FAB202,,,KINTETSU,,,0,31002
 31003,21,近鉄南大阪線,キンテツミナミオオサカセン,近鉄南大阪線,Kintetsu Minami-Osaka Line,,,#FF1493,2,F,,,#028E46,,,KINTETSU,,,0,31003
@@ -431,7 +431,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99325,138,小湊鉄道線,コミナトテツドウセン,小湊鉄道線,Kominato Line,小凑铁道线,코미나토 철도선,#DCBC9F,2,,,,,,,,,,0,99325
 99326,139,湘南モノレール,ショウナンモノレール,湘南モノレール,Shonan Monorail,湘南单轨电车,쇼난 모노레일,#3E7AFF,5,SMR,,,#000000,,,SMR,,,0,99326
 99327,140,上信電鉄,ジョウシンデンテツ,上信電鉄,Joshin Dentetsu Line,上信电铁,조신 전철,#457BC6,2,,,,,,,,,,0,99327
-99328,141,上毛電気鉄道上毛線,ジョウモウデンキテツドウジョウモウセン,上毛電気鉄道上毛線,Jomo Line,上毛电气铁道上毛线,조모 전기 철도 조모선,#9BE2D0,2,,,,,,,,,,0,99328
+99328,141,上毛電気鉄道上毛線,ジョウモウデンキテツドウジョウモウセン,上毛電気鉄道上毛線,Jomo Line,上毛电气铁道上毛线,조모 전기 철도 조모선,#40E0D0,2,,,,,,,,,,0,99328
 99329,142,新京成線,シンケイセイセン,新京成電鉄新京成線,Shin-Keisei Line,新京成线,신케이세이선,#EF59A1,2,SL,,,#EF59A1,,,KEISEI,,,0,99329
 99330,143,真岡鐵道真岡線,モオカテツドウモオカセン,真岡鐵道真岡線,Moka Line,真冈铁道真冈线,모카 철도 모카선,#EE5B5B,2,,,,,,,,,,0,99330
 99331,144,千葉都市モノレール１号線,チバトシモノレールイチゴウセン,千葉都市モノレール１号線,Chiba Urban Monorail Line 1,千叶都市单轨电车1号线,지바 도시 모노레일 1호선,#192198,5,CM,,,#3E8BAD,,,ROUND,,,0,99331
