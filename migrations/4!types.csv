@@ -19,7 +19,7 @@ type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direct
 18,つるぎ,ツルギ,Tsurugi,剑,쓰루기,#3050FF,0,,COMPLETE
 19,かもめ,カモメ,KAMOME,海鸥,카모메,#E10017,0,,COMPLETE
 100,普通,フツウ,Local,慢车,보통,#1F63C6,0,,PARTIAL
-101,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C7,0,,PARTIAL
+101,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,,PARTIAL
 102,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,,PARTIAL
 103,特別快速,トクベツカイソク,Special Rapid,特别快车,특별쾌속,#DC143C,0,,COMPLETE
 104,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#DC143C,0,,COMPLETE
@@ -119,7 +119,7 @@ Yokokawa","SL群马
 横川","SL군마
 요코카와",#0D0C09,0,,COMPLETE
 300,普通,フツウ,Local,慢车,보통,#1F63C6,0,,PARTIAL
-301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C7,0,,PARTIAL
+301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,,PARTIAL
 302,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,,PARTIAL
 303,区間急行,クカンキュウコウ,Semi Express,区域特快,구간급행,#D8CA00,0,,PARTIAL
 304,急行,キュウコウ,Express,特快,급행,#DC143C,0,,PARTIAL
@@ -158,7 +158,12 @@ Yokokawa","SL群马
 339,S-TRAIN(土休日運行),エストレイン,S-TRAIN(Holiday),S-TRAIN,S-TRAIN,#8EC21F,0,,COMPLETE
 340,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#C05EC4,0,西武用,COMPLETE
 341,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#004098,0,東武用,COMPLETE
-342,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#034F98,0,名鉄用,COMPLETE
+342,快速特急,カイソクトッキュウ,Rapid Limited Express,快速特快,쾌속특급,#C51C40,0,名鉄用,COMPLETE
+343,特急,トッキュウ,Limited Express,特快,특급,#E03837,0,名鉄用,COMPLETE
+344,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#034F98,0,名鉄用,COMPLETE
+345,急行,キュウコウ,Express,特快,급행,#00BEFE,0,名鉄用,COMPLETE
+346,準急,ジュンキュウ,Semi Express,准急,준급,#009945,0,名鉄用,COMPLETE
+347,普通,フツウ,Local,慢车,보통,#333333,0,名鉄用,COMPLETE
 400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,,COMPLETE
 401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,,COMPLETE
 402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,,COMPLETE
@@ -182,7 +187,7 @@ Yokokawa","SL群马
 508,ラピートβ,ラピートベータ,rapi:tβ,rapi:tβ,라피트β,#0065AF,0,,COMPLETE
 509,ちちぶ,チチブ,Chichibu,秩父,지치부,#FF6600,0,,COMPLETE
 510,Mt.TAKAO,マウントタカオ,Mt.TAKAO,Mt.TAKAO,Mt.TAKAO,#57A100,0,,COMPLETE
-511,ミュースカイ,ミュースカイ,μ-SKY,μ-SKY,μ-SKY,#00A496,0,,COMPLETE
+511,ミュースカイ,ミュースカイ,μ-SKY,μ-SKY,μ-SKY,#FAA902,0,,COMPLETE
 512,ひのとり,ヒノトリ,HINOTORI,HINOTORI,HINOTORI,#AD2320,0,,COMPLETE
 513,こうや,コウヤ,KŌYA,高野,코야,#009A41,0,,COMPLETE
 514,りんかん,リンカン,RINKAN,林间,린칸,#009A42,0,,COMPLETE
