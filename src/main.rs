@@ -29,7 +29,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     info!("StationAPI Server listening on {}", addr);
 
     Server::builder()
-        .accept_http1(true)
+        // .accept_http1(true)
         .add_service(StationApiServer::new(api_server))
         .serve(addr)
         .await?;
