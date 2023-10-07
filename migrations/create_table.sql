@@ -36,6 +36,15 @@ CREATE TABLE `aliases` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `aliases`
+--
+
+LOCK TABLES `aliases` WRITE;
+/*!40000 ALTER TABLE `aliases` DISABLE KEYS */;
+/*!40000 ALTER TABLE `aliases` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `companies`
 --
 
@@ -60,6 +69,15 @@ CREATE TABLE `companies` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `companies`
+--
+
+LOCK TABLES `companies` WRITE;
+/*!40000 ALTER TABLE `companies` DISABLE KEYS */;
+/*!40000 ALTER TABLE `companies` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `line_aliases`
 --
 
@@ -78,6 +96,14 @@ CREATE TABLE `line_aliases` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
+--
+-- Dumping data for table `line_aliases`
+--
+
+LOCK TABLES `line_aliases` WRITE;
+/*!40000 ALTER TABLE `line_aliases` DISABLE KEYS */;
+/*!40000 ALTER TABLE `line_aliases` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `lines`
@@ -116,6 +142,15 @@ CREATE TABLE `lines` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `lines`
+--
+
+LOCK TABLES `lines` WRITE;
+/*!40000 ALTER TABLE `lines` DISABLE KEYS */;
+/*!40000 ALTER TABLE `lines` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `station_station_types`
 --
 
@@ -137,6 +172,14 @@ CREATE TABLE `station_station_types` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
+--
+-- Dumping data for table `station_station_types`
+--
+
+LOCK TABLES `station_station_types` WRITE;
+/*!40000 ALTER TABLE `station_station_types` DISABLE KEYS */;
+/*!40000 ALTER TABLE `station_station_types` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `stations`
@@ -179,6 +222,15 @@ CREATE TABLE `stations` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `stations`
+--
+
+LOCK TABLES `stations` WRITE;
+/*!40000 ALTER TABLE `stations` DISABLE KEYS */;
+/*!40000 ALTER TABLE `stations` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `types`
 --
 
@@ -198,6 +250,15 @@ CREATE TABLE `types` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
+--
+-- Dumping data for table `types`
+--
+
+LOCK TABLES `types` WRITE;
+/*!40000 ALTER TABLE `types` DISABLE KEYS */;
+/*!40000 ALTER TABLE `types` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
@@ -207,4 +268,4 @@ CREATE TABLE `types` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-10-06  9:53:34
+-- Dump completed on 2023-10-08  8:23:03
