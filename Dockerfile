@@ -14,7 +14,6 @@ RUN mkdir /app/migrations
 COPY --from=builder /app/tmp.sql .
 COPY --from=builder /app/scripts/start.sh ./scripts
 COPY --from=builder /app/scripts/migration.sh ./scripts
-COPY --from=builder /app/migrations/create_table.sql ./migrations
 COPY --from=builder /app/target/release/stationapi /usr/local/bin/stationapi
 RUN apt-get update && \
     apt-get install -y --quiet mysql-client && \
