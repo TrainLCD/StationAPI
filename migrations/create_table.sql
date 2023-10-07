@@ -1,5 +1,3 @@
-BEGIN;
-
 -- MySQL dump 10.13  Distrib 8.1.0, for macos13 (arm64)
 --
 -- Host: localhost    Database: stationapi
@@ -210,5 +208,3 @@ CREATE TABLE `types` (
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2023-10-06  9:53:34
-
-COMMIT;
