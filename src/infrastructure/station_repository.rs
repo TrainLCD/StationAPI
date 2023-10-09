@@ -327,11 +327,11 @@ impl InternalStationRepository {
                     SELECT
                       sst.line_group_cd
                     FROM
-                      `types` AS t,
-                      `station_station_types` AS sst
+                      `station_station_types` AS sst,
+                      `stations` AS s
                     WHERE
-                      t.kind IN (0, 1)
-                      AND t.type_cd = sst.type_cd
+                      s.line_cd = ?
+                      AND sst.type_cd IN (100, 101, 300, 301)
                       AND sst.station_cd = s.station_cd
                     LIMIT
                       1
@@ -346,6 +346,7 @@ impl InternalStationRepository {
                   s.e_sort,
                   s.station_cd",
         )
+        .bind(line_id)
         .bind(line_id)
         .fetch_all(conn)
         .await?;
@@ -382,20 +383,6 @@ impl InternalStationRepository {
             (`stations` AS s, `lines` AS l)
             LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT OUTER JOIN `aliases` AS a ON a.id = la.alias_cd
-            LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
-              SELECT 
-                sst.line_group_cd 
-              FROM 
-                `types` AS t,
-                `station_station_types` AS sst 
-              WHERE 
-                t.kind IN (0, 1)
-                AND t.type_cd = sst.type_cd
-                AND sst.station_cd = s.station_cd 
-              LIMIT 
-                1
-            )
-            LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
           WHERE
             s.station_g_cd = ?
             AND s.line_cd = l.line_cd
@@ -442,20 +429,6 @@ impl InternalStationRepository {
             (`stations` AS s, `lines` AS l)
             LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT OUTER JOIN `aliases` AS a ON a.id = la.alias_cd
-            LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
-              SELECT 
-                sst.line_group_cd 
-              FROM 
-                `types` AS t,
-                `station_station_types` AS sst 
-              WHERE 
-                t.kind IN (0, 1)
-                AND t.type_cd = sst.type_cd
-                AND sst.station_cd = s.station_cd 
-              LIMIT 
-                1
-            )
-            LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd 
           WHERE
             s.station_g_cd IN ( {} )
             AND s.line_cd = l.line_cd
@@ -564,16 +537,13 @@ impl InternalStationRepository {
                     SELECT 
                       sst.line_group_cd 
                     FROM 
-                      `types` AS t,
                       `station_station_types` AS sst 
                     WHERE 
-                      t.kind IN (0, 1)
-                      AND t.type_cd = sst.type_cd
+                      sst.type_cd IN (100, 101, 300, 301) 
                       AND sst.station_cd = s.station_cd 
                     LIMIT 
                       1
-                  )
-                  LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd 
+                  ) LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd 
                 WHERE 
                   s.line_cd = l.line_cd 
                   AND s.e_status = 0 
@@ -634,11 +604,9 @@ impl InternalStationRepository {
                       SELECT
                         sst.line_group_cd
                       FROM
-                        `types` AS t,
                         `station_station_types` AS sst
                       WHERE
-                        t.kind IN (0, 1)
-                        AND t.type_cd = sst.type_cd
+                        sst.type_cd IN (100, 101, 300, 301)
                         AND sst.station_cd = s.station_cd
                       LIMIT
                         1
