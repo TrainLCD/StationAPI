@@ -299,7 +299,7 @@ impl InternalStationRepository {
                   DISTINCT l.*,
                   s.*,
                   t.*,
-                  sst.id AS sst_cd,
+                  sst.id,
                   sst.type_cd,
                   sst.line_group_cd,
                   sst.pass,
@@ -327,11 +327,12 @@ impl InternalStationRepository {
                     SELECT
                       sst.line_group_cd
                     FROM
+                      `types` AS t,
                       `station_station_types` AS sst,
                       `stations` AS s
                     WHERE
                       s.line_cd = ?
-                      AND sst.type_cd IN (100, 101, 300, 301)
+                      AND t.kind IN (0, 1)
                       AND sst.station_cd = s.station_cd
                     LIMIT
                       1
@@ -537,9 +538,10 @@ impl InternalStationRepository {
                     SELECT 
                       sst.line_group_cd 
                     FROM 
+                      `types` AS t,
                       `station_station_types` AS sst 
                     WHERE 
-                      sst.type_cd IN (100, 101, 300, 301) 
+                      t.kind IN (0, 1)
                       AND sst.station_cd = s.station_cd 
                     LIMIT 
                       1
@@ -576,7 +578,7 @@ impl InternalStationRepository {
                     DISTINCT l.*,
                     s.*,
                     t.*,
-                    sst.id AS sst_cd,
+                    sst.id,
                     sst.type_cd,
                     sst.line_group_cd,
                     sst.pass,
@@ -604,9 +606,10 @@ impl InternalStationRepository {
                       SELECT
                         sst.line_group_cd
                       FROM
+                        `types` AS t,
                         `station_station_types` AS sst
                       WHERE
-                        sst.type_cd IN (100, 101, 300, 301)
+                        t.kind IN (0, 1)
                         AND sst.station_cd = s.station_cd
                       LIMIT
                         1
@@ -649,7 +652,7 @@ impl InternalStationRepository {
             "SELECT
             DISTINCT l.*,
             s.*,
-            sst.id AS sst_cd,
+            sst.id,
             sst.pass,
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
