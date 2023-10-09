@@ -2,7 +2,7 @@ use super::line::Line;
 
 #[derive(Clone, Debug)]
 pub struct TrainType {
-    pub id: u32,
+    pub sst_cd: u32,
     pub station_cd: u32,
     pub type_cd: u32,
     pub line_group_cd: u32,
@@ -16,13 +16,12 @@ pub struct TrainType {
     pub direction: u32,
     pub line: Option<Box<Line>>,
     pub lines: Vec<Line>,
-    pub kind: u32,
 }
 
 impl TrainType {
     #![allow(clippy::too_many_arguments)]
     pub fn new(
-        id: u32,
+        sst_cd: u32,
         station_cd: u32,
         type_cd: u32,
         line_group_cd: u32,
@@ -34,10 +33,9 @@ impl TrainType {
         type_name_ko: Option<String>,
         color: String,
         direction: u32,
-        kind: u32,
     ) -> Self {
         Self {
-            id,
+            sst_cd,
             station_cd,
             type_cd,
             line_group_cd,
@@ -51,7 +49,6 @@ impl TrainType {
             direction,
             line: None,
             lines: vec![],
-            kind,
         }
     }
 }
