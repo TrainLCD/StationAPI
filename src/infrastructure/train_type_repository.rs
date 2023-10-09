@@ -7,7 +7,7 @@ use sqlx::{MySql, MySqlConnection, Pool};
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct TrainTypeRow {
-    sst_cd: u32,
+    id: u32,
     station_cd: u32,
     type_cd: u32,
     line_group_cd: u32,
@@ -19,12 +19,13 @@ pub struct TrainTypeRow {
     type_name_ko: Option<String>,
     color: String,
     direction: u32,
+    kind: u32,
 }
 
 impl From<TrainTypeRow> for TrainType {
     fn from(row: TrainTypeRow) -> Self {
         let TrainTypeRow {
-            sst_cd,
+            id,
             station_cd,
             type_cd,
             line_group_cd,
@@ -36,9 +37,10 @@ impl From<TrainTypeRow> for TrainType {
             type_name_ko,
             color,
             direction,
+            kind,
         } = row;
         Self {
-            sst_cd,
+            id,
             station_cd,
             type_cd,
             line_group_cd,
@@ -52,6 +54,7 @@ impl From<TrainTypeRow> for TrainType {
             direction,
             line: None,
             lines: vec![],
+            kind,
         }
     }
 }
@@ -107,8 +110,7 @@ impl InternalTrainTypeRepository {
         let rows: Vec<TrainTypeRow> = sqlx::query_as(
             "SELECT 
             t.*, 
-            sst.*,
-            sst.id AS sst_cd
+            sst.*
           FROM 
             types as t, 
             station_station_types as sst 
@@ -130,8 +132,7 @@ impl InternalTrainTypeRepository {
         let rows: Vec<TrainTypeRow> = sqlx::query_as(
             "SELECT 
             t.*, 
-            sst.*,
-            sst.id AS sst_cd
+            sst.*
           FROM 
             station_station_types as sst, 
             stations as s, 
@@ -158,8 +159,7 @@ impl InternalTrainTypeRepository {
         let rows: Option<TrainTypeRow> = sqlx::query_as(
             "SELECT 
             t.*, 
-            sst.*,
-            sst.id AS sst_cd
+            sst.*
           FROM 
             types as t, 
             station_station_types as sst 
