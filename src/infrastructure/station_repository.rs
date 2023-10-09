@@ -196,20 +196,6 @@ impl StationRepository for MyStationRepository {
             .await
     }
 
-    async fn get_by_station_group_and_line_id(
-        &self,
-        station_group_id: u32,
-        line_id: u32,
-    ) -> Result<Option<Station>, DomainError> {
-        let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_by_station_group_and_line_id(
-            station_group_id,
-            line_id,
-            &mut conn,
-        )
-        .await
-    }
-
     // ほぼ確実にキャッシュがヒットしないと思うのでキャッシュを使わない
     async fn get_by_coordinates(
         &self,
@@ -323,20 +309,22 @@ impl InternalStationRepository {
                   (`stations` AS s, `lines` AS l)
                   LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
                   LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-                  LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                  INNER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
                     SELECT
                       sst.line_group_cd
                     FROM
+                      `types` AS t,
                       `station_station_types` AS sst,
                       `stations` AS s
                     WHERE
                       s.line_cd = ?
-                      AND sst.type_cd IN (100, 101, 300, 301)
+                      AND t.kind IN (0, 1)
+                      AND t.type_cd = sst.type_cd
                       AND sst.station_cd = s.station_cd
                     LIMIT
                       1
                   )
-                  LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
+                  INNER JOIN `types` AS t ON t.type_cd = sst.type_cd
                 WHERE
                   s.line_cd = ?
                   AND CASE WHEN sst.station_cd THEN s.station_cd = sst.station_cd ELSE s.station_cd = s.station_cd END
@@ -447,47 +435,6 @@ impl InternalStationRepository {
         Ok(lines)
     }
 
-    async fn get_by_station_group_and_line_id(
-        station_group_id: u32,
-        line_id: u32,
-        conn: &mut MySqlConnection,
-    ) -> Result<Option<Station>, DomainError> {
-        let rows: Option<StationRow> = sqlx::query_as(
-            "SELECT l.*,
-            s.*,
-            (
-              SELECT
-                COUNT(sst.line_group_cd) 
-              FROM
-                station_station_types AS sst
-              WHERE
-                s.station_cd = sst.station_cd
-                AND sst.pass <> 1
-            ) AS station_types_count
-          FROM
-            `stations` AS s,
-            `lines` AS l
-          WHERE
-            s.station_g_cd = ?
-            AND s.line_cd = ?
-            AND s.e_status = 0
-            AND l.line_cd = s.line_cd
-          ORDER BY
-            s.e_sort,
-            s.station_cd",
-        )
-        .bind(station_group_id)
-        .bind(line_id)
-        .fetch_optional(conn)
-        .await?;
-
-        let station: Option<Station> = rows.map(|row| row.into());
-        let Some(station) = station else {
-            return Ok(None);
-        };
-        Ok(Some(station))
-    }
-
     async fn get_by_coordinates(
         latitude: f64,
         longitude: f64,
@@ -533,17 +480,20 @@ impl InternalStationRepository {
                   (`stations` AS s, `lines` AS l) 
                   LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
                   LEFT OUTER JOIN `aliases` AS a ON a.id = la.alias_cd 
-                  LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                  INNER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
                     SELECT 
                       sst.line_group_cd 
-                    FROM 
-                      `station_station_types` AS sst 
+                    FROM
+                      `types` AS t,
+                      `station_station_types` AS sst
                     WHERE 
-                      sst.type_cd IN (100, 101, 300, 301) 
+                      t.kind IN (0, 1)
+                      AND t.type_cd = sst.type_cd
                       AND sst.station_cd = s.station_cd 
                     LIMIT 
                       1
-                  ) LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd 
+                  )
+                  INNER JOIN `types` AS t ON t.type_cd = sst.type_cd 
                 WHERE 
                   s.line_cd = l.line_cd 
                   AND s.e_status = 0 
@@ -600,18 +550,20 @@ impl InternalStationRepository {
                     (`stations` AS s, `lines` AS l)
                     LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
                     LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-                    LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                    INNER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
                       SELECT
                         sst.line_group_cd
                       FROM
+                        `types` AS t,
                         `station_station_types` AS sst
                       WHERE
-                        sst.type_cd IN (100, 101, 300, 301)
+                        t.kind IN (0, 1)
+                        AND t.type_cd = sst.type_cd
                         AND sst.station_cd = s.station_cd
                       LIMIT
                         1
                     )
-                    LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
+                    INNER JOIN `types` AS t ON t.type_cd = sst.type_cd
                   WHERE
                     s.line_cd = l.line_cd
                     AND (
