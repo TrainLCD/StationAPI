@@ -587,7 +587,7 @@ impl InternalStationRepository {
                       OR station_name_zh LIKE ?
                       OR station_name_ko LIKE ?
                     )
-                    -- AND CASE WHEN sst.station_cd THEN s.station_cd = sst.station_cd ELSE s.station_cd = s.station_cd END
+                    AND CASE WHEN sst.station_cd THEN s.station_cd = sst.station_cd ELSE s.station_cd = s.station_cd END
                     AND s.line_cd = l.line_cd
                     AND s.e_status = 0
                   LIMIT
