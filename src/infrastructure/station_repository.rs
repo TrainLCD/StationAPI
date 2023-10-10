@@ -176,9 +176,13 @@ impl StationRepository for MyStationRepository {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::find_by_id(id, &mut conn).await
     }
-    async fn get_by_line_id(&self, line_id: u32) -> Result<Vec<Station>, DomainError> {
+    async fn get_by_line_id(
+        &self,
+        line_id: u32,
+        via_station_id: &Option<u32>,
+    ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_by_line_id(line_id, &mut conn).await
+        InternalStationRepository::get_by_line_id(line_id, via_station_id, &mut conn).await
     }
     async fn get_by_station_group_id(
         &self,
@@ -278,6 +282,7 @@ impl InternalStationRepository {
     }
     async fn get_by_line_id(
         line_id: u32,
+        via_station_id: &Option<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let station_row: Vec<StationRow> = sqlx::query_as(
@@ -309,7 +314,7 @@ impl InternalStationRepository {
                   (`stations` AS s, `lines` AS l)
                   LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
                   LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-                  INNER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                  LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
                     SELECT
                       sst.line_group_cd
                     FROM
@@ -318,13 +323,22 @@ impl InternalStationRepository {
                       `stations` AS s
                     WHERE
                       s.line_cd = ?
-                      AND t.kind IN (0, 1)
-                      AND t.type_cd = sst.type_cd
+                      AND t.kind = (
+                        SELECT
+                          t.kind
+                        FROM
+                          `types` AS t,
+                          `station_station_types` AS sst
+                        WHERE
+                          sst.station_cd = ?
+                          AND t.type_cd = sst.type_cd
+                          AND t.kind IN (0, 1)
+                        LIMIT 1
+                      )
                       AND sst.station_cd = s.station_cd
-                    LIMIT
-                      1
+                    LIMIT 1
                   )
-                  INNER JOIN `types` AS t ON t.type_cd = sst.type_cd
+                  LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
                 WHERE
                   s.line_cd = ?
                   AND CASE WHEN sst.station_cd THEN s.station_cd = sst.station_cd ELSE s.station_cd = s.station_cd END
@@ -335,6 +349,7 @@ impl InternalStationRepository {
                   s.station_cd",
         )
         .bind(line_id)
+        .bind(via_station_id)
         .bind(line_id)
         .fetch_all(conn)
         .await?;
@@ -480,7 +495,7 @@ impl InternalStationRepository {
                   (`stations` AS s, `lines` AS l) 
                   LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
                   LEFT OUTER JOIN `aliases` AS a ON a.id = la.alias_cd 
-                  INNER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                  LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
                     SELECT 
                       sst.line_group_cd 
                     FROM
@@ -493,7 +508,7 @@ impl InternalStationRepository {
                     LIMIT 
                       1
                   )
-                  INNER JOIN `types` AS t ON t.type_cd = sst.type_cd 
+                  LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd 
                 WHERE 
                   s.line_cd = l.line_cd 
                   AND s.e_status = 0 
@@ -550,7 +565,7 @@ impl InternalStationRepository {
                     (`stations` AS s, `lines` AS l)
                     LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
                     LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-                    INNER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                    LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
                       SELECT
                         sst.line_group_cd
                       FROM
@@ -563,7 +578,7 @@ impl InternalStationRepository {
                       LIMIT
                         1
                     )
-                    INNER JOIN `types` AS t ON t.type_cd = sst.type_cd
+                    LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
                   WHERE
                     s.line_cd = l.line_cd
                     AND (

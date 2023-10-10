@@ -98,6 +98,15 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         )
         .await
     }
+
+    async fn get_local_type_by_station_id_vec(
+        &self,
+        station_id_vec: Vec<u32>,
+    ) -> Result<Vec<TrainType>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalTrainTypeRepository::get_local_type_by_station_id_vec(station_id_vec, &mut conn)
+            .await
+    }
 }
 
 pub struct InternalTrainTypeRepository {}
@@ -187,5 +196,39 @@ impl InternalTrainTypeRepository {
         };
 
         Ok(Some(train_type))
+    }
+
+    async fn get_local_type_by_station_id_vec(
+        station_id_vec: Vec<u32>,
+        conn: &mut MySqlConnection,
+    ) -> Result<Vec<TrainType>, DomainError> {
+        let params = format!("?{}", ", ?".repeat(station_id_vec.len() - 1));
+        let query_str = format!(
+            "SELECT 
+            t.*, 
+            sst.*
+          FROM 
+            station_station_types as sst, 
+            stations as s, 
+            types as t 
+          WHERE 
+            s.station_cd IN ( {} ) 
+            AND s.station_cd = sst.station_cd
+            AND t.kind IN (0, 1)
+            AND sst.type_cd = t.type_cd 
+            AND s.e_status = 0
+            AND sst.pass <> 1",
+            params
+        );
+
+        let mut query = sqlx::query_as::<_, TrainTypeRow>(&query_str);
+        for id in station_id_vec {
+            query = query.bind(id);
+        }
+
+        let rows = query.fetch_all(conn).await?;
+        let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
+
+        Ok(train_types)
     }
 }
