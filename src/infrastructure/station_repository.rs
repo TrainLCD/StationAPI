@@ -580,8 +580,7 @@ impl InternalStationRepository {
                     )
                     LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
                   WHERE
-                    s.line_cd = l.line_cd
-                    AND (
+                    (
                       station_name LIKE ?
                       OR station_name_r LIKE ?
                       OR station_name_k LIKE ?
