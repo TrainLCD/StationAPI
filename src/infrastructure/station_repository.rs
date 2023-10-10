@@ -565,7 +565,7 @@ impl InternalStationRepository {
                     (`stations` AS s, `lines` AS l)
                     LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
                     LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-                    LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                    RIGHT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
                       SELECT
                         sst.line_group_cd
                       FROM
@@ -578,7 +578,7 @@ impl InternalStationRepository {
                       LIMIT
                         1
                     )
-                    LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
+                    RIGHT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
                   WHERE
                     (
                       station_name LIKE ?
