@@ -1,6 +1,6 @@
 use crate::pb::StopCondition;
 
-use super::{line::Line, station_number::StationNumber, train_type::TrainType};
+use super::{line::Line, station_number::StationNumber, train_type::TrainType as TrainTypeEntity};
 
 #[derive(Clone, Debug)]
 pub struct Station {
@@ -31,7 +31,7 @@ pub struct Station {
     pub stop_condition: StopCondition,
     pub distance: Option<f64>,
     pub station_types_count: i64,
-    pub train_type: Option<TrainType>,
+    pub train_type: Option<Box<TrainTypeEntity>>,
     // linesからJOIN
     pub company_cd: u32,
     pub line_name: String,
@@ -95,7 +95,7 @@ impl Station {
         stop_condition: StopCondition,
         distance: Option<f64>,
         station_types_count: i64,
-        train_type: Option<TrainType>,
+        train_type: Option<Box<TrainTypeEntity>>,
         company_cd: u32,
         line_name: String,
         line_name_k: String,

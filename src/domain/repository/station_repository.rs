@@ -7,7 +7,11 @@ use crate::domain::{entity::station::Station, error::DomainError};
 #[async_trait]
 pub trait StationRepository: Send + Sync + 'static {
     async fn find_by_id(&self, id: u32) -> Result<Option<Station>, DomainError>;
-    async fn get_by_line_id(&self, line_id: u32) -> Result<Vec<Station>, DomainError>;
+    async fn get_by_line_id(
+        &self,
+        line_id: u32,
+        via_station_id: &Option<u32>,
+    ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_station_group_id(
         &self,
         station_group_id: u32,
@@ -16,11 +20,6 @@ pub trait StationRepository: Send + Sync + 'static {
         &self,
         station_group_id_vec: Vec<u32>,
     ) -> Result<Vec<Station>, DomainError>;
-    async fn get_by_station_group_and_line_id(
-        &self,
-        station_group_id: u32,
-        line_id: u32,
-    ) -> Result<Option<Station>, DomainError>;
     async fn get_by_coordinates(
         &self,
         latitude: f64,

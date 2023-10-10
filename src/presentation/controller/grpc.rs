@@ -151,9 +151,14 @@ impl StationApi for GrpcRouter {
         request: tonic::Request<GetStationByLineIdRequest>,
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let line_id = request.get_ref().line_id;
+        let via_station_id = &request.get_ref().via_station_id;
 
         let cache = self.station_list_cache.clone();
-        let cache_key = format!("stations:line_id:{}", line_id);
+        let cache_key = format!(
+            "stations:line_id:{}:via_station_id:{}",
+            line_id,
+            via_station_id.unwrap_or(0)
+        );
         if let Some(stations) = cache.get(&cache_key) {
             let stations = stations.to_vec();
             return Ok(Response::new(MultipleStationResponse {
@@ -161,7 +166,11 @@ impl StationApi for GrpcRouter {
             }));
         };
 
-        match self.query_use_case.get_stations_by_line_id(line_id).await {
+        match self
+            .query_use_case
+            .get_stations_by_line_id(line_id, via_station_id)
+            .await
+        {
             Ok(stations) => {
                 cache.insert(cache_key, Arc::new(stations.clone())).await;
 
