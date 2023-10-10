@@ -202,6 +202,10 @@ impl InternalTrainTypeRepository {
         station_id_vec: Vec<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
+        if station_id_vec.is_empty() {
+            return Ok(vec![]);
+        }
+
         let params = format!("?{}", ", ?".repeat(station_id_vec.len() - 1));
         let query_str = format!(
             "SELECT 
