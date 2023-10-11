@@ -164,6 +164,9 @@ Yokokawa","SL群马
 0,345,急行,キュウコウ,Express,特快,급행,#00BEFE,0,3,名鉄用,COMPLETE
 0,346,準急,ジュンキュウ,Semi Express,准急,준급,#009945,0,3,名鉄用,COMPLETE
 0,347,普通,フツウ,Local,慢车,보통,#333333,0,0,名鉄用,COMPLETE
+0,348,空港急行,クウコウキュウコウ,Airport Express,机场快速,공항급행,#FF7F27,0,3,南海電車用,COMPLETE
+0,349,区間特急,クカントッキュウ,Limited Express,直通特急,구간특급,#A349A4,0,4,阪神電車,COMPLETE
+0,350,S特急,エストッキュウ,Limited Express,S特急,S특급,#22B14C,0,4,山陽電車,COMPLETE
 0,400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,2,,COMPLETE
 0,401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,2,,COMPLETE
 0,402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,2,,COMPLETE
