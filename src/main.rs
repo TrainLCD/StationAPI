@@ -25,11 +25,12 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     let db_url = fetch_database_url();
     let pool = MySqlPool::connect(db_url.as_str()).await?;
     let api_server = GrpcRouter::new(pool);
+    let accept_http1 = fetch_http1_flag();
 
     info!("StationAPI Server listening on {}", addr);
 
     Server::builder()
-        // .accept_http1(true)
+        .accept_http1(accept_http1)
         .add_service(StationApiServer::new(api_server))
         .serve(addr)
         .await?;
@@ -66,5 +67,15 @@ fn fetch_database_url() -> String {
         Ok(s) => s,
         Err(env::VarError::NotPresent) => panic!("$DATABASE_URL is not set."),
         Err(VarError::NotUnicode(_)) => panic!("$DATABASE_URL should be written in Unicode."),
+    }
+}
+fn fetch_http1_flag() -> bool {
+    match env::var("ACCEPT_HTTP1") {
+        Ok(s) => s.parse().expect("Failed to parse $ACCEPT_HTTP1"),
+        Err(env::VarError::NotPresent) => {
+            log::warn!("$ACCEPT_HTTP1 is not set. Falling back to false.");
+            false
+        }
+        Err(VarError::NotUnicode(_)) => panic!("$ACCEPT_HTTP1 should be written in Unicode."),
     }
 }
