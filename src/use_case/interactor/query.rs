@@ -94,15 +94,8 @@ where
         Ok(stations)
     }
 
-    async fn get_stations_by_line_id(
-        &self,
-        line_id: u32,
-        via_station_id: &Option<u32>,
-    ) -> Result<Vec<Station>, UseCaseError> {
-        let mut stations = self
-            .station_repository
-            .get_by_line_id(line_id, via_station_id)
-            .await?;
+    async fn get_stations_by_line_id(&self, line_id: u32) -> Result<Vec<Station>, UseCaseError> {
+        let mut stations = self.station_repository.get_by_line_id(line_id).await?;
 
         self.update_station_vec_with_attributes(&mut stations)
             .await?;

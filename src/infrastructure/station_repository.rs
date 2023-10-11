@@ -176,13 +176,9 @@ impl StationRepository for MyStationRepository {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::find_by_id(id, &mut conn).await
     }
-    async fn get_by_line_id(
-        &self,
-        line_id: u32,
-        via_station_id: &Option<u32>,
-    ) -> Result<Vec<Station>, DomainError> {
+    async fn get_by_line_id(&self, line_id: u32) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_by_line_id(line_id, via_station_id, &mut conn).await
+        InternalStationRepository::get_by_line_id(line_id, &mut conn).await
     }
     async fn get_by_station_group_id(
         &self,
@@ -282,7 +278,6 @@ impl InternalStationRepository {
     }
     async fn get_by_line_id(
         line_id: u32,
-        via_station_id: &Option<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let station_row: Vec<StationRow> = sqlx::query_as(
