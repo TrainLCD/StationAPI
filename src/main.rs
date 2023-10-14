@@ -47,7 +47,7 @@ async fn main() -> std::result::Result<(), anyhow::Error> {
 mod h2c {
     use std::pin::Pin;
 
-    use http::{header::UPGRADE, Request, Response};
+    use http::{Request, Response};
     use hyper::Body;
     use tower::Service;
 
