@@ -52,7 +52,8 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 mod h2c {
     use std::pin::Pin;
 
-    use hyper::{Body, Request, Response};
+    use http::{Request, Response};
+    use hyper::Body;
     use tower::Service;
 
     #[derive(Clone)]
