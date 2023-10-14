@@ -35,6 +35,9 @@ anyhow = "1.0.71"
 thiserror = "1.0.40"
 rand = "0.8.5"
 moka = { version = "0.11", features = ["future"] }
+hyper = "0.14.27"
+tower = "0.4.13"
+http = "0.2.9"
 
 [build-dependencies]
 tonic-build = "0.10.1"
