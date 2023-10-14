@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use mockall::automock;
 
 use crate::{
     domain::entity::{
@@ -9,7 +8,6 @@ use crate::{
     use_case::error::UseCaseError,
 };
 
-#[automock]
 #[async_trait]
 pub trait QueryUseCase: Send + Sync + 'static {
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError>;

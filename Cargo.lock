@@ -2129,13 +2129,9 @@ dependencies = [
  "async-trait",
  "bigdecimal",
  "dotenv",
- "log",
  "mockall",
  "moka",
- "percent-encoding",
  "prost",
- "rand",
- "serde",
  "sqlx",
  "thiserror",
  "tokio",
@@ -2144,7 +2140,6 @@ dependencies = [
  "tonic-web",
  "tracing",
  "tracing-subscriber",
- "url",
 ]
 
 [[package]]
