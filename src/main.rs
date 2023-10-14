@@ -13,12 +13,7 @@ use tracing::info;
 
 #[tokio::main]
 async fn main() -> std::result::Result<(), anyhow::Error> {
-    run().await
-}
-
-async fn run() -> std::result::Result<(), anyhow::Error> {
     tracing_subscriber::fmt::init();
-
     dotenv::from_filename(".env.local").ok();
 
     let addr = fetch_addr().unwrap();
