@@ -87,13 +87,15 @@ mod h2c {
         fn call(&mut self, mut req: hyper::Request<Body>) -> Self::Future {
             let svc = self.s.clone();
             Box::pin(async move {
-                let upgraded_io = hyper::upgrade::on(&mut req).await.unwrap();
+                tokio::spawn(async move {
+                    let upgraded_io = hyper::upgrade::on(&mut req).await.unwrap();
 
-                hyper::server::conn::Http::new()
-                    .http2_only(true)
-                    .serve_connection(upgraded_io, svc)
-                    .await
-                    .unwrap();
+                    hyper::server::conn::Http::new()
+                        .http2_only(true)
+                        .serve_connection(upgraded_io, svc)
+                        .await
+                        .unwrap();
+                });
 
                 let mut res = hyper::Response::new(hyper::Body::empty());
                 *res.status_mut() = http::StatusCode::SWITCHING_PROTOCOLS;
