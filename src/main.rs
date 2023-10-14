@@ -8,7 +8,7 @@ use stationapi::{
     pb::station_api_server::StationApiServer, presentation::controller::grpc::GrpcRouter,
 };
 use tonic::transport::Server;
-use tracing::info;
+use tracing::{info, warn};
 
 #[tokio::main]
 async fn main() -> std::result::Result<(), anyhow::Error> {
@@ -42,7 +42,7 @@ fn fetch_port() -> u16 {
     match env::var("PORT") {
         Ok(s) => s.parse().expect("Failed to parse $PORT"),
         Err(env::VarError::NotPresent) => {
-            log::warn!("$PORT is not set. Falling back to 50051.");
+            warn!("$PORT is not set. Falling back to 50051.");
             50051
         }
         Err(VarError::NotUnicode(_)) => panic!("$PORT should be written in Unicode."),
@@ -55,7 +55,7 @@ fn fetch_addr() -> Result<SocketAddr, AddrParseError> {
         Ok(s) => format!("{}:{}", s, port).parse(),
         Err(env::VarError::NotPresent) => {
             let fallback_host = format!("[::1]:{}", port);
-            log::warn!("$HOST is not set. Falling back to {}.", fallback_host);
+            warn!("$HOST is not set. Falling back to {}.", fallback_host);
             fallback_host.parse()
         }
         Err(VarError::NotUnicode(_)) => panic!("$HOST should be written in Unicode."),
@@ -73,7 +73,7 @@ fn fetch_http1_flag() -> bool {
     match env::var("ACCEPT_HTTP1") {
         Ok(s) => s.parse().expect("Failed to parse $ACCEPT_HTTP1"),
         Err(env::VarError::NotPresent) => {
-            log::warn!("$ACCEPT_HTTP1 is not set. Falling back to false.");
+            warn!("$ACCEPT_HTTP1 is not set. Falling back to false.");
             false
         }
         Err(VarError::NotUnicode(_)) => panic!("$ACCEPT_HTTP1 should be written in Unicode."),
