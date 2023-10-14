@@ -84,7 +84,7 @@ mod h2c {
             std::task::Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, mut req: Request<Body>) -> Self::Future {
+        fn call(&mut self, mut req: hyper::Request<Body>) -> Self::Future {
             let svc = self.s.clone();
             Box::pin(async move {
                 let upgraded_io = hyper::upgrade::on(&mut req).await.unwrap();
