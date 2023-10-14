@@ -101,7 +101,7 @@ mod h2c {
                 let mut res = hyper::Response::new(hyper::Body::empty());
                 *res.status_mut() = http::StatusCode::SWITCHING_PROTOCOLS;
                 res.headers_mut().insert(
-                    http::header::UPGRADE,
+                    hyper::header::UPGRADE,
                     http::header::HeaderValue::from_static("h2c"),
                 );
 
