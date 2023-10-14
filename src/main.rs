@@ -9,7 +9,7 @@ use stationapi::{
 };
 use tonic::transport::Server;
 use tower::make::Shared;
-use tracing::info;
+use tracing::{info, warn};
 
 #[tokio::main]
 async fn main() -> std::result::Result<(), anyhow::Error> {
@@ -47,7 +47,7 @@ async fn main() -> std::result::Result<(), anyhow::Error> {
 mod h2c {
     use std::pin::Pin;
 
-    use http::{Request, Response};
+    use http::{header::UPGRADE, Request, Response};
     use hyper::Body;
     use tower::Service;
 
@@ -110,7 +110,7 @@ fn fetch_port() -> u16 {
     match env::var("PORT") {
         Ok(s) => s.parse().expect("Failed to parse $PORT"),
         Err(env::VarError::NotPresent) => {
-            log::warn!("$PORT is not set. Falling back to 50051.");
+            warn!("$PORT is not set. Falling back to 50051.");
             50051
         }
         Err(VarError::NotUnicode(_)) => panic!("$PORT should be written in Unicode."),
@@ -123,7 +123,7 @@ fn fetch_addr() -> Result<SocketAddr, AddrParseError> {
         Ok(s) => format!("{}:{}", s, port).parse(),
         Err(env::VarError::NotPresent) => {
             let fallback_host = format!("[::1]:{}", port);
-            log::warn!("$HOST is not set. Falling back to {}.", fallback_host);
+            warn!("$HOST is not set. Falling back to {}.", fallback_host);
             fallback_host.parse()
         }
         Err(VarError::NotUnicode(_)) => panic!("$HOST should be written in Unicode."),
