@@ -1,9 +1,7 @@
 use async_trait::async_trait;
-use mockall::automock;
 
 use crate::domain::{entity::station::Station, error::DomainError};
 
-#[automock]
 #[async_trait]
 pub trait StationRepository: Send + Sync + 'static {
     async fn find_by_id(&self, id: u32) -> Result<Option<Station>, DomainError>;
