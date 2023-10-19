@@ -1,11 +1,9 @@
-use bigdecimal::ToPrimitive;
-use moka::future::Cache;
 use sqlx::{MySql, Pool};
-use std::sync::Arc;
+use std::env::{self, VarError};
 use tonic::Response;
 
 use crate::{
-    domain::entity::{station::Station as StationEntity, train_type::TrainType as TrainTypeEntity},
+    domain::entity::{station::Station, train_type::TrainType},
     infrastructure::{
         company_repository::MyCompanyRepository, line_repository::MyLineRepository,
         station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
@@ -14,18 +12,14 @@ use crate::{
         station_api_server::StationApi, GetStationByCoordinatesRequest, GetStationByGroupIdRequest,
         GetStationByIdRequest, GetStationByLineIdRequest, GetStationsByLineGroupIdRequest,
         GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleStationResponse,
-        MultipleTrainTypeResponse, SingleStationResponse, Station as PbStation,
-        TrainType as PbTrainType,
+        MultipleTrainTypeResponse, SingleStationResponse,
     },
     presentation::error::PresentationalError,
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
 
-const CACHE_SIZE: usize = 10_000;
-
 pub struct GrpcRouter {
-    station_list_cache: Cache<String, Arc<Vec<StationEntity>>>,
-    train_types_cache: Cache<String, Arc<Vec<TrainTypeEntity>>>,
+    cache_client: memcache::Client,
     query_use_case: QueryInteractor<
         MyStationRepository,
         MyLineRepository,
@@ -48,10 +42,12 @@ impl GrpcRouter {
             company_repository,
         };
 
+        let memcached_url = fetch_memcached_url();
+        let cache_client = memcache::connect(memcached_url).unwrap();
+
         Self {
+            cache_client,
             query_use_case,
-            station_list_cache: Cache::new(CACHE_SIZE.to_u64().unwrap()),
-            train_types_cache: Cache::new(CACHE_SIZE.to_u64().unwrap()),
         }
     }
 }
@@ -64,16 +60,13 @@ impl StationApi for GrpcRouter {
     ) -> Result<tonic::Response<SingleStationResponse>, tonic::Status> {
         let station_id = request.get_ref().id;
 
-        let cache = self.station_list_cache.clone();
         let cache_key = format!("station:id:{}", station_id);
-        if let Some(cache_data) = cache.get(&cache_key) {
+        if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
+            let station =
+                serde_json::from_str::<Station>(&cache_value).expect("Failed to parse JSON");
+
             return Ok(Response::new(SingleStationResponse {
-                station: Some(
-                    cache_data
-                        .first()
-                        .map(|station| station.clone().into())
-                        .unwrap(),
-                ),
+                station: Some(station.into()),
             }));
         };
 
@@ -87,13 +80,13 @@ impl StationApi for GrpcRouter {
                 .into())
             }
             Err(err) => {
-                return Err(PresentationalError::OtherError(Arc::new(anyhow::anyhow!(err))).into())
+                return Err(PresentationalError::OtherError(anyhow::anyhow!(err).into()).into())
             }
         };
 
-        cache
-            .insert(cache_key, Arc::new(vec![station.clone()]))
-            .await;
+        if let Ok(station_str) = serde_json::to_string(&station) {
+            self.cache_client.set(&cache_key, station_str, 0).unwrap();
+        };
 
         Ok(Response::new(SingleStationResponse {
             station: Some(station.into()),
@@ -105,10 +98,10 @@ impl StationApi for GrpcRouter {
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let group_id = request.get_ref().group_id;
 
-        let cache = self.station_list_cache.clone();
         let cache_key = format!("stations:group_id:{}", group_id);
-        if let Some(stations) = cache.get(&cache_key) {
-            let stations = stations.to_vec();
+        if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
+            let stations =
+                serde_json::from_str::<Vec<Station>>(&cache_value).expect("Failed to parse JSON");
             return Ok(Response::new(MultipleStationResponse {
                 stations: stations.into_iter().map(|station| station.into()).collect(),
             }));
@@ -116,7 +109,9 @@ impl StationApi for GrpcRouter {
 
         match self.query_use_case.get_stations_by_group_id(group_id).await {
             Ok(stations) => {
-                cache.insert(cache_key, Arc::new(stations.clone())).await;
+                if let Ok(station_str) = serde_json::to_string(&stations) {
+                    self.cache_client.set(&cache_key, station_str, 0).unwrap();
+                };
 
                 return Ok(Response::new(MultipleStationResponse {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
@@ -152,10 +147,10 @@ impl StationApi for GrpcRouter {
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let line_id = request.get_ref().line_id;
 
-        let cache = self.station_list_cache.clone();
         let cache_key = format!("stations:line_id:{}", line_id,);
-        if let Some(stations) = cache.get(&cache_key) {
-            let stations = stations.to_vec();
+        if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
+            let stations =
+                serde_json::from_str::<Vec<Station>>(&cache_value).expect("Failed to parse JSON");
             return Ok(Response::new(MultipleStationResponse {
                 stations: stations.into_iter().map(|station| station.into()).collect(),
             }));
@@ -163,7 +158,9 @@ impl StationApi for GrpcRouter {
 
         match self.query_use_case.get_stations_by_line_id(line_id).await {
             Ok(stations) => {
-                cache.insert(cache_key, Arc::new(stations.clone())).await;
+                if let Ok(station_str) = serde_json::to_string(&stations) {
+                    self.cache_client.set(&cache_key, station_str, 0).unwrap();
+                };
 
                 return Ok(Response::new(MultipleStationResponse {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
@@ -180,17 +177,17 @@ impl StationApi for GrpcRouter {
         let query_station_name = request_ref.station_name.clone();
         let query_limit = request_ref.limit;
 
-        let cache: Cache<String, Arc<Vec<StationEntity>>> = self.station_list_cache.clone();
         let cache_key = format!(
             "stations:station_name:{}:limit:{:?}",
             query_station_name,
             query_limit.clone()
         );
-        if let Some(cache_data) = cache.get(&cache_key) {
-            let stations = cache_data.to_vec();
-            let stations: Vec<PbStation> =
-                stations.into_iter().map(|station| station.into()).collect();
-            return Ok(Response::new(MultipleStationResponse { stations }));
+        if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
+            let stations =
+                serde_json::from_str::<Vec<Station>>(&cache_value).expect("Failed to parse JSON");
+            return Ok(Response::new(MultipleStationResponse {
+                stations: stations.into_iter().map(|station| station.into()).collect(),
+            }));
         };
 
         match self
@@ -199,7 +196,9 @@ impl StationApi for GrpcRouter {
             .await
         {
             Ok(stations) => {
-                cache.insert(cache_key, Arc::new(stations.clone())).await;
+                if let Ok(station_str) = serde_json::to_string(&stations) {
+                    self.cache_client.set(&cache_key, station_str, 0).unwrap();
+                };
 
                 return Ok(Response::new(MultipleStationResponse {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
@@ -216,13 +215,13 @@ impl StationApi for GrpcRouter {
         let request_ref = request.get_ref();
         let query_line_group_id = request_ref.line_group_id;
 
-        let cache = self.station_list_cache.clone();
         let cache_key = format!("stations:line_group_id:{}", query_line_group_id);
-        if let Some(cache_data) = cache.get(&cache_key) {
-            let stations = cache_data.to_vec();
-            let stations: Vec<PbStation> =
-                stations.into_iter().map(|station| station.into()).collect();
-            return Ok(Response::new(MultipleStationResponse { stations }));
+        if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
+            let stations =
+                serde_json::from_str::<Vec<Station>>(&cache_value).expect("Failed to parse JSON");
+            return Ok(Response::new(MultipleStationResponse {
+                stations: stations.into_iter().map(|station| station.into()).collect(),
+            }));
         };
 
         match self
@@ -231,8 +230,9 @@ impl StationApi for GrpcRouter {
             .await
         {
             Ok(stations) => {
-                cache.insert(cache_key, Arc::new(stations.clone())).await;
-
+                if let Ok(station_str) = serde_json::to_string(&stations) {
+                    self.cache_client.set(&cache_key, station_str, 0).unwrap();
+                };
                 return Ok(Response::new(MultipleStationResponse {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
                 }));
@@ -247,16 +247,16 @@ impl StationApi for GrpcRouter {
     ) -> Result<tonic::Response<MultipleTrainTypeResponse>, tonic::Status> {
         let request_ref: &GetTrainTypesByStationIdRequest = request.get_ref();
         let query_station_id = request_ref.station_id;
-
-        let cache = self.train_types_cache.clone();
         let cache_key = format!("train_types:station_id:{:?}", query_station_id);
-        if let Some(cache_data) = cache.get(&cache_key) {
-            let train_types = cache_data.to_vec();
-            let train_types: Vec<PbTrainType> = train_types
-                .into_iter()
-                .map(|station| station.into())
-                .collect();
-            return Ok(Response::new(MultipleTrainTypeResponse { train_types }));
+        if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
+            let train_types =
+                serde_json::from_str::<Vec<TrainType>>(&cache_value).expect("Failed to parse JSON");
+            return Ok(Response::new(MultipleTrainTypeResponse {
+                train_types: train_types
+                    .into_iter()
+                    .map(|station| station.into())
+                    .collect(),
+            }));
         };
 
         match self
@@ -265,13 +265,24 @@ impl StationApi for GrpcRouter {
             .await
         {
             Ok(train_types) => {
-                cache.insert(cache_key, Arc::new(train_types.clone())).await;
-
+                if let Ok(train_types_str) = serde_json::to_string(&train_types) {
+                    self.cache_client
+                        .set(&cache_key, train_types_str, 0)
+                        .unwrap();
+                };
                 Ok(Response::new(MultipleTrainTypeResponse {
                     train_types: train_types.into_iter().map(|tt| tt.into()).collect(),
                 }))
             }
             Err(err) => Err(PresentationalError::from(err).into()),
         }
+    }
+}
+
+fn fetch_memcached_url() -> String {
+    match env::var("MEMCACHED_URL") {
+        Ok(s) => s.parse().expect("Failed to parse $MEMCACHED_URL"),
+        Err(VarError::NotPresent) => panic!("$MEMCACHED_URL is not set."),
+        Err(VarError::NotUnicode(_)) => panic!("$MEMCACHED_URL should be written in Unicode."),
     }
 }

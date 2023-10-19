@@ -1,4 +1,6 @@
-#[derive(Clone, Debug)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LineSymbol {
     pub symbol: String,
     pub color: String,
