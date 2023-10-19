@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use super::line::Line;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TrainType {
     pub id: u32,
     pub station_cd: u32,
