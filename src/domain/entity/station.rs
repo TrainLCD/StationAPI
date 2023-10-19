@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 use crate::pb::StopCondition;
 
 use super::{line::Line, station_number::StationNumber, train_type::TrainType as TrainTypeEntity};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Station {
     pub station_cd: u32,
     pub station_g_cd: u32,
