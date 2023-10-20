@@ -1,6 +1,6 @@
 use std::{
     collections::hash_map::DefaultHasher,
-    hash::{self, Hash, Hasher},
+    hash::{Hash, Hasher},
     vec,
 };
 
