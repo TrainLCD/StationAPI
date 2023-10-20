@@ -300,7 +300,7 @@ impl InternalStationRepository {
                     SELECT
                       COUNT(sst.line_group_cd)
                     FROM
-                      station_station_types AS sst
+                      `station_station_types` AS sst
                     WHERE
                       s.station_cd = sst.station_cd
                       AND sst.pass <> 1
@@ -309,7 +309,10 @@ impl InternalStationRepository {
                   (`stations` AS s, `lines` AS l)
                   LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
                   LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-                  LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                  LEFT OUTER JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
+                  LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
+                WHERE
+                  CASE WHEN EXISTS (
                     SELECT
                       sst.line_group_cd
                     FROM
@@ -317,20 +320,34 @@ impl InternalStationRepository {
                       `stations` AS s
                     WHERE
                       s.line_cd = ?
+                      AND s.station_cd = sst.station_cd
                       AND sst.type_cd IN (100, 101, 300, 301)
-                      AND sst.station_cd = s.station_cd
-                    LIMIT 1
                   )
-                  LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
-                WHERE
-                  s.line_cd = ?
-                  AND (s.station_cd = sst.station_cd OR s.station_cd = s.station_cd)
+                    THEN
+                      sst.line_group_cd = (
+                        SELECT _sst.line_group_cd
+                        FROM
+                          `station_station_types` AS _sst,
+                          `stations` AS _s
+                        WHERE
+                          _s.line_cd = ?
+                          AND _sst.type_cd IN (100, 101, 300, 301)
+                          AND _s.station_cd = _sst.station_cd
+                        LIMIT 1
+                      )
+                      AND s.station_cd = sst.station_cd
+                      AND sst.type_cd = t.type_cd
+                    ELSE l.line_cd = ?
+                  END
                   AND s.line_cd = l.line_cd
                   AND s.e_status = 0
                 ORDER BY
-                  s.e_sort,
-                  s.station_cd",
+                  CASE WHEN sst.line_group_cd IS NULL
+                    THEN CONCAT(s.e_sort, s.station_cd)
+                    ELSE sst.id
+                  END",
         )
+        .bind(line_id)
         .bind(line_id)
         .bind(line_id)
         .fetch_all(conn)
