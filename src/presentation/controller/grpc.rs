@@ -35,15 +35,16 @@ impl GrpcRouter {
         let train_type_repository = MyTrainTypeRepository::new(pool.clone());
         let company_repository = MyCompanyRepository::new(pool);
 
+        let memcached_url = fetch_memcached_url();
+        let cache_client = memcache::connect(memcached_url).unwrap();
+
         let query_use_case = QueryInteractor {
             station_repository,
             line_repository,
             train_type_repository,
             company_repository,
+            cache_client: cache_client.clone(),
         };
-
-        let memcached_url = fetch_memcached_url();
-        let cache_client = memcache::connect(memcached_url).unwrap();
 
         Self {
             cache_client,
