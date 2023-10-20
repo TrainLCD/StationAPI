@@ -284,11 +284,6 @@ impl InternalStationRepository {
             "SELECT
                   DISTINCT l.*,
                   s.*,
-                  t.*,
-                  sst.id,
-                  sst.type_cd,
-                  sst.line_group_cd,
-                  sst.pass,
                   COALESCE(a.line_name, l.line_name) AS line_name,
                   COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
                   COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -300,7 +295,7 @@ impl InternalStationRepository {
                     SELECT
                       COUNT(sst.line_group_cd)
                     FROM
-                      station_station_types AS sst
+                      `station_station_types` AS sst
                     WHERE
                       s.station_cd = sst.station_cd
                       AND sst.pass <> 1
@@ -309,29 +304,14 @@ impl InternalStationRepository {
                   (`stations` AS s, `lines` AS l)
                   LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
                   LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-                  LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
-                    SELECT
-                      sst.line_group_cd
-                    FROM
-                      `station_station_types` AS sst,
-                      `stations` AS s
-                    WHERE
-                      s.line_cd = ?
-                      AND sst.type_cd IN (100, 101, 300, 301)
-                      AND sst.station_cd = s.station_cd
-                    LIMIT 1
-                  )
-                  LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
                 WHERE
                   s.line_cd = ?
-                  AND CASE WHEN sst.station_cd THEN s.station_cd = sst.station_cd ELSE s.station_cd = s.station_cd END
                   AND s.line_cd = l.line_cd
                   AND s.e_status = 0
                 ORDER BY
                   s.e_sort,
                   s.station_cd",
         )
-        .bind(line_id)
         .bind(line_id)
         .fetch_all(conn)
         .await?;
@@ -508,11 +488,6 @@ impl InternalStationRepository {
             "SELECT
                     DISTINCT l.*,
                     s.*,
-                    t.*,
-                    sst.id,
-                    sst.type_cd,
-                    sst.line_group_cd,
-                    sst.pass,
                     COALESCE(a.line_name, l.line_name) AS line_name,
                     COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
                     COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -524,7 +499,7 @@ impl InternalStationRepository {
                       SELECT
                         COUNT(sst.line_group_cd)
                       FROM
-                        station_station_types AS sst
+                        `station_station_types` AS sst
                       WHERE
                         s.station_cd = sst.station_cd
                         AND sst.pass <> 1
@@ -533,19 +508,7 @@ impl InternalStationRepository {
                     (`stations` AS s, `lines` AS l)
                     LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
                     LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-                    LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
-                      SELECT
-                        sst.line_group_cd
-                      FROM
-                        `station_station_types` AS sst
-                      WHERE
-                        sst.type_cd IN (100, 101, 300, 301)
-                        AND sst.station_cd = s.station_cd
-                      LIMIT
-                        1
-                    )
-                    LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
-                  WHERE
+                    WHERE
                     (
                       station_name LIKE ?
                       OR station_name_r LIKE ?
@@ -553,7 +516,6 @@ impl InternalStationRepository {
                       OR station_name_zh LIKE ?
                       OR station_name_ko LIKE ?
                     )
-                    AND CASE WHEN sst.station_cd THEN s.station_cd = sst.station_cd ELSE s.station_cd = s.station_cd END
                     AND s.line_cd = l.line_cd
                     AND s.e_status = 0
                   LIMIT
@@ -607,7 +569,6 @@ impl InternalStationRepository {
             LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
           WHERE
             sst.line_group_cd = ?
-            AND sst.station_cd = s.station_cd
             AND s.line_cd = l.line_cd
             AND s.e_status = 0",
         )
