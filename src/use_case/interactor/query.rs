@@ -170,8 +170,16 @@ where
         Ok(stations)
     }
 
-    async fn get_stations_by_line_id(&self, line_id: u32) -> Result<Vec<Station>, UseCaseError> {
-        let cache_key = format!("stations_by_line_id:line_id:{}", line_id);
+    async fn get_stations_by_line_id(
+        &self,
+        line_id: u32,
+        station_id: Option<u32>,
+    ) -> Result<Vec<Station>, UseCaseError> {
+        let cache_key = format!(
+            "stations_by_line_id:line_id:{}:station_id:{}",
+            line_id,
+            station_id.unwrap_or(0)
+        );
         if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
             let stations =
                 serde_json::from_str::<Vec<Station>>(&cache_value).expect("Failed to parse JSON");
@@ -179,7 +187,10 @@ where
             return Ok(stations);
         };
 
-        let mut stations = self.station_repository.get_by_line_id(line_id).await?;
+        let mut stations = self
+            .station_repository
+            .get_by_line_id(line_id, station_id)
+            .await?;
 
         self.update_station_vec_with_attributes(&mut stations)
             .await?;

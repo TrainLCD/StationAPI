@@ -176,9 +176,13 @@ impl StationRepository for MyStationRepository {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::find_by_id(id, &mut conn).await
     }
-    async fn get_by_line_id(&self, line_id: u32) -> Result<Vec<Station>, DomainError> {
+    async fn get_by_line_id(
+        &self,
+        line_id: u32,
+        station_id: Option<u32>,
+    ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_by_line_id(line_id, &mut conn).await
+        InternalStationRepository::get_by_line_id(line_id, station_id, &mut conn).await
     }
     async fn get_by_station_group_id(
         &self,
@@ -278,11 +282,13 @@ impl InternalStationRepository {
     }
     async fn get_by_line_id(
         line_id: u32,
+        station_id: Option<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let station_row: Vec<StationRow> = sqlx::query_as(
             "SELECT
-                  DISTINCT l.*,
+                  DISTINCT
+                  l.*,
                   s.*,
                   t.*,
                   sst.id,
@@ -309,46 +315,39 @@ impl InternalStationRepository {
                   (`stations` AS s, `lines` AS l)
                   LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
                   LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-                  LEFT OUTER JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
+                  LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                  	SELECT sst.line_group_cd
+                  	FROM
+                  	  `station_station_types` AS sst,
+                  	  `stations` AS s
+                  	WHERE
+                      s.line_cd = ?
+                      AND sst.type_cd IN (100, 101, 300, 301)
+                      AND s.station_cd = sst.station_cd
+                      AND CASE WHEN ? IS NOT NULL
+                        THEN s.station_cd = ?
+                        ELSE s.station_cd = s.station_cd
+                      END
+                    LIMIT 1
+                  )
                   LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
                 WHERE
-                  CASE WHEN EXISTS (
-                    SELECT
-                      sst.line_group_cd
-                    FROM
-                      `station_station_types` AS sst,
-                      `stations` AS s
-                    WHERE
-                      s.line_cd = ?
-                      AND s.station_cd = sst.station_cd
-                      AND sst.type_cd IN (100, 101, 300, 301)
-                  )
+                  CASE WHEN sst.line_group_cd IS NOT NULL
                     THEN
-                      sst.line_group_cd = (
-                        SELECT _sst.line_group_cd
-                        FROM
-                          `station_station_types` AS _sst,
-                          `stations` AS _s
-                        WHERE
-                          _s.line_cd = ?
-                          AND _sst.type_cd IN (100, 101, 300, 301)
-                          AND _s.station_cd = _sst.station_cd
-                        LIMIT 1
-                      )
-                      AND s.station_cd = sst.station_cd
-                      AND sst.type_cd = t.type_cd
-                    ELSE l.line_cd = ?
+                      s.station_cd = sst.station_cd
+                     ELSE
+                       l.line_cd = ?
                   END
-                  AND s.line_cd = l.line_cd
-                  AND s.e_status = 0
+                  AND l.line_cd = s.line_cd
                 ORDER BY
-                  CASE WHEN sst.line_group_cd IS NULL
-                    THEN CONCAT(s.e_sort, s.station_cd)
-                    ELSE sst.id
+                  CASE WHEN sst.line_group_cd IS NOT NULL
+                    THEN sst.id
+                    ELSE CONCAT(s.e_sort, s.station_cd)
                   END",
         )
         .bind(line_id)
-        .bind(line_id)
+        .bind(station_id)
+        .bind(station_id)
         .bind(line_id)
         .fetch_all(conn)
         .await?;
