@@ -35,15 +35,16 @@ impl GrpcRouter {
         let train_type_repository = MyTrainTypeRepository::new(pool.clone());
         let company_repository = MyCompanyRepository::new(pool);
 
+        let memcached_url = fetch_memcached_url();
+        let cache_client = memcache::connect(memcached_url).unwrap();
+
         let query_use_case = QueryInteractor {
             station_repository,
             line_repository,
             train_type_repository,
             company_repository,
+            cache_client: cache_client.clone(),
         };
-
-        let memcached_url = fetch_memcached_url();
-        let cache_client = memcache::connect(memcached_url).unwrap();
 
         Self {
             cache_client,
@@ -146,8 +147,13 @@ impl StationApi for GrpcRouter {
         request: tonic::Request<GetStationByLineIdRequest>,
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let line_id = request.get_ref().line_id;
+        let station_id = request.get_ref().station_id;
 
-        let cache_key = format!("stations:line_id:{}", line_id,);
+        let cache_key = format!(
+            "stations:line_id:{}:station_id:{}",
+            line_id,
+            station_id.unwrap_or(0)
+        );
         if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
             let stations =
                 serde_json::from_str::<Vec<Station>>(&cache_value).expect("Failed to parse JSON");
@@ -156,7 +162,11 @@ impl StationApi for GrpcRouter {
             }));
         };
 
-        match self.query_use_case.get_stations_by_line_id(line_id).await {
+        match self
+            .query_use_case
+            .get_stations_by_line_id(line_id, station_id)
+            .await
+        {
             Ok(stations) => {
                 if let Ok(station_str) = serde_json::to_string(&stations) {
                     self.cache_client.set(&cache_key, station_str, 0).unwrap();

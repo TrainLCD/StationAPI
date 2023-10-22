@@ -25,7 +25,11 @@ pub trait QueryUseCase: Send + Sync + 'static {
         longitude: f64,
         limit: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError>;
-    async fn get_stations_by_line_id(&self, line_id: u32) -> Result<Vec<Station>, UseCaseError>;
+    async fn get_stations_by_line_id(
+        &self,
+        line_id: u32,
+        station_id: Option<u32>,
+    ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_name(
         &self,
         station_name: String,
