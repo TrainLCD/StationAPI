@@ -328,6 +328,7 @@ impl InternalStationRepository {
                         THEN s.station_cd = ?
                         ELSE 1 <> 1
                       END
+                      ORDER BY sst.id
                     LIMIT 1
                   )
                   LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
@@ -339,11 +340,7 @@ impl InternalStationRepository {
                        l.line_cd = ?
                   END
                   AND l.line_cd = s.line_cd
-                ORDER BY
-                  CASE WHEN sst.line_group_cd IS NOT NULL
-                    THEN sst.id
-                    ELSE CONCAT(s.e_sort, s.station_cd)
-                  END",
+                ORDER BY s.e_sort, s.station_cd",
         )
         .bind(line_id)
         .bind(station_id)
