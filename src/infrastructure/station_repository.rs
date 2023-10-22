@@ -340,7 +340,11 @@ impl InternalStationRepository {
                        l.line_cd = ?
                   END
                   AND l.line_cd = s.line_cd
-                ORDER BY s.e_sort, s.station_cd",
+                ORDER BY
+                  CASE WHEN sst.line_group_cd IS NOT NULL
+                    THEN sst.id
+                    ELSE CONCAT(s.e_sort, s.station_cd)
+                  END",
         )
         .bind(line_id)
         .bind(station_id)
