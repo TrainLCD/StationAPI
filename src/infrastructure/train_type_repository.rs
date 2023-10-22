@@ -218,7 +218,7 @@ impl InternalTrainTypeRepository {
           WHERE 
             s.station_cd IN ( {} ) 
             AND s.station_cd = sst.station_cd
-            AND t.kind IN (0, 1)
+            AND (t.top_priority = 1 OR t.kind IN (0, 1))
             AND sst.type_cd = t.type_cd 
             AND s.e_status = 0
             AND sst.pass <> 1",
