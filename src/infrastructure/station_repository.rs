@@ -287,7 +287,6 @@ impl InternalStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let station_row: Vec<StationRow> = sqlx::query_as(
             "SELECT
-                  DISTINCT
                   l.*,
                   s.*,
                   COALESCE(a.line_name, l.line_name) AS line_name,
