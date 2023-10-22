@@ -320,7 +320,7 @@ impl InternalStationRepository {
                       AND s.station_cd = sst.station_cd
                       AND CASE WHEN ? IS NOT NULL
                         THEN s.station_cd = ?
-                        ELSE s.station_cd = s.station_cd
+                        ELSE 1 <> 1
                       END
                     LIMIT 1
                   )
