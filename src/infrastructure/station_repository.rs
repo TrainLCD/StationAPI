@@ -313,15 +313,22 @@ impl InternalStationRepository {
                   	SELECT sst.line_group_cd
                   	FROM
                   	  `station_station_types` AS sst,
-                  	  `stations` AS s
+                  	  `stations` AS s,
+                      `types` AS t
                   	WHERE
                       s.line_cd = ?
-                      AND sst.type_cd IN (100, 101, 300, 301)
+                      AND CASE WHEN t.top_priority = 1
+                        THEN sst.type_cd = t.type_cd
+                        ELSE
+                          t.kind IN (0, 1)
+                          AND sst.type_cd = t.type_cd
+                      END
                       AND s.station_cd = sst.station_cd
                       AND CASE WHEN ? IS NOT NULL
                         THEN s.station_cd = ?
                         ELSE 1 <> 1
                       END
+                      ORDER BY sst.id
                     LIMIT 1
                   )
                   LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
