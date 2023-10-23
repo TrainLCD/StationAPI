@@ -277,14 +277,14 @@ where
             .map(|station| station.station_g_cd)
             .collect::<Vec<u32>>();
 
-        let station_ids = stations_ref
-            .iter()
-            .map(|station| station.station_cd)
-            .collect::<Vec<u32>>();
-
         let stations_by_group_ids = self
             .get_stations_by_group_id_vec(station_group_ids.clone())
             .await?;
+
+        let station_ids = stations_by_group_ids
+            .iter()
+            .map(|station| station.station_cd)
+            .collect::<Vec<u32>>();
 
         let lines = self
             .get_lines_by_station_group_id_vec(station_group_ids.clone())
