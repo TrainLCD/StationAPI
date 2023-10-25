@@ -317,28 +317,23 @@ impl InternalStationRepository {
                       `types` AS t
                   	WHERE
                       s.line_cd = ?
-                      AND CASE WHEN t.top_priority = 1
-                        THEN sst.type_cd = t.type_cd
-                        ELSE
-                          t.kind IN (0, 1)
-                          AND sst.type_cd = t.type_cd
-                      END
-                      AND s.station_cd = sst.station_cd
                       AND CASE WHEN ? IS NOT NULL
                         THEN s.station_cd = ?
                         ELSE 1 <> 1
                       END
+                      AND CASE WHEN t.top_priority = 1
+                        THEN sst.type_cd = t.type_cd
+                        ELSE
+                          t.kind IN (0, 1)
+                      END
+                      AND sst.type_cd = t.type_cd
+                      AND s.station_cd = sst.station_cd
                       ORDER BY sst.id
                     LIMIT 1
                   )
                   LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
                 WHERE
-                  CASE WHEN sst.line_group_cd IS NOT NULL
-                    THEN
-                      s.station_cd = sst.station_cd
-                     ELSE
-                       l.line_cd = ?
-                  END
+                  s.station_cd = sst.station_cd
                   AND l.line_cd = s.line_cd
                 ORDER BY
                   CASE WHEN sst.line_group_cd IS NOT NULL
@@ -349,7 +344,6 @@ impl InternalStationRepository {
         .bind(line_id)
         .bind(station_id)
         .bind(station_id)
-        .bind(line_id)
         .fetch_all(conn)
         .await?;
 
