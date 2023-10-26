@@ -306,17 +306,17 @@ impl InternalStationRepository {
                 s.station_cd = sst.station_cd
                 AND sst.pass <> 1
             ) AS station_types_count,
-            -- UNIONのソート用
-            NULL AS line_group_cd,
-            NULL AS sst_id,
-            s.station_cd,
-            s.e_sort
+            s.e_sort AS station_e_sort,
+            NULL as sst_id
           FROM
             (`stations` AS s, `lines` AS l)
             LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
+            LEFT OUTER JOIN `station_station_types` AS sst ON sst.station_cd = ?
+            LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
           WHERE
-            l.line_cd = ?
+            sst.station_cd IS NULL
+            AND l.line_cd = ?
             AND l.line_cd = s.line_cd
         )
         UNION
@@ -340,11 +340,8 @@ impl InternalStationRepository {
                   s.station_cd = sst.station_cd
                   AND sst.pass <> 1
               ) AS station_types_count,
-              -- UNIONのソート用
-              sst.line_group_cd,
-              sst.id AS sst_id,
-              s.station_cd,
-              s.e_sort
+              s.e_sort AS station_e_sort,
+              sst.id AS sst_id
             FROM
               (`stations` AS s, `lines` AS l)
               LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
@@ -368,12 +365,18 @@ impl InternalStationRepository {
                   1
               ) LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
             WHERE
-              s.station_cd = sst.station_cd
+              sst.station_cd IS NOT NULL
+              AND s.station_cd = sst.station_cd
               AND l.line_cd = s.line_cd
           )
-          ORDER BY
-            CASE WHEN line_group_cd IS NOT NULL THEN sst_id ELSE CONCAT(e_sort, station_cd) END",
+        ORDER BY
+          IF(
+            sst_id IS NOT NULL,
+            sst_id,
+            CONCAT(e_sort, station_cd)
+          )",
         )
+        .bind(station_id)
         .bind(line_id)
         .bind(line_id)
         .bind(station_id)
