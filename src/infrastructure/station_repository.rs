@@ -285,43 +285,9 @@ impl InternalStationRepository {
         station_id: Option<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let station_row: Vec<StationRow> = sqlx::query_as("(
-          SELECT
-            DISTINCT s.*,
-            l.*,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            (
-              SELECT
-                COUNT(sst.line_group_cd)
-              FROM
-                `station_station_types` AS sst
-              WHERE
-                s.station_cd = sst.station_cd
-                AND sst.pass <> 1
-            ) AS station_types_count,
-            -- UNIONのソート用
-            NULL AS line_group_cd,
-            NULL AS sst_id,
-            s.station_cd,
-            s.e_sort
-          FROM
-            (`stations` AS s, `lines` AS l)
-            LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-          WHERE
-            l.line_cd = ?
-            AND l.line_cd = s.line_cd
-        )
-        UNION
-          DISTINCT (
-            SELECT
-              DISTINCT s.*,
+        let station_row: Vec<StationRow> = sqlx::query_as(
+            "SELECT
+              s.*,
               l.*,
               COALESCE(a.line_name, l.line_name) AS line_name,
               COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
@@ -338,12 +304,7 @@ impl InternalStationRepository {
                 WHERE
                   s.station_cd = sst.station_cd
                   AND sst.pass <> 1
-              ) AS station_types_count,
-              -- UNIONのソート用
-              sst.line_group_cd,
-              sst.id AS sst_id,
-              s.station_cd,
-              s.e_sort
+              ) AS station_types_count
             FROM
               (`stations` AS s, `lines` AS l)
               LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
@@ -361,17 +322,21 @@ impl InternalStationRepository {
                   AND CASE WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd ELSE t.kind IN (0, 1) END
                   AND sst.type_cd = t.type_cd
                   AND s.station_cd = sst.station_cd
+                -- LIMIT 1で最初のIDとなる値が求めているIDとは限らないのでソートしている
                 ORDER BY
                   sst.id
                 LIMIT
                   1
               ) LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
             WHERE
-              s.station_cd = sst.station_cd
-              AND l.line_cd = s.line_cd
-          )
+              s.station_cd = CASE WHEN sst.station_cd IS NOT NULL
+              	THEN sst.station_cd
+              	ELSE s.station_cd
+              END
+              AND l.line_cd = CASE WHEN sst.station_cd IS NULL THEN ? END
+              AND s.line_cd = l.line_cd
         ORDER BY
-          CASE WHEN line_group_cd IS NOT NULL THEN sst_id ELSE CONCAT(e_sort, station_cd) END",
+          CASE WHEN sst.id IS NOT NULL THEN sst.id ELSE CONCAT(s.e_sort, s.station_cd) END",
         )
         .bind(line_id)
         .bind(station_id)
