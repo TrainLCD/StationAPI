@@ -312,7 +312,24 @@ impl InternalStationRepository {
             (`stations` AS s, `lines` AS l)
             LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-            LEFT OUTER JOIN `station_station_types` AS sst ON sst.station_cd = ?
+            LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                SELECT
+                  sst.line_group_cd
+                FROM
+                  `station_station_types` AS sst,
+                  `stations` AS s,
+                  `types` AS t
+                WHERE
+                  s.line_cd = ?
+                  AND CASE WHEN ? IS NOT NULL THEN s.station_cd = ? END
+                  AND CASE WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd ELSE t.kind IN (0, 1) END
+                  AND sst.type_cd = t.type_cd
+                  AND s.station_cd = sst.station_cd
+                ORDER BY
+                  sst.id
+                LIMIT
+                  1
+              )
             LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
           WHERE
             sst.station_cd IS NULL
@@ -363,7 +380,8 @@ impl InternalStationRepository {
                   sst.id
                 LIMIT
                   1
-              ) LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
+              )
+              LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
             WHERE
               sst.station_cd IS NOT NULL
               AND s.station_cd = sst.station_cd
@@ -376,6 +394,8 @@ impl InternalStationRepository {
             CONCAT(e_sort, station_cd)
           )",
         )
+        .bind(line_id)
+        .bind(station_id)
         .bind(station_id)
         .bind(line_id)
         .bind(line_id)
