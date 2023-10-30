@@ -222,6 +222,7 @@ impl InternalTrainTypeRepository {
                 sst.type_cd = t.type_cd
             ELSE
                 t.kind IN (0, 1)
+                AND sst.pass <> 1
                 AND sst.type_cd = t.type_cd
             END
             AND s.station_cd = sst.station_cd
