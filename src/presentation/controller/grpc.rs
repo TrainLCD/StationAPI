@@ -1,5 +1,4 @@
 use sqlx::{MySql, Pool};
-use std::env::{self, VarError};
 use tonic::Response;
 
 use crate::{
@@ -19,7 +18,7 @@ use crate::{
 };
 
 pub struct GrpcRouter {
-    cache_client: memcache::Client,
+    cache_client: Option<memcache::Client>,
     query_use_case: QueryInteractor<
         MyStationRepository,
         MyLineRepository,
@@ -29,14 +28,11 @@ pub struct GrpcRouter {
 }
 
 impl GrpcRouter {
-    pub fn new(pool: Pool<MySql>) -> Self {
+    pub fn new(pool: Pool<MySql>, cache_client: Option<memcache::Client>) -> Self {
         let station_repository = MyStationRepository::new(pool.clone());
         let line_repository = MyLineRepository::new(pool.clone());
         let train_type_repository = MyTrainTypeRepository::new(pool.clone());
         let company_repository = MyCompanyRepository::new(pool);
-
-        let memcached_url = fetch_memcached_url();
-        let cache_client = memcache::connect(memcached_url).unwrap();
 
         let query_use_case = QueryInteractor {
             station_repository,
@@ -62,13 +58,15 @@ impl StationApi for GrpcRouter {
         let station_id = request.get_ref().id;
 
         let cache_key = format!("station:id:{}", station_id);
-        if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
-            let station =
-                serde_json::from_str::<Station>(&cache_value).expect("Failed to parse JSON");
+        if let Some(cache_client) = &self.cache_client {
+            if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
+                let station =
+                    serde_json::from_str::<Station>(&cache_value).expect("Failed to parse JSON");
 
-            return Ok(Response::new(SingleStationResponse {
-                station: Some(station.into()),
-            }));
+                return Ok(Response::new(SingleStationResponse {
+                    station: Some(station.into()),
+                }));
+            };
         };
 
         let station = match self.query_use_case.find_station_by_id(station_id).await {
@@ -85,8 +83,10 @@ impl StationApi for GrpcRouter {
             }
         };
 
-        if let Ok(station_str) = serde_json::to_string(&station) {
-            self.cache_client.set(&cache_key, station_str, 0).unwrap();
+        if let Some(cache_client) = &self.cache_client {
+            if let Ok(station_str) = serde_json::to_string(&station) {
+                cache_client.set(&cache_key, station_str, 0).unwrap();
+            };
         };
 
         Ok(Response::new(SingleStationResponse {
@@ -100,19 +100,24 @@ impl StationApi for GrpcRouter {
         let group_id = request.get_ref().group_id;
 
         let cache_key = format!("stations:group_id:{}", group_id);
-        if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
-            let stations =
-                serde_json::from_str::<Vec<Station>>(&cache_value).expect("Failed to parse JSON");
-            return Ok(Response::new(MultipleStationResponse {
-                stations: stations.into_iter().map(|station| station.into()).collect(),
-            }));
+
+        if let Some(cache_client) = &self.cache_client {
+            if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
+                let stations = serde_json::from_str::<Vec<Station>>(&cache_value)
+                    .expect("Failed to parse JSON");
+                return Ok(Response::new(MultipleStationResponse {
+                    stations: stations.into_iter().map(|station| station.into()).collect(),
+                }));
+            };
         };
 
         match self.query_use_case.get_stations_by_group_id(group_id).await {
             Ok(stations) => {
-                if let Ok(station_str) = serde_json::to_string(&stations) {
-                    self.cache_client.set(&cache_key, station_str, 0).unwrap();
-                };
+                if let Some(cache_client) = &self.cache_client {
+                    if let Ok(station_str) = serde_json::to_string(&stations) {
+                        cache_client.set(&cache_key, station_str, 0).unwrap();
+                    };
+                }
 
                 return Ok(Response::new(MultipleStationResponse {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
@@ -154,13 +159,15 @@ impl StationApi for GrpcRouter {
             line_id,
             station_id.unwrap_or(0)
         );
-        if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
-            let stations =
-                serde_json::from_str::<Vec<Station>>(&cache_value).expect("Failed to parse JSON");
-            return Ok(Response::new(MultipleStationResponse {
-                stations: stations.into_iter().map(|station| station.into()).collect(),
-            }));
-        };
+        if let Some(cache_client) = &self.cache_client {
+            if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
+                let stations = serde_json::from_str::<Vec<Station>>(&cache_value)
+                    .expect("Failed to parse JSON");
+                return Ok(Response::new(MultipleStationResponse {
+                    stations: stations.into_iter().map(|station| station.into()).collect(),
+                }));
+            };
+        }
 
         match self
             .query_use_case
@@ -168,8 +175,10 @@ impl StationApi for GrpcRouter {
             .await
         {
             Ok(stations) => {
-                if let Ok(station_str) = serde_json::to_string(&stations) {
-                    self.cache_client.set(&cache_key, station_str, 0).unwrap();
+                if let Some(cache_client) = &self.cache_client {
+                    if let Ok(station_str) = serde_json::to_string(&stations) {
+                        cache_client.set(&cache_key, station_str, 0).unwrap();
+                    };
                 };
 
                 return Ok(Response::new(MultipleStationResponse {
@@ -192,13 +201,15 @@ impl StationApi for GrpcRouter {
             query_station_name,
             query_limit.clone()
         );
-        if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
-            let stations =
-                serde_json::from_str::<Vec<Station>>(&cache_value).expect("Failed to parse JSON");
-            return Ok(Response::new(MultipleStationResponse {
-                stations: stations.into_iter().map(|station| station.into()).collect(),
-            }));
-        };
+        if let Some(cache_client) = &self.cache_client {
+            if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
+                let stations = serde_json::from_str::<Vec<Station>>(&cache_value)
+                    .expect("Failed to parse JSON");
+                return Ok(Response::new(MultipleStationResponse {
+                    stations: stations.into_iter().map(|station| station.into()).collect(),
+                }));
+            };
+        }
 
         match self
             .query_use_case
@@ -206,8 +217,10 @@ impl StationApi for GrpcRouter {
             .await
         {
             Ok(stations) => {
-                if let Ok(station_str) = serde_json::to_string(&stations) {
-                    self.cache_client.set(&cache_key, station_str, 0).unwrap();
+                if let Some(cache_client) = &self.cache_client {
+                    if let Ok(station_str) = serde_json::to_string(&stations) {
+                        cache_client.set(&cache_key, station_str, 0).unwrap();
+                    };
                 };
 
                 return Ok(Response::new(MultipleStationResponse {
@@ -226,12 +239,14 @@ impl StationApi for GrpcRouter {
         let query_line_group_id = request_ref.line_group_id;
 
         let cache_key = format!("stations:line_group_id:{}", query_line_group_id);
-        if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
-            let stations =
-                serde_json::from_str::<Vec<Station>>(&cache_value).expect("Failed to parse JSON");
-            return Ok(Response::new(MultipleStationResponse {
-                stations: stations.into_iter().map(|station| station.into()).collect(),
-            }));
+        if let Some(cache_client) = &self.cache_client {
+            if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
+                let stations = serde_json::from_str::<Vec<Station>>(&cache_value)
+                    .expect("Failed to parse JSON");
+                return Ok(Response::new(MultipleStationResponse {
+                    stations: stations.into_iter().map(|station| station.into()).collect(),
+                }));
+            };
         };
 
         match self
@@ -240,9 +255,11 @@ impl StationApi for GrpcRouter {
             .await
         {
             Ok(stations) => {
-                if let Ok(station_str) = serde_json::to_string(&stations) {
-                    self.cache_client.set(&cache_key, station_str, 0).unwrap();
-                };
+                if let Some(cache_client) = &self.cache_client {
+                    if let Ok(station_str) = serde_json::to_string(&stations) {
+                        cache_client.set(&cache_key, station_str, 0).unwrap();
+                    };
+                }
                 return Ok(Response::new(MultipleStationResponse {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
                 }));
@@ -258,15 +275,17 @@ impl StationApi for GrpcRouter {
         let request_ref: &GetTrainTypesByStationIdRequest = request.get_ref();
         let query_station_id = request_ref.station_id;
         let cache_key = format!("train_types:station_id:{:?}", query_station_id);
-        if let Ok(Some(cache_value)) = self.cache_client.get::<String>(cache_key.as_str()) {
-            let train_types =
-                serde_json::from_str::<Vec<TrainType>>(&cache_value).expect("Failed to parse JSON");
-            return Ok(Response::new(MultipleTrainTypeResponse {
-                train_types: train_types
-                    .into_iter()
-                    .map(|station| station.into())
-                    .collect(),
-            }));
+        if let Some(cache_client) = &self.cache_client {
+            if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
+                let train_types = serde_json::from_str::<Vec<TrainType>>(&cache_value)
+                    .expect("Failed to parse JSON");
+                return Ok(Response::new(MultipleTrainTypeResponse {
+                    train_types: train_types
+                        .into_iter()
+                        .map(|station| station.into())
+                        .collect(),
+                }));
+            };
         };
 
         match self
@@ -275,24 +294,16 @@ impl StationApi for GrpcRouter {
             .await
         {
             Ok(train_types) => {
-                if let Ok(train_types_str) = serde_json::to_string(&train_types) {
-                    self.cache_client
-                        .set(&cache_key, train_types_str, 0)
-                        .unwrap();
-                };
+                if let Some(cache_client) = &self.cache_client {
+                    if let Ok(train_types_str) = serde_json::to_string(&train_types) {
+                        cache_client.set(&cache_key, train_types_str, 0).unwrap();
+                    };
+                }
                 Ok(Response::new(MultipleTrainTypeResponse {
                     train_types: train_types.into_iter().map(|tt| tt.into()).collect(),
                 }))
             }
             Err(err) => Err(PresentationalError::from(err).into()),
         }
-    }
-}
-
-fn fetch_memcached_url() -> String {
-    match env::var("MEMCACHED_URL") {
-        Ok(s) => s.parse().expect("Failed to parse $MEMCACHED_URL"),
-        Err(VarError::NotPresent) => panic!("$MEMCACHED_URL is not set."),
-        Err(VarError::NotUnicode(_)) => panic!("$MEMCACHED_URL should be written in Unicode."),
     }
 }

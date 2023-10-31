@@ -1,11 +1,10 @@
-use std::{
-    env::{self, VarError},
-    net::{AddrParseError, SocketAddr},
-};
-
 use sqlx::MySqlPool;
 use stationapi::{
     pb::station_api_server::StationApiServer, presentation::controller::grpc::GrpcRouter,
+};
+use std::{
+    env::{self, VarError},
+    net::{AddrParseError, SocketAddr},
 };
 use tonic::transport::Server;
 use tracing::{info, warn};
@@ -20,12 +19,15 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     dotenv::from_filename(".env.local").ok();
 
-    let addr = fetch_addr().unwrap();
-
     let db_url = fetch_database_url();
     let pool = MySqlPool::connect(db_url.as_str()).await?;
-    let api_server = GrpcRouter::new(pool);
+
+    let cache_client = connect_to_memcached()?;
+
+    let api_server = GrpcRouter::new(pool, cache_client);
     let accept_http1 = fetch_http1_flag();
+
+    let addr = fetch_addr()?;
 
     info!("StationAPI Server listening on {}", addr);
 
@@ -77,5 +79,41 @@ fn fetch_http1_flag() -> bool {
             false
         }
         Err(VarError::NotUnicode(_)) => panic!("$ACCEPT_HTTP1 should be written in Unicode."),
+    }
+}
+
+fn fetch_memcached_url() -> String {
+    match env::var("MEMCACHED_URL") {
+        Ok(s) => s.parse().expect("Failed to parse $MEMCACHED_URL"),
+        Err(VarError::NotPresent) => panic!("$MEMCACHED_URL is not set."),
+        Err(VarError::NotUnicode(_)) => panic!("$MEMCACHED_URL should be written in Unicode."),
+    }
+}
+
+fn fetch_disable_memcache_flag() -> bool {
+    match env::var("DISABLE_MEMCACHE") {
+        Ok(s) => s.parse().expect("Failed to parse $DISABLE_MEMCACHE"),
+        Err(env::VarError::NotPresent) => {
+            warn!("$DISABLE_MEMCACHE is not set. Falling back to false.");
+            false
+        }
+        Err(VarError::NotUnicode(_)) => panic!("$DISABLE_MEMCACHE should be written in Unicode."),
+    }
+}
+
+fn connect_to_memcached() -> Result<Option<memcache::Client>, anyhow::Error> {
+    let memcached_url = fetch_memcached_url();
+    let disable_memcache = fetch_disable_memcache_flag();
+    if disable_memcache {
+        warn!("In-memory cache is disabled by an environment variable.");
+        return Ok(None);
+    }
+
+    match memcache::connect(memcached_url) {
+        Ok(client) => Ok(Some(client)),
+        Err(_) => {
+            warn!("Could not communicate with memcached. In-memory cache has been disabled.");
+            Ok(None)
+        }
     }
 }
