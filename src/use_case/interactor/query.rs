@@ -672,12 +672,7 @@ where
                 line.train_type = train_type;
             }
 
-            let train_type: Option<TrainType> = self
-                .train_type_repository
-                .find_by_line_group_id_and_line_id(tt.line_group_cd, line.line_cd)
-                .await?;
-
-            line.train_type = train_type;
+            line.train_type = Some(tt.to_owned());
             line.company = companies
                 .iter()
                 .find(|c| c.company_cd == line.company_cd)
