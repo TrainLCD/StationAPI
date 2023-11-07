@@ -672,7 +672,7 @@ where
                 line.train_type = train_type;
             }
 
-            line.train_type = Some(tt.to_owned());
+            line.train_type = Some(tt.clone());
             line.company = companies
                 .iter()
                 .find(|c| c.company_cd == line.company_cd)
