@@ -224,6 +224,11 @@ impl StationRepository for MyStationRepository {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::get_by_line_group_id(line_group_id, &mut conn).await
     }
+
+    async fn get_all_stations(&self) -> Result<Vec<Station>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalStationRepository::get_all_stations(&mut conn).await
+    }
 }
 
 struct InternalStationRepository {}
@@ -662,6 +667,26 @@ impl InternalStationRepository {
             AND s.e_status = 0",
         )
         .bind(line_group_id)
+        .fetch_all(conn)
+        .await?;
+
+        let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
+
+        Ok(stations)
+    }
+
+    async fn get_all_stations(conn: &mut MySqlConnection) -> Result<Vec<Station>, DomainError> {
+        let rows: Vec<StationRow> = sqlx::query_as(
+            "SELECT *
+            FROM
+            (`stations` AS s, `lines` AS l)
+            WHERE
+            s.line_cd = l.line_cd
+            AND s.e_status = 0
+          ORDER BY
+            s.e_sort,
+            s.station_cd",
+        )
         .fetch_all(conn)
         .await?;
 

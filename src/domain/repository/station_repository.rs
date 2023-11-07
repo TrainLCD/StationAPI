@@ -30,4 +30,5 @@ pub trait StationRepository: Send + Sync + 'static {
         limit: Option<u32>,
     ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Station>, DomainError>;
+    async fn get_all_stations(&self) -> Result<Vec<Station>, DomainError>;
 }

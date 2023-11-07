@@ -1,5 +1,8 @@
+use std::env::{self, VarError};
+
 use sqlx::{MySql, Pool};
 use tonic::Response;
+use tracing::warn;
 
 use crate::{
     domain::entity::{station::Station, train_type::TrainType},
@@ -11,7 +14,7 @@ use crate::{
         station_api_server::StationApi, GetStationByCoordinatesRequest, GetStationByGroupIdRequest,
         GetStationByIdRequest, GetStationByLineIdRequest, GetStationsByLineGroupIdRequest,
         GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleStationResponse,
-        MultipleTrainTypeResponse, SingleStationResponse,
+        MultipleTrainTypeResponse, SingleStationResponse, VoidMessage,
     },
     presentation::error::PresentationalError,
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
@@ -304,6 +307,32 @@ impl StationApi for GrpcRouter {
                 }))
             }
             Err(err) => Err(PresentationalError::from(err).into()),
+        }
+    }
+
+    async fn get_all_stations(
+        &self,
+        _: tonic::Request<VoidMessage>,
+    ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
+        let enabled: bool = match env::var("ENABLE_ALL_STATIONS_RPC") {
+            Ok(s) => s.parse().expect("Failed to parse $ENABLE_ALL_STATIONS_RPC"),
+            Err(env::VarError::NotPresent) => {
+                warn!("$ENABLE_ALL_STATIONS_RPC is not set. Falling back to false.");
+                false
+            }
+            Err(VarError::NotUnicode(_)) => panic!("$PORT should be written in Unicode."),
+        };
+
+        if !enabled {
+            return Ok(Response::new(MultipleStationResponse { stations: vec![] }));
+        }
+        match self.query_use_case.get_all_stations().await {
+            Ok(stations) => {
+                return Ok(Response::new(MultipleStationResponse {
+                    stations: stations.into_iter().map(|station| station.into()).collect(),
+                }));
+            }
+            Err(err) => return Err(PresentationalError::from(err).into()),
         }
     }
 }

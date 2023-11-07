@@ -1,7 +1,6 @@
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
-    vec,
 };
 
 use async_trait::async_trait;
@@ -729,5 +728,10 @@ where
         }
 
         Ok(train_types)
+    }
+
+    async fn get_all_stations(&self) -> Result<Vec<Station>, UseCaseError> {
+        let stations = &mut self.station_repository.get_all_stations().await?;
+        Ok(stations.to_vec())
     }
 }
