@@ -33,7 +33,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     Server::builder()
         .accept_http1(accept_http1)
-        .add_service(StationApiServer::new(api_server))
+        .add_service(tonic_web::enable(StationApiServer::new(api_server)))
         .serve(addr)
         .await?;
 
