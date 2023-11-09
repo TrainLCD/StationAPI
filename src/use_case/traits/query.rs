@@ -11,6 +11,10 @@ use crate::{
 #[async_trait]
 pub trait QueryUseCase: Send + Sync + 'static {
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError>;
+    async fn get_stations_by_id_vec(
+        &self,
+        station_ids: Vec<u32>,
+    ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_group_id(
         &self,
         station_group_id: u32,

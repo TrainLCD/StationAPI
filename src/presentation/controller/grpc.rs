@@ -1,3 +1,8 @@
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
+
 use sqlx::{MySql, Pool};
 use tonic::Response;
 
@@ -9,9 +14,9 @@ use crate::{
     },
     pb::{
         station_api_server::StationApi, GetStationByCoordinatesRequest, GetStationByGroupIdRequest,
-        GetStationByIdRequest, GetStationByLineIdRequest, GetStationsByLineGroupIdRequest,
-        GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleStationResponse,
-        MultipleTrainTypeResponse, SingleStationResponse,
+        GetStationByIdListRequest, GetStationByIdRequest, GetStationByLineIdRequest,
+        GetStationsByLineGroupIdRequest, GetStationsByNameRequest, GetTrainTypesByStationIdRequest,
+        MultipleStationResponse, MultipleTrainTypeResponse, SingleStationResponse,
     },
     presentation::error::PresentationalError,
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
@@ -93,6 +98,55 @@ impl StationApi for GrpcRouter {
             station: Some(station.into()),
         }))
     }
+
+    async fn get_station_by_id_list(
+        &self,
+        request: tonic::Request<GetStationByIdListRequest>,
+    ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
+        let mut hasher = DefaultHasher::new();
+
+        let station_ids = &request.get_ref().ids;
+        station_ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<String>>()
+            .hash(&mut hasher);
+
+        let cache_key = format!("get_station_by_id_list:ids:{}", hasher.finish());
+
+        if let Some(cache_client) = &self.cache_client {
+            if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
+                let stations = serde_json::from_str::<Vec<Station>>(&cache_value)
+                    .expect("Failed to parse JSON");
+
+                return Ok(Response::new(MultipleStationResponse {
+                    stations: stations.into_iter().map(|station| station.into()).collect(),
+                }));
+            };
+        };
+
+        let stations = match self
+            .query_use_case
+            .get_stations_by_id_vec(station_ids.to_vec())
+            .await
+        {
+            Ok(stations) => stations,
+            Err(err) => {
+                return Err(PresentationalError::OtherError(anyhow::anyhow!(err).into()).into())
+            }
+        };
+
+        if let Some(cache_client) = &self.cache_client {
+            if let Ok(station_str) = serde_json::to_string(&stations) {
+                cache_client.set(&cache_key, station_str, 0).unwrap();
+            };
+        };
+
+        Ok(Response::new(MultipleStationResponse {
+            stations: stations.into_iter().map(|station| station.into()).collect(),
+        }))
+    }
+
     async fn get_stations_by_group_id(
         &self,
         request: tonic::Request<GetStationByGroupIdRequest>,
