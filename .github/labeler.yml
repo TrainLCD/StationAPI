@@ -1,13 +1,9 @@
 ci/cd:
-  - .github/*
-  - .github/**/*
-  - scripts/*
-  - scripts/**/*
+  - .github/workflows/*
+  - .github/*.yml
 rust:
   - src/*
   - src/**/*
-data:
-  - migrations/*
 protobuf:
   - proto/*
   - proto/**/*
@@ -17,3 +13,6 @@ deploy-staging:
   - staging
 deploy-dev:
   - dev
+documentation:
+  - .github/ISSUE_TEMPLATE/*
+  - pull_request_template.md

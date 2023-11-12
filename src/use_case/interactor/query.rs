@@ -65,6 +65,16 @@ where
 
         Ok(station)
     }
+    async fn get_stations_by_id_vec(
+        &self,
+        station_ids: Vec<u32>,
+    ) -> Result<Vec<Station>, UseCaseError> {
+        let mut stations = self.station_repository.get_by_id_vec(station_ids).await?;
+        self.update_station_vec_with_attributes(&mut stations)
+            .await?;
+
+        Ok(stations)
+    }
 
     async fn get_stations_by_group_id(
         &self,

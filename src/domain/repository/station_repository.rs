@@ -5,6 +5,7 @@ use crate::domain::{entity::station::Station, error::DomainError};
 #[async_trait]
 pub trait StationRepository: Send + Sync + 'static {
     async fn find_by_id(&self, id: u32) -> Result<Option<Station>, DomainError>;
+    async fn get_by_id_vec(&self, ids: Vec<u32>) -> Result<Vec<Station>, DomainError>;
     async fn get_by_line_id(
         &self,
         line_id: u32,
