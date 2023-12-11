@@ -361,9 +361,9 @@ where
 
             let mut lines: Vec<Line> = lines
                 .iter()
+                .filter(|&l| l.station_g_cd.is_some())
+                .filter(|&l| l.station_g_cd.unwrap() == station.station_g_cd)
                 .cloned()
-                .filter(|l| l.station_g_cd.is_some())
-                .filter(|l| l.station_g_cd.unwrap() == station.station_g_cd)
                 .collect();
             for line in lines.iter_mut() {
                 line.company = companies
