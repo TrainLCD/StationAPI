@@ -181,6 +181,7 @@ impl InternalTrainTypeRepository {
                 stations as s 
               WHERE 
                 line_cd = ?
+                AND s.e_status = 0
             ) 
             AND t.type_cd = sst.type_cd",
         )
