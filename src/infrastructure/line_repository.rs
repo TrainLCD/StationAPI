@@ -160,7 +160,7 @@ impl InternalLineRepository {
                 SELECT line_cd
                 FROM stations AS s
                 WHERE s.station_cd = ?
-                AND e_status = 0
+                AND s.e_status = 0
             )
             AND e_status = 0",
         )

@@ -385,6 +385,7 @@ impl InternalStationRepository {
                   AND CASE WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd ELSE t.kind IN (0, 1) END
                   AND sst.type_cd = t.type_cd
                   AND s.station_cd = sst.station_cd
+                  AND s.e_status = 0
                 ORDER BY
                   sst.id
                 LIMIT
@@ -395,6 +396,7 @@ impl InternalStationRepository {
             sst.station_cd IS NULL
             AND l.line_cd = ?
             AND l.line_cd = s.line_cd
+            AND s.e_status = 0
         )
         UNION
           DISTINCT (
@@ -436,6 +438,7 @@ impl InternalStationRepository {
                   AND CASE WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd ELSE t.kind IN (0, 1) END
                   AND sst.type_cd = t.type_cd
                   AND s.station_cd = sst.station_cd
+                  AND s.e_status = 0
                 ORDER BY
                   sst.id
                 LIMIT
@@ -446,6 +449,7 @@ impl InternalStationRepository {
               sst.station_cd IS NOT NULL
               AND s.station_cd = sst.station_cd
               AND l.line_cd = s.line_cd
+              AND s.e_status = 0
           )
         ORDER BY
           IF(
