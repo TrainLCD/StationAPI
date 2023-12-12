@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use bigdecimal::{BigDecimal, ToPrimitive, Zero};
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::{
@@ -27,8 +26,8 @@ struct StationRow {
     pref_cd: u32,
     post: String,
     address: String,
-    lon: BigDecimal,
-    lat: BigDecimal,
+    lon: f64,
+    lat: f64,
     open_ymd: String,
     close_ymd: String,
     e_status: u32,
@@ -109,14 +108,8 @@ impl From<StationRow> for Station {
             pref_cd: row.pref_cd,
             post: row.post,
             address: row.address,
-            lon: row
-                .lon
-                .to_f64()
-                .expect("Failed to convert BigDecimal to f64"),
-            lat: row
-                .lat
-                .to_f64()
-                .expect("Failed to convert BigDecimal to f64"),
+            lon: row.lon,
+            lat: row.lat,
             open_ymd: row.open_ymd,
             close_ymd: row.close_ymd,
             e_status: row.e_status,
@@ -289,7 +282,7 @@ impl InternalStationRepository {
         ids: Vec<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        if ids.len().is_zero() {
+        if ids.is_empty() {
             return Ok(vec![]);
         }
 
@@ -518,7 +511,7 @@ impl InternalStationRepository {
         group_id_vec: Vec<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        if group_id_vec.len().is_zero() {
+        if group_id_vec.is_empty() {
             return Ok(vec![]);
         }
 

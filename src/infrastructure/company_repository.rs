@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use bigdecimal::Zero;
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::domain::{
@@ -67,7 +66,7 @@ impl InternalCompanyRepository {
         id_vec: Vec<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Company>, DomainError> {
-        if id_vec.len().is_zero() {
+        if id_vec.is_empty() {
             return Ok(vec![]);
         }
 
