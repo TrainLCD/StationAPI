@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use bigdecimal::Zero;
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::domain::{
@@ -181,7 +180,7 @@ impl InternalLineRepository {
         ids: Vec<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Line>, DomainError> {
-        if ids.len().is_zero() {
+        if ids.is_empty() {
             return Ok(vec![]);
         }
 
@@ -246,7 +245,7 @@ impl InternalLineRepository {
         station_group_id_vec: Vec<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Line>, DomainError> {
-        if station_group_id_vec.len().is_zero() {
+        if station_group_id_vec.is_empty() {
             return Ok(vec![]);
         }
 
@@ -333,7 +332,7 @@ impl InternalLineRepository {
         line_group_id_vec: Vec<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Line>, DomainError> {
-        if line_group_id_vec.len().is_zero() {
+        if line_group_id_vec.is_empty() {
             return Ok(vec![]);
         }
 

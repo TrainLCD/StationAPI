@@ -5,7 +5,6 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bigdecimal::Zero;
 
 use crate::{
     domain::{
@@ -596,7 +595,7 @@ where
             line_symbol_extra_shape,
         ];
 
-        if line_symbols_raw.len().is_zero() {
+        if line_symbols_raw.is_empty() {
             return vec![];
         }
 
