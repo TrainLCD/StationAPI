@@ -1,30 +1,27 @@
-use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
+use crate::infrastructure::{
+    company_repository::MyCompanyRepository, line_repository::MyLineRepository,
+    station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
 };
-
-use sqlx::{MySql, Pool};
-use tonic::Response;
-
+use crate::use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase};
 use crate::{
     domain::entity::{station::Station, train_type::TrainType},
-    infrastructure::{
-        company_repository::MyCompanyRepository, line_repository::MyLineRepository,
-        station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
-    },
-    pb::{
+    presentation::error::PresentationalError,
+    station_api::{
         station_api_server::StationApi, GetStationByCoordinatesRequest, GetStationByGroupIdRequest,
         GetStationByIdListRequest, GetStationByIdRequest, GetStationByLineIdRequest,
         GetStationsByLineGroupIdRequest, GetStationsByNameRequest, GetTrainTypesByStationIdRequest,
         MultipleStationResponse, MultipleTrainTypeResponse, SingleStationResponse,
     },
-    presentation::error::PresentationalError,
-    use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
+use tonic::Response;
 
-pub struct GrpcRouter {
-    cache_client: Option<memcache::Client>,
-    query_use_case: QueryInteractor<
+pub struct MyApi {
+    pub cache_client: Option<memcache::Client>,
+    pub query_use_case: QueryInteractor<
         MyStationRepository,
         MyLineRepository,
         MyTrainTypeRepository,
@@ -32,30 +29,8 @@ pub struct GrpcRouter {
     >,
 }
 
-impl GrpcRouter {
-    pub fn new(pool: Pool<MySql>, cache_client: Option<memcache::Client>) -> Self {
-        let station_repository = MyStationRepository::new(pool.clone());
-        let line_repository = MyLineRepository::new(pool.clone());
-        let train_type_repository = MyTrainTypeRepository::new(pool.clone());
-        let company_repository = MyCompanyRepository::new(pool);
-
-        let query_use_case = QueryInteractor {
-            station_repository,
-            line_repository,
-            train_type_repository,
-            company_repository,
-            cache_client: cache_client.clone(),
-        };
-
-        Self {
-            cache_client,
-            query_use_case,
-        }
-    }
-}
-
 #[tonic::async_trait]
-impl StationApi for GrpcRouter {
+impl StationApi for MyApi {
     async fn get_station_by_id(
         &self,
         request: tonic::Request<GetStationByIdRequest>,

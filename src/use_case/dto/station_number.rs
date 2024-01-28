@@ -1,5 +1,5 @@
 use crate::{
-    domain::entity::station_number::StationNumber, pb::StationNumber as GrpcStationNumber,
+    domain::entity::station_number::StationNumber, station_api::StationNumber as GrpcStationNumber,
 };
 
 impl From<StationNumber> for GrpcStationNumber {

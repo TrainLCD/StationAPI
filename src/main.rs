@@ -1,6 +1,12 @@
 use sqlx::MySqlPool;
 use stationapi::{
-    pb::station_api_server::StationApiServer, presentation::controller::grpc::GrpcRouter,
+    infrastructure::{
+        company_repository::MyCompanyRepository, line_repository::MyLineRepository,
+        station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
+    },
+    presentation::controller::grpc::MyApi,
+    station_api::station_api_server::StationApiServer,
+    use_case::interactor::query::QueryInteractor,
 };
 use std::{
     env::{self, VarError},
@@ -17,23 +23,40 @@ async fn main() -> std::result::Result<(), anyhow::Error> {
 async fn run() -> std::result::Result<(), anyhow::Error> {
     tracing_subscriber::fmt::init();
 
-    dotenv::from_filename(".env.local").ok();
+    dotenv::from_filename(".env.local")?;
+
+    let accept_http1 = fetch_http1_flag();
+    let addr = fetch_addr()?;
 
     let db_url = fetch_database_url();
     let pool = MySqlPool::connect(db_url.as_str()).await?;
-
     let cache_client = connect_to_memcached()?;
 
-    let api_server = GrpcRouter::new(pool, cache_client);
-    let accept_http1 = fetch_http1_flag();
+    let station_repository = MyStationRepository::new(pool.clone());
+    let line_repository = MyLineRepository::new(pool.clone());
+    let train_type_repository = MyTrainTypeRepository::new(pool.clone());
+    let company_repository = MyCompanyRepository::new(pool.clone());
 
-    let addr = fetch_addr()?;
+    let query_use_case = QueryInteractor {
+        station_repository,
+        line_repository,
+        train_type_repository,
+        company_repository,
+        cache_client: cache_client.clone(),
+    };
+
+    let my_api = MyApi {
+        cache_client,
+        query_use_case,
+    };
+
+    let svc = StationApiServer::new(my_api);
 
     info!("StationAPI Server listening on {}", addr);
 
     Server::builder()
         .accept_http1(accept_http1)
-        .add_service(tonic_web::enable(StationApiServer::new(api_server)))
+        .add_service(tonic_web::enable(svc))
         .serve(addr)
         .await?;
 
