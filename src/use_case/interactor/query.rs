@@ -54,7 +54,7 @@ where
         };
         let result_vec = &mut vec![station];
         self.update_station_vec_with_attributes(result_vec).await?;
-        let station = result_vec.get(0).cloned();
+        let station = result_vec.first().cloned();
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(station_str) = serde_json::to_string(&station) {

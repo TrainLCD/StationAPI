@@ -6,7 +6,7 @@ use crate::{
         entity::station::Station, error::DomainError,
         repository::station_repository::StationRepository,
     },
-    pb::StopCondition,
+    station_api::StopCondition,
 };
 
 #[derive(sqlx::FromRow, Clone)]
