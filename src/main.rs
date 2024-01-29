@@ -13,7 +13,12 @@ use std::{
     net::{AddrParseError, SocketAddr},
 };
 use tonic::transport::Server;
+use tonic_health::server::HealthReporter;
 use tracing::{info, warn};
+
+async fn station_api_service_status(mut reporter: HealthReporter) {
+    reporter.set_serving::<StationApiServer<MyApi>>().await;
+}
 
 #[tokio::main]
 async fn main() -> std::result::Result<(), anyhow::Error> {
@@ -23,7 +28,16 @@ async fn main() -> std::result::Result<(), anyhow::Error> {
 async fn run() -> std::result::Result<(), anyhow::Error> {
     tracing_subscriber::fmt::init();
 
-    dotenv::from_filename(".env.local")?;
+    if let Err(_) = dotenv::from_filename(".env.local") {
+        warn!("Could not load .env.local");
+    };
+
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter
+        .set_serving::<StationApiServer<MyApi>>()
+        .await;
+
+    tokio::spawn(station_api_service_status(health_reporter.clone()));
 
     let accept_http1 = fetch_http1_flag();
     let addr = fetch_addr()?;
@@ -56,6 +70,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     Server::builder()
         .accept_http1(accept_http1)
+        .add_service(health_service)
         .add_service(tonic_web::enable(svc))
         .serve(addr)
         .await?;
@@ -108,7 +123,10 @@ fn fetch_http1_flag() -> bool {
 fn fetch_memcached_url() -> String {
     match env::var("MEMCACHED_URL") {
         Ok(s) => s.parse().expect("Failed to parse $MEMCACHED_URL"),
-        Err(VarError::NotPresent) => panic!("$MEMCACHED_URL is not set."),
+        Err(VarError::NotPresent) => {
+            warn!("$MEMCACHED_URL is not set.");
+            "".to_string()
+        }
         Err(VarError::NotUnicode(_)) => panic!("$MEMCACHED_URL should be written in Unicode."),
     }
 }
