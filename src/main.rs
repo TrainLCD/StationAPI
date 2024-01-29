@@ -28,7 +28,7 @@ async fn main() -> std::result::Result<(), anyhow::Error> {
 async fn run() -> std::result::Result<(), anyhow::Error> {
     tracing_subscriber::fmt::init();
 
-    if let Err(_) = dotenv::from_filename(".env.local") {
+    if dotenv::from_filename(".env.local").is_err() {
         warn!("Could not load .env.local");
     };
 
