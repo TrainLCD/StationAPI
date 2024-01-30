@@ -70,7 +70,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     Server::builder()
         .accept_http1(accept_http1)
-        .add_service(health_service)
+        .add_service(tonic_web::enable(health_service))
         .add_service(tonic_web::enable(svc))
         .serve(addr)
         .await?;
