@@ -26,6 +26,6 @@ WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --quiet default-mysql-client && \
     rm -rf /var/lib/apt/lists/*
-COPY --from=migration-builder /app/data .
+COPY --from=migration-builder /app/data ./data
 COPY --from=migration-builder /app/target/release/migration .
 CMD ["./migration"]
