@@ -19,7 +19,7 @@ WORKDIR /app
 COPY --from=stationapi-builder /app/target/release/stationapi .
 ENV PORT 50051
 EXPOSE $PORT
-CMD ["stationapi"]
+CMD ["./stationapi"]
 
 FROM debian:bookworm-slim as migration
 WORKDIR /app
@@ -28,4 +28,4 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=migration-builder /app/data .
 COPY --from=migration-builder /app/target/release/migration .
-CMD ["migration"]
+CMD ["./migration"]
