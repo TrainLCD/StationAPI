@@ -2,8 +2,10 @@ use csv::{ReaderBuilder, StringRecord};
 use std::{
     env::{self, VarError},
     fs::{self, File},
+    path::Path,
     process::{Command, Stdio},
 };
+use tracing::warn;
 
 pub fn insert_data(generated_sql_path: String) -> Result<(), Box<dyn std::error::Error>> {
     let generated_sql_file = File::open(generated_sql_path.clone())?;
@@ -51,19 +53,13 @@ pub fn insert_data(generated_sql_path: String) -> Result<(), Box<dyn std::error:
 }
 
 pub fn generate_sql() -> Result<String, Box<dyn std::error::Error>> {
-    let current_dir_buf = env::current_dir()?;
-
     let out_path = match env::var("SQL_OUT_PATH") {
         Ok(s) => s,
-        Err(VarError::NotPresent) => {
-            let data_path_buf = current_dir_buf.as_path().join("out.sql");
-            data_path_buf.to_str().unwrap().to_string()
-        }
+        Err(VarError::NotPresent) => "./out.sql".to_string(),
         Err(VarError::NotUnicode(_)) => panic!("$SQL_OUT_PATH should be written in Unicode."),
     };
 
-    let data_path_buf = current_dir_buf.as_path().join("data");
-    let data_path = data_path_buf.as_path();
+    let data_path = Path::new("data");
 
     let entries = fs::read_dir(data_path)?;
     let mut file_list: Vec<_> = entries
@@ -162,6 +158,10 @@ pub fn generate_sql() -> Result<String, Box<dyn std::error::Error>> {
 }
 
 fn main() {
+    if dotenv::from_filename(".env.local").is_err() {
+        warn!("Could not load .env.local");
+    };
+
     let generated_sql_path = generate_sql().unwrap();
     insert_data(generated_sql_path).expect("Could not insert into database.");
 }
