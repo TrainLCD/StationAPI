@@ -559,7 +559,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99701,215,若桜線,ワカサセン,若桜鉄道若桜線,Wakasa Line,,,#FF2F1A,2,,,,,,,,,,0,99701
 99702,216,北松江線,キタマツエセン,一畑電車北松江線,Kita-Matsue Line,,,#EB5C02,2,,,,,,,,,,0,99702
 99703,216,大社線,タイシャセン,一畑電車大社線,Taisha Line,,,#EB5C02,2,,,,,,,,,,0,99703
-99704,217,水島本線,ミズシマホンセン,水島臨海鉄道水島本線,Mizushima Main Line,,,#CCFFFF,2,MR,,,#CCFFFF,,,REVERSED_ROUND,,,0,99704
+99704,217,水島本線,ミズシマホンセン,水島臨海鉄道水島本線,Mizushima Main Line,,,#3B82C5,2,MR,,,#3B82C5,,,REVERSED_ROUND,,,0,99704
 99705,218,井原線,イバラセン,井原鉄道井原線,Ibara Line,,,#00AD66,2,,,,,,,,,,0,99705
 99706,219,東山線,ヒガシヤマセン,岡山電軌東山本線,Higashiyama Line,,,#0A50A1,4,H,,,#EF1731,,,ROUND,,,0,99706
 99707,219,清輝橋線,セイキバシセン,岡山電軌清輝橋線,Seikibashi Line,,,#9E49A1,4,S,,,#07502B,,,ROUND,,,0,99707
