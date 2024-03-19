@@ -259,6 +259,7 @@ impl InternalStationRepository {
                     la.alias_cd = a.id                   
             WHERE
             s.line_cd = l.line_cd
+            AND l.e_status = 0
             AND s.station_cd = ?
             AND s.e_status = 0
           ORDER BY
@@ -314,6 +315,7 @@ impl InternalStationRepository {
             WHERE
             s.station_cd IN ({})
             AND s.line_cd = l.line_cd
+            AND l.e_status = 0
             AND s.e_status = 0
           ORDER BY FIELD(s.station_cd, {})",
             params, params
@@ -389,6 +391,7 @@ impl InternalStationRepository {
             sst.station_cd IS NULL
             AND l.line_cd = ?
             AND l.line_cd = s.line_cd
+            AND l.e_status = 0
             AND s.e_status = 0
         )
         UNION
@@ -442,6 +445,7 @@ impl InternalStationRepository {
               sst.station_cd IS NOT NULL
               AND s.station_cd = sst.station_cd
               AND l.line_cd = s.line_cd
+              AND l.e_status = 0
               AND s.e_status = 0
           )
         ORDER BY
@@ -496,6 +500,7 @@ impl InternalStationRepository {
           WHERE
             s.station_g_cd = ?
             AND s.line_cd = l.line_cd
+            AND l.e_status = 0
             AND s.e_status = 0",
         )
         .bind(group_id)
@@ -542,6 +547,7 @@ impl InternalStationRepository {
           WHERE
             s.station_g_cd IN ( {} )
             AND s.line_cd = l.line_cd
+            AND l.e_status = 0
             AND s.e_status = 0",
             params
         );
@@ -603,7 +609,8 @@ impl InternalStationRepository {
                   LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
                   LEFT OUTER JOIN `aliases` AS a ON a.id = la.alias_cd 
                 WHERE 
-                  s.line_cd = l.line_cd 
+                  s.line_cd = l.line_cd
+                  AND l.e_status = 0
                   AND s.e_status = 0 
                 ORDER BY 
                   distance 
@@ -662,6 +669,7 @@ impl InternalStationRepository {
                       OR station_name_ko LIKE ?
                     )
                     AND s.line_cd = l.line_cd
+                    AND l.e_status = 0
                     AND s.e_status = 0
                   LIMIT
                     ?",
@@ -716,6 +724,7 @@ impl InternalStationRepository {
             sst.line_group_cd = ?
             AND sst.station_cd = s.station_cd
             AND s.line_cd = l.line_cd
+            AND l.e_status = 0
             AND s.e_status = 0",
         )
         .bind(line_group_id)
