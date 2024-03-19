@@ -230,7 +230,8 @@ impl InternalLineRepository {
             LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id 
           WHERE 
             s.station_g_cd = ? 
-            AND s.line_cd = l.line_cd 
+            AND s.line_cd = l.line_cd
+            AND l.e_status = 0
             AND s.e_status = 0",
         )
         .bind(station_group_id)
@@ -278,7 +279,8 @@ impl InternalLineRepository {
             LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id 
           WHERE 
             s.station_g_cd IN ( {} ) 
-            AND s.line_cd = l.line_cd 
+            AND s.line_cd = l.line_cd
+            AND l.e_status = 0
             AND s.e_status = 0",
             params
         );
@@ -317,8 +319,9 @@ impl InternalLineRepository {
             LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id 
           WHERE 
             sst.line_group_cd = ?
-            AND sst.station_cd = s.station_cd 
-            AND s.line_cd = l.line_cd 
+            AND sst.station_cd = s.station_cd
+            AND l.e_status = 0
+            AND s.line_cd = l.line_cd
             AND s.e_status = 0",
         )
         .bind(line_group_id)
@@ -358,6 +361,7 @@ impl InternalLineRepository {
             sst.line_group_cd IN ( {} )
             AND sst.station_cd = s.station_cd
             AND s.line_cd = l.line_cd
+            AND l.e_status = 0
             AND s.e_status = 0",
             params
         );
