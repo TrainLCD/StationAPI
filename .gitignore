@@ -4,3 +4,4 @@ tmp.sql
 server.crt
 server.key
 api_descriptor.pb
+out.sql

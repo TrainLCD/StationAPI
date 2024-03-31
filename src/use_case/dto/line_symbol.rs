@@ -1,4 +1,4 @@
-use crate::{domain::entity::line_symbol::LineSymbol, pb::LineSymbol as GrpcLineSymbol};
+use crate::{domain::entity::line_symbol::LineSymbol, station_api::LineSymbol as GrpcLineSymbol};
 
 impl From<LineSymbol> for GrpcLineSymbol {
     fn from(symbol: LineSymbol) -> Self {

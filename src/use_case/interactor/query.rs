@@ -54,7 +54,7 @@ where
         };
         let result_vec = &mut vec![station];
         self.update_station_vec_with_attributes(result_vec).await?;
-        let station = result_vec.get(0).cloned();
+        let station = result_vec.first().cloned();
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(station_str) = serde_json::to_string(&station) {
@@ -589,7 +589,7 @@ where
             line.line_symbol_secondary_shape.clone().unwrap_or_default();
         let line_symbol_extra_shape = line.line_symbol_extra_shape.clone().unwrap_or_default();
 
-        let line_symbols_shape_raw = vec![
+        let line_symbols_shape_raw = [
             line_symbol_primary_shape,
             line_symbol_secondary_shape,
             line_symbol_extra_shape,

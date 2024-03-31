@@ -3,6 +3,6 @@ pub mod infrastructure;
 pub mod presentation;
 pub mod use_case;
 
-pub mod pb {
+pub mod station_api {
     tonic::include_proto!("app.trainlcd.grpc");
 }

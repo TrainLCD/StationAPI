@@ -1,4 +1,4 @@
-use crate::{domain::entity::line::Line, pb::Line as GrpcLine};
+use crate::{domain::entity::line::Line, station_api::Line as GrpcLine};
 
 impl From<Line> for GrpcLine {
     fn from(line: Line) -> Self {

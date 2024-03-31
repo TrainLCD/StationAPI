@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::pb::StopCondition;
+use crate::station_api::StopCondition;
 
 use super::{line::Line, station_number::StationNumber, train_type::TrainType as TrainTypeEntity};
 
