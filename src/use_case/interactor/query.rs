@@ -589,7 +589,7 @@ where
             line.line_symbol_secondary_shape.clone().unwrap_or_default();
         let line_symbol_extra_shape = line.line_symbol_extra_shape.clone().unwrap_or_default();
 
-        let line_symbols_shape_raw = vec![
+        let line_symbols_shape_raw = [
             line_symbol_primary_shape,
             line_symbol_secondary_shape,
             line_symbol_extra_shape,
