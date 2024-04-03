@@ -73,6 +73,10 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 0,152,普通,フツウ,Local,慢车,보통,#1F63C6,1,0,0,上り系統,PARTIAL
 0,153,普通,フツウ,Local,慢车,보통,#1F63C6,2,0,0,下り系統,PARTIAL
 0,154,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,1,自動選択用,COMPLETE
+0,155,区間快速エアポート,クカンカイソクエアポート,Semi Rapid Airport,区域快车机场号,구간쾌속에어포트,#33ff33,0,2,0,,COMPLETE
+0,156,快速エアポート,カイソクエアポート,Rapid Airport,快车机场号,쾌속에어포트,#FF6600,0,2,0,,COMPLETE
+0,157,特別快速エアポート,トクベツカイソクエアポート,Special Rapid Airport,特别快车机场号,특별쾌속에어포트,#FF3300,0,2,0,,COMPLETE
+0,158,快速サンポート,カイソクサンポート,Rapid Sunport,快车太陽港号,쾌속선포트,#F39800,0,2,0,,PARTIAL
 0,200,踊り子(池袋〜伊豆急下田),オドリコ,Odoriko(Ikebukuro to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
 0,201,踊り子(東京〜伊豆急下田),オドリコ,Odoriko(Tokyo to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
 0,202,踊り子(池袋〜修善寺),オドリコ,Odoriko(Ikebukuro to Shuzenji),踊子,무희,#035D67,0,4,0,,COMPLETE
@@ -119,6 +123,13 @@ Minakami","SL群马
 Yokokawa","SL群马
 横川","SL군마
 요코카와",#0D0C09,0,2,0,,COMPLETE
+0,238,やくも,ヤクモ,Yakumo,八雲,야쿠모,#bb5535,0,4,0,,COMPLETE
+0,239,スーパーまつかぜ,スーパーマツカゼ,Super Matsukaze,超松風,슈퍼마츠카제,#f8b500,0,4,0,,COMPLETE
+0,240,スーパーおき,スーパーオキ,Super Oki,超隱岐,슈퍼오키,#f8b500,0,4,0,,COMPLETE
+0,241,しまんと,シマント,Shimanto,四萬十,시만토,#E25885,0,4,0,,COMPLETE
+0,242,あしずり,アシズリ,Ashizuri,足折,아시즈리,#E25885,0,4,0,,COMPLETE
+0,243,しおかぜ,シオカゼ,Shiokaze,海風,바닷바람,#1CADCA,0,4,0,,COMPLETE
+0,244,いしづち,イシヅチ,Ishizuchi,石鎚,석진,#1CADCA,0,4,0,,COMPLETE
 0,300,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,,PARTIAL
 0,301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,,PARTIAL
 0,302,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,,PARTIAL
