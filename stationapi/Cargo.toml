@@ -1,0 +1,29 @@
+[package]
+name = "stationapi"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+async-trait = "0.1.68"
+dotenv = "0.15.0"
+prost = "0.12.0"
+sqlx = { version = "0.7", features = [
+    "runtime-tokio",
+    "tls-native-tls",
+    "mysql",
+] }
+tokio = { version = "1.28.0", features = ["full"] }
+tonic = "0.10.1"
+tonic-web = "0.10.1"
+tracing = "0.1.37"
+tracing-subscriber = "0.3.17"
+anyhow = "1.0.71"
+thiserror = "1.0.40"
+memcache = "0.17.0"
+serde = { version = "1.0.189", features = ["derive"] }
+serde_json = "1.0.107"
+tonic-health = "0.10.2"
+
+[build-dependencies]
+tonic-build = "0.10.1"

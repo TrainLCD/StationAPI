@@ -61,7 +61,7 @@ pub fn generate_sql() -> Result<String, Box<dyn std::error::Error>> {
 
     let data_path = Path::new("data");
 
-    let entries = fs::read_dir(data_path)?;
+    let entries = fs::read_dir(data_path).expect("The `data` directory could not be found.");
     let mut file_list: Vec<_> = entries
         .filter_map(|entry| {
             let path = entry.ok()?.path();
