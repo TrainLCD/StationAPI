@@ -1,0 +1,50 @@
+name: stationapi
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./docker/api/Dockerfile
+    environment:
+      DATABASE_URL: mysql://stationapi:password@db/stationapi?tcp_nodelay=true
+      MEMCACHED_URL: memcache://cache:11211
+      ACCEPT_HTTP1: true
+      DISABLE_MEMCACHE: false
+      ENABLE_ALL_STATIONS_RPC: true
+      HOST: 0.0.0.0
+    ports:
+      - 50051:50051
+    networks:
+      - sapi-link
+
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: true
+      MYSQL_USER: stationapi
+      MYSQL_PASSWORD: password
+      MYSQL_DATABASE: stationapi
+    networks:
+      - sapi-link
+
+  cache:
+    image: memcached:1
+    networks:
+      - sapi-link
+
+  migration:
+    build:
+      context: .
+      dockerfile: ./docker/migration/Dockerfile
+    environment:
+      MYSQL_USER: stationapi
+      MYSQL_PASSWORD: password
+      MYSQL_HOST: db
+      MYSQL_DATABASE: stationapi
+      MEMCACHED_URL: memcache://cache:11211
+      DISABLE_MEMCACHED_FLUSH: false
+    networks:
+      - sapi-link
+
+networks:
+  sapi-link:
