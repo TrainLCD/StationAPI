@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: ./docker/api/Dockerfile
+    depends_on:
+      - db
     environment:
       DATABASE_URL: mysql://stationapi:password@db/stationapi?tcp_nodelay=true
       MEMCACHED_URL: memcache://cache:11211
@@ -36,6 +38,10 @@ services:
     build:
       context: .
       dockerfile: ./docker/migration/Dockerfile
+    command: ["./wait-for-it.sh", "db:3306", "--", "./migration"]
+    depends_on:
+      - db
+      - cache
     environment:
       MYSQL_USER: stationapi
       MYSQL_PASSWORD: password
