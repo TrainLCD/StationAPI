@@ -507,12 +507,11 @@ where
 
                 let station_number = StationNumber {
                     line_symbol: sym.to_string(),
-                    line_symbol_color: sym_color,
-                    line_symbol_shape: sym_shape,
+                    line_symbol_color: sym_color.clone(),
+                    line_symbol_shape: sym_shape.clone(),
                     station_number: station_number_string,
                 };
                 station_numbers.push(station_number);
-                return station_numbers;
             };
 
             let station_number = StationNumber {
