@@ -4,14 +4,17 @@ services:
   api:
     build:
       context: .
-      dockerfile: ./docker/api/Dockerfile
+      dockerfile: ./docker/api/Dockerfile.dev
+    command: cargo watch -s "cargo run --bin stationapi"
     depends_on:
       - db
+    volumes:
+      - .:/app
     environment:
       DATABASE_URL: mysql://stationapi:password@db/stationapi?tcp_nodelay=true
       MEMCACHED_URL: memcache://cache:11211
       ACCEPT_HTTP1: true
-      DISABLE_MEMCACHE: false
+      DISABLE_MEMCACHE: true
       ENABLE_ALL_STATIONS_RPC: true
       HOST: 0.0.0.0
     ports:
