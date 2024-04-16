@@ -12,4 +12,5 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 COPY data /app/data
 COPY --from=builder /app/target/release/migration .
+COPY ./scripts/wait-for-it.sh .
 CMD ["./migration"]
