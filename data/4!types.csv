@@ -151,13 +151,13 @@ Yokokawa","SL群马
 0,319,区間急行,クカンキュウコウ,Section Express,区间快速,구간급행,#FF99FF,0,3,0,,PARTIAL
 0,320,空港快速,クウコウカイソク,Haneda Express,机场快速,공항쾌속,#DC143C,0,2,0,,COMPLETE
 0,321,区間快速,クカンカイソク,Rapid,区间快速,구간쾌속,#FFAE00,0,2,0,,COMPLETE
-0,322,快速急行(小田原〜新宿),カイソクキュウコウ,Rapid Express(Odawara to Shinjuku),快速急行,쾌속급행,#F7931D,0,3,0,小田急用,COMPLETE
+0,322,快速急行,カイソクキュウコウ,Rapid Express(Odawara to Shinjuku),快速急行,쾌속급행,#F7931D,0,3,0,(小田原〜新宿),COMPLETE
 0,323,通勤準急,ツウキンジュンキュウ,Commuter Semi Express,通勤准急,통근준급,#00B66B,0,3,0,,COMPLETE
-0,324,快速急行(唐木田〜新宿),カイソクキュウコウ,Rapid Express(Karakida to Shinjuku),快速急行,쾌속급행,#F7931D,0,3,0,小田急用,COMPLETE
-0,325,快速急行(片瀬江ノ島〜新宿),カイソクキュウコウ,Rapid Express(Katase-Enoshima to Shinjuku),快速急行,쾌속급행,#F7931D,0,3,0,小田急用,COMPLETE
-0,326,急行(小田原〜新宿),キュウコウ,Express(Odawara to Shinjuku),特快,급행,#DC143C,0,3,0,,COMPLETE
-0,327,急行(唐木田〜新宿),キュウコウ,Express(Karakida to Shinjuku),特快,급행,#DC143C,0,3,0,,COMPLETE
-0,328,急行(片瀬江ノ島〜新宿),キュウコウ,Express(Katase-Enoshima to Shinjuku),特快,급행,#DC143C,0,3,0,,COMPLETE
+0,324,快速急行,カイソクキュウコウ,Rapid Express(Karakida to Shinjuku),快速急行,쾌속급행,#F7931D,0,3,0,(唐木田〜新宿),COMPLETE
+0,325,快速急行,カイソクキュウコウ,Rapid Express(Katase-Enoshima to Shinjuku),快速急行,쾌속급행,#F7931D,0,3,0,(片瀬江ノ島〜新宿),COMPLETE
+0,326,急行,キュウコウ,Express(Odawara to Shinjuku),特快,급행,#DC143C,0,3,0,(小田原〜新宿),COMPLETE
+0,327,急行,キュウコウ,Express(Karakida to Shinjuku),特快,급행,#DC143C,0,3,0,(唐木田〜新宿),COMPLETE
+0,328,急行,キュウコウ,Express(Katase-Enoshima to Shinjuku),特快,급행,#DC143C,0,3,0,(片瀬江ノ島〜新宿),COMPLETE
 0,330,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,小田急用,COMPLETE
 0,331,快速特急,カイソクトッキュウ,Limited Express,快速特快,쾌속특쾌,#049C5E,0,4,0,,COMPLETE
 0,332,アクセス特急,アクセストッキュウ,Access Express,访问特快,액세스 특급,#ED7D00,0,4,0,,PARTIAL
