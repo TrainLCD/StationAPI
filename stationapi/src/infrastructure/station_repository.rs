@@ -345,6 +345,7 @@ impl InternalStationRepository {
           SELECT
             s.*,
             l.*,
+            sst.pass,
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -399,6 +400,7 @@ impl InternalStationRepository {
             SELECT
               s.*,
               l.*,
+              sst.pass,
               COALESCE(a.line_name, l.line_name) AS line_name,
               COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
               COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
