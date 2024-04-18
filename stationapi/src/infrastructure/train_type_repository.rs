@@ -99,13 +99,12 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         .await
     }
 
-    async fn get_local_type_by_station_id_vec(
+    async fn get_types_by_station_id_vec(
         &self,
         station_id_vec: Vec<u32>,
     ) -> Result<Vec<TrainType>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalTrainTypeRepository::get_local_type_by_station_id_vec(station_id_vec, &mut conn)
-            .await
+        InternalTrainTypeRepository::get_types_by_station_id_vec(station_id_vec, &mut conn).await
     }
 }
 
@@ -199,7 +198,7 @@ impl InternalTrainTypeRepository {
         Ok(Some(train_type))
     }
 
-    async fn get_local_type_by_station_id_vec(
+    async fn get_types_by_station_id_vec(
         station_id_vec: Vec<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
@@ -222,8 +221,7 @@ impl InternalTrainTypeRepository {
             THEN
                 sst.type_cd = t.type_cd
             ELSE
-                t.kind IN (0, 1)
-                AND sst.pass <> 1
+                sst.pass <> 1
                 AND sst.type_cd = t.type_cd
             END
             AND s.station_cd = sst.station_cd
