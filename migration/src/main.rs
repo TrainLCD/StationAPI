@@ -5,7 +5,7 @@ use std::{
     path::Path,
     process::{Command, Stdio},
 };
-use tracing::warn;
+use tracing::{info, warn};
 
 pub fn insert_data(generated_sql_path: String) -> Result<(), Box<dyn std::error::Error>> {
     let generated_sql_file = File::open(generated_sql_path.clone())?;
@@ -164,4 +164,6 @@ fn main() {
 
     let generated_sql_path = generate_sql().unwrap();
     insert_data(generated_sql_path).expect("Could not insert into database.");
+
+    info!("Migration successfully completed!");
 }
