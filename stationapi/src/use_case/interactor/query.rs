@@ -337,7 +337,9 @@ where
             .collect::<Vec<u32>>();
         let companies = self.find_company_by_id_vec(company_ids).await?;
 
-        let train_types = self.get_train_types_by_station_id_vec(station_ids).await?;
+        let train_types = self
+            .get_train_types_by_station_id_vec(station_ids, line_group_id)
+            .await?;
 
         for station in stations_ref.iter_mut() {
             let mut line = self.extract_line_from_station(station);
@@ -351,17 +353,13 @@ where
             let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
             station.station_numbers = station_numbers;
             station.line = Some(Box::new(line.clone()));
-            if let Some(line_group_id) = line_group_id {
-                if let Some(tt) = train_types
-                    .iter()
-                    .find(|tt| {
-                        tt.station_cd == station.station_cd && tt.line_group_cd == line_group_id
-                    })
-                    .cloned()
-                    .map(Box::new)
-                {
-                    station.train_type = Some(tt.clone());
-                };
+            if let Some(tt) = train_types
+                .iter()
+                .find(|tt| tt.station_cd == station.station_cd)
+                .cloned()
+                .map(Box::new)
+            {
+                station.train_type = Some(tt.clone());
             };
 
             let mut lines: Vec<Line> = lines
@@ -709,6 +707,7 @@ where
     async fn get_train_types_by_station_id_vec(
         &self,
         station_id_vec: Vec<u32>,
+        line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, UseCaseError> {
         let mut hasher = DefaultHasher::new();
         station_id_vec
@@ -733,7 +732,7 @@ where
 
         let train_types = self
             .train_type_repository
-            .get_types_by_station_id_vec(station_id_vec)
+            .get_types_by_station_id_vec(station_id_vec, line_group_id)
             .await?;
 
         if let Some(cache_client) = &self.cache_client {
