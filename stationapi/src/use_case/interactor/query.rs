@@ -53,7 +53,8 @@ where
             return Ok(None);
         };
         let result_vec = &mut vec![station];
-        self.update_station_vec_with_attributes(result_vec).await?;
+        self.update_station_vec_with_attributes(result_vec, None)
+            .await?;
         let station = result_vec.first().cloned();
 
         if let Some(cache_client) = &self.cache_client {
@@ -69,7 +70,7 @@ where
         station_ids: Vec<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut stations = self.station_repository.get_by_id_vec(station_ids).await?;
-        self.update_station_vec_with_attributes(&mut stations)
+        self.update_station_vec_with_attributes(&mut stations, None)
             .await?;
 
         Ok(stations)
@@ -94,7 +95,7 @@ where
             .get_by_station_group_id(station_group_id)
             .await?;
 
-        self.update_station_vec_with_attributes(&mut stations)
+        self.update_station_vec_with_attributes(&mut stations, Some(station_group_id))
             .await?;
 
         if let Some(cache_client) = &self.cache_client {
@@ -191,7 +192,7 @@ where
             .get_by_coordinates(latitude, longitude, limit)
             .await?;
 
-        self.update_station_vec_with_attributes(&mut stations)
+        self.update_station_vec_with_attributes(&mut stations, None)
             .await?;
 
         Ok(stations)
@@ -221,7 +222,7 @@ where
             .get_by_line_id(line_id, station_id)
             .await?;
 
-        self.update_station_vec_with_attributes(&mut stations)
+        self.update_station_vec_with_attributes(&mut stations, None)
             .await?;
 
         if let Some(cache_client) = &self.cache_client {
@@ -260,7 +261,7 @@ where
             .get_by_name(station_name, limit)
             .await?;
 
-        self.update_station_vec_with_attributes(&mut stations)
+        self.update_station_vec_with_attributes(&mut stations, None)
             .await?;
 
         if let Some(cache_client) = &self.cache_client {
@@ -310,6 +311,7 @@ where
     async fn update_station_vec_with_attributes(
         &self,
         stations_ref: &mut Vec<Station>,
+        line_group_id: Option<u32>,
     ) -> Result<(), UseCaseError> {
         let station_group_ids = stations_ref
             .iter()
@@ -335,7 +337,9 @@ where
             .collect::<Vec<u32>>();
         let companies = self.find_company_by_id_vec(company_ids).await?;
 
-        let train_types = self.get_train_types_by_station_id_vec(station_ids).await?;
+        let train_types = self
+            .get_train_types_by_station_id_vec(station_ids, line_group_id)
+            .await?;
 
         for station in stations_ref.iter_mut() {
             let mut line = self.extract_line_from_station(station);
@@ -447,7 +451,7 @@ where
             .get_by_line_group_id(line_group_id)
             .await?;
 
-        self.update_station_vec_with_attributes(&mut stations)
+        self.update_station_vec_with_attributes(&mut stations, Some(line_group_id))
             .await?;
 
         if let Some(cache_client) = &self.cache_client {
@@ -512,16 +516,15 @@ where
                     station_number: station_number_string,
                 };
                 station_numbers.push(station_number);
-                return station_numbers;
-            };
-
-            let station_number = StationNumber {
-                line_symbol: "".to_string(),
-                line_symbol_color: sym_color,
-                line_symbol_shape: sym_shape,
-                station_number: station_number.to_string(),
-            };
-            station_numbers.push(station_number);
+            } else {
+                let station_number = StationNumber {
+                    line_symbol: "".to_string(),
+                    line_symbol_color: sym_color,
+                    line_symbol_shape: sym_shape,
+                    station_number,
+                };
+                station_numbers.push(station_number);
+            }
         }
 
         station_numbers
@@ -704,6 +707,7 @@ where
     async fn get_train_types_by_station_id_vec(
         &self,
         station_id_vec: Vec<u32>,
+        line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, UseCaseError> {
         let mut hasher = DefaultHasher::new();
         station_id_vec
@@ -728,7 +732,7 @@ where
 
         let train_types = self
             .train_type_repository
-            .get_local_type_by_station_id_vec(station_id_vec)
+            .get_types_by_station_id_vec(station_id_vec, line_group_id)
             .await?;
 
         if let Some(cache_client) = &self.cache_client {

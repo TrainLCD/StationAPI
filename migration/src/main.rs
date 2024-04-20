@@ -5,7 +5,7 @@ use std::{
     path::Path,
     process::{Command, Stdio},
 };
-use tracing::warn;
+use tracing::{info, warn};
 
 pub fn insert_data(generated_sql_path: String) -> Result<(), Box<dyn std::error::Error>> {
     let generated_sql_file = File::open(generated_sql_path.clone())?;
@@ -61,7 +61,7 @@ pub fn generate_sql() -> Result<String, Box<dyn std::error::Error>> {
 
     let data_path = Path::new("data");
 
-    let entries = fs::read_dir(data_path)?;
+    let entries = fs::read_dir(data_path).expect("The `data` directory could not be found.");
     let mut file_list: Vec<_> = entries
         .filter_map(|entry| {
             let path = entry.ok()?.path();
@@ -164,4 +164,6 @@ fn main() {
 
     let generated_sql_path = generate_sql().unwrap();
     insert_data(generated_sql_path).expect("Could not insert into database.");
+
+    info!("Migration successfully completed!");
 }

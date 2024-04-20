@@ -12,8 +12,9 @@ pub trait TrainTypeRepository: Send + Sync + 'static {
         line_group_id: u32,
         line_id: u32,
     ) -> Result<Option<TrainType>, DomainError>;
-    async fn get_local_type_by_station_id_vec(
+    async fn get_types_by_station_id_vec(
         &self,
         station_id_vec: Vec<u32>,
+        line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, DomainError>;
 }

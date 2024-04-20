@@ -73,6 +73,10 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 0,152,普通,フツウ,Local,慢车,보통,#1F63C6,1,0,0,上り系統,PARTIAL
 0,153,普通,フツウ,Local,慢车,보통,#1F63C6,2,0,0,下り系統,PARTIAL
 0,154,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,1,自動選択用,COMPLETE
+0,155,区間快速エアポート,クカンカイソクエアポート,Semi Rapid Airport,区域快车机场号,구간쾌속에어포트,#33ff33,0,2,0,,COMPLETE
+0,156,快速エアポート,カイソクエアポート,Rapid Airport,快车机场号,쾌속에어포트,#FF6600,0,2,0,,COMPLETE
+0,157,特別快速エアポート,トクベツカイソクエアポート,Special Rapid Airport,特别快车机场号,특별쾌속에어포트,#FF3300,0,2,0,,COMPLETE
+0,158,快速サンポート,カイソクサンポート,Rapid Sunport,快车太陽港号,쾌속선포트,#F39800,0,2,0,,PARTIAL
 0,200,踊り子(池袋〜伊豆急下田),オドリコ,Odoriko(Ikebukuro to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
 0,201,踊り子(東京〜伊豆急下田),オドリコ,Odoriko(Tokyo to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
 0,202,踊り子(池袋〜修善寺),オドリコ,Odoriko(Ikebukuro to Shuzenji),踊子,무희,#035D67,0,4,0,,COMPLETE
@@ -119,6 +123,13 @@ Minakami","SL群马
 Yokokawa","SL群马
 横川","SL군마
 요코카와",#0D0C09,0,2,0,,COMPLETE
+0,238,やくも,ヤクモ,Yakumo,八雲,야쿠모,#bb5535,0,4,0,,COMPLETE
+0,239,スーパーまつかぜ,スーパーマツカゼ,Super Matsukaze,超松風,슈퍼마츠카제,#f8b500,0,4,0,,COMPLETE
+0,240,スーパーおき,スーパーオキ,Super Oki,超隱岐,슈퍼오키,#f8b500,0,4,0,,COMPLETE
+0,241,しまんと,シマント,Shimanto,四萬十,시만토,#E25885,0,4,0,,COMPLETE
+0,242,あしずり,アシズリ,Ashizuri,足折,아시즈리,#E25885,0,4,0,,COMPLETE
+0,243,しおかぜ,シオカゼ,Shiokaze,海風,바닷바람,#1CADCA,0,4,0,,COMPLETE
+0,244,いしづち,イシヅチ,Ishizuchi,石鎚,석진,#1CADCA,0,4,0,,COMPLETE
 0,300,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,,PARTIAL
 0,301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,,PARTIAL
 0,302,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,,PARTIAL
@@ -140,13 +151,13 @@ Yokokawa","SL群马
 0,319,区間急行,クカンキュウコウ,Section Express,区间快速,구간급행,#FF99FF,0,3,0,,PARTIAL
 0,320,空港快速,クウコウカイソク,Haneda Express,机场快速,공항쾌속,#DC143C,0,2,0,,COMPLETE
 0,321,区間快速,クカンカイソク,Rapid,区间快速,구간쾌속,#FFAE00,0,2,0,,COMPLETE
-0,322,快速急行(小田原〜新宿),カイソクキュウコウ,Rapid Express(Odawara to Shinjuku),快速急行,쾌속급행,#F7931D,0,3,0,小田急用,COMPLETE
+0,322,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,(小田原〜新宿),COMPLETE
 0,323,通勤準急,ツウキンジュンキュウ,Commuter Semi Express,通勤准急,통근준급,#00B66B,0,3,0,,COMPLETE
-0,324,快速急行(唐木田〜新宿),カイソクキュウコウ,Rapid Express(Karakida to Shinjuku),快速急行,쾌속급행,#F7931D,0,3,0,小田急用,COMPLETE
-0,325,快速急行(片瀬江ノ島〜新宿),カイソクキュウコウ,Rapid Express(Katase-Enoshima to Shinjuku),快速急行,쾌속급행,#F7931D,0,3,0,小田急用,COMPLETE
-0,326,急行(小田原〜新宿),キュウコウ,Express(Odawara to Shinjuku),特快,급행,#DC143C,0,3,0,,COMPLETE
-0,327,急行(唐木田〜新宿),キュウコウ,Express(Karakida to Shinjuku),特快,급행,#DC143C,0,3,0,,COMPLETE
-0,328,急行(片瀬江ノ島〜新宿),キュウコウ,Express(Katase-Enoshima to Shinjuku),特快,급행,#DC143C,0,3,0,,COMPLETE
+0,324,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,(唐木田〜新宿),COMPLETE
+0,325,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,(片瀬江ノ島〜新宿),COMPLETE
+0,326,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,(小田原〜新宿),COMPLETE
+0,327,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,(唐木田〜新宿),COMPLETE
+0,328,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,(片瀬江ノ島〜新宿),COMPLETE
 0,330,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,小田急用,COMPLETE
 0,331,快速特急,カイソクトッキュウ,Limited Express,快速特快,쾌속특쾌,#049C5E,0,4,0,,COMPLETE
 0,332,アクセス特急,アクセストッキュウ,Access Express,访问特快,액세스 특급,#ED7D00,0,4,0,,PARTIAL
@@ -168,6 +179,9 @@ Yokokawa","SL群马
 0,348,空港急行,クウコウキュウコウ,Airport Express,机场快速,공항급행,#FF7F27,0,3,0,南海電車用,COMPLETE
 0,349,区間特急,クカントッキュウ,Limited Express,直通特急,구간특급,#A349A4,0,4,0,阪神電車,COMPLETE
 0,350,S特急,エストッキュウ,Limited Express,S特急,S특급,#22B14C,0,4,0,山陽電車,COMPLETE
+0,351,快速急行(新松田より急行),カイソクキュウコウ,Rapid Express(Express from Shin-Matsuda),快速急行,쾌속급행,#F7931D,0,3,0,,COMPLETE
+0,352,急行(新松田より各駅停車),キュウコウ,Express(Local from Shin-Matsuda),特快,급행,#DC143C,0,3,0,,COMPLETE
+0,353,各駅停車(新松田より急行),カクエキテイシャ,Local(Express from Shin-Matsuda),每站停车,각역정차,#1F63C6,0,0,0,,PARTIAL
 0,400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,2,0,,COMPLETE
 0,401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,2,0,,COMPLETE
 0,402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,2,0,,COMPLETE

@@ -46,6 +46,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
     async fn update_station_vec_with_attributes(
         &self,
         station: &mut Vec<Station>,
+        line_group_id: Option<u32>,
     ) -> Result<(), UseCaseError>;
     async fn get_lines_by_station_group_id(
         &self,
@@ -69,5 +70,6 @@ pub trait QueryUseCase: Send + Sync + 'static {
     async fn get_train_types_by_station_id_vec(
         &self,
         station_id_vec: Vec<u32>,
+        line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, UseCaseError>;
 }

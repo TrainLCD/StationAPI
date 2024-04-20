@@ -99,13 +99,18 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         .await
     }
 
-    async fn get_local_type_by_station_id_vec(
+    async fn get_types_by_station_id_vec(
         &self,
         station_id_vec: Vec<u32>,
+        line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalTrainTypeRepository::get_local_type_by_station_id_vec(station_id_vec, &mut conn)
-            .await
+        InternalTrainTypeRepository::get_types_by_station_id_vec(
+            station_id_vec,
+            line_group_id,
+            &mut conn,
+        )
+        .await
     }
 }
 
@@ -125,7 +130,8 @@ impl InternalTrainTypeRepository {
             station_station_types as sst 
           WHERE 
             sst.line_group_cd = ? 
-            AND t.type_cd = sst.type_cd",
+            AND t.type_cd = sst.type_cd
+            ORDER BY t.kind, sst.id",
         )
         .bind(line_group_id)
         .fetch_all(conn)
@@ -151,7 +157,8 @@ impl InternalTrainTypeRepository {
             AND s.station_cd = sst.station_cd 
             AND sst.type_cd = t.type_cd 
             AND s.e_status = 0 
-            AND sst.pass <> 1",
+            AND sst.pass <> 1
+            ORDER BY t.kind, sst.id",
         )
         .bind(station_id)
         .fetch_all(conn)
@@ -169,21 +176,22 @@ impl InternalTrainTypeRepository {
             "SELECT 
             t.*, 
             sst.*
-          FROM 
+            FROM 
             types as t, 
             station_station_types as sst 
-          WHERE 
+            WHERE 
             sst.line_group_cd = ? 
             AND sst.station_cd IN (
-              SELECT 
+                SELECT 
                 station_cd 
-              FROM 
+                FROM 
                 stations as s 
-              WHERE 
+                WHERE 
                 line_cd = ?
                 AND s.e_status = 0
-            ) 
-            AND t.type_cd = sst.type_cd",
+            )
+            AND t.type_cd = sst.type_cd
+            ORDER BY t.kind, sst.id",
         )
         .bind(line_group_id)
         .bind(line_id)
@@ -199,8 +207,9 @@ impl InternalTrainTypeRepository {
         Ok(Some(train_type))
     }
 
-    async fn get_local_type_by_station_id_vec(
+    async fn get_types_by_station_id_vec(
         station_id_vec: Vec<u32>,
+        line_group_id: Option<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         if station_id_vec.is_empty() {
@@ -212,25 +221,25 @@ impl InternalTrainTypeRepository {
             "SELECT 
             t.*, 
             sst.*
-          FROM 
+            FROM 
             station_station_types as sst, 
             stations as s, 
             types as t 
-          WHERE 
+            WHERE 
             s.station_cd IN ( {} ) 
             AND CASE WHEN t.top_priority = 1
             THEN
                 sst.type_cd = t.type_cd
             ELSE
-                t.kind IN (0, 1)
-                AND sst.pass <> 1
+                sst.pass <> 1
                 AND sst.type_cd = t.type_cd
             END
             AND s.station_cd = sst.station_cd
             AND sst.type_cd = t.type_cd 
             AND s.e_status = 0
+            AND sst.line_group_cd = ?
             AND sst.pass <> 1
-            ORDER BY sst.id",
+            ORDER BY t.kind, sst.id",
             params
         );
 
@@ -239,7 +248,7 @@ impl InternalTrainTypeRepository {
             query = query.bind(id);
         }
 
-        let rows = query.fetch_all(conn).await?;
+        let rows = query.bind(line_group_id).fetch_all(conn).await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(train_types)
