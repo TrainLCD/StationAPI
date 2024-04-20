@@ -131,7 +131,7 @@ impl InternalTrainTypeRepository {
           WHERE 
             sst.line_group_cd = ? 
             AND t.type_cd = sst.type_cd
-            ORDER BY t.kind, sst.id ",
+            ORDER BY t.kind, sst.id",
         )
         .bind(line_group_id)
         .fetch_all(conn)
