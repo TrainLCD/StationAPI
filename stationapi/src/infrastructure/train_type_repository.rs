@@ -237,8 +237,13 @@ impl InternalTrainTypeRepository {
             AND s.station_cd = sst.station_cd
             AND sst.type_cd = t.type_cd 
             AND s.e_status = 0
-            AND sst.line_group_cd = ?
             AND sst.pass <> 1
+            AND CASE WHEN ? <> 0
+            THEN
+                sst.line_group_cd = ?
+            ELSE
+                sst.line_group_cd = sst.line_group_cd
+            END
             ORDER BY t.kind, sst.id",
             params
         );
@@ -248,7 +253,10 @@ impl InternalTrainTypeRepository {
             query = query.bind(id);
         }
 
-        let rows = query.bind(line_group_id).fetch_all(conn).await?;
+        query = query.bind(line_group_id.unwrap_or(0));
+        query = query.bind(line_group_id);
+
+        let rows = query.fetch_all(conn).await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(train_types)
