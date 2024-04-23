@@ -55,7 +55,7 @@ where
     }
 
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
-        let cache_key = Self::calculate_hash(&station_id.to_string()).to_string();
+        let cache_key = format!("find_station_by_id:{}", Self::calculate_hash(&station_id));
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(&cache_key) {
@@ -85,13 +85,10 @@ where
         &self,
         station_ids: Vec<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let cache_key: String = Self::calculate_hash(
-            &station_ids
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<String>(),
-        )
-        .to_string();
+        let cache_key: String = format!(
+            "get_stations_by_id_vec:{}",
+            Self::calculate_hash(&station_ids)
+        );
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(&cache_key) {
                 if let Ok(stations) = serde_json::from_str::<Vec<Station>>(&cache_value) {
@@ -116,7 +113,10 @@ where
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let cache_key = Self::calculate_hash(&station_group_id).to_string();
+        let cache_key = format!(
+            "get_stations_by_group_id:{}",
+            Self::calculate_hash(&station_group_id)
+        );
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(&cache_key) {
                 if let Ok(stations) = serde_json::from_str::<Vec<Station>>(&cache_value) {
@@ -145,13 +145,10 @@ where
         &self,
         station_group_id_vec: Vec<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let cache_key = Self::calculate_hash(
-            &station_group_id_vec
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<String>(),
-        )
-        .to_string();
+        let cache_key = format!(
+            "get_stations_by_group_id_vec:{}",
+            Self::calculate_hash(&station_group_id_vec)
+        );
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(&cache_key) {
@@ -178,13 +175,10 @@ where
         &self,
         station_group_id_vec: Vec<u32>,
     ) -> Result<Vec<Line>, UseCaseError> {
-        let cache_key = Self::calculate_hash(
-            &station_group_id_vec
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<String>(),
-        )
-        .to_string();
+        let cache_key = format!(
+            "get_lines_by_station_group_id_vec:{}",
+            Self::calculate_hash(&station_group_id_vec)
+        );
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
                 if let Ok(lines) = serde_json::from_str::<Vec<Line>>(&cache_value) {
@@ -227,8 +221,10 @@ where
         line_id: u32,
         station_id: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let cache_key =
-            Self::calculate_hash(&format!("{}:{}", line_id, station_id.unwrap_or(0))).to_string();
+        let cache_key = format!(
+            "get_stations_by_line_id:{}",
+            Self::calculate_hash(&format!("{}:{}", line_id, station_id.unwrap_or(0)))
+        );
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(&cache_key) {
@@ -259,8 +255,10 @@ where
         station_name: String,
         limit: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let cache_key =
-            Self::calculate_hash(&format!("{}:{}", station_name, limit.unwrap_or(1))).to_string();
+        let cache_key = format!(
+            "get_stations_by_name:{}",
+            Self::calculate_hash(&format!("{}:{}", station_name, limit.unwrap_or(0)))
+        );
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
@@ -290,13 +288,10 @@ where
         &self,
         company_id_vec: Vec<u32>,
     ) -> Result<Vec<Company>, UseCaseError> {
-        let cache_key: String = Self::calculate_hash(
-            &company_id_vec
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<String>(),
-        )
-        .to_string();
+        let cache_key = format!(
+            "find_company_by_id_vec:{}",
+            Self::calculate_hash(&company_id_vec)
+        );
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
@@ -416,7 +411,10 @@ where
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Line>, UseCaseError> {
-        let cache_key = Self::calculate_hash(&station_group_id).to_string();
+        let cache_key = format!(
+            "get_lines_by_station_group_id:{}",
+            Self::calculate_hash(&station_group_id)
+        );
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
@@ -442,7 +440,10 @@ where
         &self,
         line_group_id: u32,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let cache_key = Self::calculate_hash(&line_group_id).to_string();
+        let cache_key = format!(
+            "get_stations_by_line_group_id:{}",
+            Self::calculate_hash(&line_group_id)
+        );
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
@@ -635,7 +636,10 @@ where
         &self,
         station_id: u32,
     ) -> Result<Vec<TrainType>, UseCaseError> {
-        let cache_key = Self::calculate_hash(&station_id.to_string()).to_string();
+        let cache_key = format!(
+            "get_train_types_by_station_id:{}",
+            Self::calculate_hash(&station_id)
+        );
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
@@ -716,12 +720,14 @@ where
             .map(|id| id.to_string())
             .collect::<String>();
 
-        let cache_key = match line_group_id {
-            Some(line_group_id) => {
-                Self::calculate_hash(&format!("{}:{}", station_id_key, line_group_id)).to_string()
-            }
-            None => Self::calculate_hash(&station_id_key.to_string()).to_string(),
-        };
+        let cache_key = format!(
+            "get_train_types_by_station_id_vec:{}",
+            Self::calculate_hash(&format!(
+                "{}:{}",
+                station_id_key,
+                line_group_id.unwrap_or(0)
+            ))
+        );
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
