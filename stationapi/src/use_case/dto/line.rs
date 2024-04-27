@@ -19,6 +19,7 @@ impl From<Line> for GrpcLine {
             train_type: line
                 .train_type
                 .map(|train_type| Box::new(train_type.into())),
+            average_distance: line.average_distance,
         }
     }
 }

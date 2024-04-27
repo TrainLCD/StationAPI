@@ -579,6 +579,7 @@ where
             train_type: None,
             line_group_cd: None,
             station_g_cd: None,
+            average_distance: station.average_distance,
         }
     }
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol> {
