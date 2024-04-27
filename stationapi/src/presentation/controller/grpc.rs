@@ -2,6 +2,7 @@ use crate::infrastructure::{
     company_repository::MyCompanyRepository, line_repository::MyLineRepository,
     station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
 };
+use crate::station_api::{CoordinatesRequest, DistanceResponse, DistanceResponseState};
 use crate::use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase};
 use crate::{
     presentation::error::PresentationalError,
@@ -187,6 +188,39 @@ impl StationApi for MyApi {
                 train_types: train_types.into_iter().map(|tt| tt.into()).collect(),
             })),
             Err(err) => Err(PresentationalError::from(err).into()),
+        }
+    }
+
+    async fn get_distance_for_closest_station_from_coordinates(
+        &self,
+        request: tonic::Request<CoordinatesRequest>,
+    ) -> std::result::Result<tonic::Response<DistanceResponse>, tonic::Status> {
+        let request_ref = request.get_ref();
+        let latitude = request_ref.latitude;
+        let longitude = request_ref.longitude;
+        let line_id = request_ref.line_id;
+
+        match self
+            .query_use_case
+            .get_station_id_and_distance_by_coordinates(latitude, longitude, line_id)
+            .await
+        {
+            Ok(station) => {
+                let mut state = DistanceResponseState::Away;
+                if station.distance < 500.0 {
+                    state = DistanceResponseState::Arrived;
+                }
+                if station.distance < 1000.0 {
+                    state = DistanceResponseState::Approaching
+                }
+
+                Ok(Response::new(DistanceResponse {
+                    station_id: station.station_id,
+                    distance: station.distance,
+                    state: state.into(),
+                }))
+            }
+            Err(err) => return Err(PresentationalError::from(err).into()),
         }
     }
 }
