@@ -10,8 +10,8 @@ use async_trait::async_trait;
 use crate::{
     domain::{
         entity::{
-            company::Company, line::Line, line_symbol::LineSymbol, station::Station,
-            station_number::StationNumber, train_type::TrainType,
+            company::Company, line::Line, line_symbol::LineSymbol, misc::StationIdWithDistance,
+            station::Station, station_number::StationNumber, train_type::TrainType,
         },
         repository::{
             company_repository::CompanyRepository, line_repository::LineRepository,
@@ -215,6 +215,19 @@ where
             .await?;
 
         Ok(stations)
+    }
+    async fn get_station_id_and_distance_by_coordinates(
+        &self,
+        latitude: f64,
+        longitude: f64,
+        line_id: Option<u32>,
+    ) -> Result<StationIdWithDistance, UseCaseError> {
+        let station = self
+            .station_repository
+            .get_station_id_and_distance_by_coordinates(latitude, longitude, line_id)
+            .await?;
+
+        Ok(station)
     }
     async fn get_stations_by_line_id(
         &self,

@@ -34,6 +34,7 @@ services:
 
   cache:
     image: memcached:1
+    command: ["memcached", "-I", "16m"]
     networks:
       - sapi-link
 
