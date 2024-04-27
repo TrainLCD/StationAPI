@@ -1,11 +1,12 @@
 use csv::{ReaderBuilder, StringRecord};
 use std::{
     env::{self, VarError},
+    error::{self},
     fs::{self, File},
     path::Path,
     process::{Command, Stdio},
 };
-use tracing::{info, warn};
+use tracing::info;
 
 pub fn insert_data(generated_sql_path: String) -> Result<(), Box<dyn std::error::Error>> {
     let generated_sql_file = File::open(generated_sql_path.clone())?;
@@ -157,13 +158,14 @@ pub fn generate_sql() -> Result<String, Box<dyn std::error::Error>> {
     Ok(out_path)
 }
 
-fn main() {
-    if dotenv::from_filename(".env.local").is_err() {
-        warn!("Could not load .env.local");
-    };
+fn main() -> Result<(), Box<dyn error::Error>> {
+    tracing_subscriber::fmt::init();
+    dotenv::from_filename(".env.local")?;
 
-    let generated_sql_path = generate_sql().unwrap();
-    insert_data(generated_sql_path).expect("Could not insert into database.");
+    let generated_sql_path = generate_sql()?;
+    insert_data(generated_sql_path)?;
 
     info!("Migration successfully completed!");
+
+    Ok(())
 }
