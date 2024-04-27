@@ -207,10 +207,10 @@ impl StationApi for MyApi {
         {
             Ok(station) => {
                 let mut state = DistanceResponseState::Away;
-                if station.distance < 500.0 {
+                if station.distance < 1.0 {
                     state = DistanceResponseState::Arrived;
                 }
-                if station.distance < 1000.0 {
+                if station.distance < 1.0 && station.distance > 0.5 {
                     state = DistanceResponseState::Approaching
                 }
 
