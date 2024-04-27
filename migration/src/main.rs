@@ -6,7 +6,7 @@ use std::{
     path::Path,
     process::{Command, Stdio},
 };
-use tracing::info;
+use tracing::{info, warn};
 
 pub fn insert_data(generated_sql_path: String) -> Result<(), Box<dyn std::error::Error>> {
     let generated_sql_file = File::open(generated_sql_path.clone())?;
@@ -160,7 +160,9 @@ pub fn generate_sql() -> Result<String, Box<dyn std::error::Error>> {
 
 fn main() -> Result<(), Box<dyn error::Error>> {
     tracing_subscriber::fmt::init();
-    dotenv::from_filename(".env.local")?;
+    if dotenv::from_filename(".env.local").is_err() {
+        warn!("Could not load .env.local");
+    };
 
     let generated_sql_path = generate_sql()?;
     insert_data(generated_sql_path)?;
