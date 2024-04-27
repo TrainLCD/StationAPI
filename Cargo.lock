@@ -875,6 +875,7 @@ dependencies = [
  "dotenv",
  "memcache",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
