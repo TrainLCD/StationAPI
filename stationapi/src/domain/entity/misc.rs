@@ -4,13 +4,15 @@ use serde::{Deserialize, Serialize};
 pub struct StationIdWithDistance {
     pub station_id: u32,
     pub distance: f64,
+    pub average_distance: f64,
 }
 
 impl StationIdWithDistance {
-    pub fn new(station_id: u32, distance: f64) -> Self {
+    pub fn new(station_id: u32, distance: f64, average_distance: f64) -> Self {
         Self {
             station_id,
             distance,
+            average_distance,
         }
     }
 }

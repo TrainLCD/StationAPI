@@ -108,6 +108,7 @@ CREATE TABLE `lines` (
   `line_symbol_extra_shape` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `e_status` int unsigned NOT NULL,
   `e_sort` int unsigned NOT NULL,
+  `average_distance` double unsigned NOT NULL,
   PRIMARY KEY (`line_cd`),
   KEY `company_cd` (`company_cd`),
   KEY `e_sort` (`e_sort`),

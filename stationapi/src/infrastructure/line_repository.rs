@@ -32,6 +32,7 @@ pub struct LineRow {
     pub line_group_cd: Option<u32>,
     #[sqlx(default)]
     pub station_g_cd: Option<u32>,
+    average_distance: f64,
 }
 
 impl From<LineRow> for Line {
@@ -64,6 +65,7 @@ impl From<LineRow> for Line {
             train_type: None,
             line_group_cd: row.line_group_cd,
             station_g_cd: row.station_g_cd,
+            average_distance: row.average_distance,
         }
     }
 }

@@ -206,11 +206,24 @@ impl StationApi for MyApi {
             .await
         {
             Ok(station) => {
+                let avg_distance_in_km = station.average_distance / 1000.0;
+                let arrived_threshold = if (avg_distance_in_km / 4.5) > 0.5 {
+                    0.5
+                } else {
+                    avg_distance_in_km / 4.5
+                };
+                let approaching_threshold = if (avg_distance_in_km / 2.0) > 1.0 {
+                    1.0
+                } else {
+                    avg_distance_in_km / 2.0
+                };
+
                 let mut state = DistanceResponseState::Away;
-                if station.distance < 1.0 {
+                if station.distance < arrived_threshold {
                     state = DistanceResponseState::Arrived;
                 }
-                if station.distance < 1.0 && station.distance > 0.5 {
+                if station.distance < approaching_threshold && station.distance > arrived_threshold
+                {
                     state = DistanceResponseState::Approaching
                 }
 
