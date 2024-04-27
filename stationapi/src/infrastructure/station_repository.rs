@@ -157,6 +157,7 @@ impl From<StationRow> for Station {
 struct DistanceWithIdRow {
     station_cd: u32,
     distance: f64,
+    average_distance: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -708,6 +709,7 @@ impl InternalStationRepository {
         let id_with_distance = StationIdWithDistance {
             station_id: row.station_cd,
             distance: row.distance,
+            average_distance: row.average_distance,
         };
 
         Ok(id_with_distance)
@@ -755,6 +757,7 @@ impl InternalStationRepository {
         let id_with_distance = StationIdWithDistance {
             station_id: row.station_cd,
             distance: row.distance,
+            average_distance: row.average_distance,
         };
 
         Ok(id_with_distance)
