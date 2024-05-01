@@ -407,7 +407,7 @@ where
                         .cloned()
                         .map(Box::new)
                     {
-                        station.train_type = Some(tt.clone());
+                        station.train_type = Some(tt);
                     };
                     line.station = Some(station.clone());
                 }
