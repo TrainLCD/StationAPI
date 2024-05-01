@@ -1,7 +1,9 @@
 {
   "image": "mcr.microsoft.com/devcontainers/universal:2",
   "features": {
-    "ghcr.io/devcontainers/features/rust:1": {},
+    "ghcr.io/devcontainers/features/rust:1": {
+      "profile": "default"
+    },
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   }
 }
