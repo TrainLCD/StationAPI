@@ -117,6 +117,29 @@ CREATE TABLE `lines` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `types`
+--
+
+DROP TABLE IF EXISTS `types`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `types` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `type_cd` int unsigned NOT NULL,
+  `type_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type_name_k` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type_name_r` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type_name_zh` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type_name_ko` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `color` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `direction` int unsigned NOT NULL DEFAULT '0',
+  `kind` int unsigned NOT NULL DEFAULT '0',
+  `top_priority` int unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`, `type_cd`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `station_station_types`
 --
 
@@ -172,30 +195,6 @@ CREATE TABLE `stations` (
   KEY `line_cd` (`line_cd`),
   KEY `station_g_cd` (`station_g_cd`),
   CONSTRAINT `stations_ibfk_1` FOREIGN KEY (`line_cd`) REFERENCES `lines` (`line_cd`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `types`
---
-
-DROP TABLE IF EXISTS `types`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `types` (
-  `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `type_cd` int unsigned NOT NULL,
-  `type_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type_name_k` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type_name_r` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type_name_zh` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type_name_ko` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `color` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `direction` int unsigned NOT NULL DEFAULT '0',
-  `kind` int unsigned NOT NULL DEFAULT '0',
-  `top_priority` int unsigned NOT NULL DEFAULT '0',
-  PRIMARY KEY (`id`),
-  KEY `type_cd` (`type_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
