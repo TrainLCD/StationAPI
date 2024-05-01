@@ -3,7 +3,8 @@ use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::{
     domain::{
-        entity::station::Station, error::DomainError,
+        entity::{misc::StationIdWithDistance, station::Station},
+        error::DomainError,
         repository::station_repository::StationRepository,
     },
     station_api::StopCondition,
@@ -53,6 +54,7 @@ struct StationRow {
     pub line_symbol_primary_shape: Option<String>,
     pub line_symbol_secondary_shape: Option<String>,
     pub line_symbol_extra_shape: Option<String>,
+    average_distance: f64,
     // station_station_typesからJOIN
     #[sqlx(default)]
     pub type_cd: Option<u32>,
@@ -136,6 +138,7 @@ impl From<StationRow> for Station {
             line_symbol_primary_shape: row.line_symbol_primary_shape,
             line_symbol_secondary_shape: row.line_symbol_secondary_shape,
             line_symbol_extra_shape: row.line_symbol_extra_shape,
+            average_distance: row.average_distance,
             type_cd: row.type_cd,
             line_group_cd: row.line_group_cd,
             pass: row.pass,
@@ -148,6 +151,13 @@ impl From<StationRow> for Station {
             direction: row.direction,
         }
     }
+}
+
+#[derive(sqlx::FromRow, Clone)]
+struct DistanceWithIdRow {
+    station_cd: u32,
+    distance: f64,
+    average_distance: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -220,6 +230,28 @@ impl StationRepository for MyStationRepository {
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::get_by_line_group_id(line_group_id, &mut conn).await
+    }
+    async fn get_station_id_and_distance_by_coordinates(
+        &self,
+        latitude: f64,
+        longitude: f64,
+        line_id: Option<u32>,
+    ) -> Result<StationIdWithDistance, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        match line_id {
+            Some(line_id) => {
+                InternalStationRepository::get_station_id_and_distance_by_coordinates_and_line_id(
+                    latitude, longitude, line_id, &mut conn,
+                )
+                .await
+            }
+            None => {
+                InternalStationRepository::get_station_id_and_distance_by_coordinates(
+                    latitude, longitude, &mut conn,
+                )
+                .await
+            }
+        }
     }
 }
 
@@ -573,51 +605,51 @@ impl InternalStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let rows = sqlx::query_as::<_, StationRow>(
             "SELECT 
-                  l.*, 
-                  s.*, 
-                  COALESCE(a.line_name, l.line_name) AS line_name, 
-                  COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
-                  COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
-                  COALESCE(a.line_name_r, l.line_name_r) AS line_name_r, 
-                  COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh, 
-                  COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko, 
-                  COALESCE(a.line_color_c, l.line_color_c) AS line_color_c, 
-                  (
-                    6371 * acos(
-                      cos(
-                        radians(s.lat)
-                      ) * cos(
-                        radians(?)
-                      ) * cos(
-                        radians(?) - radians(s.lon)
-                      ) + sin(
-                        radians(s.lat)
-                      ) * sin(
-                        radians(?)
-                      )
+                l.*, 
+                s.*, 
+                COALESCE(a.line_name, l.line_name) AS line_name, 
+                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
+                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
+                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r, 
+                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh, 
+                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko, 
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c, 
+                (
+                  6371 * acos(
+                    cos(
+                      radians(s.lat)
+                    ) * cos(
+                      radians(?)
+                    ) * cos(
+                      radians(?) - radians(s.lon)
+                    ) + sin(
+                      radians(s.lat)
+                    ) * sin(
+                      radians(?)
                     )
-                  ) AS distance, 
-                  (
-                    SELECT 
-                      COUNT(sst.line_group_cd) 
-                    FROM 
-                      station_station_types AS sst 
-                    WHERE 
-                      s.station_cd = sst.station_cd 
-                      AND sst.pass <> 1
-                  ) AS station_types_count 
-                FROM 
-                  (`stations` AS s, `lines` AS l) 
-                  LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
-                  LEFT OUTER JOIN `aliases` AS a ON a.id = la.alias_cd 
-                WHERE 
-                  s.line_cd = l.line_cd
-                  AND l.e_status = 0
-                  AND s.e_status = 0 
-                ORDER BY 
-                  distance 
-                LIMIT 
-                  ?",
+                  )
+                ) AS distance, 
+                (
+                  SELECT 
+                    COUNT(sst.line_group_cd) 
+                  FROM 
+                    station_station_types AS sst 
+                  WHERE 
+                    s.station_cd = sst.station_cd 
+                    AND sst.pass <> 1
+                ) AS station_types_count 
+              FROM 
+                (`stations` AS s, `lines` AS l) 
+                LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
+                LEFT OUTER JOIN `aliases` AS a ON a.id = la.alias_cd 
+              WHERE 
+                s.line_cd = l.line_cd
+                AND l.e_status = 0
+                AND s.e_status = 0 
+              ORDER BY 
+                distance 
+              LIMIT 
+                ?",
         )
         .bind(latitude)
         .bind(longitude)
@@ -629,6 +661,106 @@ impl InternalStationRepository {
         let stations = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(stations)
+    }
+
+    async fn get_station_id_and_distance_by_coordinates_and_line_id(
+        latitude: f64,
+        longitude: f64,
+        line_id: u32,
+        conn: &mut MySqlConnection,
+    ) -> Result<StationIdWithDistance, DomainError> {
+        let row = sqlx::query_as::<_, DistanceWithIdRow>(
+            "SELECT
+            s.station_cd,
+            s.station_g_cd, 
+            l.average_distance,
+            (
+              6371 * acos(
+                cos(
+                  radians(s.lat)
+                ) * cos(
+                  radians(?)
+                ) * cos(
+                  radians(?) - radians(s.lon)
+                ) + sin(
+                  radians(s.lat)
+                ) * sin(
+                  radians(?)
+                )
+              )
+            ) AS distance
+          FROM `stations` AS s, `lines` AS l
+          WHERE
+            l.line_cd = ?
+            AND s.line_cd = ?
+            AND s.e_status = 0
+          ORDER BY 
+            distance
+          LIMIT 
+            1",
+        )
+        .bind(latitude)
+        .bind(longitude)
+        .bind(latitude)
+        .bind(line_id)
+        .bind(line_id)
+        .fetch_one(conn)
+        .await?;
+        let id_with_distance = StationIdWithDistance {
+            station_id: row.station_cd,
+            distance: row.distance,
+            average_distance: row.average_distance,
+        };
+
+        Ok(id_with_distance)
+    }
+
+    async fn get_station_id_and_distance_by_coordinates(
+        latitude: f64,
+        longitude: f64,
+        conn: &mut MySqlConnection,
+    ) -> Result<StationIdWithDistance, DomainError> {
+        let row = sqlx::query_as::<_, DistanceWithIdRow>(
+            "SELECT
+          s.station_cd,
+          s.station_g_cd,
+          l.average_distance,
+          (
+            6371 * acos(
+              cos(
+                radians(s.lat)
+              ) * cos(
+                radians(?)
+              ) * cos(
+                radians(?) - radians(s.lon)
+              ) + sin(
+                radians(s.lat)
+              ) * sin(
+                radians(?)
+              )
+            )
+          ) AS distance
+        FROM `stations` AS s, `lines` AS l
+        WHERE
+          s.e_status = 0
+          AND l.line_cd = s.line_cd
+        ORDER BY 
+          distance
+        LIMIT 
+          1",
+        )
+        .bind(latitude)
+        .bind(longitude)
+        .bind(latitude)
+        .fetch_one(conn)
+        .await?;
+        let id_with_distance = StationIdWithDistance {
+            station_id: row.station_cd,
+            distance: row.distance,
+            average_distance: row.average_distance,
+        };
+
+        Ok(id_with_distance)
     }
 
     async fn get_by_name(

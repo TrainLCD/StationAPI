@@ -1,15 +1,18 @@
+use std::hash::Hash;
+
 use async_trait::async_trait;
 
 use crate::{
     domain::entity::{
-        company::Company, line::Line, line_symbol::LineSymbol, station::Station,
-        station_number::StationNumber, train_type::TrainType,
+        company::Company, line::Line, line_symbol::LineSymbol, misc::StationIdWithDistance,
+        station::Station, station_number::StationNumber, train_type::TrainType,
     },
     use_case::error::UseCaseError,
 };
 
 #[async_trait]
 pub trait QueryUseCase: Send + Sync + 'static {
+    fn calculate_hash<T: Hash>(t: &T) -> u64;
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError>;
     async fn get_stations_by_id_vec(
         &self,
@@ -72,4 +75,10 @@ pub trait QueryUseCase: Send + Sync + 'static {
         station_id_vec: Vec<u32>,
         line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, UseCaseError>;
+    async fn get_station_id_and_distance_by_coordinates(
+        &self,
+        latitude: f64,
+        longitude: f64,
+        line_id: Option<u32>,
+    ) -> Result<StationIdWithDistance, UseCaseError>;
 }

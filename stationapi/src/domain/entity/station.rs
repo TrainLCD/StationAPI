@@ -53,6 +53,7 @@ pub struct Station {
     pub line_symbol_primary_shape: Option<String>,
     pub line_symbol_secondary_shape: Option<String>,
     pub line_symbol_extra_shape: Option<String>,
+    pub average_distance: f64,
     // station_station_typesからJOIN
     pub type_cd: Option<u32>,
     pub line_group_cd: Option<u32>,
@@ -117,6 +118,7 @@ impl Station {
         line_symbol_secondary_shape: Option<String>,
         line_symbol_extra_shape: Option<String>,
         line_group_cd: Option<u32>,
+        average_distance: f64,
         pass: Option<u32>,
         type_cd: Option<u32>,
         type_name: Option<String>,
@@ -176,6 +178,7 @@ impl Station {
             line_symbol_extra_shape,
             line_group_cd,
             pass,
+            average_distance,
             type_cd,
             type_name,
             type_name_k,

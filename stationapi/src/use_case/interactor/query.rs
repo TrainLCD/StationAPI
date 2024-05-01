@@ -1,5 +1,6 @@
 use std::{
     collections::hash_map::DefaultHasher,
+    env::{self, VarError},
     hash::{Hash, Hasher},
     vec,
 };
@@ -9,8 +10,8 @@ use async_trait::async_trait;
 use crate::{
     domain::{
         entity::{
-            company::Company, line::Line, line_symbol::LineSymbol, station::Station,
-            station_number::StationNumber, train_type::TrainType,
+            company::Company, line::Line, line_symbol::LineSymbol, misc::StationIdWithDistance,
+            station::Station, station_number::StationNumber, train_type::TrainType,
         },
         repository::{
             company_repository::CompanyRepository, line_repository::LineRepository,
@@ -37,15 +38,30 @@ where
     TR: TrainTypeRepository,
     CR: CompanyRepository,
 {
+    fn calculate_hash<T: Hash>(t: &T) -> u64 {
+        match env::var("DISABLE_MEMCACHE") {
+            Ok(s) => {
+                let is_memcached_disabled: bool = s.parse().unwrap();
+                if !is_memcached_disabled {
+                    let mut s = DefaultHasher::new();
+                    t.hash(&mut s);
+                    return s.finish();
+                }
+                0
+            }
+            Err(env::VarError::NotPresent) => 0,
+            Err(VarError::NotUnicode(_)) => 0,
+        }
+    }
+
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
-        let cache_key = format!("find_station_by_id:station_id:{}", station_id);
+        let cache_key = format!("find_station_by_id:{}", Self::calculate_hash(&station_id));
 
         if let Some(cache_client) = &self.cache_client {
-            if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
-                let station =
-                    serde_json::from_str::<Station>(&cache_value).expect("Failed to parse JSON");
-
-                return Ok(Some(station));
+            if let Ok(Some(cache_value)) = cache_client.get::<String>(&cache_key) {
+                if let Ok(station) = serde_json::from_str::<Station>(&cache_value) {
+                    return Ok(Some(station));
+                };
             };
         }
 
@@ -59,7 +75,7 @@ where
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(station_str) = serde_json::to_string(&station) {
-                cache_client.set(&cache_key, station_str, 0).unwrap();
+                let _ = cache_client.set(&cache_key, station_str, 0);
             };
         }
 
@@ -69,24 +85,43 @@ where
         &self,
         station_ids: Vec<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
+        let cache_key: String = format!(
+            "get_stations_by_id_vec:{}",
+            Self::calculate_hash(&station_ids)
+        );
+        if let Some(cache_client) = &self.cache_client {
+            if let Ok(Some(cache_value)) = cache_client.get::<String>(&cache_key) {
+                if let Ok(stations) = serde_json::from_str::<Vec<Station>>(&cache_value) {
+                    return Ok(stations);
+                };
+            };
+        }
+
         let mut stations = self.station_repository.get_by_id_vec(station_ids).await?;
         self.update_station_vec_with_attributes(&mut stations, None)
             .await?;
 
+        if let Some(cache_client) = &self.cache_client {
+            if let Ok(stations_str) = serde_json::to_string(&stations) {
+                let _ = cache_client.set(&cache_key, stations_str, 0);
+            };
+        }
+
         Ok(stations)
     }
-
     async fn get_stations_by_group_id(
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let cache_key = format!("stations_by_group_id:station_group_id:{}", station_group_id);
+        let cache_key = format!(
+            "get_stations_by_group_id:{}",
+            Self::calculate_hash(&station_group_id)
+        );
         if let Some(cache_client) = &self.cache_client {
-            if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
-                let stations = serde_json::from_str::<Vec<Station>>(&cache_value)
-                    .expect("Failed to parse JSON");
-
-                return Ok(stations);
+            if let Ok(Some(cache_value)) = cache_client.get::<String>(&cache_key) {
+                if let Ok(stations) = serde_json::from_str::<Vec<Station>>(&cache_value) {
+                    return Ok(stations);
+                }
             };
         }
 
@@ -100,7 +135,7 @@ where
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(stations_str) = serde_json::to_string(&stations) {
-                cache_client.set(&cache_key, stations_str, 0).unwrap();
+                let _ = cache_client.set(&cache_key, stations_str, 0);
             };
         }
 
@@ -110,24 +145,16 @@ where
         &self,
         station_group_id_vec: Vec<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let mut hasher = DefaultHasher::new();
-        station_group_id_vec
-            .iter()
-            .map(|id| id.to_string())
-            .collect::<String>()
-            .hash(&mut hasher);
-
         let cache_key = format!(
-            "get_stations_by_group_id_vec:station_group_id_vec:{}",
-            hasher.finish()
+            "get_stations_by_group_id_vec:{}",
+            Self::calculate_hash(&station_group_id_vec)
         );
 
         if let Some(cache_client) = &self.cache_client {
-            if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
-                let stations = serde_json::from_str::<Vec<Station>>(&cache_value)
-                    .expect("Failed to parse JSON");
-
-                return Ok(stations);
+            if let Ok(Some(cache_value)) = cache_client.get::<String>(&cache_key) {
+                if let Ok(stations) = serde_json::from_str::<Vec<Station>>(&cache_value) {
+                    return Ok(stations);
+                }
             };
         }
 
@@ -138,7 +165,7 @@ where
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(stations_str) = serde_json::to_string(&stations) {
-                cache_client.set(&cache_key, stations_str, 0).unwrap();
+                let _ = cache_client.set(&cache_key, stations_str, 0);
             };
         }
 
@@ -148,23 +175,15 @@ where
         &self,
         station_group_id_vec: Vec<u32>,
     ) -> Result<Vec<Line>, UseCaseError> {
-        let mut hasher = DefaultHasher::new();
-        station_group_id_vec
-            .iter()
-            .map(|id| id.to_string())
-            .collect::<String>()
-            .hash(&mut hasher);
-
         let cache_key = format!(
-            "get_lines_by_station_group_id_vec:station_group_id_vec:{}",
-            hasher.finish()
+            "get_lines_by_station_group_id_vec:{}",
+            Self::calculate_hash(&station_group_id_vec)
         );
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
-                let lines =
-                    serde_json::from_str::<Vec<Line>>(&cache_value).expect("Failed to parse JSON");
-
-                return Ok(lines);
+                if let Ok(lines) = serde_json::from_str::<Vec<Line>>(&cache_value) {
+                    return Ok(lines);
+                }
             };
         }
 
@@ -175,7 +194,7 @@ where
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(lines_str) = serde_json::to_string(&lines) {
-                cache_client.set(&cache_key, lines_str, 0).unwrap();
+                let _ = cache_client.set(&cache_key, lines_str, 0);
             };
         }
 
@@ -197,23 +216,34 @@ where
 
         Ok(stations)
     }
+    async fn get_station_id_and_distance_by_coordinates(
+        &self,
+        latitude: f64,
+        longitude: f64,
+        line_id: Option<u32>,
+    ) -> Result<StationIdWithDistance, UseCaseError> {
+        let station = self
+            .station_repository
+            .get_station_id_and_distance_by_coordinates(latitude, longitude, line_id)
+            .await?;
 
+        Ok(station)
+    }
     async fn get_stations_by_line_id(
         &self,
         line_id: u32,
         station_id: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let cache_key = format!(
-            "stations_by_line_id:line_id:{}:station_id:{}",
-            line_id,
-            station_id.unwrap_or(0)
+            "get_stations_by_line_id:{}",
+            Self::calculate_hash(&format!("{}:{}", line_id, station_id.unwrap_or(0)))
         );
-        if let Some(cache_client) = &self.cache_client {
-            if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
-                let stations = serde_json::from_str::<Vec<Station>>(&cache_value)
-                    .expect("Failed to parse JSON");
 
-                return Ok(stations);
+        if let Some(cache_client) = &self.cache_client {
+            if let Ok(Some(cache_value)) = cache_client.get::<String>(&cache_key) {
+                if let Ok(stations) = serde_json::from_str::<Vec<Station>>(&cache_value) {
+                    return Ok(stations);
+                }
             };
         }
 
@@ -227,7 +257,7 @@ where
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(stations_str) = serde_json::to_string(&stations) {
-                cache_client.set(&cache_key, stations_str, 0).unwrap();
+                let _ = cache_client.set(&cache_key, stations_str, 0);
             };
         }
 
@@ -238,21 +268,16 @@ where
         station_name: String,
         limit: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let mut station_name_hasher = DefaultHasher::new();
-        station_name.hash(&mut station_name_hasher);
-
         let cache_key = format!(
-            "stations_by_name:station_name:{}:limit:{}",
-            station_name_hasher.finish(),
-            limit.unwrap_or(1)
+            "get_stations_by_name:{}",
+            Self::calculate_hash(&format!("{}:{}", station_name, limit.unwrap_or(0)))
         );
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
-                let stations = serde_json::from_str::<Vec<Station>>(&cache_value)
-                    .expect("Failed to parse JSON");
-
-                return Ok(stations);
+                if let Ok(stations) = serde_json::from_str::<Vec<Station>>(&cache_value) {
+                    return Ok(stations);
+                }
             };
         }
 
@@ -266,7 +291,7 @@ where
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(stations_str) = serde_json::to_string(&stations) {
-                cache_client.set(&cache_key, stations_str, 0).unwrap();
+                let _ = cache_client.set(&cache_key, stations_str, 0);
             };
         }
 
@@ -276,21 +301,16 @@ where
         &self,
         company_id_vec: Vec<u32>,
     ) -> Result<Vec<Company>, UseCaseError> {
-        let mut hasher = DefaultHasher::new();
-        company_id_vec
-            .iter()
-            .map(|id| id.to_string())
-            .collect::<String>()
-            .hash(&mut hasher);
-
-        let cache_key = format!("find_company_by_id_vec:company_id_vec:{}", hasher.finish());
+        let cache_key = format!(
+            "find_company_by_id_vec:{}",
+            Self::calculate_hash(&company_id_vec)
+        );
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
-                let companies = serde_json::from_str::<Vec<Company>>(&cache_value)
-                    .expect("Failed to parse JSON");
-
-                return Ok(companies);
+                if let Ok(companies) = serde_json::from_str::<Vec<Company>>(&cache_value) {
+                    return Ok(companies);
+                }
             };
         }
 
@@ -301,13 +321,12 @@ where
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(companies_str) = serde_json::to_string(&companies) {
-                cache_client.set(&cache_key, companies_str, 0).unwrap();
+                let _ = cache_client.set(&cache_key, companies_str, 0);
             };
         }
 
         Ok(companies)
     }
-
     async fn update_station_vec_with_attributes(
         &self,
         stations_ref: &mut Vec<Station>,
@@ -401,22 +420,20 @@ where
 
         Ok(())
     }
-
     async fn get_lines_by_station_group_id(
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Line>, UseCaseError> {
         let cache_key = format!(
-            "lines_by_station_group_id:station_group_id:{}",
-            station_group_id
+            "get_lines_by_station_group_id:{}",
+            Self::calculate_hash(&station_group_id)
         );
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
-                let lines =
-                    serde_json::from_str::<Vec<Line>>(&cache_value).expect("Failed to parse JSON");
-
-                return Ok(lines);
+                if let Ok(lines) = serde_json::from_str::<Vec<Line>>(&cache_value) {
+                    return Ok(lines);
+                }
             };
         }
 
@@ -427,7 +444,7 @@ where
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(lines_str) = serde_json::to_string(&lines) {
-                cache_client.set(&cache_key, lines_str, 0).unwrap();
+                let _ = cache_client.set(&cache_key, lines_str, 0);
             };
         }
         Ok(lines)
@@ -436,13 +453,16 @@ where
         &self,
         line_group_id: u32,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let cache_key = format!("stations_by_line_group_id:line_group_id:{}", line_group_id);
+        let cache_key = format!(
+            "get_stations_by_line_group_id:{}",
+            Self::calculate_hash(&line_group_id)
+        );
+
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
-                let stations = serde_json::from_str::<Vec<Station>>(&cache_value)
-                    .expect("Failed to parse JSON");
-
-                return Ok(stations);
+                if let Ok(stations) = serde_json::from_str::<Vec<Station>>(&cache_value) {
+                    return Ok(stations);
+                }
             };
         }
 
@@ -456,7 +476,7 @@ where
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(stations_str) = serde_json::to_string(&stations) {
-                cache_client.set(&cache_key, stations_str, 0).unwrap();
+                let _ = cache_client.set(&cache_key, stations_str, 0);
             };
         }
 
@@ -529,7 +549,6 @@ where
 
         station_numbers
     }
-
     fn extract_line_from_station(&self, station: &Station) -> Line {
         let station = station.clone();
         Line {
@@ -560,9 +579,9 @@ where
             train_type: None,
             line_group_cd: None,
             station_g_cd: None,
+            average_distance: station.average_distance,
         }
     }
-
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol> {
         let line_symbol_primary = &line.line_symbol_primary;
         let line_symbol_secondary = &line.line_symbol_secondary;
@@ -627,19 +646,20 @@ where
 
         line_symbols
     }
-
     async fn get_train_types_by_station_id(
         &self,
         station_id: u32,
     ) -> Result<Vec<TrainType>, UseCaseError> {
-        let cache_key = format!("train_types_by_station_id:station_id:{}", station_id);
+        let cache_key = format!(
+            "get_train_types_by_station_id:{}",
+            Self::calculate_hash(&station_id)
+        );
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
-                let train_types = serde_json::from_str::<Vec<TrainType>>(&cache_value)
-                    .expect("Failed to parse JSON");
-
-                return Ok(train_types);
+                if let Ok(train_types) = serde_json::from_str::<Vec<TrainType>>(&cache_value) {
+                    return Ok(train_types);
+                }
             };
         }
 
@@ -697,7 +717,7 @@ where
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(train_types_str) = serde_json::to_string(&train_types) {
-                cache_client.set(&cache_key, train_types_str, 0).unwrap();
+                let _ = cache_client.set(&cache_key, train_types_str, 0);
             };
         }
 
@@ -709,24 +729,25 @@ where
         station_id_vec: Vec<u32>,
         line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, UseCaseError> {
-        let mut hasher = DefaultHasher::new();
-        station_id_vec
+        let station_id_key: String = station_id_vec
             .iter()
             .map(|id| id.to_string())
-            .collect::<String>()
-            .hash(&mut hasher);
+            .collect::<String>();
 
         let cache_key = format!(
-            "train_types_by_station_id_vec:station_id_vec:{}",
-            hasher.finish()
+            "get_train_types_by_station_id_vec:{}",
+            Self::calculate_hash(&format!(
+                "{}:{}",
+                station_id_key,
+                line_group_id.unwrap_or(0)
+            ))
         );
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(Some(cache_value)) = cache_client.get::<String>(cache_key.as_str()) {
-                let train_types = serde_json::from_str::<Vec<TrainType>>(&cache_value)
-                    .expect("Failed to parse JSON");
-
-                return Ok(train_types);
+                if let Ok(train_types) = serde_json::from_str::<Vec<TrainType>>(&cache_value) {
+                    return Ok(train_types);
+                }
             };
         }
 
@@ -737,7 +758,7 @@ where
 
         if let Some(cache_client) = &self.cache_client {
             if let Ok(train_types_str) = serde_json::to_string(&train_types) {
-                cache_client.set(&cache_key, train_types_str, 0).unwrap();
+                let _ = cache_client.set(&cache_key, train_types_str, 0);
             };
         }
 
