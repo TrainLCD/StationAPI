@@ -59,10 +59,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
         cache_client: cache_client.clone(),
     };
 
-    let my_api = MyApi {
-        cache_client,
-        query_use_case,
-    };
+    let my_api = MyApi { query_use_case };
 
     let svc = StationApiServer::new(my_api);
 

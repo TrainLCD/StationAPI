@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 
-use crate::domain::{entity::station::Station, error::DomainError};
+use crate::domain::{
+    entity::{misc::StationIdWithDistance, station::Station},
+    error::DomainError,
+};
 
 #[async_trait]
 pub trait StationRepository: Send + Sync + 'static {
@@ -31,4 +34,10 @@ pub trait StationRepository: Send + Sync + 'static {
         limit: Option<u32>,
     ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Station>, DomainError>;
+    async fn get_station_id_and_distance_by_coordinates(
+        &self,
+        latitude: f64,
+        longitude: f64,
+        line_id: Option<u32>,
+    ) -> Result<StationIdWithDistance, DomainError>;
 }

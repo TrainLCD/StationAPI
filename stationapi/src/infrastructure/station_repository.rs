@@ -3,7 +3,8 @@ use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::{
     domain::{
-        entity::station::Station, error::DomainError,
+        entity::{misc::StationIdWithDistance, station::Station},
+        error::DomainError,
         repository::station_repository::StationRepository,
     },
     station_api::StopCondition,
@@ -53,6 +54,7 @@ struct StationRow {
     pub line_symbol_primary_shape: Option<String>,
     pub line_symbol_secondary_shape: Option<String>,
     pub line_symbol_extra_shape: Option<String>,
+    average_distance: f64,
     // station_station_typesからJOIN
     #[sqlx(default)]
     pub type_cd: Option<u32>,
@@ -136,6 +138,7 @@ impl From<StationRow> for Station {
             line_symbol_primary_shape: row.line_symbol_primary_shape,
             line_symbol_secondary_shape: row.line_symbol_secondary_shape,
             line_symbol_extra_shape: row.line_symbol_extra_shape,
+            average_distance: row.average_distance,
             type_cd: row.type_cd,
             line_group_cd: row.line_group_cd,
             pass: row.pass,
@@ -148,6 +151,13 @@ impl From<StationRow> for Station {
             direction: row.direction,
         }
     }
+}
+
+#[derive(sqlx::FromRow, Clone)]
+struct DistanceWithIdRow {
+    station_cd: u32,
+    distance: f64,
+    average_distance: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -221,6 +231,28 @@ impl StationRepository for MyStationRepository {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::get_by_line_group_id(line_group_id, &mut conn).await
     }
+    async fn get_station_id_and_distance_by_coordinates(
+        &self,
+        latitude: f64,
+        longitude: f64,
+        line_id: Option<u32>,
+    ) -> Result<StationIdWithDistance, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        match line_id {
+            Some(line_id) => {
+                InternalStationRepository::get_station_id_and_distance_by_coordinates_and_line_id(
+                    latitude, longitude, line_id, &mut conn,
+                )
+                .await
+            }
+            None => {
+                InternalStationRepository::get_station_id_and_distance_by_coordinates(
+                    latitude, longitude, &mut conn,
+                )
+                .await
+            }
+        }
+    }
 }
 
 struct InternalStationRepository {}
@@ -231,7 +263,8 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Option<Station>, DomainError> {
         let rows: Option<StationRow> = sqlx::query_as(
-            "SELECT l.*,
+            "SELECT
+            l.*,
             s.*,
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
@@ -249,22 +282,16 @@ impl InternalStationRepository {
                 s.station_cd = sst.station_cd
                 AND sst.pass <> 1
             ) AS station_types_count
-            FROM
-            (`stations` AS s, `lines` AS l)
-            LEFT OUTER JOIN `line_aliases` AS la
-                ON
-                    la.station_cd = ?
-            LEFT OUTER JOIN `aliases` AS a
-                ON
-                    la.alias_cd = a.id                   
+            FROM `stations` AS s
+            JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
+            LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = ?
+            LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
             WHERE
-            s.line_cd = l.line_cd
-            AND l.e_status = 0
-            AND s.station_cd = ?
-            AND s.e_status = 0
-          ORDER BY
-            s.e_sort,
-            s.station_cd",
+              s.station_cd = ?
+              AND s.e_status = 0
+            ORDER BY
+              s.e_sort,
+              s.station_cd",
         )
         .bind(id)
         .bind(id)
@@ -290,34 +317,34 @@ impl InternalStationRepository {
         let params = format!("?{}", ", ?".repeat(ids.len() - 1));
 
         let query_str = format!(
-            "SELECT l.*,
-            s.*,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            (
-              SELECT
-                COUNT(sst.line_group_cd) 
-              FROM
-                station_station_types AS sst
-              WHERE
-                s.station_cd = sst.station_cd
-                AND sst.pass <> 1
-            ) AS station_types_count
-            FROM
-            (`stations` AS s, `lines` AS l)
+            "SELECT
+              l.*,
+              s.*,
+              COALESCE(a.line_name, l.line_name) AS line_name,
+              COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+              COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+              COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+              COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+              COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+              COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+              (
+                SELECT
+                  COUNT(sst.line_group_cd) 
+                FROM
+                  station_station_types AS sst
+                WHERE
+                  s.station_cd = sst.station_cd
+                  AND sst.pass <> 1
+              ) AS station_types_count
+            FROM `stations` AS s
+            JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
             LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
             WHERE
-            s.station_cd IN ({})
-            AND s.line_cd = l.line_cd
-            AND l.e_status = 0
-            AND s.e_status = 0
-          ORDER BY FIELD(s.station_cd, {})",
+              s.station_cd IN ( {} )
+              AND s.line_cd = l.line_cd
+              AND s.e_status = 0
+            ORDER BY FIELD(s.station_cd, {})",
             params, params
         );
 
@@ -342,126 +369,102 @@ impl InternalStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let station_row: Vec<StationRow> = sqlx::query_as(
             "(
-          SELECT
-            s.*,
-            l.*,
-            sst.pass,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            (
-              SELECT
-                COUNT(sst.line_group_cd)
-              FROM
-                `station_station_types` AS sst
-              WHERE
-                s.station_cd = sst.station_cd
-                AND sst.pass <> 1
-            ) AS station_types_count,
-            s.e_sort AS station_e_sort,
-            NULL as sst_id
-          FROM
-            (`stations` AS s, `lines` AS l)
-            LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-            LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
-                SELECT
-                  sst.line_group_cd
-                FROM
-                  `station_station_types` AS sst,
-                  `stations` AS s,
-                  `types` AS t
-                WHERE
-                  s.line_cd = ?
-                  AND CASE WHEN ? IS NOT NULL THEN s.station_cd = ? END
-                  AND CASE WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd ELSE t.kind IN (0, 1) END
-                  AND sst.type_cd = t.type_cd
-                  AND s.station_cd = sst.station_cd
-                  AND s.e_status = 0
-                ORDER BY
-                  sst.id
-                LIMIT
-                  1
-              )
-            LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
-          WHERE
-            sst.station_cd IS NULL
-            AND l.line_cd = ?
-            AND l.line_cd = s.line_cd
-            AND l.e_status = 0
-            AND s.e_status = 0
-        )
-        UNION
-          DISTINCT (
-            SELECT
-              s.*,
-              l.*,
-              sst.pass,
-              COALESCE(a.line_name, l.line_name) AS line_name,
-              COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-              COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-              COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-              COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-              COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-              COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-              (
-                SELECT
-                  COUNT(sst.line_group_cd)
-                FROM
-                  `station_station_types` AS sst
-                WHERE
-                  s.station_cd = sst.station_cd
-                  AND sst.pass <> 1
-              ) AS station_types_count,
-              s.e_sort AS station_e_sort,
-              sst.id AS sst_id
-            FROM
-              (`stations` AS s, `lines` AS l)
-              LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-              LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-              LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
-                SELECT
-                  sst.line_group_cd
-                FROM
-                  `station_station_types` AS sst,
-                  `stations` AS s,
-                  `types` AS t
-                WHERE
-                  s.line_cd = ?
-                  AND CASE WHEN ? IS NOT NULL THEN s.station_cd = ? END
-                  AND CASE WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd ELSE t.kind IN (0, 1) END
-                  AND sst.type_cd = t.type_cd
-                  AND s.station_cd = sst.station_cd
-                  AND s.e_status = 0
-                ORDER BY
-                  sst.id
-                LIMIT
-                  1
-              )
-              LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
-            WHERE
-              sst.station_cd IS NOT NULL
-              AND s.station_cd = sst.station_cd
-              AND l.line_cd = s.line_cd
-              AND l.e_status = 0
-              AND s.e_status = 0
-          )
-        ORDER BY
-          IF(
-            sst_id IS NOT NULL,
-            sst_id,
-            CONCAT(e_sort, station_cd)
-          )",
+              SELECT s.*,
+                l.*,
+                sst.pass,
+                COALESCE(a.line_name, l.line_name) AS line_name,
+                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+                (
+                  SELECT COUNT(sst.line_group_cd)
+                  FROM `station_station_types` AS sst
+                  WHERE s.station_cd = sst.station_cd
+                    AND sst.pass <> 1
+                ) AS station_types_count,
+                s.e_sort AS station_e_sort,
+                NULL as sst_id
+              FROM `stations` AS s
+                JOIN `lines` AS l ON l.line_cd = ?
+                AND l.e_status = 0
+                LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+                LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
+                LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                  SELECT sst.line_group_cd
+                  FROM `station_station_types` AS sst
+                    LEFT OUTER JOIN `types` AS t ON sst.type_cd = t.type_cd
+                  WHERE CASE
+                      WHEN ? IS NOT NULL THEN sst.station_cd = ?
+                    END
+                    AND CASE
+                      WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd
+                      ELSE t.kind IN (0, 1)
+                    END
+                  ORDER BY sst.id
+                  LIMIT 1
+                )
+                LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
+              WHERE sst.station_cd IS NULL
+                AND s.line_cd = l.line_cd
+                AND s.e_status = 0
+            )
+            UNION
+            DISTINCT (
+              SELECT s.*,
+                l.*,
+                sst.pass,
+                COALESCE(a.line_name, l.line_name) AS line_name,
+                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+                (
+                  SELECT COUNT(sst.line_group_cd)
+                  FROM `station_station_types` AS sst
+                  WHERE s.station_cd = sst.station_cd
+                    AND sst.pass <> 1
+                ) AS station_types_count,
+                s.e_sort AS station_e_sort,
+                sst.id AS sst_id
+              FROM `stations` AS s
+                JOIN `lines` AS l ON l.line_cd = s.line_cd
+                AND l.e_status = 0
+                LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+                LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
+                LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                  SELECT sst.line_group_cd
+                  FROM `station_station_types` AS sst
+                    LEFT OUTER JOIN `types` AS t ON sst.type_cd = t.type_cd
+                  WHERE CASE
+                      WHEN ? IS NOT NULL THEN sst.station_cd = ?
+                    END
+                    AND CASE
+                      WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd
+                      ELSE t.kind IN (0, 1)
+                    END
+                  ORDER BY sst.id
+                  LIMIT 1
+                )
+                LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
+              WHERE sst.station_cd IS NOT NULL
+                AND s.station_cd = sst.station_cd
+                AND s.line_cd = l.line_cd
+                AND s.e_status = 0
+            )
+            ORDER BY IF(
+                sst_id IS NOT NULL,
+                sst_id,
+                CONCAT(e_sort, station_cd)
+              )",
         )
         .bind(line_id)
         .bind(station_id)
         .bind(station_id)
-        .bind(line_id)
-        .bind(line_id)
         .bind(station_id)
         .bind(station_id)
         .fetch_all(conn)
@@ -496,13 +499,13 @@ impl InternalStationRepository {
                 AND sst.pass <> 1
             ) AS station_types_count
           FROM
-            (`stations` AS s, `lines` AS l)
+            `stations` AS s
+            JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
             LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT OUTER JOIN `aliases` AS a ON a.id = la.alias_cd
           WHERE
             s.station_g_cd = ?
             AND s.line_cd = l.line_cd
-            AND l.e_status = 0
             AND s.e_status = 0",
         )
         .bind(group_id)
@@ -524,7 +527,8 @@ impl InternalStationRepository {
 
         let params = format!("?{}", ", ?".repeat(group_id_vec.len() - 1));
         let query_str = format!(
-            "SELECT l.*,
+            "SELECT
+            l.*,
             s.*,
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
@@ -543,13 +547,13 @@ impl InternalStationRepository {
                 AND sst.pass <> 1
             ) AS station_types_count
           FROM
-            (`stations` AS s, `lines` AS l)
+            `stations` AS s
+            JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
             LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT OUTER JOIN `aliases` AS a ON a.id = la.alias_cd
           WHERE
             s.station_g_cd IN ( {} )
             AND s.line_cd = l.line_cd
-            AND l.e_status = 0
             AND s.e_status = 0",
             params
         );
@@ -573,51 +577,54 @@ impl InternalStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let rows = sqlx::query_as::<_, StationRow>(
             "SELECT 
-                  l.*, 
-                  s.*, 
-                  COALESCE(a.line_name, l.line_name) AS line_name, 
-                  COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
-                  COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
-                  COALESCE(a.line_name_r, l.line_name_r) AS line_name_r, 
-                  COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh, 
-                  COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko, 
-                  COALESCE(a.line_color_c, l.line_color_c) AS line_color_c, 
-                  (
-                    6371 * acos(
-                      cos(
-                        radians(s.lat)
-                      ) * cos(
-                        radians(?)
-                      ) * cos(
-                        radians(?) - radians(s.lon)
-                      ) + sin(
-                        radians(s.lat)
-                      ) * sin(
-                        radians(?)
-                      )
+                l.*, 
+                s.*, 
+                COALESCE(a.line_name, l.line_name) AS line_name, 
+                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
+                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
+                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r, 
+                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh, 
+                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko, 
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c, 
+                (
+                  6371 * acos(
+                    cos(
+                      radians(s.lat)
+                    ) * cos(
+                      radians(?)
+                    ) * cos(
+                      radians(?) - radians(s.lon)
+                    ) + sin(
+                      radians(s.lat)
+                    ) * sin(
+                      radians(?)
                     )
-                  ) AS distance, 
-                  (
-                    SELECT 
-                      COUNT(sst.line_group_cd) 
-                    FROM 
-                      station_station_types AS sst 
-                    WHERE 
-                      s.station_cd = sst.station_cd 
-                      AND sst.pass <> 1
-                  ) AS station_types_count 
-                FROM 
-                  (`stations` AS s, `lines` AS l) 
-                  LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
-                  LEFT OUTER JOIN `aliases` AS a ON a.id = la.alias_cd 
-                WHERE 
-                  s.line_cd = l.line_cd
-                  AND l.e_status = 0
-                  AND s.e_status = 0 
-                ORDER BY 
-                  distance 
-                LIMIT 
-                  ?",
+                  )
+                ) AS distance, 
+                (
+                  SELECT 
+                    COUNT(sst.line_group_cd) 
+                  FROM 
+                    station_station_types AS sst 
+                  WHERE 
+                    s.station_cd = sst.station_cd 
+                    AND sst.pass <> 1
+                AND s.line_cd = l.line_cd
+                ) AS station_types_count  
+              FROM `stations` AS s
+              JOIN `lines` AS l ON l.line_cd IN (
+                SELECT _s.line_cd
+                FROM `stations` AS _s
+                WHERE _s.station_g_cd = s.station_g_cd
+              )
+              LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
+              LEFT OUTER JOIN `aliases` AS a ON a.id = la.alias_cd 
+              WHERE
+                s.e_status = 0
+              ORDER BY 
+                distance 
+              LIMIT
+                ?",
         )
         .bind(latitude)
         .bind(longitude)
@@ -631,6 +638,106 @@ impl InternalStationRepository {
         Ok(stations)
     }
 
+    async fn get_station_id_and_distance_by_coordinates_and_line_id(
+        latitude: f64,
+        longitude: f64,
+        line_id: u32,
+        conn: &mut MySqlConnection,
+    ) -> Result<StationIdWithDistance, DomainError> {
+        let row = sqlx::query_as::<_, DistanceWithIdRow>(
+            "SELECT
+            s.station_cd,
+            s.station_g_cd, 
+            l.average_distance,
+            (
+              6371 * acos(
+                cos(
+                  radians(s.lat)
+                ) * cos(
+                  radians(?)
+                ) * cos(
+                  radians(?) - radians(s.lon)
+                ) + sin(
+                  radians(s.lat)
+                ) * sin(
+                  radians(?)
+                )
+              )
+            ) AS distance
+          FROM `stations` AS s
+          JOIN `lines` AS l ON l.line_cd = ?
+          WHERE
+            s.line_cd = ?
+            AND s.e_status = 0
+          ORDER BY 
+            distance
+          LIMIT 
+            1",
+        )
+        .bind(latitude)
+        .bind(longitude)
+        .bind(latitude)
+        .bind(line_id)
+        .bind(line_id)
+        .fetch_one(conn)
+        .await?;
+        let id_with_distance = StationIdWithDistance {
+            station_id: row.station_cd,
+            distance: row.distance,
+            average_distance: row.average_distance,
+        };
+
+        Ok(id_with_distance)
+    }
+
+    async fn get_station_id_and_distance_by_coordinates(
+        latitude: f64,
+        longitude: f64,
+        conn: &mut MySqlConnection,
+    ) -> Result<StationIdWithDistance, DomainError> {
+        let row = sqlx::query_as::<_, DistanceWithIdRow>(
+            "SELECT
+          s.station_cd,
+          s.station_g_cd,
+          l.average_distance,
+          (
+            6371 * acos(
+              cos(
+                radians(s.lat)
+              ) * cos(
+                radians(?)
+              ) * cos(
+                radians(?) - radians(s.lon)
+              ) + sin(
+                radians(s.lat)
+              ) * sin(
+                radians(?)
+              )
+            )
+          ) AS distance
+        FROM `stations` AS s
+        JOIN `lines` AS l ON l.line_cd = s.line_cd
+        WHERE
+          s.e_status = 0
+        ORDER BY 
+          distance
+        LIMIT 
+          1",
+        )
+        .bind(latitude)
+        .bind(longitude)
+        .bind(latitude)
+        .fetch_one(conn)
+        .await?;
+        let id_with_distance = StationIdWithDistance {
+            station_id: row.station_cd,
+            distance: row.distance,
+            average_distance: row.average_distance,
+        };
+
+        Ok(id_with_distance)
+    }
+
     async fn get_by_name(
         station_name: String,
         limit: Option<u32>,
@@ -639,8 +746,8 @@ impl InternalStationRepository {
         let station_name = format!("%{}%", station_name);
 
         let rows = sqlx::query_as::<_, StationRow>(
-            "SELECT
-                    DISTINCT l.*,
+            "SELECT DISTINCT
+                    l.*,
                     s.*,
                     COALESCE(a.line_name, l.line_name) AS line_name,
                     COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
@@ -658,10 +765,10 @@ impl InternalStationRepository {
                         s.station_cd = sst.station_cd
                         AND sst.pass <> 1
                     ) AS station_types_count
-                  FROM
-                    (`stations` AS s, `lines` AS l)
-                    LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-                    LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
+                  FROM `stations` AS s
+                  JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
+                  LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+                  LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
                   WHERE
                     (
                       station_name LIKE ?
@@ -670,8 +777,6 @@ impl InternalStationRepository {
                       OR station_name_zh LIKE ?
                       OR station_name_ko LIKE ?
                     )
-                    AND s.line_cd = l.line_cd
-                    AND l.e_status = 0
                     AND s.e_status = 0
                   LIMIT
                     ?",
@@ -716,17 +821,14 @@ impl InternalStationRepository {
                 s.station_cd = sst.station_cd
                 AND sst.pass <> 1
             ) AS station_types_count
-          FROM
-            (
-              `lines` AS l, `stations` AS s, `station_station_types` AS sst
-            )
-            LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
+          FROM `stations` AS s
+          JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
+          LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = ?
+          LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+          LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
           WHERE
-            sst.line_group_cd = ?
-            AND sst.station_cd = s.station_cd
-            AND s.line_cd = l.line_cd
-            AND l.e_status = 0
+            s.line_cd = l.line_cd
+            AND s.station_cd = sst.station_cd
             AND s.e_status = 0",
         )
         .bind(line_group_id)
