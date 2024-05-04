@@ -369,125 +369,102 @@ impl InternalStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let station_row: Vec<StationRow> = sqlx::query_as(
             "(
-          SELECT
-            s.*,
-            l.*,
-            sst.pass,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            (
-              SELECT
-                COUNT(sst.line_group_cd)
-              FROM
-                `station_station_types` AS sst
-              WHERE
-                s.station_cd = sst.station_cd
-                AND sst.pass <> 1
-            ) AS station_types_count,
-            s.e_sort AS station_e_sort,
-            NULL as sst_id
-          FROM
-            `stations` AS s
-            JOIN `lines` AS l ON l.line_cd = ? AND l.e_status = 0
-            LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-            LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
-                SELECT
-                  sst.line_group_cd
-                FROM
-                  `station_station_types` AS sst,
-                  `stations` AS s,
-                  `types` AS t
-                WHERE
-                  s.line_cd = ?
-                  AND CASE WHEN ? IS NOT NULL THEN s.station_cd = ? END
-                  AND CASE WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd ELSE t.kind IN (0, 1) END
-                  AND sst.type_cd = t.type_cd
-                  AND s.station_cd = sst.station_cd
-                  AND s.e_status = 0
-                ORDER BY
-                  sst.id
-                LIMIT
-                  1
-              )
-            LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
-          WHERE
-            sst.station_cd IS NULL
-            AND s.line_cd = l.line_cd
-            AND s.e_status = 0
-        )
-        UNION
-          DISTINCT (
-            SELECT
-              s.*,
-              l.*,
-              sst.pass,
-              COALESCE(a.line_name, l.line_name) AS line_name,
-              COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-              COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-              COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-              COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-              COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-              COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-              (
-                SELECT
-                  COUNT(sst.line_group_cd)
-                FROM
-                  `station_station_types` AS sst
-                WHERE
-                  s.station_cd = sst.station_cd
-                  AND sst.pass <> 1
-              ) AS station_types_count,
-              s.e_sort AS station_e_sort,
-              sst.id AS sst_id
-            FROM
-              `stations` AS s
-              JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
-              LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-              LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-              LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
-                SELECT
-                  sst.line_group_cd
-                FROM
-                  `station_station_types` AS sst,
-                  `stations` AS s,
-                  `types` AS t
-                WHERE
-                  s.line_cd = ?
-                  AND CASE WHEN ? IS NOT NULL THEN s.station_cd = ? END
-                  AND CASE WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd ELSE t.kind IN (0, 1) END
-                  AND sst.type_cd = t.type_cd
-                  AND s.station_cd = sst.station_cd
-                  AND s.e_status = 0
-                ORDER BY
-                  sst.id
-                LIMIT
-                  1
-              )
-              LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
-            WHERE
-              sst.station_cd IS NOT NULL
-              AND s.station_cd = sst.station_cd
-              AND s.line_cd = l.line_cd
-              AND s.e_status = 0
-          )
-        ORDER BY
-          IF(
-            sst_id IS NOT NULL,
-            sst_id,
-            CONCAT(e_sort, station_cd)
-          )",
+              SELECT s.*,
+                l.*,
+                sst.pass,
+                COALESCE(a.line_name, l.line_name) AS line_name,
+                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+                (
+                  SELECT COUNT(sst.line_group_cd)
+                  FROM `station_station_types` AS sst
+                  WHERE s.station_cd = sst.station_cd
+                    AND sst.pass <> 1
+                ) AS station_types_count,
+                s.e_sort AS station_e_sort,
+                NULL as sst_id
+              FROM `stations` AS s
+                JOIN `lines` AS l ON l.line_cd = ?
+                AND l.e_status = 0
+                LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+                LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
+                LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                  SELECT sst.line_group_cd
+                  FROM `station_station_types` AS sst
+                    LEFT OUTER JOIN `types` AS t ON sst.type_cd = t.type_cd
+                  WHERE CASE
+                      WHEN ? IS NOT NULL THEN sst.station_cd = ?
+                    END
+                    AND CASE
+                      WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd
+                      ELSE t.kind IN (0, 1)
+                    END
+                  ORDER BY sst.id
+                  LIMIT 1
+                )
+                LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
+              WHERE sst.station_cd IS NULL
+                AND s.line_cd = l.line_cd
+                AND s.e_status = 0
+            )
+            UNION
+            DISTINCT (
+              SELECT s.*,
+                l.*,
+                sst.pass,
+                COALESCE(a.line_name, l.line_name) AS line_name,
+                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+                (
+                  SELECT COUNT(sst.line_group_cd)
+                  FROM `station_station_types` AS sst
+                  WHERE s.station_cd = sst.station_cd
+                    AND sst.pass <> 1
+                ) AS station_types_count,
+                s.e_sort AS station_e_sort,
+                sst.id AS sst_id
+              FROM `stations` AS s
+                JOIN `lines` AS l ON l.line_cd = s.line_cd
+                AND l.e_status = 0
+                LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+                LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
+                LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                  SELECT sst.line_group_cd
+                  FROM `station_station_types` AS sst
+                    LEFT OUTER JOIN `types` AS t ON sst.type_cd = t.type_cd
+                  WHERE CASE
+                      WHEN ? IS NOT NULL THEN sst.station_cd = ?
+                    END
+                    AND CASE
+                      WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd
+                      ELSE t.kind IN (0, 1)
+                    END
+                  ORDER BY sst.id
+                  LIMIT 1
+                )
+                LEFT OUTER JOIN `types` AS t ON t.type_cd = sst.type_cd
+              WHERE sst.station_cd IS NOT NULL
+                AND s.station_cd = sst.station_cd
+                AND s.line_cd = l.line_cd
+                AND s.e_status = 0
+            )
+            ORDER BY IF(
+                sst_id IS NOT NULL,
+                sst_id,
+                CONCAT(e_sort, station_cd)
+              )",
         )
         .bind(line_id)
         .bind(station_id)
         .bind(station_id)
-        .bind(line_id)
-        .bind(line_id)
         .bind(station_id)
         .bind(station_id)
         .fetch_all(conn)
