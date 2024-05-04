@@ -401,9 +401,8 @@ impl InternalStationRepository {
                     END
                     AND CASE
                       WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd
-                      ELSE sst.pass <> 1
+                      ELSE t.kind IN (0, 1)
                     END
-                    AND sst.type_cd = t.type_cd
                   ORDER BY sst.id
                   LIMIT 1
                 )
@@ -446,9 +445,8 @@ impl InternalStationRepository {
                     END
                     AND CASE
                       WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd
-                      ELSE sst.pass <> 1
+                      ELSE t.kind IN (0, 1)
                     END
-                    AND sst.type_cd = t.type_cd
                   ORDER BY sst.id
                   LIMIT 1
                 )
