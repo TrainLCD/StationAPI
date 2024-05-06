@@ -17,7 +17,19 @@ use tonic_health::server::HealthReporter;
 use tracing::{info, warn};
 
 async fn station_api_service_status(mut reporter: HealthReporter) {
-    reporter.set_serving::<StationApiServer<MyApi>>().await;
+    let db_url = fetch_database_url();
+    let pool: sqlx::Pool<sqlx::MySql> = MySqlPool::connect(db_url.as_str()).await.unwrap();
+    // NOTE: 今までの障害でDBのデータが一部だけ消えたという現象はなかったので駅数だけ見ればいい
+    let row = sqlx::query!("SELECT COUNT(`stations`.station_cd) <> 0 AS alive FROM `stations`")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    if row.alive == 1 {
+        reporter.set_serving::<StationApiServer<MyApi>>().await;
+    } else {
+        reporter.set_not_serving::<StationApiServer<MyApi>>().await;
+    }
 }
 
 #[tokio::main]
