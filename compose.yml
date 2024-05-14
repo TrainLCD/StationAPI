@@ -12,9 +12,7 @@ services:
       - .:/app
     environment:
       DATABASE_URL: mysql://stationapi:password@db/stationapi?tcp_nodelay=true
-      MEMCACHED_URL: memcache://cache:11211
       ACCEPT_HTTP1: true
-      DISABLE_MEMCACHE: false
       ENABLE_ALL_STATIONS_RPC: true
       HOST: 0.0.0.0
     ports:
@@ -32,12 +30,6 @@ services:
     networks:
       - sapi-link
 
-  cache:
-    image: memcached:1
-    command: ["memcached", "-I", "16m"]
-    networks:
-      - sapi-link
-
   migration:
     build:
       context: .
@@ -45,14 +37,11 @@ services:
     command: ["./wait-for-it.sh", "db:3306", "--", "./migration"]
     depends_on:
       - db
-      - cache
     environment:
       MYSQL_USER: stationapi
       MYSQL_PASSWORD: password
       MYSQL_HOST: db
       MYSQL_DATABASE: stationapi
-      MEMCACHED_URL: memcache://cache:11211
-      DISABLE_MEMCACHED_FLUSH: false
     networks:
       - sapi-link
 
