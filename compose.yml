@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: ./docker/api/Dockerfile.dev
-    command: cargo watch -s "cargo run --bin stationapi"
+    command: cargo watch -s "cargo run -p stationapi"
     depends_on:
       - db
     volumes:
