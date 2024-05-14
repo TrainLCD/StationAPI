@@ -56,7 +56,6 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     let db_url = fetch_database_url();
     let pool = MySqlPool::connect(db_url.as_str()).await?;
-    let cache_client = connect_to_memcached()?;
 
     let station_repository = MyStationRepository::new(pool.clone());
     let line_repository = MyLineRepository::new(pool.clone());
@@ -68,7 +67,6 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
         line_repository,
         train_type_repository,
         company_repository,
-        cache_client: cache_client.clone(),
     };
 
     let my_api = MyApi { query_use_case };
@@ -126,44 +124,5 @@ fn fetch_http1_flag() -> bool {
             false
         }
         Err(VarError::NotUnicode(_)) => panic!("$ACCEPT_HTTP1 should be written in Unicode."),
-    }
-}
-
-fn fetch_memcached_url() -> String {
-    match env::var("MEMCACHED_URL") {
-        Ok(s) => s.parse().expect("Failed to parse $MEMCACHED_URL"),
-        Err(VarError::NotPresent) => {
-            warn!("$MEMCACHED_URL is not set.");
-            "".to_string()
-        }
-        Err(VarError::NotUnicode(_)) => panic!("$MEMCACHED_URL should be written in Unicode."),
-    }
-}
-
-fn fetch_disable_memcache_flag() -> bool {
-    match env::var("DISABLE_MEMCACHE") {
-        Ok(s) => s.parse().expect("Failed to parse $DISABLE_MEMCACHE"),
-        Err(env::VarError::NotPresent) => {
-            warn!("$DISABLE_MEMCACHE is not set. Falling back to false.");
-            false
-        }
-        Err(VarError::NotUnicode(_)) => panic!("$DISABLE_MEMCACHE should be written in Unicode."),
-    }
-}
-
-fn connect_to_memcached() -> Result<Option<memcache::Client>, anyhow::Error> {
-    let memcached_url = fetch_memcached_url();
-    let disable_memcache = fetch_disable_memcache_flag();
-    if disable_memcache {
-        warn!("In-memory cache is disabled by an environment variable.");
-        return Ok(None);
-    }
-
-    match memcache::connect(memcached_url) {
-        Ok(client) => Ok(Some(client)),
-        Err(_) => {
-            warn!("Could not communicate with memcached. In-memory cache has been disabled.");
-            Ok(None)
-        }
     }
 }
