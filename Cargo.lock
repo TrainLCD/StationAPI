@@ -1796,7 +1796,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "dotenv",
- "memcache",
  "prost",
  "serde",
  "serde_json",

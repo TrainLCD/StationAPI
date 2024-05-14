@@ -1,5 +1,3 @@
-use std::hash::Hash;
-
 use async_trait::async_trait;
 
 use crate::{
@@ -12,7 +10,6 @@ use crate::{
 
 #[async_trait]
 pub trait QueryUseCase: Send + Sync + 'static {
-    fn calculate_hash<T: Hash>(t: &T) -> u64;
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError>;
     async fn get_stations_by_id_vec(
         &self,
