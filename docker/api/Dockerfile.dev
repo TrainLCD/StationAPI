@@ -4,7 +4,10 @@ RUN apt-get update && \
     apt-get install -y --quiet protobuf-compiler && \
     rm -rf /var/lib/apt/lists/*
 COPY . .
-RUN cargo install cargo-watch
+RUN curl -L --proto '=https' --tlsv1.2 -sSf https://github.com/cargo-bins/cargo-binstall/releases/latest/download/cargo-binstall-aarch64-unknown-linux-musl.tgz -o binstall.tgz
+RUN tar xvf binstall.tgz
+RUN rm -f binstall.tgz
+RUN echo yes | ./cargo-binstall cargo-watch
 ENV PORT 50051
 EXPOSE $PORT
-CMD ["./stationapi"]
+CMD ["cargo", "run", "-p", "stationapi"]
