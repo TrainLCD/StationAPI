@@ -11,14 +11,6 @@ use tracing::{info, warn};
 pub fn insert_data(generated_sql_path: String) -> Result<(), Box<dyn std::error::Error>> {
     let generated_sql_file = File::open(generated_sql_path.clone())?;
 
-    let disable_memcached_flush: bool = match env::var("DISABLE_MEMCACHED_FLUSH") {
-        Ok(s) => s.parse()?,
-        Err(VarError::NotPresent) => false,
-        Err(VarError::NotUnicode(_)) => {
-            panic!("$DISABLE_MEMCACHED_FLUSH should be written in Unicode.")
-        }
-    };
-
     Command::new("mysql")
         .arg(format!("-u{}", env::var("MYSQL_USER").unwrap()))
         .arg(format!("-p{}", env::var("MYSQL_PASSWORD").unwrap()))
@@ -43,12 +35,6 @@ pub fn insert_data(generated_sql_path: String) -> Result<(), Box<dyn std::error:
         .spawn()
         .expect("Failed to insert.")
         .wait()?;
-
-    if !disable_memcached_flush {
-        let memcached_url = env::var("MEMCACHED_URL")?;
-        let cache_client = memcache::connect(memcached_url)?;
-        cache_client.flush()?;
-    }
 
     Ok(())
 }

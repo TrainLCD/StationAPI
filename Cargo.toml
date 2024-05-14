@@ -1,1 +1,1 @@
-workspace = { members = ["stationapi", "migration"] }
+workspace = { resolver = "2", members = ["stationapi", "migration"] }
