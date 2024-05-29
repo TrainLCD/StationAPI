@@ -4,6 +4,7 @@
     "ghcr.io/devcontainers/features/rust:1": {
       "profile": "default"
     },
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers-contrib/features/protoc:1": {}
   }
 }
