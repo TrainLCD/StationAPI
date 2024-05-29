@@ -7,28 +7,32 @@ use crate::{
             station::Station, station_number::StationNumber, train_type::TrainType,
         },
         repository::{
-            company_repository::CompanyRepository, line_repository::LineRepository,
-            station_repository::StationRepository, train_type_repository::TrainTypeRepository,
+            company_repository::CompanyRepository, connection_repository::ConnectionRepository,
+            line_repository::LineRepository, station_repository::StationRepository,
+            train_type_repository::TrainTypeRepository,
         },
     },
+    station_api::Route,
     use_case::{error::UseCaseError, traits::query::QueryUseCase},
 };
 
 #[derive(Clone)]
-pub struct QueryInteractor<SR, LR, TR, CR> {
+pub struct QueryInteractor<SR, LR, TR, CR, RR> {
     pub station_repository: SR,
     pub line_repository: LR,
     pub train_type_repository: TR,
     pub company_repository: CR,
+    pub connection_repository: RR,
 }
 
 #[async_trait]
-impl<SR, LR, TR, CR> QueryUseCase for QueryInteractor<SR, LR, TR, CR>
+impl<SR, LR, TR, CR, RR> QueryUseCase for QueryInteractor<SR, LR, TR, CR, RR>
 where
     SR: StationRepository,
     LR: LineRepository,
     TR: TrainTypeRepository,
     CR: CompanyRepository,
+    RR: ConnectionRepository,
 {
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
         let Some(station) = self.station_repository.find_by_id(station_id).await? else {
@@ -509,5 +513,13 @@ where
             .await?;
 
         Ok(train_types)
+    }
+
+    async fn get_routes(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+    ) -> Result<Vec<Route>, UseCaseError> {
+        Ok(vec![])
     }
 }
