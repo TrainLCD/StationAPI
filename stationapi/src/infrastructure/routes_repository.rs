@@ -181,7 +181,7 @@ impl InternalRoutesRepository {
             AND stations.station_cd = sst.station_cd
             AND sst.pass <> 1
             AND to_sst.pass <> 1
-            ORDER BY sst.line_group_cd",
+            ORDER BY stations.e_sort, stations.station_cd",
         )
         .bind(from_station_id)
         .bind(to_station_id)
