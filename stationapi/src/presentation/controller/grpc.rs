@@ -1,4 +1,4 @@
-use crate::infrastructure::connection_repository::MyConnectionRepository;
+use crate::infrastructure::routes_repository::MyRoutesRepository;
 use crate::infrastructure::{
     company_repository::MyCompanyRepository, line_repository::MyLineRepository,
     station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
@@ -24,7 +24,7 @@ pub struct MyApi {
         MyLineRepository,
         MyTrainTypeRepository,
         MyCompanyRepository,
-        MyConnectionRepository,
+        MyRoutesRepository,
     >,
 }
 

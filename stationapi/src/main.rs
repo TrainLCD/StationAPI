@@ -2,7 +2,7 @@ use sqlx::MySqlPool;
 use stationapi::{
     infrastructure::{
         company_repository::MyCompanyRepository, line_repository::MyLineRepository,
-        connection_repository::MyConnectionRepository, station_repository::MyStationRepository,
+        routes_repository::MyRoutesRepository, station_repository::MyStationRepository,
         train_type_repository::MyTrainTypeRepository,
     },
     presentation::controller::grpc::MyApi,
@@ -62,14 +62,14 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     let line_repository = MyLineRepository::new(pool.clone());
     let train_type_repository = MyTrainTypeRepository::new(pool.clone());
     let company_repository = MyCompanyRepository::new(pool.clone());
-    let connection_repository = MyConnectionRepository::new(pool.clone());
+    let routes_repository = MyRoutesRepository::new(pool.clone());
 
     let query_use_case = QueryInteractor {
         station_repository,
         line_repository,
         train_type_repository,
         company_repository,
-        connection_repository,
+        routes_repository,
     };
 
     let my_api = MyApi { query_use_case };

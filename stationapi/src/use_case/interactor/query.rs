@@ -7,8 +7,8 @@ use crate::{
             station::Station, station_number::StationNumber, train_type::TrainType,
         },
         repository::{
-            company_repository::CompanyRepository, connection_repository::ConnectionRepository,
-            line_repository::LineRepository, station_repository::StationRepository,
+            company_repository::CompanyRepository, line_repository::LineRepository,
+            routes_repository::RoutesRepository, station_repository::StationRepository,
             train_type_repository::TrainTypeRepository,
         },
     },
@@ -22,7 +22,7 @@ pub struct QueryInteractor<SR, LR, TR, CR, RR> {
     pub line_repository: LR,
     pub train_type_repository: TR,
     pub company_repository: CR,
-    pub connection_repository: RR,
+    pub routes_repository: RR,
 }
 
 #[async_trait]
@@ -32,7 +32,7 @@ where
     LR: LineRepository,
     TR: TrainTypeRepository,
     CR: CompanyRepository,
-    RR: ConnectionRepository,
+    RR: RoutesRepository,
 {
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
         let Some(station) = self.station_repository.find_by_id(station_id).await? else {
@@ -520,6 +520,10 @@ where
         from_station_id: u32,
         to_station_id: u32,
     ) -> Result<Vec<Route>, UseCaseError> {
-        Ok(vec![])
+        let routes = self
+            .routes_repository
+            .get_routes(from_station_id, to_station_id)
+            .await?;
+        Ok(routes)
     }
 }
