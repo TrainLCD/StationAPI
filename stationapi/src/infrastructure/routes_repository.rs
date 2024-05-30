@@ -51,6 +51,7 @@ pub struct RouteRow {
     pub line_symbol_primary_shape: Option<String>,
     pub line_symbol_secondary_shape: Option<String>,
     pub line_symbol_extra_shape: Option<String>,
+    pub average_distance: f64,
     // types
     pub id: u32,
     pub type_cd: u32,
@@ -64,6 +65,7 @@ pub struct RouteRow {
     pub color: String,
     pub direction: u32,
     pub kind: u32,
+    pub top_priority: u32,
 }
 
 impl From<RouteRow> for TrainType {
@@ -152,10 +154,10 @@ impl InternalRoutesRepository {
             via_lines.*,
             sst.*,
             types.*
-            FROM `stations`
-            JOIN `station_station_types` AS sst
+            FROM stations
+            JOIN station_station_types AS sst
             ON sst.station_cd = ?
-            JOIN `station_station_types` AS to_sst
+            JOIN station_station_types AS to_sst
             ON to_sst.station_cd = ?
             JOIN types
             ON sst.type_cd = types.type_cd
@@ -167,12 +169,12 @@ impl InternalRoutesRepository {
               ON via_sst.line_group_cd = sst.line_group_cd
               WHERE stations.station_cd = via_sst.station_cd
             )
-            JOIN `stations` AS via_stations
+            JOIN stations AS via_stations
             ON via_stations.station_cd IN (
               SELECT station_cd
               FROM station_station_types AS via_sst
               WHERE via_stations.line_cd = via_lines.line_cd
-              AND via_sst.type_cd = `types`.type_cd
+              AND via_sst.type_cd = types.type_cd
               AND via_sst.pass <> 1
             )
             WHERE sst.line_group_cd = to_sst.line_group_cd
