@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{domain::error::DomainError, station_api::Route};
+use crate::{domain::error::DomainError, infrastructure::routes_repository::RouteRow};
 
 #[async_trait]
 pub trait RoutesRepository: Send + Sync + 'static {
@@ -8,5 +8,5 @@ pub trait RoutesRepository: Send + Sync + 'static {
         &self,
         from_station_id: u32,
         to_station_id: u32,
-    ) -> Result<Vec<Route>, DomainError>;
+    ) -> Result<Vec<RouteRow>, DomainError>;
 }

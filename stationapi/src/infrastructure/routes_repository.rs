@@ -1,11 +1,9 @@
-use std::collections::BTreeMap;
-
 use async_trait::async_trait;
 use sqlx::{MySql, MySqlConnection, Pool};
 
 use crate::{
     domain::{error::DomainError, repository::routes_repository::RoutesRepository},
-    station_api::{Route, Station, TrainType},
+    station_api::{Station, TrainType},
 };
 
 #[derive(sqlx::FromRow, Clone)]
@@ -53,37 +51,36 @@ pub struct RouteRow {
     pub line_symbol_extra_shape: Option<String>,
     pub average_distance: f64,
     // types
-    pub id: u32,
-    pub type_cd: u32,
-    pub line_group_cd: u32,
-    pub pass: u32,
-    pub type_name: String,
-    pub type_name_k: String,
+    pub type_id: Option<u32>,
+    pub type_cd: Option<u32>,
+    pub line_group_cd: Option<u32>,
+    pub pass: Option<u32>,
+    pub type_name: Option<String>,
+    pub type_name_k: Option<String>,
     pub type_name_r: Option<String>,
     pub type_name_zh: Option<String>,
     pub type_name_ko: Option<String>,
-    pub color: String,
-    pub direction: u32,
-    pub kind: u32,
-    pub top_priority: u32,
+    pub color: Option<String>,
+    pub direction: Option<u32>,
+    pub kind: Option<u32>,
 }
 
 impl From<RouteRow> for TrainType {
     fn from(row: RouteRow) -> Self {
         Self {
-            id: row.id,
-            type_id: row.type_cd,
-            group_id: row.line_group_cd,
-            name: row.type_name,
-            name_katakana: row.type_name_k,
+            id: row.type_id.unwrap_or_default(),
+            type_id: row.type_cd.unwrap_or_default(),
+            group_id: row.line_group_cd.unwrap_or_default(),
+            name: row.type_name.unwrap_or_default(),
+            name_katakana: row.type_name_k.unwrap_or_default(),
             name_roman: row.type_name_r,
             name_chinese: row.type_name_zh,
             name_korean: row.type_name_ko,
-            color: row.color,
+            color: row.color.unwrap_or_default(),
             lines: vec![],
             line: None,
-            direction: row.direction as i32,
-            kind: row.kind as i32,
+            direction: row.direction.unwrap_or_default() as i32,
+            kind: row.kind.unwrap_or_default() as i32,
         }
     }
 }
@@ -92,7 +89,7 @@ impl From<RouteRow> for Station {
     fn from(row: RouteRow) -> Self {
         Self {
             id: row.station_cd,
-            group_id: row.line_group_cd,
+            group_id: row.line_group_cd.unwrap_or_default(),
             name: row.station_name,
             name_katakana: row.station_name_k,
             name_roman: row.station_name_r,
@@ -110,7 +107,7 @@ impl From<RouteRow> for Station {
             closed_at: row.close_ymd,
             status: row.e_status as i32,
             station_numbers: vec![],
-            stop_condition: row.pass as i32,
+            stop_condition: row.pass.unwrap_or(0) as i32,
             distance: Some(0.0),
             has_train_types: Some(false),
             train_type: None,
@@ -135,7 +132,7 @@ impl RoutesRepository for MyRoutesRepository {
         &self,
         from_station_id: u32,
         to_station_id: u32,
-    ) -> Result<Vec<Route>, DomainError> {
+    ) -> Result<Vec<RouteRow>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalRoutesRepository::get_routes(from_station_id, to_station_id, &mut conn).await
     }
@@ -148,72 +145,92 @@ impl InternalRoutesRepository {
         from_station_id: u32,
         to_station_id: u32,
         conn: &mut MySqlConnection,
-    ) -> Result<Vec<Route>, DomainError> {
-        let rows: Vec<RouteRow> = sqlx::query_as(
-            "SELECT via_stations.*,
-            via_lines.*,
-            sst.*,
-            types.*
-            FROM stations
-            JOIN station_station_types AS sst
-            ON sst.station_cd = ?
-            JOIN station_station_types AS to_sst
-            ON to_sst.station_cd = ?
-            JOIN types
-            ON sst.type_cd = types.type_cd
-            JOIN `lines` AS via_lines
-            ON via_lines.line_cd IN (
-              SELECT stations.line_cd
-              FROM stations
-              JOIN station_station_types AS via_sst
-              ON via_sst.line_group_cd = sst.line_group_cd
-              WHERE stations.station_cd = via_sst.station_cd
-            )
-            JOIN stations AS via_stations
-            ON via_stations.station_cd IN (
-              SELECT station_cd
-              FROM station_station_types AS via_sst
-              WHERE via_stations.line_cd = via_lines.line_cd
-              AND via_sst.type_cd = types.type_cd
-              AND via_sst.pass <> 1
-            )
-            WHERE sst.line_group_cd = to_sst.line_group_cd
-            AND stations.station_cd = sst.station_cd
+    ) -> Result<Vec<RouteRow>, DomainError> {
+        let rows = sqlx::query_as!(
+            RouteRow,
+            "SELECT sta.*,
+            via_lines.company_cd,
+            via_lines.line_name,
+            via_lines.line_name_k,
+            via_lines.line_name_h,
+            via_lines.line_name_r,
+            via_lines.line_name_zh,
+            via_lines.line_name_ko,
+            via_lines.line_color_c,
+            via_lines.line_type,
+            line_symbol_primary,
+            line_symbol_secondary,
+            line_symbol_extra,
+            line_symbol_primary_color,
+            line_symbol_secondary_color,
+            line_symbol_extra_color,
+            line_symbol_primary_shape,
+            line_symbol_secondary_shape,
+            line_symbol_extra_shape,
+            average_distance,
+            sst.type_cd,
+            sst.line_group_cd,
+            sst.pass,
+            types.id AS type_id,
+            types.type_name,
+            types.type_name_k,
+            types.type_name_r,
+            types.type_name_zh,
+            types.type_name_ko,
+            types.color,
+            types.direction,
+            types.kind
+        FROM stations AS sta
+            LEFT JOIN station_station_types AS sst ON sta.station_cd = sst.station_cd
             AND sst.pass <> 1
-            AND to_sst.pass <> 1
-            ORDER BY stations.e_sort, stations.station_cd",
+            LEFT JOIN types ON sst.type_cd = types.type_cd
+            JOIN `lines` AS via_lines ON sta.line_cd = via_lines.line_cd
+        WHERE (
+                (sst.station_cd IS NOT NULL)
+                AND sst.line_group_cd IN (
+                    SELECT _sst.line_group_cd
+                    FROM station_station_types AS _sst
+                    WHERE _sst.station_cd = ?
+                )
+                AND sst.line_group_cd IN (
+                    SELECT _sst.line_group_cd
+                    FROM station_station_types AS _sst
+                    WHERE _sst.station_cd = ?
+                )
+                AND sta.line_cd = (
+                    SELECT s.line_cd
+                    FROM stations AS s
+                    WHERE s.station_cd = sst.station_cd
+                )
+                AND sta.station_cd = sst.station_cd
+                AND types.type_cd = sst.type_cd
+            )
+            OR (
+                (sst.station_cd IS NULL)
+                AND (
+                    sta.line_cd = (
+                        SELECT s.line_cd
+                        FROM stations AS s
+                        WHERE s.station_cd = ?
+                    )
+                    AND (
+                        sta.line_cd = (
+                            SELECT s.line_cd
+                            FROM stations AS s
+                            WHERE s.station_cd = ?
+                        )
+                    )
+                )
+            )
+        ORDER BY sst.id",
+            from_station_id,
+            to_station_id,
+            from_station_id,
+            to_station_id,
         )
-        .bind(from_station_id)
-        .bind(to_station_id)
         .fetch_all(conn)
         .await?;
 
-        let train_type_tree = rows.clone().into_iter().fold(
-            BTreeMap::new(),
-            |mut acc: BTreeMap<u32, TrainType>, value| {
-                acc.insert(value.line_group_cd, value.into());
-                acc
-            },
-        );
-        let stations_tree_map = rows.into_iter().fold(
-            BTreeMap::new(),
-            |mut acc: BTreeMap<u32, Vec<Station>>, value| {
-                acc.entry(value.line_group_cd)
-                    .or_default()
-                    .push(std::convert::Into::<Station>::into(value));
-                acc
-            },
-        );
-
-        let mut routes = vec![];
-
-        for (line_group_cd, stops) in &stations_tree_map {
-            routes.push(Route {
-                train_type: train_type_tree.get(line_group_cd).cloned(),
-                stops: stops.to_vec(),
-            });
-        }
-
-        Ok(routes)
+        Ok(rows)
     }
 }
