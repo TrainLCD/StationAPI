@@ -222,7 +222,10 @@ impl InternalRoutesRepository {
                     )
                 )
             )
-        ORDER BY sst.id",
+        ORDER BY CASE
+                WHEN sst.station_cd IS NULL THEN sta.e_sort -- NOTE: sta.station_cdが指定できていないので順序がおかしい場合ここを疑う
+                ELSE sst.id
+            END",
             from_station_id,
             to_station_id,
             from_station_id,
