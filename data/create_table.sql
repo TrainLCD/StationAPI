@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.1.0, for macos13 (arm64)
+-- MySQL dump 10.13  Distrib 8.3.0, for macos14.2 (arm64)
 --
 -- Host: localhost    Database: stationapi
 -- ------------------------------------------------------
--- Server version	8.1.0
+-- Server version	8.3.0
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -56,6 +56,28 @@ CREATE TABLE `companies` (
   `e_status` int unsigned NOT NULL,
   `e_sort` int unsigned NOT NULL,
   PRIMARY KEY (`company_cd`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `connections`
+--
+
+DROP TABLE IF EXISTS `connections`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `connections` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `line_cd` int unsigned NOT NULL,
+  `station_cd1` int unsigned NOT NULL,
+  `station_cd2` int unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `line_cd` (`line_cd`),
+  KEY `station_cd1` (`station_cd1`),
+  KEY `station_cd2` (`station_cd2`),
+  CONSTRAINT `connections_ibfk_1` FOREIGN KEY (`line_cd`) REFERENCES `lines` (`line_cd`),
+  CONSTRAINT `connections_ibfk_2` FOREIGN KEY (`station_cd1`) REFERENCES `stations` (`station_cd`),
+  CONSTRAINT `connections_ibfk_3` FOREIGN KEY (`station_cd2`) REFERENCES `stations` (`station_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -207,4 +229,4 @@ CREATE TABLE `types` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2023-10-26 19:51:45
+-- Dump completed on 2024-05-29  9:09:34
