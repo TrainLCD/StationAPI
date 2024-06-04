@@ -540,17 +540,6 @@ where
             },
         );
 
-        let train_type_tree: &BTreeMap<u32, crate::station_api::TrainType> =
-            &rows.clone().into_iter().fold(
-                BTreeMap::new(),
-                |mut acc: BTreeMap<u32, crate::station_api::TrainType>, value: RouteRow| {
-                    if let Some(line_group_cd) = value.line_group_cd {
-                        acc.insert(line_group_cd, value.into());
-                    };
-                    acc
-                },
-            );
-
         let mut routes = vec![];
 
         for (line_group_cd, stops) in route_row_tree_map {
@@ -576,11 +565,28 @@ where
                         train_type: None,
                         average_distance: 0.0,
                     }));
+                    if row.has_train_types != 0 {
+                        stop.train_type = Some(Box::new(crate::station_api::TrainType {
+                            id: row.type_id.unwrap(),
+                            type_id: row.type_id.unwrap(),
+                            group_id: row.line_group_cd.unwrap(),
+                            name: row.type_name.to_owned().unwrap(),
+                            name_katakana: row.type_name_k.to_owned().unwrap(),
+                            name_roman: row.type_name_r.to_owned(),
+                            name_chinese: row.type_name_zh.to_owned(),
+                            name_korean: row.type_name_ko.to_owned(),
+                            color: row.line_color_c.to_owned(),
+                            lines: vec![],
+                            line: None,
+                            direction: row.direction.unwrap() as i32,
+                            kind: row.kind.unwrap() as i32,
+                        }));
+                    }
                     stop
                 })
                 .collect();
             routes.push(Route {
-                train_type: train_type_tree.get(line_group_cd).cloned(),
+                id: *line_group_cd,
                 stops: stops_with_line,
             });
         }
