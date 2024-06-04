@@ -63,6 +63,7 @@ pub struct RouteRow {
     pub color: Option<String>,
     pub direction: Option<u32>,
     pub kind: Option<u32>,
+    pub has_train_types: i64,
 }
 
 impl From<RouteRow> for TrainType {
@@ -109,7 +110,7 @@ impl From<RouteRow> for Station {
             station_numbers: vec![],
             stop_condition: row.pass.unwrap_or(0) as i32,
             distance: Some(0.0),
-            has_train_types: Some(false),
+            has_train_types: Some(row.has_train_types != 0),
             train_type: None,
         }
     }
@@ -179,7 +180,8 @@ impl InternalRoutesRepository {
             types.type_name_ko,
             types.color,
             types.direction,
-            types.kind
+            types.kind,
+            IFNULL(sta.station_cd = sst.station_cd, 0) AS has_train_types
         FROM stations AS sta
             LEFT JOIN station_station_types AS sst ON sta.station_cd = sst.station_cd
             AND sst.pass <> 1
