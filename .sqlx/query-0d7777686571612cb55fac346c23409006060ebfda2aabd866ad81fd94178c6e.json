@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT sta.*,\n            via_lines.company_cd,\n            via_lines.line_name,\n            via_lines.line_name_k,\n            via_lines.line_name_h,\n            via_lines.line_name_r,\n            via_lines.line_name_zh,\n            via_lines.line_name_ko,\n            via_lines.line_color_c,\n            via_lines.line_type,\n            line_symbol_primary,\n            line_symbol_secondary,\n            line_symbol_extra,\n            line_symbol_primary_color,\n            line_symbol_secondary_color,\n            line_symbol_extra_color,\n            line_symbol_primary_shape,\n            line_symbol_secondary_shape,\n            line_symbol_extra_shape,\n            average_distance,\n            sst.type_cd,\n            sst.line_group_cd,\n            sst.pass,\n            types.id AS type_id,\n            types.type_name,\n            types.type_name_k,\n            types.type_name_r,\n            types.type_name_zh,\n            types.type_name_ko,\n            types.color,\n            types.direction,\n            types.kind\n        FROM stations AS sta\n            LEFT JOIN station_station_types AS sst ON sta.station_cd = sst.station_cd\n            AND sst.pass <> 1\n            LEFT JOIN types ON sst.type_cd = types.type_cd\n            JOIN `lines` AS via_lines ON sta.line_cd = via_lines.line_cd\n        WHERE (\n                (sst.station_cd IS NOT NULL)\n                AND sst.line_group_cd IN (\n                    SELECT _sst.line_group_cd\n                    FROM station_station_types AS _sst\n                    WHERE _sst.station_cd = ?\n                )\n                AND sst.line_group_cd IN (\n                    SELECT _sst.line_group_cd\n                    FROM station_station_types AS _sst\n                    WHERE _sst.station_cd = ?\n                )\n                AND sta.line_cd = (\n                    SELECT s.line_cd\n                    FROM stations AS s\n                    WHERE s.station_cd = sst.station_cd\n                )\n                AND sta.station_cd = sst.station_cd\n                AND types.type_cd = sst.type_cd\n            )\n            OR (\n                (sst.station_cd IS NULL)\n                AND (\n                    sta.line_cd = (\n                        SELECT s.line_cd\n                        FROM stations AS s\n                        WHERE s.station_cd = ?\n                    )\n                    AND (\n                        sta.line_cd = (\n                            SELECT s.line_cd\n                            FROM stations AS s\n                            WHERE s.station_cd = ?\n                        )\n                    )\n                )\n            )\n        ORDER BY CASE\n                WHEN sst.station_cd IS NULL THEN sta.e_sort -- NOTE: sta.station_cdが指定できていないので順序がおかしい場合ここを疑う\n                ELSE sst.id\n            END",
+  "query": "SELECT sta.*,\n            via_lines.company_cd,\n            via_lines.line_name,\n            via_lines.line_name_k,\n            via_lines.line_name_h,\n            via_lines.line_name_r,\n            via_lines.line_name_zh,\n            via_lines.line_name_ko,\n            via_lines.line_color_c,\n            via_lines.line_type,\n            line_symbol_primary,\n            line_symbol_secondary,\n            line_symbol_extra,\n            line_symbol_primary_color,\n            line_symbol_secondary_color,\n            line_symbol_extra_color,\n            line_symbol_primary_shape,\n            line_symbol_secondary_shape,\n            line_symbol_extra_shape,\n            average_distance,\n            sst.type_cd,\n            sst.line_group_cd,\n            sst.pass,\n            types.id AS type_id,\n            types.type_name,\n            types.type_name_k,\n            types.type_name_r,\n            types.type_name_zh,\n            types.type_name_ko,\n            types.color,\n            types.direction,\n            types.kind,\n            IFNULL(sta.station_cd = sst.station_cd, 0) AS has_train_types\n        FROM stations AS sta\n            LEFT JOIN station_station_types AS sst ON sta.station_cd = sst.station_cd\n            AND sst.pass <> 1\n            LEFT JOIN types ON sst.type_cd = types.type_cd\n            JOIN `lines` AS via_lines ON sta.line_cd = via_lines.line_cd\n        WHERE (\n                (sst.station_cd IS NOT NULL)\n                AND sst.line_group_cd IN (\n                    SELECT _sst.line_group_cd\n                    FROM station_station_types AS _sst\n                    WHERE _sst.station_cd = ?\n                )\n                AND sst.line_group_cd IN (\n                    SELECT _sst.line_group_cd\n                    FROM station_station_types AS _sst\n                    WHERE _sst.station_cd = ?\n                )\n                AND sta.line_cd = (\n                    SELECT s.line_cd\n                    FROM stations AS s\n                    WHERE s.station_cd = sst.station_cd\n                )\n                AND sta.station_cd = sst.station_cd\n                AND types.type_cd = sst.type_cd\n            )\n            OR (\n                (sst.station_cd IS NULL)\n                AND (\n                    sta.line_cd = (\n                        SELECT s.line_cd\n                        FROM stations AS s\n                        WHERE s.station_cd = ?\n                    )\n                    AND (\n                        sta.line_cd = (\n                            SELECT s.line_cd\n                            FROM stations AS s\n                            WHERE s.station_cd = ?\n                        )\n                    )\n                )\n            )\n        ORDER BY CASE\n                WHEN sst.station_cd IS NULL THEN sta.e_sort -- NOTE: sta.station_cdが指定できていないので順序がおかしい場合ここを疑う\n                ELSE sst.id\n            END",
   "describe": {
     "columns": [
       {
@@ -522,6 +522,16 @@
           "char_set": 63,
           "max_size": 10
         }
+      },
+      {
+        "ordinal": 52,
+        "name": "has_train_types",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | BINARY",
+          "char_set": 63,
+          "max_size": 2
+        }
       }
     ],
     "parameters": {
@@ -579,8 +589,9 @@
       true,
       true,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "e055b17426c8cd384f843cd6f1db3868f2b0d0cc5c33d71e083a5a099645e48f"
+  "hash": "0d7777686571612cb55fac346c23409006060ebfda2aabd866ad81fd94178c6e"
 }
