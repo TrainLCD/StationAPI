@@ -192,17 +192,17 @@ impl InternalRoutesRepository {
                 AND sst.line_group_cd IN (
                     SELECT _sst.line_group_cd
                     FROM station_station_types AS _sst
-                    WHERE _sst.station_cd = ?
+                    WHERE _sst.station_cd IN (SELECT s.station_cd FROM stations AS s WHERE s.station_g_cd = ?)
                 )
                 AND sst.line_group_cd IN (
                     SELECT _sst.line_group_cd
                     FROM station_station_types AS _sst
-                    WHERE _sst.station_cd = ?
+                    WHERE _sst.station_cd IN (SELECT s.station_cd FROM stations AS s WHERE s.station_g_cd = ?)
                 )
-                AND sta.line_cd = (
+                AND sta.line_cd IN (
                     SELECT s.line_cd
                     FROM stations AS s
-                    WHERE s.station_cd = sst.station_cd
+                    WHERE s.station_g_cd = sst.station_cd
                 )
                 AND sta.station_cd = sst.station_cd
                 AND types.type_cd = sst.type_cd
@@ -210,22 +210,22 @@ impl InternalRoutesRepository {
             OR (
                 (sst.station_cd IS NULL)
                 AND (
-                    sta.line_cd = (
+                    sta.line_cd IN (
                         SELECT s.line_cd
                         FROM stations AS s
-                        WHERE s.station_cd = ?
+                        WHERE s.station_g_cd = ?
                     )
                     AND (
-                        sta.line_cd = (
+                        sta.line_cd IN (
                             SELECT s.line_cd
                             FROM stations AS s
-                            WHERE s.station_cd = ?
+                            WHERE s.station_g_cd = ?
                         )
                     )
                 )
             )
         ORDER BY CASE
-                WHEN sst.station_cd IS NULL THEN sta.e_sort -- NOTE: sta.station_cdが指定できていないので順序がおかしい場合ここを疑う
+                WHEN sst.station_cd IS NULL THEN CONCAT(sta.e_sort, sta.station_cd)
                 ELSE sst.id
             END",
             from_station_id,
