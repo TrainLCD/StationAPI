@@ -245,8 +245,8 @@ impl StationApi for MyApi {
         &self,
         request: tonic::Request<GetRouteRequest>,
     ) -> Result<tonic::Response<RouteResponse>, tonic::Status> {
-        let from_id = request.get_ref().from_station_id;
-        let to_id = request.get_ref().to_station_id;
+        let from_id = request.get_ref().from_station_group_id;
+        let to_id = request.get_ref().to_station_group_id;
 
         match self.query_use_case.get_routes(from_id, to_id).await {
             Ok(routes) => {
