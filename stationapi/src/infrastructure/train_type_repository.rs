@@ -121,17 +121,25 @@ impl InternalTrainTypeRepository {
         line_group_id: u32,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let rows: Vec<TrainTypeRow> = sqlx::query_as(
+        let rows: Vec<TrainTypeRow> = sqlx::query_as!(
+            TrainTypeRow,
             "SELECT 
-            t.*, 
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
             sst.*
             FROM types as t
             JOIN `station_station_types` AS sst ON sst.line_group_cd = ?
             WHERE 
                 t.type_cd = sst.type_cd
             ORDER BY t.kind, sst.id",
+            line_group_id
         )
-        .bind(line_group_id)
         .fetch_all(conn)
         .await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
@@ -142,16 +150,23 @@ impl InternalTrainTypeRepository {
         station_id: u32,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let rows: Vec<TrainTypeRow> = sqlx::query_as(
+        let rows: Vec<TrainTypeRow> = sqlx::query_as!(TrainTypeRow,
             "SELECT 
-            t.*, 
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
             sst.*
             FROM  `types` AS t
             JOIN `stations` AS s ON s.station_cd = ? AND s.e_status = 0
             JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd AND sst.type_cd = t.type_cd AND sst.pass <> 1
             ORDER BY t.kind, sst.id",
+            station_id
         )
-        .bind(station_id)
         .fetch_all(conn)
         .await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
