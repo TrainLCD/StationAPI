@@ -123,11 +123,42 @@ pub struct InternalLineRepository {}
 
 impl InternalLineRepository {
     async fn find_by_id(id: u32, conn: &mut MySqlConnection) -> Result<Option<Line>, DomainError> {
-        let rows: Option<LineRow> =
-            sqlx::query_as("SELECT * FROM `lines` WHERE line_cd = ? AND e_status = 0")
-                .bind(id)
-                .fetch_optional(conn)
-                .await?;
+        let rows: Option<LineRow> = sqlx::query_as!(
+            LineRow,
+            "SELECT DISTINCT l.line_cd,
+            l.company_cd,
+            l.line_type,
+            l.line_symbol_primary,
+            l.line_symbol_secondary,
+            l.line_symbol_extra,
+            l.line_symbol_primary_color,
+            l.line_symbol_secondary_color,
+            l.line_symbol_extra_color,
+            l.line_symbol_primary_shape,
+            l.line_symbol_secondary_shape,
+            l.line_symbol_extra_shape,
+            l.e_status,
+            l.e_sort,
+            l.average_distance,
+            COALESCE(a.line_name, l.line_name) AS line_name,
+            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+            s.station_g_cd,
+            sst.line_group_cd
+        FROM `lines` AS l
+            JOIN `stations` AS s ON s.station_cd = ?
+            JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
+            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+        WHERE l.line_cd = s.line_cd",
+            id
+        )
+        .fetch_optional(conn)
+        .await?;
         let line: Option<Line> = rows.map(|row| row.into());
 
         let Some(line) = line else {
@@ -141,32 +172,40 @@ impl InternalLineRepository {
         station_id: u32,
         conn: &mut MySqlConnection,
     ) -> Result<Option<Line>, DomainError> {
-        let rows: Option<LineRow> = sqlx::query_as(
-            "SELECT l.*,
+        let rows: Option<LineRow> = sqlx::query_as!(
+            LineRow,
+            "SELECT DISTINCT l.line_cd,
+            l.company_cd,
+            l.line_type,
+            l.line_symbol_primary,
+            l.line_symbol_secondary,
+            l.line_symbol_extra,
+            l.line_symbol_primary_color,
+            l.line_symbol_secondary_color,
+            l.line_symbol_extra_color,
+            l.line_symbol_primary_shape,
+            l.line_symbol_secondary_shape,
+            l.line_symbol_extra_shape,
+            l.e_status,
+            l.e_sort,
+            l.average_distance,
+            s.station_g_cd,
+            sst.line_group_cd,
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
             COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh,l.line_name_zh) AS line_name_zh,
+            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
-            FROM `lines` AS l
-            LEFT OUTER JOIN `line_aliases` AS la
-            ON
-                la.station_cd = ?
-            LEFT OUTER JOIN `aliases` AS a
-            ON
-                la.alias_cd = a.id                    
-            WHERE l.line_cd IN (
-                SELECT line_cd
-                FROM stations AS s
-                WHERE s.station_cd = ?
-                AND s.e_status = 0
-            )
-            AND e_status = 0",
+        FROM `lines` AS l
+            JOIN `stations` AS s ON s.station_cd = ?
+            JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
+            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+        WHERE l.line_cd = s.line_cd",
+            station_id,
         )
-        .bind(station_id)
-        .bind(station_id)
         .fetch_optional(conn)
         .await?;
         let line: Option<Line> = rows.map(|row| row.into());
@@ -207,34 +246,42 @@ impl InternalLineRepository {
         station_group_id: u32,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Line>, DomainError> {
-        let rows: Vec<LineRow> = sqlx::query_as(
-            "SELECT DISTINCT
-                l.*,
-                COALESCE(a.line_name, l.line_name) AS line_name,
-                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-                (
-                    SELECT 
-                    COUNT(sst.line_group_cd) 
-                    FROM 
-                    station_station_types AS sst 
-                    WHERE 
-                    s.station_cd = sst.station_cd 
-                    AND sst.pass <> 1
-                ) AS station_types_count 
-            FROM `lines` AS l
-            JOIN `stations` AS s ON s.station_g_cd = ? AND s.e_status = 0
-            LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
-            LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id 
-            WHERE
-                l.line_cd = s.line_cd
-                AND l.e_status = 0",
+        let rows: Vec<LineRow> = sqlx::query_as!(
+            LineRow,
+            "SELECT DISTINCT l.line_cd,
+            l.company_cd,
+            l.line_type,
+            l.line_symbol_primary,
+            l.line_symbol_secondary,
+            l.line_symbol_extra,
+            l.line_symbol_primary_color,
+            l.line_symbol_secondary_color,
+            l.line_symbol_extra_color,
+            l.line_symbol_primary_shape,
+            l.line_symbol_secondary_shape,
+            l.line_symbol_extra_shape,
+            l.e_status,
+            l.e_sort,
+            l.average_distance,
+            COALESCE(a.line_name, l.line_name) AS line_name,
+            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+            sst.line_group_cd,
+            s.station_g_cd
+        FROM `lines` AS l
+            JOIN `stations` AS s ON s.station_g_cd = ?
+            AND s.e_status = 0
+            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
+            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+        WHERE l.line_cd = s.line_cd
+            AND l.e_status = 0",
+            station_group_id
         )
-        .bind(station_group_id)
         .fetch_all(conn)
         .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
@@ -261,20 +308,11 @@ impl InternalLineRepository {
                 COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
                 COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
                 COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-                (
-                    SELECT 
-                    COUNT(sst.line_group_cd) 
-                    FROM 
-                    station_station_types AS sst 
-                    WHERE 
-                    s.station_cd = sst.station_cd 
-                    AND sst.pass <> 1
-                ) AS station_types_count 
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
             FROM `lines` AS l
             JOIN `stations` AS s ON s.station_g_cd IN ( {} ) AND s.e_status = 0
-            LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
-            LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id 
+            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
+            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id 
             WHERE
                 l.line_cd = s.line_cd
                 AND l.e_status = 0",
@@ -296,27 +334,42 @@ impl InternalLineRepository {
         line_group_id: u32,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Line>, DomainError> {
-        let rows: Vec<LineRow> = sqlx::query_as(
-            "SELECT DISTINCT
-                l.*,
-                sst.line_group_cd,
-                COALESCE(a.line_name, l.line_name) AS line_name,
-                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
-            FROM 
-            LEFT OUTER JOIN `station_station_types` AS sst ON sst.line_group_cd = ?
-            JOIN `stations` AS s ON s.station_cd = sst.station_cd AND s.e_status = 0
-            LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
-            LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
-            WHERE
-                l.line_cd = s.line_cd
-                AND l.e_status = 0",
+        let rows: Vec<LineRow> = sqlx::query_as!(
+            LineRow,
+            "SELECT DISTINCT l.line_cd,
+            l.company_cd,
+            l.line_type,
+            l.line_symbol_primary,
+            l.line_symbol_secondary,
+            l.line_symbol_extra,
+            l.line_symbol_primary_color,
+            l.line_symbol_secondary_color,
+            l.line_symbol_extra_color,
+            l.line_symbol_primary_shape,
+            l.line_symbol_secondary_shape,
+            l.line_symbol_extra_shape,
+            l.e_status,
+            l.e_sort,
+            l.average_distance,
+            s.station_g_cd,
+            sst.line_group_cd,
+            COALESCE(a.line_name, l.line_name) AS line_name,
+            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
+        FROM `lines` AS l
+            JOIN `station_station_types` AS sst ON sst.line_group_cd = ?
+            JOIN `stations` AS s ON s.station_cd = sst.station_cd
+            AND s.e_status = 0
+            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+        WHERE l.line_cd = s.line_cd
+            AND l.e_status = 0",
+            line_group_id
         )
-        .bind(line_group_id)
         .fetch_all(conn)
         .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
@@ -346,8 +399,8 @@ impl InternalLineRepository {
             FROM `lines` AS l
             JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} )
             JOIN `stations` AS s ON s.station_cd = sst.station_cd AND s.e_status = 0
-            LEFT OUTER JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT OUTER JOIN `aliases` AS a ON la.alias_cd = a.id
+            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
             WHERE
                 l.line_cd = s.line_cd
                 AND l.e_status = 0",

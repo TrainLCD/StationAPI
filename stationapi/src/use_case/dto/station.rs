@@ -28,7 +28,7 @@ impl From<Station> for GrpcStation {
                 .collect(),
             stop_condition: station.stop_condition.into(),
             distance: station.distance,
-            has_train_types: Some(station.station_types_count > 0),
+            has_train_types: Some(station.has_train_types),
             train_type: station.train_type.map(|tt| Box::new((*tt).into())),
         }
     }
