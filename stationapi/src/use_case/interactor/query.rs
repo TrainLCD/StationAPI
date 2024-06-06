@@ -530,11 +530,11 @@ where
 
         let route_row_tree_map: &BTreeMap<u32, Vec<RouteRow>> = &rows.clone().into_iter().fold(
             BTreeMap::new(),
-            |mut acc: BTreeMap<u32, Vec<RouteRow>>, value: RouteRow| {
+            |mut acc: BTreeMap<u32, Vec<RouteRow>>, value| {
                 if let Some(line_group_cd) = value.line_group_cd {
                     acc.entry(line_group_cd).or_default().push(value);
                 } else {
-                    acc.entry(0).or_default().push(value);
+                    acc.entry(value.line_cd).or_default().push(value);
                 };
                 acc
             },
@@ -542,7 +542,7 @@ where
 
         let mut routes = vec![];
 
-        for (line_group_cd, stops) in route_row_tree_map {
+        for (id, stops) in route_row_tree_map {
             let stops_with_line = stops
                 .iter()
                 .map(|row| {
@@ -556,7 +556,7 @@ where
                         name_roman: row.line_name_r.clone(),
                         name_chinese: row.line_name_zh.clone(),
                         name_korean: row.line_name_ko.clone(),
-                        color: row.color.clone().unwrap_or_default(),
+                        color: row.line_color_c.clone(),
                         line_type: row.line_type as i32,
                         line_symbols: vec![],
                         status: row.e_status as i32,
@@ -568,14 +568,14 @@ where
                     if row.has_train_types != 0 {
                         stop.train_type = Some(Box::new(crate::station_api::TrainType {
                             id: row.type_id.unwrap(),
-                            type_id: row.type_id.unwrap(),
+                            type_id: row.type_cd.unwrap(),
                             group_id: row.line_group_cd.unwrap(),
                             name: row.type_name.to_owned().unwrap(),
                             name_katakana: row.type_name_k.to_owned().unwrap(),
                             name_roman: row.type_name_r.to_owned(),
                             name_chinese: row.type_name_zh.to_owned(),
                             name_korean: row.type_name_ko.to_owned(),
-                            color: row.line_color_c.to_owned(),
+                            color: row.color.to_owned().unwrap(),
                             lines: vec![],
                             line: None,
                             direction: row.direction.unwrap() as i32,
@@ -586,7 +586,7 @@ where
                 })
                 .collect();
             routes.push(Route {
-                id: *line_group_cd,
+                id: *id,
                 stops: stops_with_line,
             });
         }
