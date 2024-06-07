@@ -60,28 +60,6 @@ CREATE TABLE `companies` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `connections`
---
-
-DROP TABLE IF EXISTS `connections`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `connections` (
-  `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `line_cd` int unsigned NOT NULL,
-  `station_cd1` int unsigned NOT NULL,
-  `station_cd2` int unsigned NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `line_cd` (`line_cd`),
-  KEY `station_cd1` (`station_cd1`),
-  KEY `station_cd2` (`station_cd2`),
-  CONSTRAINT `connections_ibfk_1` FOREIGN KEY (`line_cd`) REFERENCES `lines` (`line_cd`),
-  CONSTRAINT `connections_ibfk_2` FOREIGN KEY (`station_cd1`) REFERENCES `stations` (`station_cd`),
-  CONSTRAINT `connections_ibfk_3` FOREIGN KEY (`station_cd2`) REFERENCES `stations` (`station_cd`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `line_aliases`
 --
 
@@ -135,6 +113,31 @@ CREATE TABLE `lines` (
   KEY `company_cd` (`company_cd`),
   KEY `e_sort` (`e_sort`),
   CONSTRAINT `lines_ibfk_1` FOREIGN KEY (`company_cd`) REFERENCES `companies` (`company_cd`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+
+--
+-- Table structure for table `types`
+--
+
+DROP TABLE IF EXISTS `types`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `types` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `type_cd` int unsigned NOT NULL,
+  `type_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type_name_k` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type_name_r` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type_name_zh` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type_name_ko` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `color` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `direction` int unsigned NOT NULL DEFAULT '0',
+  `kind` int unsigned NOT NULL DEFAULT '0',
+  `top_priority` int unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `type_cd` (`type_cd`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -197,30 +200,6 @@ CREATE TABLE `stations` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
---
--- Table structure for table `types`
---
-
-DROP TABLE IF EXISTS `types`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `types` (
-  `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `type_cd` int unsigned NOT NULL,
-  `type_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type_name_k` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type_name_r` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type_name_zh` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type_name_ko` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `color` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `direction` int unsigned NOT NULL DEFAULT '0',
-  `kind` int unsigned NOT NULL DEFAULT '0',
-  `top_priority` int unsigned NOT NULL DEFAULT '0',
-  PRIMARY KEY (`id`),
-  KEY `type_cd` (`type_cd`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
@@ -230,4 +209,4 @@ CREATE TABLE `types` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-05-29  9:09:34
+-- Dump completed on 2024-06-07 14:01:23
