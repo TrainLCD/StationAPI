@@ -1,7 +1,10 @@
+use crate::infrastructure::routes_repository::MyRoutesRepository;
 use crate::infrastructure::{
     company_repository::MyCompanyRepository, line_repository::MyLineRepository,
     station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
 };
+use crate::station_api::GetRouteRequest;
+use crate::station_api::RouteResponse;
 use crate::station_api::{CoordinatesRequest, DistanceResponse, DistanceResponseState};
 use crate::use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase};
 use crate::{
@@ -21,6 +24,7 @@ pub struct MyApi {
         MyLineRepository,
         MyTrainTypeRepository,
         MyCompanyRepository,
+        MyRoutesRepository,
     >,
 }
 
@@ -194,7 +198,7 @@ impl StationApi for MyApi {
     async fn get_distance_for_closest_station_from_coordinates(
         &self,
         request: tonic::Request<CoordinatesRequest>,
-    ) -> std::result::Result<tonic::Response<DistanceResponse>, tonic::Status> {
+    ) -> Result<tonic::Response<DistanceResponse>, tonic::Status> {
         let request_ref = request.get_ref();
         let latitude = request_ref.latitude;
         let longitude = request_ref.longitude;
@@ -234,6 +238,21 @@ impl StationApi for MyApi {
                 }))
             }
             Err(err) => return Err(PresentationalError::from(err).into()),
+        }
+    }
+
+    async fn get_routes(
+        &self,
+        request: tonic::Request<GetRouteRequest>,
+    ) -> Result<tonic::Response<RouteResponse>, tonic::Status> {
+        let from_id = request.get_ref().from_station_group_id;
+        let to_id = request.get_ref().to_station_group_id;
+
+        match self.query_use_case.get_routes(from_id, to_id).await {
+            Ok(routes) => {
+                return Ok(Response::new(RouteResponse { routes }));
+            }
+            Err(err) => Err(PresentationalError::from(err).into()),
         }
     }
 }
