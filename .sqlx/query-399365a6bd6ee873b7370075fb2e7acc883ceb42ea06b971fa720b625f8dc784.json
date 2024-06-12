@@ -1,0 +1,95 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT \n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.kind AS \"kind?\",\n            t.direction AS \"direction?\",\n            sst.*\n            FROM \n            types AS t\n            JOIN stations AS s ON s.station_cd IN (SELECT UNNEST($1::integer[])) AND s.e_status = 0\n            JOIN station_station_types AS sst ON sst.line_group_cd = $2 AND sst.pass <> 1 AND sst.type_cd = t.type_cd\n            WHERE \n            CASE WHEN t.top_priority = 1\n            THEN\n                sst.type_cd = t.type_cd\n            ELSE\n                sst.pass <> 1\n                AND sst.type_cd = t.type_cd\n            END\n            ORDER BY t.kind, sst.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "type_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "type_name_k",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "type_name_r",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "type_name_zh",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "type_name_ko",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "color",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "kind?",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "direction?",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "station_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "type_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "line_group_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "pass",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4Array",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "399365a6bd6ee873b7370075fb2e7acc883ceb42ea06b971fa720b625f8dc784"
+}

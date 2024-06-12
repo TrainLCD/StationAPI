@@ -7,37 +7,37 @@ use crate::domain::{
 
 #[async_trait]
 pub trait StationRepository: Send + Sync + 'static {
-    async fn find_by_id(&self, id: u32) -> Result<Option<Station>, DomainError>;
-    async fn get_by_id_vec(&self, ids: Vec<u32>) -> Result<Vec<Station>, DomainError>;
+    async fn find_by_id(&self, id: i32) -> Result<Option<Station>, DomainError>;
+    async fn get_by_id_vec(&self, ids: Vec<i32>) -> Result<Vec<Station>, DomainError>;
     async fn get_by_line_id(
         &self,
-        line_id: u32,
-        station_id: Option<u32>,
+        line_id: i32,
+        station_id: Option<i32>,
     ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_station_group_id(
         &self,
-        station_group_id: u32,
+        station_group_id: i32,
     ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_station_group_id_vec(
         &self,
-        station_group_id_vec: Vec<u32>,
+        station_group_id_vec: Vec<i32>,
     ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_coordinates(
         &self,
         latitude: f64,
         longitude: f64,
-        limit: Option<u32>,
+        limit: Option<i32>,
     ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_name(
         &self,
         station_name: String,
-        limit: Option<u32>,
+        limit: Option<i64>,
     ) -> Result<Vec<Station>, DomainError>;
-    async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Station>, DomainError>;
+    async fn get_by_line_group_id(&self, line_group_id: i32) -> Result<Vec<Station>, DomainError>;
     async fn get_station_id_and_distance_by_coordinates(
         &self,
         latitude: f64,
         longitude: f64,
-        line_id: Option<u32>,
+        line_id: Option<i32>,
     ) -> Result<StationIdWithDistance, DomainError>;
 }

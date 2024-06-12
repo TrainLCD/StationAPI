@@ -2,19 +2,19 @@ use serde::{Deserialize, Serialize};
 
 use super::{company::Company, line_symbol::LineSymbol, station::Station, train_type::TrainType};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Line {
-    pub line_cd: u32,
-    pub company_cd: u32,
+    pub line_cd: i32,
+    pub company_cd: i32,
     pub company: Option<Company>,
     pub line_name: String,
     pub line_name_k: String,
     pub line_name_h: String,
-    pub line_name_r: Option<String>,
+    pub line_name_r: String,
     pub line_name_zh: Option<String>,
     pub line_name_ko: Option<String>,
     pub line_color_c: String,
-    pub line_type: u32,
+    pub line_type: i32,
     pub line_symbols: Vec<LineSymbol>,
     pub line_symbol_primary: Option<String>,
     pub line_symbol_secondary: Option<String>,
@@ -25,29 +25,29 @@ pub struct Line {
     pub line_symbol_primary_shape: Option<String>,
     pub line_symbol_secondary_shape: Option<String>,
     pub line_symbol_extra_shape: Option<String>,
-    pub e_status: u32,
-    pub e_sort: u32,
+    pub e_status: i32,
+    pub e_sort: i32,
     pub station: Option<Station>,
     pub train_type: Option<TrainType>,
-    pub line_group_cd: Option<u32>,
-    pub station_g_cd: Option<u32>,
+    pub line_group_cd: Option<i32>,
+    pub station_g_cd: Option<i32>,
     pub average_distance: f64,
 }
 
 impl Line {
     #![allow(clippy::too_many_arguments)]
     pub fn new(
-        line_cd: u32,
-        company_cd: u32,
+        line_cd: i32,
+        company_cd: i32,
         company: Option<Company>,
         line_name: String,
         line_name_k: String,
         line_name_h: String,
-        line_name_r: Option<String>,
+        line_name_r: String,
         line_name_zh: Option<String>,
         line_name_ko: Option<String>,
         line_color_c: String,
-        line_type: u32,
+        line_type: i32,
         line_symbols: Vec<LineSymbol>,
         line_symbol_primary: Option<String>,
         line_symbol_secondary: Option<String>,
@@ -58,12 +58,12 @@ impl Line {
         line_symbol_primary_shape: Option<String>,
         line_symbol_secondary_shape: Option<String>,
         line_symbol_extra_shape: Option<String>,
-        e_status: u32,
-        e_sort: u32,
+        e_status: i32,
+        e_sort: i32,
         station: Option<Station>,
         train_type: Option<TrainType>,
-        line_group_cd: Option<u32>,
-        station_g_cd: Option<u32>,
+        line_group_cd: Option<i32>,
+        station_g_cd: Option<i32>,
         average_distance: f64,
     ) -> Self {
         Self {

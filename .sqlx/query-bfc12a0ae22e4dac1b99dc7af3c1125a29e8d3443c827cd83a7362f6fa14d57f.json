@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(stations.station_cd) AS alive FROM stations",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "alive",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "bfc12a0ae22e4dac1b99dc7af3c1125a29e8d3443c827cd83a7362f6fa14d57f"
+}

@@ -2,35 +2,35 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Company {
-    pub company_cd: u32,
-    pub rr_cd: u32,
+    pub company_cd: i32,
+    pub rr_cd: i32,
     pub company_name: String,
     pub company_name_k: String,
     pub company_name_h: String,
     pub company_name_r: String,
     pub company_name_en: String,
     pub company_name_full_en: String,
-    pub company_url: Option<String>,
-    pub company_type: u32,
-    pub e_status: u32,
-    pub e_sort: u32,
+    pub company_url: String,
+    pub company_type: i32,
+    pub e_status: i32,
+    pub e_sort: i32,
 }
 
 impl Company {
     #![allow(clippy::too_many_arguments)]
     pub fn new(
-        company_cd: u32,
-        rr_cd: u32,
+        company_cd: i32,
+        rr_cd: i32,
         company_name: String,
         company_name_k: String,
         company_name_h: String,
         company_name_r: String,
         company_name_en: String,
         company_name_full_en: String,
-        company_url: Option<String>,
-        company_type: u32,
-        e_status: u32,
-        e_sort: u32,
+        company_url: String,
+        company_type: i32,
+        e_status: i32,
+        e_sort: i32,
     ) -> Self {
         Self {
             company_cd,

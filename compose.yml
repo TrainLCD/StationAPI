@@ -11,7 +11,7 @@ services:
     volumes:
       - .:/app
     environment:
-      DATABASE_URL: mysql://stationapi:password@db/stationapi?tcp_nodelay=true
+      DATABASE_URL: postgres://stationapi:password@db/stationapi
       ACCEPT_HTTP1: true
       ENABLE_ALL_STATIONS_RPC: true
       HOST: 0.0.0.0
@@ -21,29 +21,28 @@ services:
       - sapi-link
 
   db:
-    image: mysql:8
+    image: postgres:16
     environment:
-      MYSQL_RANDOM_ROOT_PASSWORD: true
-      MYSQL_USER: stationapi
-      MYSQL_PASSWORD: password
-      MYSQL_DATABASE: stationapi
+      POSTGRES_USER: stationapi
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: stationapi
     networks:
       - sapi-link
 
-  migration:
-    build:
-      context: .
-      dockerfile: ./docker/migration/Dockerfile
-    command: ["./wait-for-it.sh", "db:3306", "--", "./migration"]
-    depends_on:
-      - db
-    environment:
-      MYSQL_USER: stationapi
-      MYSQL_PASSWORD: password
-      MYSQL_HOST: db
-      MYSQL_DATABASE: stationapi
-    networks:
-      - sapi-link
+  # migration:
+  #   build:
+  #     context: .
+  #     dockerfile: ./docker/migration/Dockerfile
+  #   command: ["./wait-for-it.sh", "db:3306", "--", "./migration"]
+  #   depends_on:
+  #     - db
+  #   environment:
+  #     MYSQL_USER: stationapi
+  #     MYSQL_PASSWORD: password
+  #     MYSQL_HOST: db
+  #     MYSQL_DATABASE: stationapi
+  #   networks:
+  #     - sapi-link
 
 networks:
   sapi-link:

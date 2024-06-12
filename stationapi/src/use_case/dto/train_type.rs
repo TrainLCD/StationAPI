@@ -25,14 +25,14 @@ impl From<TrainType> for GrpcTrainType {
             group_id: line_group_cd,
             name: type_name,
             name_katakana: type_name_k,
-            name_roman: type_name_r,
-            name_chinese: type_name_zh,
-            name_korean: type_name_ko,
+            name_roman: Some(type_name_r),
+            name_chinese: Some(type_name_zh),
+            name_korean: Some(type_name_ko),
             color,
             line: line.map(|line| Box::new((*line).into())),
             lines: lines.into_iter().map(|line| line.into()).collect(),
-            direction: direction as i32,
-            kind: kind as i32,
+            direction,
+            kind,
         }
     }
 }

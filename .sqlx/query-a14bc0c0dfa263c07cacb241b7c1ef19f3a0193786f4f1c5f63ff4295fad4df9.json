@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM companies WHERE company_cd IN (SELECT UNNEST($1::integer[]))",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "company_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "rr_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "company_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "company_name_k",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "company_name_h",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "company_name_r",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "company_name_en",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "company_name_full_en",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "company_url",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "company_type",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "e_status",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "e_sort",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4Array"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a14bc0c0dfa263c07cacb241b7c1ef19f3a0193786f4f1c5f63ff4295fad4df9"
+}

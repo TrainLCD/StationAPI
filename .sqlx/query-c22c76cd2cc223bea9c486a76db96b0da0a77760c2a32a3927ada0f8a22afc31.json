@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n    s.station_cd,\n    l.average_distance,\n            (\n              6371 * acos(\n                cos(\n                  radians(s.lat)\n                ) * cos(\n                  radians($1)\n                ) * cos(\n                  radians($2) - radians(s.lon)\n                ) + sin(\n                  radians(s.lat)\n                ) * sin(\n                  radians($3)\n                )\n              )\n            ) AS distance\n          FROM stations AS s\n          JOIN lines AS l ON l.line_cd = $4\n          WHERE\n            s.line_cd = $5\n            AND s.e_status = 0\n          ORDER BY \n            distance\n          LIMIT \n            1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "station_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "average_distance",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 2,
+        "name": "distance",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Float8",
+        "Float8",
+        "Float8",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "c22c76cd2cc223bea9c486a76db96b0da0a77760c2a32a3927ada0f8a22afc31"
+}

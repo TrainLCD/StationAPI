@@ -15,7 +15,7 @@ use crate::{
         },
     },
     infrastructure::routes_repository::RouteRow,
-    station_api::Route,
+    station_api::Route as ApiRoute,
     use_case::{error::UseCaseError, traits::query::QueryUseCase},
 };
 
@@ -37,7 +37,7 @@ where
     CR: CompanyRepository,
     RR: RoutesRepository,
 {
-    async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
+    async fn find_station_by_id(&self, station_id: i32) -> Result<Option<Station>, UseCaseError> {
         let Some(station) = self.station_repository.find_by_id(station_id).await? else {
             return Ok(None);
         };
@@ -50,7 +50,7 @@ where
     }
     async fn get_stations_by_id_vec(
         &self,
-        station_ids: Vec<u32>,
+        station_ids: Vec<i32>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut stations = self.station_repository.get_by_id_vec(station_ids).await?;
         self.update_station_vec_with_attributes(&mut stations, None)
@@ -60,7 +60,7 @@ where
     }
     async fn get_stations_by_group_id(
         &self,
-        station_group_id: u32,
+        station_group_id: i32,
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut stations = self
             .station_repository
@@ -74,7 +74,7 @@ where
     }
     async fn get_stations_by_group_id_vec(
         &self,
-        station_group_id_vec: Vec<u32>,
+        station_group_id_vec: Vec<i32>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
@@ -85,7 +85,7 @@ where
     }
     async fn get_lines_by_station_group_id_vec(
         &self,
-        station_group_id_vec: Vec<u32>,
+        station_group_id_vec: Vec<i32>,
     ) -> Result<Vec<Line>, UseCaseError> {
         let lines = self
             .line_repository
@@ -98,7 +98,7 @@ where
         &self,
         latitude: f64,
         longitude: f64,
-        limit: Option<u32>,
+        limit: Option<i32>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut stations = self
             .station_repository
@@ -114,7 +114,7 @@ where
         &self,
         latitude: f64,
         longitude: f64,
-        line_id: Option<u32>,
+        line_id: Option<i32>,
     ) -> Result<StationIdWithDistance, UseCaseError> {
         let station = self
             .station_repository
@@ -125,8 +125,8 @@ where
     }
     async fn get_stations_by_line_id(
         &self,
-        line_id: u32,
-        station_id: Option<u32>,
+        line_id: i32,
+        station_id: Option<i32>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut stations = self
             .station_repository
@@ -141,7 +141,7 @@ where
     async fn get_stations_by_name(
         &self,
         station_name: String,
-        limit: Option<u32>,
+        limit: Option<i64>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut stations = self
             .station_repository
@@ -155,7 +155,7 @@ where
     }
     async fn find_company_by_id_vec(
         &self,
-        company_id_vec: Vec<u32>,
+        company_id_vec: Vec<i32>,
     ) -> Result<Vec<Company>, UseCaseError> {
         let companies = self
             .company_repository
@@ -167,12 +167,12 @@ where
     async fn update_station_vec_with_attributes(
         &self,
         stations_ref: &mut Vec<Station>,
-        line_group_id: Option<u32>,
+        line_group_id: Option<i32>,
     ) -> Result<(), UseCaseError> {
         let station_group_ids = stations_ref
             .iter()
             .map(|station| station.station_g_cd)
-            .collect::<Vec<u32>>();
+            .collect::<Vec<i32>>();
 
         let stations_by_group_ids = self
             .get_stations_by_group_id_vec(station_group_ids.clone())
@@ -181,7 +181,7 @@ where
         let station_ids = stations_by_group_ids
             .iter()
             .map(|station| station.station_cd)
-            .collect::<Vec<u32>>();
+            .collect::<Vec<i32>>();
 
         let lines = self
             .get_lines_by_station_group_id_vec(station_group_ids.clone())
@@ -190,7 +190,7 @@ where
         let company_ids = lines
             .iter()
             .map(|station| station.company_cd)
-            .collect::<Vec<u32>>();
+            .collect::<Vec<i32>>();
         let companies = self.find_company_by_id_vec(company_ids).await?;
 
         let train_types = self
@@ -221,7 +221,7 @@ where
             let mut lines: Vec<Line> = lines
                 .iter()
                 .filter(|&l| l.station_g_cd.is_some())
-                .filter(|&l| l.station_g_cd.unwrap() == station.station_g_cd)
+                .filter(|&l| l.station_g_cd.unwrap_or_default() == station.station_g_cd)
                 .cloned()
                 .collect();
             for line in lines.iter_mut() {
@@ -259,7 +259,7 @@ where
     }
     async fn get_lines_by_station_group_id(
         &self,
-        station_group_id: u32,
+        station_group_id: i32,
     ) -> Result<Vec<Line>, UseCaseError> {
         let lines = self
             .line_repository
@@ -270,7 +270,7 @@ where
     }
     async fn get_stations_by_line_group_id(
         &self,
-        line_group_id: u32,
+        line_group_id: i32,
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut stations = self
             .station_repository
@@ -295,25 +295,21 @@ where
         ];
 
         let line_symbol_colors_raw: Vec<String> = vec![
-            station.line_symbol_primary_color.unwrap_or("".to_string()),
-            station
-                .line_symbol_secondary_color
-                .unwrap_or("".to_string()),
-            station.line_symbol_extra_color.unwrap_or("".to_string()),
+            station.line_symbol_primary_color.unwrap_or_default(),
+            station.line_symbol_secondary_color.unwrap_or_default(),
+            station.line_symbol_extra_color.unwrap_or_default(),
         ];
 
         let station_numbers_raw = vec![
-            station.primary_station_number.unwrap_or("".to_string()),
-            station.secondary_station_number.unwrap_or("".to_string()),
-            station.extra_station_number.unwrap_or("".to_string()),
+            station.primary_station_number.unwrap_or_default(),
+            station.secondary_station_number.unwrap_or_default(),
+            station.extra_station_number.unwrap_or_default(),
         ];
 
         let line_symbols_shape_raw: Vec<String> = vec![
-            station.line_symbol_primary_shape.unwrap_or("".to_string()),
-            station
-                .line_symbol_secondary_shape
-                .unwrap_or("".to_string()),
-            station.line_symbol_extra_shape.unwrap_or("".to_string()),
+            station.line_symbol_primary_shape.unwrap_or_default(),
+            station.line_symbol_secondary_shape.unwrap_or_default(),
+            station.line_symbol_extra_shape.unwrap_or_default(),
         ];
 
         let mut station_numbers: Vec<StationNumber> = Vec::with_capacity(station_numbers_raw.len());
@@ -330,7 +326,7 @@ where
                 let station_number_string = format!("{}-{}", sym, station_number);
 
                 let station_number = StationNumber {
-                    line_symbol: sym.to_string(),
+                    line_symbol: sym.to_owned(),
                     line_symbol_color: sym_color,
                     line_symbol_shape: sym_shape,
                     station_number: station_number_string,
@@ -358,7 +354,7 @@ where
             line_name: station.line_name,
             line_name_k: station.line_name_k,
             line_name_h: station.line_name_h,
-            line_name_r: station.line_name_r,
+            line_name_r: station.line_name_r.unwrap_or_default(),
             line_name_zh: station.line_name_zh,
             line_name_ko: station.line_name_ko,
             line_color_c: station.line_color_c,
@@ -448,7 +444,7 @@ where
     }
     async fn get_train_types_by_station_id(
         &self,
-        station_id: u32,
+        station_id: i32,
     ) -> Result<Vec<TrainType>, UseCaseError> {
         let mut train_types: Vec<TrainType> = self
             .train_type_repository
@@ -475,7 +471,7 @@ where
                 .iter_mut()
                 .map(|l| l.clone())
                 .filter(|l| l.line_group_cd.is_some())
-                .filter(|l| l.line_group_cd.unwrap() == tt.line_group_cd)
+                .filter(|l| l.line_group_cd.unwrap_or_default() == tt.line_group_cd)
                 .collect::<Vec<Line>>();
 
             for line in lines.iter_mut() {
@@ -507,8 +503,8 @@ where
 
     async fn get_train_types_by_station_id_vec(
         &self,
-        station_id_vec: Vec<u32>,
-        line_group_id: Option<u32>,
+        station_id_vec: Vec<i32>,
+        line_group_id: Option<i32>,
     ) -> Result<Vec<TrainType>, UseCaseError> {
         let train_types = self
             .train_type_repository
@@ -520,21 +516,23 @@ where
 
     async fn get_routes(
         &self,
-        from_station_id: u32,
-        to_station_id: u32,
-    ) -> Result<Vec<Route>, UseCaseError> {
+        from_station_id: i32,
+        to_station_id: i32,
+    ) -> Result<Vec<ApiRoute>, UseCaseError> {
         let rows = self
             .routes_repository
             .get_routes(from_station_id, to_station_id)
             .await?;
 
-        let route_row_tree_map: &BTreeMap<u32, Vec<RouteRow>> = &rows.clone().into_iter().fold(
+        let route_row_tree_map: &BTreeMap<i32, Vec<RouteRow>> = &rows.clone().into_iter().fold(
             BTreeMap::new(),
-            |mut acc: BTreeMap<u32, Vec<RouteRow>>, value| {
+            |mut acc: BTreeMap<i32, Vec<RouteRow>>, value| {
                 if let Some(line_group_cd) = value.line_group_cd {
                     acc.entry(line_group_cd).or_default().push(value);
                 } else {
-                    acc.entry(value.line_cd).or_default().push(value);
+                    acc.entry(value.line_cd.unwrap_or_default())
+                        .or_default()
+                        .push(value);
                 };
                 acc
             },
@@ -549,43 +547,43 @@ where
                     let mut stop =
                         std::convert::Into::<crate::station_api::Station>::into(row.clone());
                     stop.line = Some(Box::new(crate::station_api::Line {
-                        id: row.line_cd,
-                        name_short: row.line_name.clone(),
-                        name_katakana: row.line_name_k.clone(),
-                        name_full: row.line_name_h.clone(),
+                        id: row.line_cd.unwrap_or_default(),
+                        name_short: row.clone().line_name.unwrap_or_default(),
+                        name_katakana: row.clone().line_name_k.unwrap_or_default(),
+                        name_full: row.clone().line_name_h.unwrap_or_default(),
                         name_roman: row.line_name_r.clone(),
                         name_chinese: row.line_name_zh.clone(),
                         name_korean: row.line_name_ko.clone(),
-                        color: row.line_color_c.clone(),
-                        line_type: row.line_type as i32,
+                        color: row.clone().line_color_c.unwrap_or("#ffffff".to_string()),
+                        line_type: row.line_type.unwrap_or_default(),
                         line_symbols: vec![],
-                        status: row.e_status as i32,
+                        status: row.e_status.unwrap_or_default(),
                         station: None,
                         company: None,
                         train_type: None,
                         average_distance: 0.0,
                     }));
-                    if row.has_train_types != 0 {
+                    if row.has_train_types.unwrap_or(false) {
                         stop.train_type = Some(Box::new(crate::station_api::TrainType {
-                            id: row.type_id.unwrap(),
-                            type_id: row.type_cd.unwrap(),
-                            group_id: row.line_group_cd.unwrap(),
-                            name: row.type_name.to_owned().unwrap(),
-                            name_katakana: row.type_name_k.to_owned().unwrap(),
+                            id: row.type_id.unwrap_or_default(),
+                            type_id: row.type_cd.unwrap_or_default(),
+                            group_id: row.line_group_cd.unwrap_or_default(),
+                            name: row.type_name.to_owned().unwrap_or_default(),
+                            name_katakana: row.type_name_k.to_owned().unwrap_or_default(),
                             name_roman: row.type_name_r.to_owned(),
                             name_chinese: row.type_name_zh.to_owned(),
                             name_korean: row.type_name_ko.to_owned(),
-                            color: row.color.to_owned().unwrap(),
+                            color: row.color.to_owned().unwrap_or_default(),
                             lines: vec![],
                             line: None,
-                            direction: row.direction.unwrap() as i32,
-                            kind: row.kind.unwrap() as i32,
+                            direction: row.direction.unwrap_or(0),
+                            kind: row.kind.unwrap_or(0),
                         }));
                     }
                     stop
                 })
                 .collect();
-            routes.push(Route {
+            routes.push(ApiRoute {
                 id: *id,
                 stops: stops_with_line,
             });

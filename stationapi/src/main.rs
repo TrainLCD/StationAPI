@@ -1,4 +1,4 @@
-use sqlx::MySqlPool;
+use sqlx::postgres::PgPoolOptions;
 use stationapi::{
     infrastructure::{
         company_repository::MyCompanyRepository, line_repository::MyLineRepository,
@@ -19,14 +19,18 @@ use tracing::{info, warn};
 
 async fn station_api_service_status(mut reporter: HealthReporter) {
     let db_url = fetch_database_url();
-    let pool: sqlx::Pool<sqlx::MySql> = MySqlPool::connect(db_url.as_str()).await.unwrap();
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(db_url.as_str())
+        .await
+        .unwrap();
     // NOTE: 今までの障害でDBのデータが一部だけ消えたという現象はなかったので駅数だけ見ればいい
-    let row = sqlx::query!("SELECT COUNT(`stations`.station_cd) <> 0 AS alive FROM `stations`")
+    let row = sqlx::query!("SELECT COUNT(stations.station_cd) AS alive FROM stations")
         .fetch_one(&pool)
         .await
         .unwrap();
 
-    if row.alive == 1 {
+    if row.alive > Some(0) {
         reporter.set_serving::<StationApiServer<MyApi>>().await;
     } else {
         reporter.set_not_serving::<StationApiServer<MyApi>>().await;
@@ -56,7 +60,10 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     let addr = fetch_addr()?;
 
     let db_url = fetch_database_url();
-    let pool = MySqlPool::connect(db_url.as_str()).await?;
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(db_url.as_str())
+        .await?;
 
     let station_repository = MyStationRepository::new(pool.clone());
     let line_repository = MyLineRepository::new(pool.clone());

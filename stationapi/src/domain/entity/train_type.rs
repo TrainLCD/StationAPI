@@ -2,41 +2,41 @@ use serde::{Deserialize, Serialize};
 
 use super::line::Line;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TrainType {
-    pub id: u32,
-    pub station_cd: u32,
-    pub type_cd: u32,
-    pub line_group_cd: u32,
-    pub pass: u32,
+    pub id: i32,
+    pub station_cd: i32,
+    pub type_cd: i32,
+    pub line_group_cd: i32,
+    pub pass: i32,
     pub type_name: String,
     pub type_name_k: String,
-    pub type_name_r: Option<String>,
-    pub type_name_zh: Option<String>,
-    pub type_name_ko: Option<String>,
+    pub type_name_r: String,
+    pub type_name_zh: String,
+    pub type_name_ko: String,
     pub color: String,
-    pub direction: u32,
+    pub direction: i32,
     pub line: Option<Box<Line>>,
     pub lines: Vec<Line>,
-    pub kind: u32,
+    pub kind: i32,
 }
 
 impl TrainType {
     #![allow(clippy::too_many_arguments)]
     pub fn new(
-        id: u32,
-        station_cd: u32,
-        type_cd: u32,
-        line_group_cd: u32,
-        pass: u32,
+        id: i32,
+        station_cd: i32,
+        type_cd: i32,
+        line_group_cd: i32,
+        pass: i32,
         type_name: String,
         type_name_k: String,
-        type_name_r: Option<String>,
-        type_name_zh: Option<String>,
-        type_name_ko: Option<String>,
+        type_name_r: String,
+        type_name_zh: String,
+        type_name_ko: String,
         color: String,
-        direction: u32,
-        kind: u32,
+        direction: i32,
+        kind: i32,
     ) -> Self {
         Self {
             id,
@@ -51,9 +51,9 @@ impl TrainType {
             type_name_ko,
             color,
             direction,
+            kind,
             line: None,
             lines: vec![],
-            kind,
         }
     }
 }

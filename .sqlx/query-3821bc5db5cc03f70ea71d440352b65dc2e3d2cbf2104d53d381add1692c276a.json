@@ -1,0 +1,94 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.kind AS \"kind?\",\n            t.direction AS \"direction?\",\n            sst.*\n            FROM types as t\n            JOIN station_station_types AS sst ON sst.line_group_cd = $1\n            WHERE \n                t.type_cd = sst.type_cd\n            ORDER BY t.kind, sst.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "type_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "type_name_k",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "type_name_r",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "type_name_zh",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "type_name_ko",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "color",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "kind?",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "direction?",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "station_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "type_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "line_group_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "pass",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3821bc5db5cc03f70ea71d440352b65dc2e3d2cbf2104d53d381add1692c276a"
+}

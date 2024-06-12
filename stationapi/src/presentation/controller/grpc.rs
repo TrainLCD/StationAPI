@@ -6,7 +6,8 @@ use crate::infrastructure::{
 use crate::station_api::GetRouteRequest;
 use crate::station_api::RouteResponse;
 use crate::station_api::{CoordinatesRequest, DistanceResponse, DistanceResponseState};
-use crate::use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase};
+use crate::use_case::interactor::query::QueryInteractor;
+use crate::use_case::traits::query::QueryUseCase;
 use crate::{
     presentation::error::PresentationalError,
     station_api::{
@@ -16,6 +17,7 @@ use crate::{
         MultipleStationResponse, MultipleTrainTypeResponse, SingleStationResponse,
     },
 };
+use bigdecimal::ToPrimitive;
 use tonic::Response;
 
 pub struct MyApi {
@@ -143,7 +145,7 @@ impl StationApi for MyApi {
 
         match self
             .query_use_case
-            .get_stations_by_name(query_station_name, query_limit)
+            .get_stations_by_name(query_station_name, query_limit.unwrap_or(0).to_i64())
             .await
         {
             Ok(stations) => {

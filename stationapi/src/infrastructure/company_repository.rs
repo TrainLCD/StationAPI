@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::{MySql, MySqlConnection, Pool};
+use sqlx::{query_as, PgConnection, Pool, Postgres};
 
 use crate::domain::{
     entity::company::Company, error::DomainError, repository::company_repository::CompanyRepository,
@@ -7,8 +7,8 @@ use crate::domain::{
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct CompanyRow {
-    pub company_cd: u32,
-    pub rr_cd: u32,
+    pub company_cd: i32,
+    pub rr_cd: i32,
     pub company_name: String,
     pub company_name_k: String,
     pub company_name_h: String,
@@ -16,9 +16,9 @@ pub struct CompanyRow {
     pub company_name_en: String,
     pub company_name_full_en: String,
     pub company_url: Option<String>,
-    pub company_type: u32,
-    pub e_status: u32,
-    pub e_sort: u32,
+    pub company_type: i32,
+    pub e_status: i32,
+    pub e_sort: i32,
 }
 
 impl From<CompanyRow> for Company {
@@ -32,7 +32,7 @@ impl From<CompanyRow> for Company {
             company_name_r: row.company_name_r,
             company_name_en: row.company_name_en,
             company_name_full_en: row.company_name_full_en,
-            company_url: row.company_url,
+            company_url: row.company_url.unwrap_or_default(),
             company_type: row.company_type,
             e_status: row.e_status,
             e_sort: row.e_sort,
@@ -42,18 +42,18 @@ impl From<CompanyRow> for Company {
 
 #[derive(Debug, Clone)]
 pub struct MyCompanyRepository {
-    pool: Pool<MySql>,
+    pool: Pool<Postgres>,
 }
 
 impl MyCompanyRepository {
-    pub fn new(pool: Pool<MySql>) -> Self {
+    pub fn new(pool: Pool<Postgres>) -> Self {
         Self { pool }
     }
 }
 
 #[async_trait]
 impl CompanyRepository for MyCompanyRepository {
-    async fn find_by_id_vec(&self, id_vec: Vec<u32>) -> Result<Vec<Company>, DomainError> {
+    async fn find_by_id_vec(&self, id_vec: Vec<i32>) -> Result<Vec<Company>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalCompanyRepository::find_by_id_vec(id_vec, &mut conn).await
     }
@@ -63,25 +63,20 @@ pub struct InternalCompanyRepository {}
 
 impl InternalCompanyRepository {
     async fn find_by_id_vec(
-        id_vec: Vec<u32>,
-        conn: &mut MySqlConnection,
+        id_vec: Vec<i32>,
+        conn: &mut PgConnection,
     ) -> Result<Vec<Company>, DomainError> {
         if id_vec.is_empty() {
             return Ok(vec![]);
         }
 
-        let params = format!("?{}", ", ?".repeat(id_vec.len() - 1));
-        let query_str = format!(
-            "SELECT * FROM `companies` WHERE company_cd IN ( {} )",
-            params
-        );
-
-        let mut query = sqlx::query_as::<_, CompanyRow>(&query_str);
-        for id in id_vec {
-            query = query.bind(id);
-        }
-
-        let rows = query.fetch_all(conn).await?;
+        let rows = query_as!(
+            CompanyRow,
+            "SELECT * FROM companies WHERE company_cd IN (SELECT UNNEST($1::integer[]))",
+            &id_vec
+        )
+        .fetch_all(conn)
+        .await?;
         let companies: Vec<Company> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(companies)
