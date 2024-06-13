@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT \n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.kind AS \"kind?\",\n            t.direction AS \"direction?\",\n            sst.*\n            FROM \n            types AS t\n            JOIN stations AS s ON s.station_cd IN (SELECT UNNEST($1::integer[])) AND s.e_status = 0\n            JOIN station_station_types AS sst ON sst.line_group_cd = $2 AND sst.pass <> 1 AND sst.type_cd = t.type_cd\n            WHERE \n            CASE WHEN t.top_priority = 1\n            THEN\n                sst.type_cd = t.type_cd\n            ELSE\n                sst.pass <> 1\n                AND sst.type_cd = t.type_cd\n            END\n            ORDER BY t.kind, sst.id",
+  "query": "SELECT\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.kind AS \"kind?\",\n            t.direction AS \"direction?\",\n            sst.*,\n            s.line_cd\n            FROM types as t\n            JOIN station_station_types AS sst ON sst.line_group_cd IN (SELECT(UNNEST($1::integer[])))\n            JOIN stations AS s ON s.station_cd = sst.station_cd\n            WHERE \n                t.type_cd = sst.type_cd",
   "describe": {
     "columns": [
       {
@@ -67,12 +67,16 @@
         "ordinal": 12,
         "name": "pass",
         "type_info": "Int4"
+      },
+      {
+        "ordinal": 13,
+        "name": "line_cd",
+        "type_info": "Int4"
       }
     ],
     "parameters": {
       "Left": [
-        "Int4Array",
-        "Int4"
+        "Int4Array"
       ]
     },
     "nullable": [
@@ -88,8 +92,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "399365a6bd6ee873b7370075fb2e7acc883ceb42ea06b971fa720b625f8dc784"
+  "hash": "fc507a5972f6c7dfd5d20fa1c6381725983d60446f79e7014d547bf66575ab8f"
 }

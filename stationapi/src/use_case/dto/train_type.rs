@@ -6,6 +6,7 @@ impl From<TrainType> for GrpcTrainType {
             id,
             station_cd: _,
             type_cd,
+            line_cd: _,
             line_group_cd,
             pass: _,
             type_name,

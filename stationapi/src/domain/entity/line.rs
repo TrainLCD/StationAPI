@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{company::Company, line_symbol::LineSymbol, station::Station, train_type::TrainType};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Line {
     pub line_cd: i32,
     pub company_cd: i32,

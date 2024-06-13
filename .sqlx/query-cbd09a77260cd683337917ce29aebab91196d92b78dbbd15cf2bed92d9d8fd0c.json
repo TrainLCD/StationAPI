@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT \n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.kind AS \"kind?\",\n            t.direction AS \"direction?\",\n            sst.*\n            FROM types AS t\n            JOIN stations AS s ON s.station_cd = $1 AND s.e_status = 0\n            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.type_cd = t.type_cd AND sst.pass <> 1\n            ORDER BY t.kind, sst.id",
+  "query": "SELECT\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.kind AS \"kind?\",\n            t.direction AS \"direction?\",\n            sst.*,\n            s.line_cd\n            FROM types AS t\n            JOIN stations AS s ON s.station_cd = $1 AND s.e_status = 0\n            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.type_cd = t.type_cd AND sst.pass <> 1\n            ORDER BY t.kind, sst.id",
   "describe": {
     "columns": [
       {
@@ -67,6 +67,11 @@
         "ordinal": 12,
         "name": "pass",
         "type_info": "Int4"
+      },
+      {
+        "ordinal": 13,
+        "name": "line_cd",
+        "type_info": "Int4"
       }
     ],
     "parameters": {
@@ -87,8 +92,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "8fe6fae8a85f7201709e18bfa20eefe5641dd010f17e51524d0d6a9c0e5ad021"
+  "hash": "cbd09a77260cd683337917ce29aebab91196d92b78dbbd15cf2bed92d9d8fd0c"
 }

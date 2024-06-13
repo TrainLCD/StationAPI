@@ -4,7 +4,7 @@ use crate::station_api::StopCondition;
 
 use super::{line::Line, station_number::StationNumber, train_type::TrainType as TrainTypeEntity};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Station {
     pub station_cd: i32,
     pub station_g_cd: i32,

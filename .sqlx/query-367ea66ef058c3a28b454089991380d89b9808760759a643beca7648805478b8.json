@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n          s.station_cd,\n          l.average_distance,\n            POINT(s.lat, s.lon) <-> POINT($1, $2) AS distance\n        FROM stations AS s\n        JOIN lines AS l ON l.line_cd = s.line_cd\n        WHERE\n          s.e_status = 0\n        ORDER BY \n          distance\n        LIMIT \n          1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "station_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "average_distance",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 2,
+        "name": "distance",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Float8",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "367ea66ef058c3a28b454089991380d89b9808760759a643beca7648805478b8"
+}

@@ -1,0 +1,101 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n            sst.type_cd,\n            s.line_cd,\n            sst.station_cd,\n            sst.line_group_cd,\n            sst.pass,\n            t.id,\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.kind AS \"kind?\",\n            t.direction AS \"direction?\"\n            FROM types as t\n            JOIN station_station_types AS sst ON sst.line_group_cd = $1\n            JOIN stations AS s ON s.station_cd = sst.station_cd\n            WHERE \n            sst.station_cd IN (\n                SELECT \n                station_cd \n                FROM \n                stations as s \n                WHERE \n                line_cd = $2\n                AND s.e_status = 0\n            )\n            AND t.type_cd = sst.type_cd\n            ORDER BY t.kind, sst.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "type_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "line_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "station_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "line_group_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "pass",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "type_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "type_name_k",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "type_name_r",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "type_name_zh",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "type_name_ko",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 11,
+        "name": "color",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "kind?",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 13,
+        "name": "direction?",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "015cf48f36fd48f733bc51a23d3b8a7a4fd990db4f16e10390f2cfcdbb386eec"
+}

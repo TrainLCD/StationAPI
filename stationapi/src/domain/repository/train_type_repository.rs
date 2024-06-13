@@ -4,8 +4,10 @@ use crate::domain::{entity::train_type::TrainType, error::DomainError};
 
 #[async_trait]
 pub trait TrainTypeRepository: Send + Sync + 'static {
-    async fn get_by_line_group_id(&self, line_group_id: i32)
-        -> Result<Vec<TrainType>, DomainError>;
+    async fn get_by_line_group_id_vec(
+        &self,
+        line_group_ids: Vec<i32>,
+    ) -> Result<Vec<TrainType>, DomainError>;
     async fn get_by_station_id(&self, station_id: i32) -> Result<Vec<TrainType>, DomainError>;
     async fn find_by_line_group_id_and_line_id(
         &self,

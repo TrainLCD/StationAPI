@@ -3,7 +3,6 @@ use crate::{
     station_api::{Station, TrainType},
 };
 use async_trait::async_trait;
-use bigdecimal::ToPrimitive;
 use sqlx::{PgConnection, PgPool};
 
 #[derive(Default, sqlx::FromRow, Clone)]
@@ -53,6 +52,7 @@ pub struct RouteRow {
     pub line_symbol_extra_shape: Option<String>,
     pub average_distance: Option<f64>,
     // types
+    sst_id: Option<i32>,
     pub type_id: Option<i32>,
     pub type_cd: Option<i32>,
     pub line_group_cd: Option<i32>,
@@ -111,7 +111,7 @@ impl From<RouteRow> for Station {
             status: row.e_status.unwrap_or_default(),
             station_numbers: vec![],
             stop_condition: row.pass.unwrap_or_default(),
-            distance: row.distance.unwrap_or_default().to_f64(),
+            distance: row.distance.unwrap_or_default().into(),
             has_train_types: row.has_train_types,
             train_type: None,
         }
@@ -165,6 +165,7 @@ impl InternalRoutesRepository {
             via_lines.line_symbol_secondary_shape,
             via_lines.line_symbol_extra_shape,
             via_lines.average_distance,
+            sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
             sst.pass,
@@ -229,6 +230,7 @@ impl InternalRoutesRepository {
             via_lines.line_symbol_secondary_shape,
             via_lines.line_symbol_extra_shape,
             via_lines.average_distance,
+            sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
             sst.pass,
@@ -256,18 +258,17 @@ impl InternalRoutesRepository {
             JOIN lines AS via_lines ON via_lines.line_cd IN (
                 SELECT s.line_cd
                 FROM stations AS s
-                WHERE s.station_g_cd = $3
+                WHERE s.station_g_cd = $1
             )
             AND via_lines.line_cd IN (
                 SELECT s.line_cd
                 FROM stations AS s
-                WHERE s.station_g_cd = $4
+                WHERE s.station_g_cd = $2
             )
             LEFT JOIN line_aliases AS la ON la.station_cd = sta.station_cd
             LEFT JOIN aliases AS a ON a.id = la.alias_cd
-        WHERE sta.line_cd = via_lines.line_cd"#,
-            from_station_id,
-            to_station_id,
+        WHERE sta.line_cd = via_lines.line_cd
+        ORDER BY sst_id, e_sort, station_cd"#,
             from_station_id,
             to_station_id,
         )

@@ -141,7 +141,7 @@ where
     async fn get_stations_by_name(
         &self,
         station_name: String,
-        limit: Option<i64>,
+        limit: Option<i32>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut stations = self
             .station_repository
@@ -221,7 +221,7 @@ where
             let mut lines: Vec<Line> = lines
                 .iter()
                 .filter(|&l| l.station_g_cd.is_some())
-                .filter(|&l| l.station_g_cd.unwrap_or_default() == station.station_g_cd)
+                .filter(|&l| l.station_g_cd.unwrap() == station.station_g_cd)
                 .cloned()
                 .collect();
             for line in lines.iter_mut() {
@@ -451,28 +451,33 @@ where
             .get_by_station_id(station_id)
             .await?;
 
-        let train_type_ids = train_types.iter().map(|tt| tt.line_group_cd).collect();
+        let train_type_ids: Vec<i32> = train_types.iter().map(|tt| tt.line_group_cd).collect();
 
         let mut lines = self
             .line_repository
-            .get_by_line_group_id_vec(train_type_ids)
+            .get_by_line_group_id_vec(train_type_ids.clone())
             .await?;
 
         let company_ids = lines.iter().map(|l| l.company_cd).collect();
         let companies = self.company_repository.find_by_id_vec(company_ids).await?;
 
-        let line = self.line_repository.find_by_station_id(station_id).await?;
-        let Some(mut line) = line else {
-            return Ok(vec![]);
-        };
+        let inner_train_types = self
+            .train_type_repository
+            .get_by_line_group_id_vec(train_type_ids)
+            .await?;
 
         for tt in train_types.iter_mut() {
             let mut lines: Vec<Line> = lines
                 .iter_mut()
                 .map(|l| l.clone())
-                .filter(|l| l.line_group_cd.is_some())
-                .filter(|l| l.line_group_cd.unwrap_or_default() == tt.line_group_cd)
+                .filter(|l| l.line_group_cd == Some(tt.line_group_cd))
                 .collect::<Vec<Line>>();
+
+            let line_train_types: Vec<TrainType> = inner_train_types
+                .clone()
+                .into_iter()
+                .filter(|itt| itt.line_group_cd == tt.line_group_cd)
+                .collect();
 
             for line in lines.iter_mut() {
                 line.company = companies
@@ -480,22 +485,15 @@ where
                     .find(|c| c.company_cd == line.company_cd)
                     .cloned();
                 line.line_symbols = self.get_line_symbols(line);
-                let train_type: Option<TrainType> = self
-                    .train_type_repository
-                    .find_by_line_group_id_and_line_id(tt.line_group_cd, line.line_cd)
-                    .await?;
-                line.train_type = train_type;
+
+                let train_type = line_train_types
+                    .iter()
+                    .find(|ltt| ltt.line_cd == line.line_cd);
+
+                line.train_type = train_type.cloned();
             }
 
-            line.train_type = Some(tt.clone());
-            line.company = companies
-                .iter()
-                .find(|c| c.company_cd == line.company_cd)
-                .cloned();
-            line.line_symbols = self.get_line_symbols(&line);
-
             tt.lines = lines;
-            tt.line = Some(Box::new(line.clone()));
         }
 
         Ok(train_types)

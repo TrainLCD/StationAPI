@@ -222,7 +222,7 @@ impl StationRepository for MyStationRepository {
     async fn get_by_name(
         &self,
         station_name: String,
-        limit: Option<i64>,
+        limit: Option<i32>,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::get_by_name(station_name, limit, &mut conn).await
@@ -372,7 +372,7 @@ impl InternalStationRepository {
               s.station_cd IN (SELECT UNNEST($1::integer[]))
               AND s.line_cd = l.line_cd
               AND s.e_status = 0
-              ORDER BY s.station_cd, s.e_sort"#,
+              ORDER BY s.e_sort, s.station_cd"#,
             &ids
         )
         .fetch_all(conn)
@@ -432,7 +432,7 @@ impl InternalStationRepository {
               FROM station_station_types AS sst
                 LEFT JOIN types AS t ON sst.type_cd = t.type_cd
               WHERE CASE
-                  WHEN $2::integer IS NOT NULL THEN sst.station_cd = $3
+                  WHEN $2::integer IS NOT NULL THEN sst.station_cd = $2
                 END
                 AND CASE
                   WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd
@@ -490,7 +490,7 @@ impl InternalStationRepository {
                 FROM station_station_types AS sst
                   LEFT JOIN types AS t ON sst.type_cd = t.type_cd
                 WHERE CASE
-                    WHEN $4::integer IS NOT NULL THEN sst.station_cd = $5
+                    WHEN $2::integer IS NOT NULL THEN sst.station_cd = $2
                   END
                   AND CASE
                     WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd
@@ -504,11 +504,9 @@ impl InternalStationRepository {
               AND s.station_cd = sst.station_cd
               AND s.line_cd = l.line_cd
               AND s.e_status = 0
-          )"#,
+          )
+          ORDER BY e_sort, station_cd"#,
             line_id,
-            station_id,
-            station_id,
-            station_id,
             station_id
         )
         .fetch_all(conn)
@@ -697,7 +695,7 @@ impl InternalStationRepository {
                 $3"#,
             latitude,
             longitude,
-            limit.unwrap_or(1) as i64
+            limit.unwrap_or(1) as i32
         )
         .fetch_all(conn)
         .await?;
@@ -716,27 +714,13 @@ impl InternalStationRepository {
         let row = sqlx::query_as!(
             DistanceWithIdRow,
             "SELECT
-    s.station_cd,
-    l.average_distance,
-            (
-              6371 * acos(
-                cos(
-                  radians(s.lat)
-                ) * cos(
-                  radians($1)
-                ) * cos(
-                  radians($2) - radians(s.lon)
-                ) + sin(
-                  radians(s.lat)
-                ) * sin(
-                  radians($3)
-                )
-              )
-            ) AS distance
+            s.station_cd,
+            l.average_distance,
+            POINT(s.lat, s.lon) <-> POINT($1, $2) AS distance
           FROM stations AS s
-          JOIN lines AS l ON l.line_cd = $4
+          JOIN lines AS l ON l.line_cd = $3
           WHERE
-            s.line_cd = $5
+            s.line_cd = $3
             AND s.e_status = 0
           ORDER BY 
             distance
@@ -744,8 +728,6 @@ impl InternalStationRepository {
             1",
             latitude,
             longitude,
-            latitude,
-            line_id,
             line_id
         )
         .fetch_one(conn)
@@ -770,21 +752,7 @@ impl InternalStationRepository {
             "SELECT
           s.station_cd,
           l.average_distance,
-          (
-            6371 * acos(
-              cos(
-                radians(s.lat)
-              ) * cos(
-                radians($1)
-              ) * cos(
-                radians($2) - radians(s.lon)
-              ) + sin(
-                radians(s.lat)
-              ) * sin(
-                radians($3)
-              )
-            )
-          ) AS distance
+            POINT(s.lat, s.lon) <-> POINT($1, $2) AS distance
         FROM stations AS s
         JOIN lines AS l ON l.line_cd = s.line_cd
         WHERE
@@ -794,8 +762,7 @@ impl InternalStationRepository {
         LIMIT 
           1",
             latitude,
-            longitude,
-            latitude
+            longitude
         )
         .fetch_one(conn)
         .await?;
@@ -810,7 +777,7 @@ impl InternalStationRepository {
 
     async fn get_by_name(
         station_name: String,
-        limit: Option<i64>,
+        limit: Option<i32>,
         conn: &mut PgConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let station_name = format!("%{}%", station_name);
@@ -858,21 +825,17 @@ impl InternalStationRepository {
                   LEFT JOIN aliases AS a ON la.alias_cd = a.id
                   WHERE
                     (
-                      station_name LIKE $1
-                      OR station_name_r LIKE $2
-                      OR station_name_k LIKE $3
-                      OR station_name_zh LIKE $4
-                      OR station_name_ko LIKE $5
+                      station_name ILIKE $1
+                      OR station_name_r ILIKE $1
+                      OR station_name_k ILIKE $1
+                      OR station_name_zh ILIKE $1
+                      OR station_name_ko ILIKE $1
                     )
                     AND s.e_status = 0
                   LIMIT
-                    $6"#,
+                    $2"#,
             station_name,
-            station_name,
-            station_name,
-            station_name,
-            station_name,
-            limit.unwrap_or(1),
+            limit.unwrap_or(1) as i32,
         )
         .fetch_all(conn)
         .await?;

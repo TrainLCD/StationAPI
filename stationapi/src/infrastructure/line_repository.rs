@@ -123,7 +123,7 @@ impl InternalLineRepository {
     async fn find_by_id(id: i32, conn: &mut PgConnection) -> Result<Option<Line>, DomainError> {
         let rows = sqlx::query_as!(
             LineRow,
-            "SELECT
+            r#"SELECT
             l.line_cd,
             l.company_cd,
             l.line_type,
@@ -140,7 +140,7 @@ impl InternalLineRepository {
             l.e_sort,
             l.average_distance,
             s.station_g_cd,
-            sst.line_group_cd,
+            sst.line_group_cd AS "line_group_cd?",
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -150,10 +150,10 @@ impl InternalLineRepository {
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
         FROM lines AS l
             JOIN stations AS s ON s.station_cd = $1
-            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
+            LEFT JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
             LEFT JOIN aliases AS a ON la.alias_cd = a.id
-        WHERE l.line_cd = s.line_cd",
+        WHERE l.line_cd = s.line_cd"#,
             id
         )
         .fetch_optional(conn)
@@ -173,7 +173,7 @@ impl InternalLineRepository {
     ) -> Result<Option<Line>, DomainError> {
         let rows = sqlx::query_as!(
             LineRow,
-            "SELECT
+            r#"SELECT
             l.line_cd,
             l.company_cd,
             l.line_type,
@@ -190,7 +190,7 @@ impl InternalLineRepository {
             l.e_sort,
             l.average_distance,
             s.station_g_cd,
-            sst.line_group_cd,
+            sst.line_group_cd AS "line_group_cd?",
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -200,10 +200,10 @@ impl InternalLineRepository {
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
         FROM lines AS l
             JOIN stations AS s ON s.station_cd = $1
-            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
+            LEFT JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
             LEFT JOIN aliases AS a ON la.alias_cd = a.id
-        WHERE l.line_cd = s.line_cd",
+        WHERE l.line_cd = s.line_cd"#,
             station_id,
         )
         .fetch_optional(conn)
@@ -224,8 +224,7 @@ impl InternalLineRepository {
 
         let rows = query_as!(
             LineRow,
-            "
-            SELECT
+            r#"SELECT
             l.line_cd,
             l.company_cd,
             l.line_type,
@@ -242,7 +241,7 @@ impl InternalLineRepository {
             l.e_sort,
             l.average_distance,
             s.station_g_cd,
-            sst.line_group_cd,
+            sst.line_group_cd AS "line_group_cd?",
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -252,10 +251,10 @@ impl InternalLineRepository {
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
             FROM lines AS l
                 JOIN stations AS s ON s.line_cd = l.line_cd
-                JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
+                LEFT JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
                 LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
                 LEFT JOIN aliases AS a ON la.alias_cd = a.id
-            WHERE l.line_cd IN (SELECT UNNEST($1::integer[]))",
+            WHERE l.line_cd IN (SELECT UNNEST($1::integer[]))"#,
             &ids
         )
         .fetch_all(conn)
@@ -271,7 +270,7 @@ impl InternalLineRepository {
     ) -> Result<Vec<Line>, DomainError> {
         let rows = sqlx::query_as!(
             LineRow,
-            "SELECT
+            r#"SELECT
             l.line_cd,
             l.company_cd,
             l.line_type,
@@ -299,11 +298,11 @@ impl InternalLineRepository {
         FROM lines AS l
             JOIN stations AS s ON s.station_g_cd = $1
             AND s.e_status = 0
-            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
+            LEFT JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
             LEFT JOIN aliases AS a ON la.alias_cd = a.id
         WHERE l.line_cd = s.line_cd
-            AND l.e_status = 0",
+            AND l.e_status = 0"#,
             station_group_id
         )
         .fetch_all(conn)
@@ -323,7 +322,7 @@ impl InternalLineRepository {
 
         let rows = query_as!(
             LineRow,
-            "SELECT
+            r#"SELECT DISTINCT ON (s.station_g_cd, l.line_cd)
             l.line_cd,
             l.company_cd,
             l.line_type,
@@ -340,7 +339,7 @@ impl InternalLineRepository {
             l.e_sort,
             l.average_distance,
             s.station_g_cd,
-            sst.line_group_cd,
+            sst.line_group_cd AS "line_group_cd?",
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -348,14 +347,16 @@ impl InternalLineRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
-            FROM lines AS l
-            JOIN stations AS s ON s.station_g_cd IN (SELECT UNNEST($1::integer[])) AND s.e_status = 0
-            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
-            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd 
-            LEFT JOIN aliases AS a ON la.alias_cd = a.id 
-            WHERE
-                l.line_cd = s.line_cd
-                AND l.e_status = 0",
+        FROM lines AS l
+            JOIN stations AS s ON s.station_g_cd IN (
+                SELECT UNNEST($1::integer[])
+            )
+            AND s.e_status = 0
+            LEFT JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
+            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+            LEFT JOIN aliases AS a ON la.alias_cd = a.id
+        WHERE l.line_cd = s.line_cd
+            AND l.e_status = 0"#,
             &station_group_id_vec
         )
         .fetch_all(conn)
@@ -421,7 +422,7 @@ impl InternalLineRepository {
 
         let rows = query_as!(
             LineRow,
-            "SELECT
+            "SELECT DISTINCT ON (sst.line_group_cd, l.line_cd)
             l.line_cd,
             l.company_cd,
             l.line_type,
@@ -448,6 +449,7 @@ impl InternalLineRepository {
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
             FROM lines AS l
             JOIN station_station_types AS sst ON sst.line_group_cd IN (SELECT UNNEST($1::integer[]))
+            JOIN types AS t ON t.type_cd = sst.type_cd
             JOIN stations AS s ON s.station_cd = sst.station_cd AND s.e_status = 0
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
             LEFT JOIN aliases AS a ON la.alias_cd = a.id

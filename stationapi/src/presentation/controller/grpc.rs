@@ -17,7 +17,6 @@ use crate::{
         MultipleStationResponse, MultipleTrainTypeResponse, SingleStationResponse,
     },
 };
-use bigdecimal::ToPrimitive;
 use tonic::Response;
 
 pub struct MyApi {
@@ -145,7 +144,7 @@ impl StationApi for MyApi {
 
         match self
             .query_use_case
-            .get_stations_by_name(query_station_name, query_limit.unwrap_or(0).to_i64())
+            .get_stations_by_name(query_station_name, query_limit)
             .await
         {
             Ok(stations) => {

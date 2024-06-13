@@ -31,7 +31,7 @@ pub trait StationRepository: Send + Sync + 'static {
     async fn get_by_name(
         &self,
         station_name: String,
-        limit: Option<i64>,
+        limit: Option<i32>,
     ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_line_group_id(&self, line_group_id: i32) -> Result<Vec<Station>, DomainError>;
     async fn get_station_id_and_distance_by_coordinates(

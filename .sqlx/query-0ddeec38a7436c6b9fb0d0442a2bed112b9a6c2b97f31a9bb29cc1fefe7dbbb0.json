@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.kind AS \"kind?\",\n            t.direction AS \"direction?\",\n            sst.*\n            FROM types as t\n            JOIN station_station_types AS sst ON sst.line_group_cd = $1\n            WHERE \n                t.type_cd = sst.type_cd\n            ORDER BY t.kind, sst.id",
+  "query": "SELECT \n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.kind AS \"kind?\",\n            t.direction AS \"direction?\",\n            sst.*,\n            s.line_cd\n            FROM \n            types AS t\n            JOIN stations AS s ON s.station_cd IN (SELECT UNNEST($1::integer[])) AND s.e_status = 0\n            LEFT JOIN station_station_types AS sst ON sst.line_group_cd = $2 AND sst.pass <> 1 AND sst.type_cd = t.type_cd\n            WHERE \n            CASE WHEN t.top_priority = 1\n            THEN\n                sst.type_cd = t.type_cd\n            ELSE\n                sst.pass <> 1\n                AND sst.type_cd = t.type_cd\n            END\n            ORDER BY t.kind, sst.id",
   "describe": {
     "columns": [
       {
@@ -67,10 +67,16 @@
         "ordinal": 12,
         "name": "pass",
         "type_info": "Int4"
+      },
+      {
+        "ordinal": 13,
+        "name": "line_cd",
+        "type_info": "Int4"
       }
     ],
     "parameters": {
       "Left": [
+        "Int4Array",
         "Int4"
       ]
     },
@@ -87,8 +93,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "3821bc5db5cc03f70ea71d440352b65dc2e3d2cbf2104d53d381add1692c276a"
+  "hash": "0ddeec38a7436c6b9fb0d0442a2bed112b9a6c2b97f31a9bb29cc1fefe7dbbb0"
 }

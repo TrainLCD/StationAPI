@@ -2,11 +2,12 @@ use serde::{Deserialize, Serialize};
 
 use super::line::Line;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct TrainType {
     pub id: i32,
     pub station_cd: i32,
     pub type_cd: i32,
+    pub line_cd: i32,
     pub line_group_cd: i32,
     pub pass: i32,
     pub type_name: String,
@@ -27,6 +28,7 @@ impl TrainType {
         id: i32,
         station_cd: i32,
         type_cd: i32,
+        line_cd: i32,
         line_group_cd: i32,
         pass: i32,
         type_name: String,
@@ -42,6 +44,7 @@ impl TrainType {
             id,
             station_cd,
             type_cd,
+            line_cd,
             line_group_cd,
             pass,
             type_name,
