@@ -8,7 +8,7 @@ RUN cargo build -p migration --release
 FROM debian:bookworm-slim
 WORKDIR /app
 RUN apt-get update && \
-    apt-get install -y --quiet default-mysql-client && \
+    apt-get install -y --quiet postgresql && \
     rm -rf /var/lib/apt/lists/*
 COPY data /app/data
 COPY --from=builder /app/target/release/migration .

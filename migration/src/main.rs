@@ -2,38 +2,32 @@ use csv::{ReaderBuilder, StringRecord};
 use std::{
     env::{self, VarError},
     error,
-    fs::{self, File},
+    fs::{self},
     io::{self, Write},
     path::Path,
-    process::{Command, Stdio},
+    process::Command,
 };
 use tracing::{info, warn};
 
 pub fn insert_data(generated_sql_path: String) -> Result<(), Box<dyn std::error::Error>> {
-    let generated_sql_file = File::open(generated_sql_path.clone())?;
+    // let output = Command::new("psql")
+    //     .arg(format!("-h{}", env::var("POSTGRES_HOST")?))
+    //     .arg(format!("-p{}", env::var("POSTGRES_PORT")?))
+    //     .arg(format!("-U{}", env::var("POSTGRES_USER")?))
+    //     .arg("postgres")
+    //     .arg("--command")
+    //     .arg("CREATE COLLATION ignore_accents (provider = icu, locale = 'und-u-ks-level1-kc-true', deterministic = false);")
+    //     .output()?;
 
-    let output = Command::new("mysql")
-        .arg(format!("-u{}", env::var("MYSQL_USER")?))
-        .arg(format!("-p{}", env::var("MYSQL_PASSWORD")?))
-        .arg(format!("-h{}", env::var("MYSQL_HOST")?))
-        .arg("--default-character-set=utf8mb4")
-        .arg("-e")
-        .arg(format!(
-            "CREATE DATABASE IF NOT EXISTS {}",
-            env::var("MYSQL_DATABASE")?
-        ))
-        .output()?;
+    // io::stdout().write_all(&output.stdout)?;
+    // io::stderr().write_all(&output.stderr)?;
 
-    io::stdout().write_all(&output.stdout)?;
-    io::stderr().write_all(&output.stderr)?;
-
-    let output = Command::new("mysql")
-        .arg(format!("-u{}", env::var("MYSQL_USER")?))
-        .arg(format!("-p{}", env::var("MYSQL_PASSWORD")?))
-        .arg(format!("-h{}", env::var("MYSQL_HOST")?))
-        .arg("--default-character-set=utf8mb4")
-        .arg(env::var("MYSQL_DATABASE")?)
-        .stdin(Stdio::from(generated_sql_file))
+    let output = Command::new("psql")
+        .arg(format!("-h{}", env::var("POSTGRES_HOST")?))
+        .arg(format!("-p{}", env::var("POSTGRES_PORT")?))
+        .arg(format!("-U{}", env::var("POSTGRES_USER")?))
+        .arg(env::var("POSTGRES_DB")?)
+        .arg(format!("-f{}", generated_sql_path))
         .output()?;
 
     io::stdout().write_all(&output.stdout)?;
@@ -66,7 +60,7 @@ pub fn generate_sql() -> Result<String, Box<dyn std::error::Error>> {
         .collect();
     file_list.sort();
 
-    let mut sql_lines = Vec::new();
+    let mut sql_lines: Vec<String> = Vec::new();
 
     for file_name in &file_list {
         if file_name
@@ -101,13 +95,19 @@ pub fn generate_sql() -> Result<String, Box<dyn std::error::Error>> {
             .next()
             .unwrap_or_default();
 
-        let mut sql_lines_inner = Vec::new();
+        let mut sql_lines_inner = vec!["\n".to_string()];
         sql_lines_inner.push(format!(
-            "LOCK TABLES `{}` WRITE;\nINSERT INTO `{}` VALUES ",
-            table_name, table_name
+            "\nCOPY stationapi.{} ({}) FROM stdin;\n",
+            table_name,
+            headers
+                .clone()
+                .into_iter()
+                .filter(|h| !h.starts_with('#'))
+                .collect::<Vec<String>>()
+                .join(", ")
         ));
 
-        for (idx, data) in csv_data.iter().enumerate() {
+        for data in csv_data.iter() {
             let cols: Vec<_> = data
                 .iter()
                 .enumerate()
@@ -121,21 +121,18 @@ pub fn generate_sql() -> Result<String, Box<dyn std::error::Error>> {
                     }
 
                     if col.is_empty() {
-                        Some("NULL".to_string())
+                        Some("\\N".to_string())
                     } else {
-                        Some(format!("'{}'", col.replace('\'', "\\'")))
+                        Some(col.replace('\n', "\\n").to_string())
                     }
                 })
                 .collect();
 
-            sql_lines_inner.push(if idx == csv_data.len() - 1 {
-                format!("({});", cols.join(","))
-            } else {
-                format!("({}),", cols.join(","))
-            });
+            sql_lines_inner.push(cols.join("\t").to_string());
+            sql_lines_inner.push("\n".to_string());
         }
 
-        sql_lines.push(format!("{}\nUNLOCK TABLES", sql_lines_inner.concat()));
+        sql_lines.push(format!("{}\\.\n", sql_lines_inner.concat()));
     }
 
     let create_sql: String =
@@ -143,7 +140,7 @@ pub fn generate_sql() -> Result<String, Box<dyn std::error::Error>> {
 
     fs::write(
         out_path.clone(),
-        format!("{}{};", create_sql, sql_lines.join(";")),
+        format!("{}{}", create_sql, sql_lines.join("\n")),
     )?;
 
     Ok(out_path)

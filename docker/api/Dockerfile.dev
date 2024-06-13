@@ -8,6 +8,7 @@ RUN curl -L --proto '=https' --tlsv1.2 -sSf https://github.com/cargo-bins/cargo-
 RUN tar xvf binstall.tgz
 RUN rm -f binstall.tgz
 RUN echo yes | ./cargo-binstall cargo-watch
+RUN cargo install sqlx-cli --no-default-features --features native-tls,postgres
 ENV PORT 50051
 EXPOSE $PORT
 CMD ["cargo", "run", "-p", "stationapi"]

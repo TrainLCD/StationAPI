@@ -21,28 +21,32 @@ services:
       - sapi-link
 
   db:
-    image: postgres:16
+    image: postgres:16-alpine
     environment:
       POSTGRES_USER: stationapi
       POSTGRES_PASSWORD: password
       POSTGRES_DB: stationapi
+      POSTGRES_INITDB_ARGS: --locale-provider=icu --icu-locale=ja_JP.UTF8 --no-locale
+    ports:
+      - 5432:5432
     networks:
       - sapi-link
 
-  # migration:
-  #   build:
-  #     context: .
-  #     dockerfile: ./docker/migration/Dockerfile
-  #   command: ["./wait-for-it.sh", "db:3306", "--", "./migration"]
-  #   depends_on:
-  #     - db
-  #   environment:
-  #     MYSQL_USER: stationapi
-  #     MYSQL_PASSWORD: password
-  #     MYSQL_HOST: db
-  #     MYSQL_DATABASE: stationapi
-  #   networks:
-  #     - sapi-link
+  migration:
+    build:
+      context: .
+      dockerfile: ./docker/migration/Dockerfile
+    command: ["./wait-for-it.sh", "db:5432", "--", "./migration"]
+    depends_on:
+      - db
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: stationapi
+      POSTGRES_DB: stationapi
+      PGPASSWORD: password
+    networks:
+      - sapi-link
 
 networks:
   sapi-link:
