@@ -9,8 +9,7 @@ use crate::{
 use async_trait::async_trait;
 use sqlx::{query_as, PgConnection, PgPool};
 
-#[derive(Default, sqlx::FromRow, Clone)]
-#[sqlx(default)]
+#[derive(sqlx::FromRow, Clone)]
 struct StationRow {
     pub station_cd: Option<i32>,
     pub station_g_cd: Option<i32>,
@@ -56,28 +55,20 @@ struct StationRow {
     pub line_symbol_extra_shape: Option<String>,
     average_distance: Option<f64>,
     // station_station_typesからJOIN
-    #[sqlx(default)]
     pub type_cd: Option<i32>,
-    #[sqlx(default)]
     pub line_group_cd: Option<i32>,
-    #[sqlx(default)]
     pub pass: Option<i32>,
     // typesからJOIN
     #[sqlx(default)]
+    #[allow(dead_code)]
+    sst_id: Option<i32>,
     pub type_name: Option<String>,
-    #[sqlx(default)]
     pub type_name_k: Option<String>,
-    #[sqlx(default)]
     pub type_name_r: Option<String>,
-    #[sqlx(default)]
     pub type_name_zh: Option<String>,
-    #[sqlx(default)]
     pub type_name_ko: Option<String>,
-    #[sqlx(default)]
     pub kind: Option<i32>,
-    #[sqlx(default)]
     pub color: Option<String>,
-    #[sqlx(default)]
     pub direction: Option<i32>,
 }
 
@@ -286,6 +277,7 @@ impl InternalStationRepository {
             sst.type_cd AS "type_cd?",
             sst.line_group_cd AS "line_group_cd?",
             sst.pass AS "pass?",
+            sst.id AS "sst_id?",
             t.type_name AS "type_name?",
             t.type_name_k AS "type_name_k?",
             t.type_name_r AS "type_name_r?",
@@ -353,6 +345,7 @@ impl InternalStationRepository {
             sst.type_cd AS "type_cd?",
             sst.line_group_cd AS "line_group_cd?",
             sst.pass AS "pass?",
+            sst.id AS "sst_id?",
             t.type_name AS "type_name?",
             t.type_name_k AS "type_name_k?",
             t.type_name_r AS "type_name_r?",
@@ -389,123 +382,127 @@ impl InternalStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let station_row: Vec<StationRow> = sqlx::query_as!(
             StationRow,
-            r#"SELECT s.*,
-            l.company_cd,
-            l.line_type,
-            l.line_symbol_primary,
-            l.line_symbol_secondary,
-            l.line_symbol_extra,
-            l.line_symbol_primary_color,
-            l.line_symbol_secondary_color,
-            l.line_symbol_extra_color,
-            l.line_symbol_primary_shape,
-            l.line_symbol_secondary_shape,
-            l.line_symbol_extra_shape,
-            l.average_distance,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            COALESCE(s.station_cd = sst.station_cd, FALSE) AS has_train_types,
-            sst.type_cd AS "type_cd?",
-            sst.line_group_cd AS "line_group_cd?",
-            sst.pass AS "pass?",
-            t.type_name AS "type_name?",
-            t.type_name_k AS "type_name_k?",
-            t.type_name_r AS "type_name_r?",
-            t.type_name_zh AS "type_name_zh?",
-            t.type_name_ko AS "type_name_ko?",
-            t.color AS "color?",
-            t.kind AS "kind?",
-            t.direction AS "direction?",
-            0.0::double precision AS distance
-            FROM stations AS s
-            JOIN lines AS l ON l.line_cd = $1
-            AND l.e_status = 0
-            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
-            LEFT JOIN aliases AS a ON la.alias_cd = a.id
-            LEFT JOIN station_station_types AS sst ON sst.line_group_cd = (
-              SELECT sst.line_group_cd
-              FROM station_station_types AS sst
-                LEFT JOIN types AS t ON sst.type_cd = t.type_cd
-              WHERE CASE
-                  WHEN $2::integer IS NOT NULL THEN sst.station_cd = $2
-                END
-                AND CASE
-                  WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd
-                  ELSE t.kind IN (0, 1)
-                END
-              ORDER BY sst.id
-              LIMIT 1
-            )
-            LEFT JOIN types AS t ON t.type_cd = sst.type_cd
-          WHERE sst.station_cd IS NULL
-            AND s.line_cd = l.line_cd
-            AND s.e_status = 0
-          UNION
-          (
+            r#"(
             SELECT s.*,
-            l.company_cd,
-            l.line_type,
-            l.line_symbol_primary,
-            l.line_symbol_secondary,
-            l.line_symbol_extra,
-            l.line_symbol_primary_color,
-            l.line_symbol_secondary_color,
-            l.line_symbol_extra_color,
-            l.line_symbol_primary_shape,
-            l.line_symbol_secondary_shape,
-            l.line_symbol_extra_shape,
-            l.average_distance,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            COALESCE(s.station_cd = sst.station_cd, FALSE) AS has_train_types,
-            sst.type_cd AS "type_cd?",
-            sst.line_group_cd AS "line_group_cd?",
-            sst.pass AS "pass?",
-            t.type_name AS "type_name?",
-            t.type_name_k AS "type_name_k?",
-            t.type_name_r AS "type_name_r?",
-            t.type_name_zh AS "type_name_zh?",
-            t.type_name_ko AS "type_name_ko?",
-            t.color AS "color?",
-            t.kind AS "kind?",
-            t.direction AS "direction?",
-            0.0::double precision AS distance
+                l.company_cd,
+                l.line_type,
+                l.line_symbol_primary,
+                l.line_symbol_secondary,
+                l.line_symbol_extra,
+                l.line_symbol_primary_color,
+                l.line_symbol_secondary_color,
+                l.line_symbol_extra_color,
+                l.line_symbol_primary_shape,
+                l.line_symbol_secondary_shape,
+                l.line_symbol_extra_shape,
+                l.average_distance,
+                t.type_cd,
+                t.color,
+                t.type_name,
+                t.type_name_k,
+                t.type_name_r,
+                t.type_name_zh,
+                t.type_name_ko,
+                t.direction,
+                t.kind,
+                sst.pass,
+                COALESCE(a.line_name, l.line_name) AS line_name,
+                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+                sst.line_group_cd,
+                COALESCE(s.station_cd = sst.station_cd, FALSE) AS has_train_types,
+                sst.id AS sst_id,
+                0.0::double precision AS distance
             FROM stations AS s
-              JOIN lines AS l ON l.line_cd = s.line_cd
-              AND l.e_status = 0
-              LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
-              LEFT JOIN aliases AS a ON la.alias_cd = a.id
-              LEFT JOIN station_station_types AS sst ON sst.line_group_cd = (
+                JOIN lines AS l ON l.line_cd = $1
+                AND l.e_status = 0
+                LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+                LEFT JOIN aliases AS a ON la.alias_cd = a.id
+                LEFT JOIN station_station_types AS sst ON sst.line_group_cd = (
                 SELECT sst.line_group_cd
                 FROM station_station_types AS sst
-                  LEFT JOIN types AS t ON sst.type_cd = t.type_cd
+                    LEFT JOIN types AS t ON sst.type_cd = t.type_cd
                 WHERE CASE
                     WHEN $2::integer IS NOT NULL THEN sst.station_cd = $2
-                  END
-                  AND CASE
+                    END
+                    AND CASE
                     WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd
                     ELSE t.kind IN (0, 1)
-                  END
+                    END
                 ORDER BY sst.id
                 LIMIT 1
-              )
-              LEFT JOIN types AS t ON t.type_cd = sst.type_cd
+                )
+                LEFT JOIN types AS t ON t.type_cd = sst.type_cd
+            WHERE sst.station_cd IS NULL
+                AND s.line_cd = l.line_cd
+                AND s.e_status = 0
+            )
+            UNION
+            (
+            SELECT s.*,
+                l.company_cd,
+                l.line_type,
+                l.line_symbol_primary,
+                l.line_symbol_secondary,
+                l.line_symbol_extra,
+                l.line_symbol_primary_color,
+                l.line_symbol_secondary_color,
+                l.line_symbol_extra_color,
+                l.line_symbol_primary_shape,
+                l.line_symbol_secondary_shape,
+                l.line_symbol_extra_shape,
+                l.average_distance,
+                t.type_cd,
+                t.color,
+                t.type_name,
+                t.type_name_k,
+                t.type_name_r,
+                t.type_name_zh,
+                t.type_name_ko,
+                t.direction,
+                t.kind,
+                sst.pass,
+                COALESCE(a.line_name, l.line_name) AS line_name,
+                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+                sst.line_group_cd,
+                COALESCE(s.station_cd = sst.station_cd, FALSE) AS has_train_types,
+                sst.id AS sst_id,
+                0.0::double precision AS distance
+            FROM stations AS s
+                JOIN lines AS l ON l.line_cd = s.line_cd
+                AND l.e_status = 0
+                LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+                LEFT JOIN aliases AS a ON la.alias_cd = a.id
+                LEFT JOIN station_station_types AS sst ON sst.line_group_cd = (
+                SELECT sst.line_group_cd
+                FROM station_station_types AS sst
+                    LEFT JOIN types AS t ON sst.type_cd = t.type_cd
+                WHERE CASE
+                    WHEN $2::integer IS NOT NULL THEN sst.station_cd = $2
+                    END
+                    AND CASE
+                    WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd
+                    ELSE t.kind IN (0, 1)
+                    END
+                ORDER BY sst.id
+                LIMIT 1
+                )
+                LEFT JOIN types AS t ON t.type_cd = sst.type_cd
             WHERE sst.station_cd IS NOT NULL
-              AND s.station_cd = sst.station_cd
-              AND s.line_cd = l.line_cd
-              AND s.e_status = 0
-          )
-          ORDER BY e_sort, station_cd"#,
+                AND s.station_cd = sst.station_cd
+                AND s.line_cd = l.line_cd
+                AND s.e_status = 0
+            )
+            ORDER BY sst_id, e_status, station_cd"#,
             line_id,
             station_id
         )
@@ -547,6 +544,7 @@ impl InternalStationRepository {
             sst.type_cd AS "type_cd?",
             sst.line_group_cd AS "line_group_cd?",
             sst.pass AS "pass?",
+            sst.id AS "sst_id?",
             t.type_name AS "type_name?",
             t.type_name_k AS "type_name_k?",
             t.type_name_r AS "type_name_r?",
@@ -611,6 +609,7 @@ impl InternalStationRepository {
             sst.type_cd AS "type_cd?",
             sst.line_group_cd AS "line_group_cd?",
             sst.pass AS "pass?",
+            sst.id AS "sst_id?",
             t.type_name AS "type_name?",
             t.type_name_k AS "type_name_k?",
             t.type_name_r AS "type_name_r?",
@@ -672,6 +671,7 @@ impl InternalStationRepository {
             sst.type_cd AS "type_cd?",
             sst.line_group_cd AS "line_group_cd?",
             sst.pass AS "pass?",
+            sst.id AS "sst_id?",
             t.type_name AS "type_name?",
             t.type_name_k AS "type_name_k?",
             t.type_name_r AS "type_name_r?",
@@ -808,6 +808,7 @@ impl InternalStationRepository {
             sst.type_cd AS "type_cd?",
             sst.line_group_cd AS "line_group_cd?",
             sst.pass AS "pass?",
+            sst.id AS "sst_id?",
             t.type_name AS "type_name?",
             t.type_name_k AS "type_name_k?",
             t.type_name_r AS "type_name_r?",
@@ -875,6 +876,7 @@ impl InternalStationRepository {
             sst.type_cd AS "type_cd?",
             sst.line_group_cd AS "line_group_cd?",
             sst.pass AS "pass?",
+            sst.id AS "sst_id?",
             t.type_name AS "type_name?",
             t.type_name_k AS "type_name_k?",
             t.type_name_r AS "type_name_r?",
