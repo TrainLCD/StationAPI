@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::use_case::error::UseCaseError;
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Error)]
 pub enum PresentationalError {
     #[error("{0}")]
     NotFound(String),

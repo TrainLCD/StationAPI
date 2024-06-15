@@ -5,7 +5,7 @@ use crate::domain::{
 use async_trait::async_trait;
 use sqlx::{query_as, PgConnection, Pool, Postgres};
 
-#[derive(sqlx::FromRow, Clone)]
+#[derive(sqlx::FromRow)]
 pub struct TrainTypeRow {
     id: i32,
     station_cd: i32,
@@ -62,7 +62,7 @@ impl From<TrainTypeRow> for TrainType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MyTrainTypeRepository {
     pool: Pool<Postgres>,
 }

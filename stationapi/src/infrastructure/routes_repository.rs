@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{
     domain::{error::DomainError, repository::routes_repository::RoutesRepository},
     station_api::{Station, TrainType},
@@ -5,7 +7,7 @@ use crate::{
 use async_trait::async_trait;
 use sqlx::{PgConnection, PgPool};
 
-#[derive(Default, sqlx::FromRow, Clone)]
+#[derive(Default, sqlx::FromRow)]
 #[sqlx(default)]
 pub struct RouteRow {
     // stations
@@ -71,15 +73,15 @@ pub struct RouteRow {
 impl From<RouteRow> for TrainType {
     fn from(row: RouteRow) -> Self {
         Self {
-            id: row.type_id.unwrap_or_default(),
-            type_id: row.type_cd.unwrap_or_default(),
-            group_id: row.line_group_cd.unwrap_or_default(),
-            name: row.type_name.unwrap_or_default(),
-            name_katakana: row.type_name_k.unwrap_or_default(),
+            id: *row.type_id.as_ref().unwrap(),
+            type_id: *row.type_cd.as_ref().unwrap(),
+            group_id: *row.line_group_cd.as_ref().unwrap(),
+            name: row.type_name.as_ref().unwrap().to_string(),
+            name_katakana: row.type_name_k.as_ref().unwrap().to_string(),
             name_roman: row.type_name_r,
             name_chinese: row.type_name_zh,
             name_korean: row.type_name_ko,
-            color: row.color.unwrap_or_default(),
+            color: row.color.as_ref().unwrap().to_string(),
             lines: vec![],
             line: None,
             direction: row.direction.unwrap_or(0),
@@ -88,37 +90,55 @@ impl From<RouteRow> for TrainType {
     }
 }
 
-impl From<RouteRow> for Station {
-    fn from(row: RouteRow) -> Self {
+impl From<Rc<&RouteRow>> for Station {
+    fn from(row: Rc<&RouteRow>) -> Self {
         Self {
-            id: row.station_cd.unwrap_or_default(),
-            group_id: row.station_g_cd.unwrap_or_default(),
-            name: row.station_name.unwrap_or_default(),
-            name_katakana: row.station_name_k.unwrap_or_default(),
-            name_roman: row.station_name_r,
-            name_chinese: row.station_name_zh,
-            name_korean: row.station_name_ko,
-            three_letter_code: row.three_letter_code,
+            id: *Rc::clone(&row).station_cd.as_ref().unwrap(),
+            group_id: *Rc::clone(&row).station_g_cd.as_ref().unwrap(),
+            name: Rc::clone(&row).station_name.as_ref().unwrap().to_string(),
+            name_katakana: Rc::clone(&row).station_name_k.as_ref().unwrap().to_string(),
+            name_roman: Some(Rc::clone(&row).station_name_r.as_ref().unwrap().to_string()),
+            name_chinese: Some(
+                Rc::clone(&row)
+                    .station_name_zh
+                    .as_ref()
+                    .unwrap_or(&"".to_string())
+                    .to_string(),
+            ),
+            name_korean: Some(
+                Rc::clone(&row)
+                    .station_name_ko
+                    .as_ref()
+                    .unwrap_or(&"".to_string())
+                    .to_string(),
+            ),
+            three_letter_code: Some(
+                Rc::clone(&row)
+                    .three_letter_code
+                    .as_ref()
+                    .unwrap_or(&"".to_string())
+                    .to_string(),
+            ),
             lines: vec![],
             line: None,
-            prefecture_id: row.pref_cd.unwrap_or_default(),
-            postal_code: row.post.unwrap_or_default(),
-            address: row.address.unwrap_or_default(),
-            latitude: row.lat.unwrap_or_default(),
-            longitude: row.lon.unwrap_or_default(),
-            opened_at: row.open_ymd.unwrap_or_default(),
-            closed_at: row.close_ymd.unwrap_or_default(),
-            status: row.e_status.unwrap_or_default(),
+            prefecture_id: *Rc::clone(&row).pref_cd.as_ref().unwrap(),
+            postal_code: Rc::clone(&row).post.as_ref().unwrap().to_string(),
+            address: Rc::clone(&row).address.as_ref().unwrap().to_string(),
+            latitude: *Rc::clone(&row).lat.as_ref().unwrap(),
+            longitude: *Rc::clone(&row).lon.as_ref().unwrap(),
+            opened_at: Rc::clone(&row).open_ymd.as_ref().unwrap().to_string(),
+            closed_at: Rc::clone(&row).close_ymd.as_ref().unwrap().to_string(),
+            status: *Rc::clone(&row).e_status.as_ref().unwrap(),
             station_numbers: vec![],
-            stop_condition: row.pass.unwrap_or_default(),
-            distance: row.distance.unwrap_or_default().into(),
-            has_train_types: row.has_train_types,
+            stop_condition: *Rc::clone(&row).pass.as_ref().unwrap_or(&0),
+            distance: Rc::clone(&row).distance.unwrap_or_default().into(),
+            has_train_types: Rc::clone(&row).has_train_types,
             train_type: None,
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MyRoutesRepository {
     pool: PgPool,
 }

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, rc::Rc};
 
 use async_trait::async_trait;
 
@@ -522,7 +522,7 @@ where
             .get_routes(from_station_id, to_station_id)
             .await?;
 
-        let route_row_tree_map: &BTreeMap<i32, Vec<RouteRow>> = &rows.clone().into_iter().fold(
+        let route_row_tree_map: &BTreeMap<i32, Vec<RouteRow>> = &rows.into_iter().fold(
             BTreeMap::new(),
             |mut acc: BTreeMap<i32, Vec<RouteRow>>, value| {
                 if let Some(line_group_cd) = value.line_group_cd {
@@ -542,17 +542,18 @@ where
             let stops_with_line = stops
                 .iter()
                 .map(|row| {
-                    let mut stop =
-                        std::convert::Into::<crate::station_api::Station>::into(row.clone());
+                    let row = Rc::new(row);
+                    let mut stop: crate::station_api::Station =
+                        std::convert::Into::<crate::station_api::Station>::into(Rc::clone(&row));
                     stop.line = Some(Box::new(crate::station_api::Line {
                         id: row.line_cd.unwrap_or_default(),
-                        name_short: row.clone().line_name.unwrap_or_default(),
-                        name_katakana: row.clone().line_name_k.unwrap_or_default(),
-                        name_full: row.clone().line_name_h.unwrap_or_default(),
-                        name_roman: row.line_name_r.clone(),
-                        name_chinese: row.line_name_zh.clone(),
-                        name_korean: row.line_name_ko.clone(),
-                        color: row.clone().line_color_c.unwrap_or("#ffffff".to_string()),
+                        name_short: Rc::clone(&row).line_name.as_ref().unwrap().to_string(),
+                        name_katakana: Rc::clone(&row).line_name_k.as_ref().unwrap().to_string(),
+                        name_full: Rc::clone(&row).line_name_h.as_ref().unwrap().to_string(),
+                        name_roman: Rc::clone(&row).line_name_r.clone(),
+                        name_chinese: Rc::clone(&row).line_name_zh.clone(),
+                        name_korean: Rc::clone(&row).line_name_ko.clone(),
+                        color: Rc::clone(&row).line_color_c.as_ref().unwrap().to_string(),
                         line_type: row.line_type.unwrap_or_default(),
                         line_symbols: vec![],
                         status: row.e_status.unwrap_or_default(),
