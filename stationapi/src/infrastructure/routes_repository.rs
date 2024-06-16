@@ -93,46 +93,43 @@ impl From<RouteRow> for TrainType {
 impl From<Rc<&RouteRow>> for Station {
     fn from(row: Rc<&RouteRow>) -> Self {
         Self {
-            id: Rc::clone(&row).station_cd.unwrap(),
-            group_id: Rc::clone(&row).station_g_cd.unwrap(),
-            name: Rc::clone(&row).station_name.as_ref().unwrap().to_string(),
-            name_katakana: Rc::clone(&row).station_name_k.as_ref().unwrap().to_string(),
-            name_roman: Some(Rc::clone(&row).station_name_r.as_ref().unwrap().to_string()),
+            id: row.station_cd.unwrap(),
+            group_id: row.station_g_cd.unwrap(),
+            name: row.station_name.as_ref().unwrap().to_string(),
+            name_katakana: row.station_name_k.as_ref().unwrap().to_string(),
+            name_roman: Some(row.station_name_r.as_ref().unwrap().to_string()),
             name_chinese: Some(
-                Rc::clone(&row)
-                    .station_name_zh
+                row.station_name_zh
                     .as_ref()
                     .unwrap_or(&"".to_string())
                     .to_string(),
             ),
             name_korean: Some(
-                Rc::clone(&row)
-                    .station_name_ko
+                row.station_name_ko
                     .as_ref()
                     .unwrap_or(&"".to_string())
                     .to_string(),
             ),
             three_letter_code: Some(
-                Rc::clone(&row)
-                    .three_letter_code
+                row.three_letter_code
                     .as_ref()
                     .unwrap_or(&"".to_string())
                     .to_string(),
             ),
             lines: vec![],
             line: None,
-            prefecture_id: Rc::clone(&row).pref_cd.unwrap(),
-            postal_code: Rc::clone(&row).post.as_ref().unwrap().to_string(),
-            address: Rc::clone(&row).address.as_ref().unwrap().to_string(),
-            latitude: Rc::clone(&row).lat.unwrap(),
-            longitude: Rc::clone(&row).lon.unwrap(),
-            opened_at: Rc::clone(&row).open_ymd.as_ref().unwrap().to_string(),
-            closed_at: Rc::clone(&row).close_ymd.as_ref().unwrap().to_string(),
-            status: Rc::clone(&row).e_status.unwrap(),
+            prefecture_id: row.pref_cd.unwrap(),
+            postal_code: row.post.as_ref().unwrap().to_string(),
+            address: row.address.as_ref().unwrap().to_string(),
+            latitude: row.lat.unwrap(),
+            longitude: row.lon.unwrap(),
+            opened_at: row.open_ymd.as_ref().unwrap().to_string(),
+            closed_at: row.close_ymd.as_ref().unwrap().to_string(),
+            status: row.e_status.unwrap(),
             station_numbers: vec![],
-            stop_condition: Rc::clone(&row).pass.unwrap_or(0),
-            distance: Rc::clone(&row).distance.unwrap_or_default().into(),
-            has_train_types: Rc::clone(&row).has_train_types,
+            stop_condition: row.pass.unwrap_or(0),
+            distance: row.distance.unwrap_or_default().into(),
+            has_train_types: row.has_train_types,
             train_type: None,
         }
     }
