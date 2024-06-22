@@ -41,6 +41,7 @@ services:
       MYSQL_PASSWORD: password
       MYSQL_HOST: db
       MYSQL_DATABASE: stationapi
+    restart: on-failure
     networks:
       - sapi-link
 
