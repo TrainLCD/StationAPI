@@ -303,8 +303,7 @@ impl InternalStationRepository {
             LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
           WHERE s.station_cd = ?
-            AND s.e_status = 0
-          ORDER BY s.e_sort, s.station_cd ASC",
+            AND s.e_status = 0",
             id,
         )
         .fetch_optional(conn)
