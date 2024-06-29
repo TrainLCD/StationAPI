@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT s.*,\n            l.company_cd,\n            l.line_type,\n            l.line_symbol_primary,\n            l.line_symbol_secondary,\n            l.line_symbol_extra,\n            l.line_symbol_primary_color,\n            l.line_symbol_secondary_color,\n            l.line_symbol_extra_color,\n            l.line_symbol_primary_shape,\n            l.line_symbol_secondary_shape,\n            l.line_symbol_extra_shape,\n            l.average_distance,\n            t.type_cd,\n            t.color,\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.direction,\n            sst.pass,\n            COALESCE(a.line_name, l.line_name) AS line_name,\n            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,\n            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,\n            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,\n            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,\n            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,\n            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,\n            sst.line_group_cd,\n            IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types\n            FROM `stations` AS s\n            JOIN `lines` AS l ON l.line_cd = ?\n            AND l.e_status = 0\n            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd\n            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id\n            LEFT JOIN `station_station_types` AS sst ON sst.line_group_cd = (\n              SELECT sst.line_group_cd\n              FROM `station_station_types` AS sst\n                LEFT JOIN `types` AS t ON sst.type_cd = t.type_cd\n              WHERE CASE\n                  WHEN ? IS NOT NULL THEN sst.station_cd = ?\n                END\n                AND CASE\n                  WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd\n                  ELSE t.kind IN (0, 1)\n                END\n              ORDER BY sst.id\n              LIMIT 1\n            )\n            LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd\n          WHERE sst.station_cd IS NULL\n            AND s.line_cd = l.line_cd\n            AND s.e_status = 0\n          UNION\n          DISTINCT (\n            SELECT s.*,\n              l.company_cd,\n              l.line_type,\n              l.line_symbol_primary,\n              l.line_symbol_secondary,\n              l.line_symbol_extra,\n              l.line_symbol_primary_color,\n              l.line_symbol_secondary_color,\n              l.line_symbol_extra_color,\n              l.line_symbol_primary_shape,\n              l.line_symbol_secondary_shape,\n              l.line_symbol_extra_shape,\n              l.average_distance,\n              t.type_cd,\n              t.color,\n              t.type_name,\n              t.type_name_k,\n              t.type_name_r,\n              t.type_name_zh,\n              t.type_name_ko,\n              t.direction,\n              sst.pass,\n              COALESCE(a.line_name, l.line_name) AS line_name,\n              COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,\n              COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,\n              COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,\n              COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,\n              COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,\n              COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,\n              sst.line_group_cd,\n              IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types\n            FROM `stations` AS s\n              JOIN `lines` AS l ON l.line_cd = s.line_cd\n              AND l.e_status = 0\n              LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd\n              LEFT JOIN `aliases` AS a ON la.alias_cd = a.id\n              LEFT JOIN `station_station_types` AS sst ON sst.line_group_cd = (\n                SELECT sst.line_group_cd\n                FROM `station_station_types` AS sst\n                  LEFT JOIN `types` AS t ON sst.type_cd = t.type_cd\n                WHERE CASE\n                    WHEN ? IS NOT NULL THEN sst.station_cd = ?\n                  END\n                  AND CASE\n                    WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd\n                    ELSE t.kind IN (0, 1)\n                  END\n                ORDER BY sst.id\n                LIMIT 1\n              )\n              LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd\n            WHERE sst.station_cd IS NOT NULL\n              AND s.station_cd = sst.station_cd\n              AND s.line_cd = l.line_cd\n              AND s.e_status = 0\n          )",
+  "query": "SELECT DISTINCT s.*,\n            l.company_cd,\n            l.line_type,\n            l.line_symbol_primary,\n            l.line_symbol_secondary,\n            l.line_symbol_extra,\n            l.line_symbol_primary_color,\n            l.line_symbol_secondary_color,\n            l.line_symbol_extra_color,\n            l.line_symbol_primary_shape,\n            l.line_symbol_secondary_shape,\n            l.line_symbol_extra_shape,\n            l.average_distance,\n            sst.type_cd,\n            sst.line_group_cd,\n            sst.pass,\n            COALESCE(a.line_name, l.line_name) AS line_name,\n            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,\n            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,\n            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,\n            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,\n            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,\n            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,\n            IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types,\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.direction\n          FROM `stations` AS s\n            JOIN `lines` AS l ON l.line_cd = s.line_cd\n            AND l.e_status = 0\n            LEFT JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd\n            LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd\n            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd\n            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id\n          WHERE s.station_cd = ?\n            AND s.e_status = 0\n          ORDER BY s.e_sort, s.station_cd ASC",
   "describe": {
     "columns": [
       {
@@ -8,7 +8,7 @@
         "name": "station_cd",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | PRIMARY_KEY | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 10
         }
@@ -18,7 +18,7 @@
         "name": "station_g_cd",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 10
         }
@@ -28,7 +28,7 @@
         "name": "station_name",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
           "char_set": 224,
           "max_size": 1020
         }
@@ -38,7 +38,7 @@
         "name": "station_name_k",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
           "char_set": 224,
           "max_size": 1020
         }
@@ -118,7 +118,7 @@
         "name": "line_cd",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 10
         }
@@ -128,7 +128,7 @@
         "name": "pref_cd",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 10
         }
@@ -138,7 +138,7 @@
         "name": "post",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
           "char_set": 224,
           "max_size": 1020
         }
@@ -148,7 +148,7 @@
         "name": "address",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
           "char_set": 224,
           "max_size": 1020
         }
@@ -158,9 +158,9 @@
         "name": "lon",
         "type_info": {
           "type": "Double",
-          "flags": "NOT_NULL | BINARY",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
-          "max_size": 23
+          "max_size": 22
         }
       },
       {
@@ -168,9 +168,9 @@
         "name": "lat",
         "type_info": {
           "type": "Double",
-          "flags": "NOT_NULL | BINARY",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
-          "max_size": 23
+          "max_size": 22
         }
       },
       {
@@ -178,7 +178,7 @@
         "name": "open_ymd",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
           "char_set": 224,
           "max_size": 1020
         }
@@ -188,7 +188,7 @@
         "name": "close_ymd",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
           "char_set": 224,
           "max_size": 1020
         }
@@ -198,7 +198,7 @@
         "name": "e_status",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 10
         }
@@ -208,7 +208,7 @@
         "name": "e_sort",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 10
         }
@@ -218,7 +218,7 @@
         "name": "company_cd",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 10
         }
@@ -228,7 +228,7 @@
         "name": "line_type",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 10
         }
@@ -328,9 +328,9 @@
         "name": "average_distance",
         "type_info": {
           "type": "Double",
-          "flags": "NOT_NULL | BINARY",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
-          "max_size": 23
+          "max_size": 22
         }
       },
       {
@@ -338,93 +338,33 @@
         "name": "type_cd",
         "type_info": {
           "type": "Long",
-          "flags": "UNSIGNED | BINARY",
+          "flags": "MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 10
         }
       },
       {
         "ordinal": 34,
-        "name": "color",
+        "name": "line_group_cd",
         "type_info": {
-          "type": "VarString",
-          "flags": "",
-          "char_set": 224,
-          "max_size": 1020
+          "type": "Long",
+          "flags": "MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
         }
       },
       {
         "ordinal": 35,
-        "name": "type_name",
+        "name": "pass",
         "type_info": {
-          "type": "VarString",
-          "flags": "",
-          "char_set": 224,
-          "max_size": 1020
+          "type": "Long",
+          "flags": "UNSIGNED",
+          "char_set": 63,
+          "max_size": 10
         }
       },
       {
         "ordinal": 36,
-        "name": "type_name_k",
-        "type_info": {
-          "type": "VarString",
-          "flags": "",
-          "char_set": 224,
-          "max_size": 1020
-        }
-      },
-      {
-        "ordinal": 37,
-        "name": "type_name_r",
-        "type_info": {
-          "type": "VarString",
-          "flags": "",
-          "char_set": 224,
-          "max_size": 1020
-        }
-      },
-      {
-        "ordinal": 38,
-        "name": "type_name_zh",
-        "type_info": {
-          "type": "VarString",
-          "flags": "",
-          "char_set": 224,
-          "max_size": 1020
-        }
-      },
-      {
-        "ordinal": 39,
-        "name": "type_name_ko",
-        "type_info": {
-          "type": "VarString",
-          "flags": "",
-          "char_set": 224,
-          "max_size": 1020
-        }
-      },
-      {
-        "ordinal": 40,
-        "name": "direction",
-        "type_info": {
-          "type": "Long",
-          "flags": "UNSIGNED | BINARY",
-          "char_set": 63,
-          "max_size": 10
-        }
-      },
-      {
-        "ordinal": 41,
-        "name": "pass",
-        "type_info": {
-          "type": "Long",
-          "flags": "UNSIGNED | BINARY",
-          "char_set": 63,
-          "max_size": 10
-        }
-      },
-      {
-        "ordinal": 42,
         "name": "line_name",
         "type_info": {
           "type": "VarString",
@@ -434,7 +374,7 @@
         }
       },
       {
-        "ordinal": 43,
+        "ordinal": 37,
         "name": "line_name_k",
         "type_info": {
           "type": "VarString",
@@ -444,7 +384,7 @@
         }
       },
       {
-        "ordinal": 44,
+        "ordinal": 38,
         "name": "line_name_h",
         "type_info": {
           "type": "VarString",
@@ -454,7 +394,7 @@
         }
       },
       {
-        "ordinal": 45,
+        "ordinal": 39,
         "name": "line_name_r",
         "type_info": {
           "type": "VarString",
@@ -464,7 +404,7 @@
         }
       },
       {
-        "ordinal": 46,
+        "ordinal": 40,
         "name": "line_name_zh",
         "type_info": {
           "type": "VarString",
@@ -474,7 +414,7 @@
         }
       },
       {
-        "ordinal": 47,
+        "ordinal": 41,
         "name": "line_name_ko",
         "type_info": {
           "type": "VarString",
@@ -484,7 +424,7 @@
         }
       },
       {
-        "ordinal": 48,
+        "ordinal": 42,
         "name": "line_color_c",
         "type_info": {
           "type": "VarString",
@@ -494,17 +434,7 @@
         }
       },
       {
-        "ordinal": 49,
-        "name": "line_group_cd",
-        "type_info": {
-          "type": "Long",
-          "flags": "UNSIGNED | BINARY",
-          "char_set": 63,
-          "max_size": 10
-        }
-      },
-      {
-        "ordinal": 50,
+        "ordinal": 43,
         "name": "has_train_types",
         "type_info": {
           "type": "LongLong",
@@ -512,10 +442,80 @@
           "char_set": 63,
           "max_size": 2
         }
+      },
+      {
+        "ordinal": 44,
+        "name": "type_name",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 45,
+        "name": "type_name_k",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 46,
+        "name": "type_name_r",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 47,
+        "name": "type_name_zh",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 48,
+        "name": "type_name_ko",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 49,
+        "name": "color",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 50,
+        "name": "direction",
+        "type_info": {
+          "type": "Long",
+          "flags": "UNSIGNED",
+          "char_set": 63,
+          "max_size": 10
+        }
       }
     ],
     "parameters": {
-      "Right": 5
+      "Right": 1
     },
     "nullable": [
       false,
@@ -554,12 +554,6 @@
       true,
       true,
       true,
-      true,
-      true,
-      true,
-      true,
-      true,
-      true,
       false,
       false,
       false,
@@ -567,9 +561,15 @@
       true,
       true,
       false,
+      false,
       true,
-      false
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
     ]
   },
-  "hash": "202c363d8fabaa7d2d44d72bfe81a37017ca144ebd29c3972bb4eac5305cc6eb"
+  "hash": "89336ab04b5d7b5ed1fb4cc82e21ee8f18596782e9228c10860c53dd20ea1873"
 }
