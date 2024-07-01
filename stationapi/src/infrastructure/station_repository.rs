@@ -201,7 +201,10 @@ impl StationRepository for MyStationRepository {
                 )
                 .await
             }
-            None => InternalStationRepository::get_by_line_id(line_id, &mut conn).await,
+            None => {
+                InternalStationRepository::get_by_line_id_without_train_types(line_id, &mut conn)
+                    .await
+            }
         }
     }
     async fn get_by_station_group_id(
@@ -271,13 +274,13 @@ impl StationRepository for MyStationRepository {
 struct InternalStationRepository {}
 
 impl InternalStationRepository {
-    async fn fetch_has_train_types_by_station_id(
+    async fn fetch_has_local_train_types_by_station_id(
         id: u32,
         conn: &mut MySqlConnection,
     ) -> Result<bool, DomainError> {
         let row: TrainTypesCountRow = sqlx::query_as!(
           TrainTypesCountRow,
-        "SELECT COUNT(sst.line_group_cd) AS train_types_count FROM station_station_types AS sst WHERE sst.station_cd = ? LIMIT 1",
+        "SELECT COUNT(sst.line_group_cd) AS train_types_count FROM station_station_types AS sst JOIN `types` AS t ON t.type_cd = sst.type_cd AND t.kind IN (0, 1) WHERE sst.station_cd = ? LIMIT 1",
         id,
     )
     .fetch_one(conn)
@@ -395,7 +398,7 @@ impl InternalStationRepository {
         Ok(lines)
     }
 
-    async fn get_by_line_id(
+    async fn get_by_line_id_without_train_types(
         line_id: u32,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
@@ -435,8 +438,8 @@ impl InternalStationRepository {
               FROM `stations` AS s
               JOIN `lines` AS l ON l.line_cd = s.line_cd
                 AND l.e_status = 0
-              LEFT JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
-              LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd
+              LEFT JOIN `station_station_types` AS sst ON 1 <> 1
+              LEFT JOIN `types` AS t ON 1 <> 1
               LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
               LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
             WHERE l.line_cd = ?
@@ -457,75 +460,70 @@ impl InternalStationRepository {
         station_id: u32,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let stations: Vec<Station> = match Self::fetch_has_train_types_by_station_id(
-            station_id, conn,
-        )
-        .await?
-        {
-            true => {
-                let rows: Vec<StationRow> = sqlx::query_as!(
+        let stations: Vec<Station> =
+            match Self::fetch_has_local_train_types_by_station_id(station_id, conn).await? {
+                true => {
+                    let rows: Vec<StationRow> = sqlx::query_as!(
                         StationRow,
                         "SELECT s.*,
-                        l.company_cd,
-                        l.line_type,
-                        l.line_symbol_primary,
-                        l.line_symbol_secondary,
-                        l.line_symbol_extra,
-                        l.line_symbol_primary_color,
-                        l.line_symbol_secondary_color,
-                        l.line_symbol_extra_color,
-                        l.line_symbol_primary_shape,
-                        l.line_symbol_secondary_shape,
-                        l.line_symbol_extra_shape,
-                        l.average_distance,
-                        t.type_cd,
-                        t.color,
-                        t.type_name,
-                        t.type_name_k,
-                        t.type_name_r,
-                        t.type_name_zh,
-                        t.type_name_ko,
-                        t.direction,
-                        sst.pass,
-                        COALESCE(a.line_name, l.line_name) AS line_name,
-                        COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-                        COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-                        COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-                        COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-                        COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-                        COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-                        sst.line_group_cd,
-                        IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types
-                      FROM `stations` AS s
-                        JOIN `lines` AS l ON l.line_cd = ?
-                        AND l.e_status = 0
-                        LEFT JOIN `station_station_types` AS sst ON sst.line_group_cd = (
-                          SELECT sst.line_group_cd
-                          FROM `station_station_types` AS sst
-                            LEFT JOIN `types` AS t ON sst.type_cd = t.type_cd
-                          WHERE sst.station_cd = ?
-                            AND CASE
-                              WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd
-                              ELSE t.kind IN (0, 1)
-                            END
+                          l.company_cd,
+                          l.line_type,
+                          l.line_symbol_primary,
+                          l.line_symbol_secondary,
+                          l.line_symbol_extra,
+                          l.line_symbol_primary_color,
+                          l.line_symbol_secondary_color,
+                          l.line_symbol_extra_color,
+                          l.line_symbol_primary_shape,
+                          l.line_symbol_secondary_shape,
+                          l.line_symbol_extra_shape,
+                          l.average_distance,
+                          t.type_cd,
+                          t.color,
+                          t.type_name,
+                          t.type_name_k,
+                          t.type_name_r,
+                          t.type_name_zh,
+                          t.type_name_ko,
+                          t.direction,
+                          sst.pass,
+                          COALESCE(a.line_name, l.line_name) AS line_name,
+                          COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+                          COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+                          COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+                          COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+                          COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+                          COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+                          sst.line_group_cd,
+                          IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types
+                          FROM `stations` AS s
+                          JOIN `station_station_types` AS sst ON sst.line_group_cd = (
+                            SELECT sst.line_group_cd
+                            FROM `station_station_types` AS sst
+                              LEFT JOIN `types` AS t ON sst.type_cd = t.type_cd
+                            WHERE sst.station_cd = ?
+                              AND CASE
+                                WHEN t.top_priority = 1 THEN sst.type_cd = t.type_cd
+                                ELSE t.kind IN (0, 1)
+                              END
                             LIMIT 1
-                        )
-                        LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd
-                        LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-                        LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
-                        WHERE
-                        CASE WHEN sst.station_cd THEN s.station_cd = sst.station_cd ELSE s.line_cd = l.line_cd END
-                        AND s.e_status = 0
-                      ORDER BY sst.id",
-                        line_id,
+                          )
+                          AND sst.station_cd = s.station_cd
+                          AND s.e_status = 0
+                          JOIN `types` AS t ON t.type_cd = sst.type_cd
+                          JOIN `lines` AS l ON l.line_cd = s.line_cd
+                            AND l.e_status = 0
+                          LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+                          LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+                        ORDER BY sst.id",
                         station_id
                     )
                     .fetch_all(conn)
                     .await?;
-                rows.into_iter().map(|row| row.into()).collect()
-            }
-            false => Self::get_by_line_id(line_id, conn).await?,
-        };
+                    rows.into_iter().map(|row| row.into()).collect()
+                }
+                false => Self::get_by_line_id_without_train_types(line_id, conn).await?,
+            };
 
         Ok(stations)
     }
