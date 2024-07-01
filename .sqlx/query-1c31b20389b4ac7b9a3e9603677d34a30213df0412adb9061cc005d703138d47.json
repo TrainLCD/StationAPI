@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT COUNT(sst.line_group_cd) AS train_types_count FROM station_station_types AS sst WHERE sst.station_cd = ? LIMIT 1",
+  "query": "SELECT COUNT(sst.line_group_cd) AS train_types_count FROM station_station_types AS sst JOIN `types` AS t ON t.type_cd = sst.type_cd AND t.kind IN (0, 1) WHERE sst.station_cd = ? LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -21,5 +21,5 @@
       false
     ]
   },
-  "hash": "d78a763a4a5ba7172ba36c4ddd93be0b06616466dcd28a181d035f2a87a7ae44"
+  "hash": "1c31b20389b4ac7b9a3e9603677d34a30213df0412adb9061cc005d703138d47"
 }
