@@ -1,5 +1,3 @@
-use std::hash::Hash;
-
 use async_trait::async_trait;
 
 use crate::{
@@ -7,12 +5,12 @@ use crate::{
         company::Company, line::Line, line_symbol::LineSymbol, misc::StationIdWithDistance,
         station::Station, station_number::StationNumber, train_type::TrainType,
     },
+    station_api::Route,
     use_case::error::UseCaseError,
 };
 
 #[async_trait]
 pub trait QueryUseCase: Send + Sync + 'static {
-    fn calculate_hash<T: Hash>(t: &T) -> u64;
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError>;
     async fn get_stations_by_id_vec(
         &self,
@@ -81,4 +79,9 @@ pub trait QueryUseCase: Send + Sync + 'static {
         longitude: f64,
         line_id: Option<u32>,
     ) -> Result<StationIdWithDistance, UseCaseError>;
+    async fn get_routes(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+    ) -> Result<Vec<Route>, UseCaseError>;
 }

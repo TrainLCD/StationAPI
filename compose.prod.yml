@@ -1,22 +1,20 @@
-name: stationapi
+name: stationapi-prod
 
 services:
   api:
     build:
       context: .
-      dockerfile: ./docker/api/Dockerfile.dev
-    command: cargo watch -s "cargo run -p stationapi"
+      dockerfile: ./docker/api/Dockerfile.prod
     depends_on:
       - db
-    volumes:
-      - .:/app
+      - migration
     environment:
-      DATABASE_URL: mysql://stationapi:password@db/stationapi?tcp_nodelay=true
+      DATABASE_URL: mysql://stationapi:password@db/stationapi
       ACCEPT_HTTP1: true
-      ENABLE_ALL_STATIONS_RPC: true
       HOST: 0.0.0.0
     ports:
       - 50051:50051
+    restart: always
     networks:
       - sapi-link
 
@@ -27,8 +25,7 @@ services:
       MYSQL_USER: stationapi
       MYSQL_PASSWORD: password
       MYSQL_DATABASE: stationapi
-    ports:
-      - 3306:3306
+    restart: always
     networks:
       - sapi-link
 
@@ -44,6 +41,7 @@ services:
       MYSQL_PASSWORD: password
       MYSQL_HOST: db
       MYSQL_DATABASE: stationapi
+    restart: on-failure
     networks:
       - sapi-link
 

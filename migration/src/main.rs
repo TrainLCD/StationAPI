@@ -1,8 +1,9 @@
 use csv::{ReaderBuilder, StringRecord};
 use std::{
     env::{self, VarError},
-    error::{self},
+    error,
     fs::{self, File},
+    io::{self, Write},
     path::Path,
     process::{Command, Stdio},
 };
@@ -11,44 +12,34 @@ use tracing::{info, warn};
 pub fn insert_data(generated_sql_path: String) -> Result<(), Box<dyn std::error::Error>> {
     let generated_sql_file = File::open(generated_sql_path.clone())?;
 
-    let disable_memcached_flush: bool = match env::var("DISABLE_MEMCACHED_FLUSH") {
-        Ok(s) => s.parse()?,
-        Err(VarError::NotPresent) => false,
-        Err(VarError::NotUnicode(_)) => {
-            panic!("$DISABLE_MEMCACHED_FLUSH should be written in Unicode.")
-        }
-    };
-
-    Command::new("mysql")
-        .arg(format!("-u{}", env::var("MYSQL_USER").unwrap()))
-        .arg(format!("-p{}", env::var("MYSQL_PASSWORD").unwrap()))
-        .arg(format!("-h{}", env::var("MYSQL_HOST").unwrap()))
+    let output = Command::new("mysql")
+        .arg(format!("-u{}", env::var("MYSQL_USER")?))
+        .arg(format!("-p{}", env::var("MYSQL_PASSWORD")?))
+        .arg(format!("-h{}", env::var("MYSQL_HOST")?))
         .arg("--default-character-set=utf8mb4")
         .arg("-e")
         .arg(format!(
             "CREATE DATABASE IF NOT EXISTS {}",
-            env::var("MYSQL_DATABASE").unwrap()
+            env::var("MYSQL_DATABASE")?
         ))
-        .spawn()
-        .expect("Failed to create database.")
-        .wait()?;
+        .output()?;
 
-    Command::new("mysql")
-        .arg(format!("-u{}", env::var("MYSQL_USER").unwrap()))
-        .arg(format!("-p{}", env::var("MYSQL_PASSWORD").unwrap()))
-        .arg(format!("-h{}", env::var("MYSQL_HOST").unwrap()))
+    io::stdout().write_all(&output.stdout)?;
+    io::stderr().write_all(&output.stderr)?;
+
+    let output = Command::new("mysql")
+        .arg(format!("-u{}", env::var("MYSQL_USER")?))
+        .arg(format!("-p{}", env::var("MYSQL_PASSWORD")?))
+        .arg(format!("-h{}", env::var("MYSQL_HOST")?))
         .arg("--default-character-set=utf8mb4")
-        .arg(env::var("MYSQL_DATABASE").unwrap())
+        .arg(env::var("MYSQL_DATABASE")?)
         .stdin(Stdio::from(generated_sql_file))
-        .spawn()
-        .expect("Failed to insert.")
-        .wait()?;
+        .output()?;
 
-    if !disable_memcached_flush {
-        let memcached_url = env::var("MEMCACHED_URL")?;
-        let cache_client = memcache::connect(memcached_url)?;
-        cache_client.flush()?;
-    }
+    io::stdout().write_all(&output.stdout)?;
+    io::stderr().write_all(&output.stderr)?;
+
+    assert!(output.status.success());
 
     Ok(())
 }
