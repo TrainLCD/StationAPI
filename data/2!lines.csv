@@ -421,7 +421,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99315,129,ひたちなか海浜鉄道湊線,ヒタチナカカイヒンテツドウミナトセン,ひたちなか海浜鉄道湊線,Hitachinaka Seaside Railway,常陆那珂海滨铁道凑线,히타치나카 해안철도 미나토선,#A77718,2,,,,,,,,,,0,99315,1369.683571
 99316,130,ブルーライン,ブルーライン,横浜市高速鉄道1号線・3号線,Blue Line,蓝线,블루라인,#006BF0,3,B,,,#006BF0,,,REVERSED_ROUND,,,0,99316,1223.501777
 99343,130,グリーンライン,グリーンライン,横浜市高速鉄道4号線,Green Line,绿线,그린라인,#40CC40,3,G,,,#40CC40,,,REVERSED_ROUND,,,0,99316,1384.817458
-99317,131,金沢シーサイドライン,カナザワシーサイドライン,横浜新都市交通金沢シーサイドライン,Kanazawa Seaside Line,横滨海岸线,요코하마 시사이드라인,#F68B1E,5,,,,,,,,,,0,99317,737.5483441
+99317,131,金沢シーサイドライン,カナザワシーサイドライン,横浜新都市交通金沢シーサイドライン,Kanazawa Seaside Line,横滨海岸线,요코하마 시사이드라인,#F68B1E,5,,,,#5466BC,,,REVERSED_ROUND_HORIZONTAL,,,0,99317,737.5483441
 99318,132,関東鉄道常総線,カントウテツドウジョウソウセン,関東鉄道常総線,Kanto Railway Joso Line,关东铁道常总线,간토 철도 조소선,#121892,2,,,,,,,,,,0,99318,2080.733259
 99319,132,関東鉄道竜ヶ崎線,カントウテツドウリュウガサキセン,関東鉄道竜ヶ崎線,Kanto Railway Ryugasaki Line,关东铁道龙崎线,간토 철도 류가사키선,#121892,2,,,,,,,,,,0,99319,2175.80464
 99320,133,江ノ島電鉄線,エノシマデンテツセン,江ノ島電鉄線,Enoshima Electric Railway Line,江之岛电铁线,에노시마 전철선,#209A3F,2,,,,,,,,,,0,99320,677.6343943
@@ -569,7 +569,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99709,221,アストラムライン,アストラムライン,広島高速交通広島新交通1号線,Astram Line,,,#FFA500,5,,,,,,,,,,0,99709,850.3427213
 99710,222,広電１号線,ヒロデンイチゴウセン,広電１号線,Hiroden Ujina Line,,,#FF5900,4,M,U,,#00A85F,#0092D7,,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,,0,99710,297.6649521
 99711,222,広電２号線,ヒロデンニゴウセン,広電２号線,Hiroden Miyajima Line,,,#EF1731,4,M,,,#00A85F,,,REVERSED_ROUND_HORIZONTAL,,,0,99711,525.4362883
-99712,222,広電３号線,ヒロデンサンゴウセン,広電３号線,Hiroden Streetcar Route 3,,,#4243BE,4,U,M,,#0092D7,#00A85F,,,,,0,99712,316.3902997
+99712,222,広電３号線,ヒロデンサンゴウセン,広電３号線,Hiroden Streetcar Route 3,,,#4243BE,4,U,M,,#0092D7,#00A85F,,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,0,99712,316.3902997
 99713,222,広電５号線,ヒロデンゴゴウセン,広電５号線,Hiroden Minami Line,,,#00CC66,4,M,H,U,#00A85F,#7DBF4C,#0092D7,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,0,99713,333.1124595
 99714,222,広電６号線,ヒロデンロクゴウセン,広電６号線,Hiroden Eba Line,,,#FFCC00,4,E,M,,#FEDB4F,#008033,,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,,0,99714,314.4535287
 99715,222,広電７号線,ヒロデンナナゴウセン,広電７号線,Hiroden Streetcar Route 7,,,#005A52,4,Y,M,U,#ED8095,#00A85F,#0092D7,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,0,99715,323.8349809
