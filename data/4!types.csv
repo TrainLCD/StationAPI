@@ -130,9 +130,9 @@ Yokokawa","SL群马
 0,242,あしずり,アシズリ,Ashizuri,足折,아시즈리,#E25885,0,4,0,,COMPLETE
 0,243,しおかぜ,シオカゼ,Shiokaze,海風,바닷바람,#1CADCA,0,4,0,,COMPLETE
 0,244,いしづち,イシヅチ,Ishizuchi,石鎚,석진,#1CADCA,0,4,0,,COMPLETE
-0,300,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,,PARTIAL
-0,301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,,PARTIAL
-0,302,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,,PARTIAL
+0,300,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,廃止済み 100に移行,PARTIAL
+0,301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,廃止済み 101に移行,PARTIAL
+0,302,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,廃止済み 102に移行,PARTIAL
 0,303,区間急行,クカンキュウコウ,Semi Express,区域特快,구간급행,#D8CA00,0,3,0,,PARTIAL
 0,304,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,,PARTIAL
 0,306,特急,トッキュウ,Limited Express,特快,특급,#DC143C,0,4,0,,COMPLETE
