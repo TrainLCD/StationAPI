@@ -640,8 +640,8 @@ impl InternalStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let rows = sqlx::query_as::<_, StationRow>(
             "SELECT 
-                l.*, 
                 s.*, 
+                l.*,
                 COALESCE(a.line_name, l.line_name) AS line_name, 
                 COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
                 COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
@@ -663,22 +663,16 @@ impl InternalStationRepository {
                       radians(?)
                     )
                   )
-                ) AS distance, 
-                IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types
+                ) AS distance
               FROM `stations` AS s
-              JOIN `lines` AS l ON l.line_cd IN (
-                SELECT _s.line_cd
-                FROM `stations` AS _s
-                WHERE _s.station_g_cd = s.station_g_cd
-              )
-              LEFT JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
-              LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd  
+              JOIN `lines` AS l ON s.line_cd = l.line_cd
               LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
               LEFT JOIN `aliases` AS a ON a.id = la.alias_cd 
               WHERE
-                s.e_status = 0
+                s.station_cd = s.station_g_cd
+                AND s.e_status = 0
               ORDER BY 
-                distance 
+                distance
               LIMIT
                 ?",
         )
