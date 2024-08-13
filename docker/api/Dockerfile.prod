@@ -5,10 +5,14 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 COPY . .
 RUN cargo build -p stationapi --release
+RUN GRPC_HEALTH_PROBE_VERSION=v0.4.28 && \
+    wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-arm64 && \
+    chmod +x /bin/grpc_health_probe
 
 FROM gcr.io/distroless/cc-debian12
 WORKDIR /app
 COPY --from=builder /app/target/release/stationapi .
+COPY --from=builder /bin/grpc_health_probe /bin/grpc_health_probe
 ENV PORT 50051
 EXPOSE $PORT
 CMD ["./stationapi"]
