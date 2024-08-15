@@ -164,7 +164,7 @@ Yokokawa","SL群马
 0,333,準急,ジュンキュウ,Semi-Express,准急,준급,#2A9B50,0,3,0,堺筋準急,PARTIAL
 0,334,直通特急,チョクツウトッキュウ,Limited Express,直通特急,직통특급,#DD2E1E,0,4,0,山陽電車,COMPLETE
 0,335,区間快速,クカンカイソク,Semi Rapid,区间快速,구간쾌속,#000084,0,2,0,TX用,COMPLETE
-0,336,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#FFA500,0,2,0,廃止済み 104に移行,COMPLETE
+0,336,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#FFA500,0,2,0,廃止済み 104に移行,NOT
 0,337,準特急,ジュントッキュウ,Semi-Limited Express,准特急,준특급,#FF6E00,0,4,0,,COMPLETE
 0,338,区間急行,クカンキュウコウ,Sub Express,区间快速,구간급행,#009A41,0,3,0,南海電車用,COMPLETE
 0,339,S-TRAIN(土休日運行),エストレイン,S-TRAIN(Holiday),S-TRAIN,S-TRAIN,#8EC21F,0,2,0,,COMPLETE
