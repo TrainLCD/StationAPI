@@ -93,7 +93,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 11331,2,東金線,トウガネセン,東金線,Togane Line,东金线,도가네선,#F15A22,2,,,,,,,,,,0,11331,3359.841654
 11332,2,京浜東北線,ケイヒントウホクセン,京浜東北線,Keihin-Tohoku Line,京滨东北线,게이힌 도호쿠선,#00B2E5,2,JK,,,#00B2E5,,,SQUARE,,,0,11332,1658.692149
 11333,2,湘南新宿ライン,ショウナンシンジュクライン,湘南新宿ライン,Shonan-Shinjuku Line,湘南新宿线,쇼난 신주쿠 라인,#F68B1E,2,JS,,,#E31F26,,,SQUARE,,,0,11333,4890.079223
-11343,2,上野東京ライン,ウエノトウキョウライン,上野東京ライン,Ueno-Tokyo Line,上野东京线,우에노 도쿄 라인,#8D2E90,2,JU,,,#F68B1E,,,SQUARE,,,0,11333,3728.648756
+11343,2,上野東京ライン,ウエノトウキョウライン,上野東京ライン,Ueno-Tokyo Line,上野东京线,우에노 도쿄 라인,#F68B1E,2,JU,,,#F68B1E,,,SQUARE,,,0,11333,3728.648756
 11334,2,烏山線,カラスヤマセン,烏山線,Karasuyama Line,乌山线,가라스야마선,#008000,2,,,,,,,,,,0,11334,2512.100478
 11335,2,吾妻線,アヅマセン,吾妻線,Agatsuma Line,吾妻线,아가쓰마선,#0F5474,2,,,,,,,,,,0,11335,2985.243754
 11337,2,信越本線,シンエツホンセン,信越本線,Shin’etsu Main Line,信越本线,신에쓰 본선,#9ACD32,2,,,,,,,,,,0,11337,3971.269673
@@ -417,11 +417,11 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99311,125,ゆりかもめ,ユリカモメ,ゆりかもめ東京臨海新交通臨海線,Yurikamome,百合鸥,유리카모메,#00418E,5,U,,,#00418E,,,REVERSED_ROUND,,,0,99311,808.8922641
 99312,126,わたらせ渓谷線,ワタラセケイコクセン,わたらせ渓谷鐵道わたらせ渓谷線,Watarase Keikoku Line,渡良濑溪谷线,와타라세 계곡선,#5B1511,2,WK,,,#5B1511,,,ROUND,,,0,99312,2414.916824
 99313,127,ユーカリが丘線,ユーガリガオカセン,山万ユーカリが丘線,Yukarigaoka Line,有加利丘线,유카리가오카선,#30B474,5,,,,#5B1511,,,ROUND,,,0,99313,662.0282073
-99314,128,伊豆箱根鉄道大雄山線,イズハコネテツドウダイユウザンセン,伊豆箱根鉄道大雄山線,Izuhakone Railway Daiyuzan Line,伊豆箱根铁道大雄山线,이즈하코네 철도 다이유잔선,#0D52A0,2,ID,,,#0D52A0,,,REVERSED_ROUND,,,0,99314,843.0292253
+99314,128,伊豆箱根鉄道大雄山線,イズハコネテツドウダイユウザンセン,伊豆箱根鉄道大雄山線,Izuhakone Railway Daiyuzan Line,伊豆箱根铁道大雄山线,이즈하코네 철도 다이유잔선,#4086E5,2,ID,,,#4086E5,,,IZUHAKONE,,,0,99314,843.0292253
 99315,129,ひたちなか海浜鉄道湊線,ヒタチナカカイヒンテツドウミナトセン,ひたちなか海浜鉄道湊線,Hitachinaka Seaside Railway,常陆那珂海滨铁道凑线,히타치나카 해안철도 미나토선,#A77718,2,,,,,,,,,,0,99315,1369.683571
 99316,130,ブルーライン,ブルーライン,横浜市高速鉄道1号線・3号線,Blue Line,蓝线,블루라인,#006BF0,3,B,,,#006BF0,,,REVERSED_ROUND,,,0,99316,1223.501777
 99343,130,グリーンライン,グリーンライン,横浜市高速鉄道4号線,Green Line,绿线,그린라인,#40CC40,3,G,,,#40CC40,,,REVERSED_ROUND,,,0,99316,1384.817458
-99317,131,金沢シーサイドライン,カナザワシーサイドライン,横浜新都市交通金沢シーサイドライン,Kanazawa Seaside Line,横滨海岸线,요코하마 시사이드라인,#F68B1E,5,,,,,,,,,,0,99317,737.5483441
+99317,131,金沢シーサイドライン,カナザワシーサイドライン,横浜新都市交通金沢シーサイドライン,Kanazawa Seaside Line,横滨海岸线,요코하마 시사이드라인,#F68B1E,5,,,,#5466BC,,,REVERSED_ROUND_HORIZONTAL,,,0,99317,737.5483441
 99318,132,関東鉄道常総線,カントウテツドウジョウソウセン,関東鉄道常総線,Kanto Railway Joso Line,关东铁道常总线,간토 철도 조소선,#121892,2,,,,,,,,,,0,99318,2080.733259
 99319,132,関東鉄道竜ヶ崎線,カントウテツドウリュウガサキセン,関東鉄道竜ヶ崎線,Kanto Railway Ryugasaki Line,关东铁道龙崎线,간토 철도 류가사키선,#121892,2,,,,,,,,,,0,99319,2175.80464
 99320,133,江ノ島電鉄線,エノシマデンテツセン,江ノ島電鉄線,Enoshima Electric Railway Line,江之岛电铁线,에노시마 전철선,#209A3F,2,,,,,,,,,,0,99320,677.6343943
@@ -453,8 +453,8 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99403,156,しなの鉄道線,シナノテツドウセン,しなの鉄道線,Shinano Railway Line,,,#F0A401,2,,,,,,,,,,0,99403,3245.235758
 99427,156,北しなの線,キタシナノセン,北しなの線,Kita-Shinano Line,,,#FEC9FE,2,,,,,,,,,,0,99403,4478.301701
 99404,157,上田電鉄別所線,ウエダデンテツベッショセン,上田電鉄別所線,Ueda Electric Railway Bessho Line,,,#E0F3C7,2,BE,,,#0B2846,,,REVERSED_ROUND,,,0,99404,786.3767532
-99405,158,長野電鉄長野線,ナガノデンテツナガノセン,長野電鉄長野線,Nagano Electric Railway Nagano Line,,,#E21919,2,N,,,#E21919,,,REVERSED_ROUND_HORIZONTAL,,,0,99405,1335.199537
-99406,158,長野電鉄屋代線,ナガノデンテツヤシロセン,長野電鉄屋代線,Nagano Electric Railway Yashiro Line,,,#E21919,2,Y,,,#E21919,,,REVERSED_ROUND_HORIZONTAL,,,2,99406,1909.79814
+99405,158,長野電鉄長野線,ナガノデンテツナガノセン,長野電鉄長野線,Nagano Electric Railway Nagano Line,,,#E21919,2,N,,,#E21919,,,ROUND,,,0,99405,1335.199537
+99406,158,長野電鉄屋代線,ナガノデンテツヤシロセン,長野電鉄屋代線,Nagano Electric Railway Yashiro Line,,,#E21919,2,Y,,,#E21919,,,ROUND,,,2,99406,1909.79814
 99407,159,上高地線,カミコウチセン,アルピコ交通上高地線,Kamikochi Line,,,#465DAA,2,AK,,,#465DAA,,,ROUND,,,0,99407,1086.699348
 99408,160,富山地鉄本線,トヤマチテツホンセン,富山地鉄本線,Toyama Chiho Railway Main Line,,,#1D1686,2,T,,,,,,,,,0,99408,1299.637637
 99409,160,富山地鉄立山線,トヤマチテツタテヤマセン,富山地鉄立山線,Toyama Chiho Railway Tateyama Line,,,#008000,2,T,,,,,,,,,0,99409,1801.160048
@@ -477,7 +477,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99421,168,福井鉄道福武線,フクイテツドウフクブセン,福井鉄道福武線,Fukui Railway Fukutake Line,,,#197A3D,4,,,,,,,,,,0,99421,855.6039455
 99428,251,ハピラインふくい線,ハピラインフクイセン,ハピラインふくい線,Hapi-line Fukui线,,,#EC1C9C,2,,,,,,,,,,0,99426,4480.588607
 99501,169,伊豆急行線,イズキュウコウセン,伊豆急行線,Izu Kyuko Line,,,#0085CD,2,IZ,,,#000000,,,SQUARE,,,0,99501,2837.052489
-99502,128,伊豆箱根鉄道駿豆線,イズハコネテツドウスンズセン,伊豆箱根鉄道駿豆線,Izuhakone Railway Sunzu Line,,,#08746F,2,,,,,,,,,,0,99502,1550.334564
+99502,128,伊豆箱根鉄道駿豆線,イズハコネテツドウスンズセン,伊豆箱根鉄道駿豆線,Izuhakone Railway Sunzu Line,,,#4086E5,2,IS,,,#4086E5,,,IZUHAKONE,,,0,99502,1550.334564
 99503,170,岳南鉄道線,ガクナンテツドウセン,岳南鉄道線,Gakunan Railway Line,,,#6B0102,2,GD,,,,,,,,,0,99503,926.2883295
 99504,171,静岡鉄道静岡清水線,シズオカテツドウシズオカシミズセン,静岡鉄道静岡清水線,Shizuoka Railway Shizuoka Shimizu Line,,,#0063B5,2,S,,,,,,,,,0,99504,759.7729306
 99505,172,天竜浜名湖線,テンリュウハマナコセン,天竜浜名湖鉄道天竜浜名湖線,Tenryu Hamanako Line,,,#95805A,2,,,,,,,,,,0,99505,1653.706397
@@ -569,7 +569,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99709,221,アストラムライン,アストラムライン,広島高速交通広島新交通1号線,Astram Line,,,#FFA500,5,,,,,,,,,,0,99709,850.3427213
 99710,222,広電１号線,ヒロデンイチゴウセン,広電１号線,Hiroden Ujina Line,,,#FF5900,4,M,U,,#00A85F,#0092D7,,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,,0,99710,297.6649521
 99711,222,広電２号線,ヒロデンニゴウセン,広電２号線,Hiroden Miyajima Line,,,#EF1731,4,M,,,#00A85F,,,REVERSED_ROUND_HORIZONTAL,,,0,99711,525.4362883
-99712,222,広電３号線,ヒロデンサンゴウセン,広電３号線,Hiroden Streetcar Route 3,,,#4243BE,4,U,M,,#0092D7,#00A85F,,,,,0,99712,316.3902997
+99712,222,広電３号線,ヒロデンサンゴウセン,広電３号線,Hiroden Streetcar Route 3,,,#4243BE,4,U,M,,#0092D7,#00A85F,,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,0,99712,316.3902997
 99713,222,広電５号線,ヒロデンゴゴウセン,広電５号線,Hiroden Minami Line,,,#00CC66,4,M,H,U,#00A85F,#7DBF4C,#0092D7,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,0,99713,333.1124595
 99714,222,広電６号線,ヒロデンロクゴウセン,広電６号線,Hiroden Eba Line,,,#FFCC00,4,E,M,,#FEDB4F,#008033,,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,,0,99714,314.4535287
 99715,222,広電７号線,ヒロデンナナゴウセン,広電７号線,Hiroden Streetcar Route 7,,,#005A52,4,Y,M,U,#ED8095,#00A85F,#0092D7,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,0,99715,323.8349809
