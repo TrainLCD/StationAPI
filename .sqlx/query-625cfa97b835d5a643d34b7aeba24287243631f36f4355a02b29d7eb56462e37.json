@@ -8,7 +8,7 @@
         "name": "station_cd",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -18,7 +18,7 @@
         "name": "station_g_cd",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -118,7 +118,7 @@
         "name": "line_cd",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -128,7 +128,7 @@
         "name": "pref_cd",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -158,9 +158,9 @@
         "name": "lon",
         "type_info": {
           "type": "Double",
-          "flags": "NOT_NULL | BINARY",
+          "flags": "NOT_NULL",
           "char_set": 63,
-          "max_size": 23
+          "max_size": 22
         }
       },
       {
@@ -168,9 +168,9 @@
         "name": "lat",
         "type_info": {
           "type": "Double",
-          "flags": "NOT_NULL | BINARY",
+          "flags": "NOT_NULL",
           "char_set": 63,
-          "max_size": 23
+          "max_size": 22
         }
       },
       {
@@ -198,7 +198,7 @@
         "name": "e_status",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -208,7 +208,7 @@
         "name": "e_sort",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -218,7 +218,7 @@
         "name": "company_cd",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -228,7 +228,7 @@
         "name": "line_type",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "flags": "NOT_NULL | UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -328,9 +328,9 @@
         "name": "average_distance",
         "type_info": {
           "type": "Double",
-          "flags": "NOT_NULL | BINARY",
+          "flags": "NOT_NULL",
           "char_set": 63,
-          "max_size": 23
+          "max_size": 22
         }
       },
       {
@@ -338,7 +338,7 @@
         "name": "type_cd",
         "type_info": {
           "type": "Long",
-          "flags": "UNSIGNED | BINARY",
+          "flags": "UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -348,7 +348,7 @@
         "name": "line_group_cd",
         "type_info": {
           "type": "Long",
-          "flags": "UNSIGNED | BINARY",
+          "flags": "UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -358,7 +358,7 @@
         "name": "pass",
         "type_info": {
           "type": "Long",
-          "flags": "UNSIGNED | BINARY",
+          "flags": "UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -368,7 +368,7 @@
         "name": "type_id",
         "type_info": {
           "type": "Long",
-          "flags": "UNSIGNED | BINARY",
+          "flags": "UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -438,7 +438,7 @@
         "name": "direction",
         "type_info": {
           "type": "Long",
-          "flags": "UNSIGNED | BINARY",
+          "flags": "UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -448,7 +448,7 @@
         "name": "kind",
         "type_info": {
           "type": "Long",
-          "flags": "UNSIGNED | BINARY",
+          "flags": "UNSIGNED",
           "char_set": 63,
           "max_size": 10
         }
@@ -458,7 +458,7 @@
         "name": "line_name",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "",
           "char_set": 224,
           "max_size": 1020
         }
@@ -468,7 +468,7 @@
         "name": "line_name_k",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "",
           "char_set": 224,
           "max_size": 1020
         }
@@ -478,7 +478,7 @@
         "name": "line_name_h",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "",
           "char_set": 224,
           "max_size": 1020
         }
@@ -488,7 +488,7 @@
         "name": "line_name_r",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "",
           "char_set": 224,
           "max_size": 1020
         }
@@ -518,7 +518,7 @@
         "name": "line_color_c",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "",
           "char_set": 224,
           "max_size": 1020
         }
@@ -527,10 +527,10 @@
         "ordinal": 52,
         "name": "has_train_types",
         "type_info": {
-          "type": "LongLong",
-          "flags": "NOT_NULL | BINARY",
+          "type": "Long",
+          "flags": "NOT_NULL",
           "char_set": 63,
-          "max_size": 2
+          "max_size": 1
         }
       }
     ],
@@ -583,13 +583,13 @@
       true,
       true,
       true,
-      false,
-      false,
-      false,
-      false,
       true,
       true,
-      false,
+      true,
+      true,
+      true,
+      true,
+      true,
       false
     ]
   },

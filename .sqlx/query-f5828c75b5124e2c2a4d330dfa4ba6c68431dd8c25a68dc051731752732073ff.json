@@ -7,7 +7,7 @@
         "ordinal": 0,
         "name": "alive",
         "type_info": {
-          "type": "LongLong",
+          "type": "Long",
           "flags": "NOT_NULL | BINARY",
           "char_set": 63,
           "max_size": 1
