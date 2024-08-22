@@ -11,7 +11,7 @@ services:
     volumes:
       - .:/app
     environment:
-      DATABASE_URL: mysql://stationapi:password@db/stationapi?tcp_nodelay=true
+      DATABASE_URL: mariadb://stationapi:password@db/stationapi
       ACCEPT_HTTP1: true
       ENABLE_ALL_STATIONS_RPC: true
       HOST: 0.0.0.0
@@ -21,12 +21,12 @@ services:
       - sapi-link
 
   db:
-    image: mysql:8
+    image: mariadb:11.5.2
     environment:
-      MYSQL_RANDOM_ROOT_PASSWORD: true
-      MYSQL_USER: stationapi
-      MYSQL_PASSWORD: password
-      MYSQL_DATABASE: stationapi
+      MARIADB_RANDOM_ROOT_PASSWORD: true
+      MARIADB_USER: stationapi
+      MARIADB_PASSWORD: password
+      MARIADB_DATABASE: stationapi
     ports:
       - 3306:3306
     networks:
