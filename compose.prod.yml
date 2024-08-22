@@ -19,12 +19,12 @@ services:
       - sapi-link
 
   db:
-    image: mysql:8
+    image: mariadb:11.5.2
     environment:
-      MYSQL_RANDOM_ROOT_PASSWORD: true
-      MYSQL_USER: stationapi
-      MYSQL_PASSWORD: password
-      MYSQL_DATABASE: stationapi
+      MARIADB_RANDOM_ROOT_PASSWORD: true
+      MARIADB_USER: stationapi
+      MARIADB_PASSWORD: password
+      MARIADB_DATABASE: stationapi
     restart: always
     networks:
       - sapi-link
