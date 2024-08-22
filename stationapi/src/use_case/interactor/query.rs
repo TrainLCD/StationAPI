@@ -189,8 +189,7 @@ where
 
         let company_ids = lines
             .iter()
-            .map(|station| station.company_cd)
-            .flatten()
+            .filter_map(|station| station.company_cd)
             .collect::<Vec<u32>>();
         let companies = self.find_company_by_id_vec(company_ids).await?;
 
@@ -463,7 +462,7 @@ where
             .get_by_line_group_id_vec(train_type_ids)
             .await?;
 
-        let company_ids = lines.iter().map(|l| l.company_cd).flatten().collect();
+        let company_ids = lines.iter().filter_map(|l| l.company_cd).collect();
         let companies = self.company_repository.find_by_id_vec(company_ids).await?;
 
         let line = self.line_repository.find_by_station_id(station_id).await?;
