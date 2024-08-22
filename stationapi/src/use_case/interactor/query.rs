@@ -189,7 +189,7 @@ where
 
         let company_ids = lines
             .iter()
-            .map(|station| station.company_cd)
+            .filter_map(|station| station.company_cd)
             .collect::<Vec<u32>>();
         let companies = self.find_company_by_id_vec(company_ids).await?;
 
@@ -202,7 +202,7 @@ where
             line.line_symbols = self.get_line_symbols(&line);
             line.company = companies
                 .iter()
-                .find(|c| c.company_cd == line.company_cd)
+                .find(|c| c.company_cd == line.company_cd.unwrap_or(0))
                 .cloned();
             line.station = Some(station.clone());
 
@@ -227,7 +227,7 @@ where
             for line in lines.iter_mut() {
                 line.company = companies
                     .iter()
-                    .find(|c| c.company_cd == line.company_cd)
+                    .find(|c| c.company_cd == line.company_cd.unwrap_or(0))
                     .cloned();
                 line.line_symbols = self.get_line_symbols(line);
                 if let Some(station) = stations_by_group_ids
@@ -394,7 +394,7 @@ where
 
         let line_symbol_primary_color = match line.line_symbol_primary_color {
             Some(ref color) => color.to_string(),
-            None => line.line_color_c.to_string(),
+            None => line.line_color_c.clone().unwrap_or("".to_string()),
         };
         let line_symbol_secondary_color =
             line.line_symbol_secondary_color.clone().unwrap_or_default();
@@ -462,7 +462,7 @@ where
             .get_by_line_group_id_vec(train_type_ids)
             .await?;
 
-        let company_ids = lines.iter().map(|l| l.company_cd).collect();
+        let company_ids = lines.iter().filter_map(|l| l.company_cd).collect();
         let companies = self.company_repository.find_by_id_vec(company_ids).await?;
 
         let line = self.line_repository.find_by_station_id(station_id).await?;
@@ -481,7 +481,7 @@ where
             for line in lines.iter_mut() {
                 line.company = companies
                     .iter()
-                    .find(|c| c.company_cd == line.company_cd)
+                    .find(|c| c.company_cd == line.company_cd.unwrap_or(0))
                     .cloned();
                 line.line_symbols = self.get_line_symbols(line);
                 let train_type: Option<TrainType> = self
@@ -493,7 +493,7 @@ where
 
             line.company = companies
                 .iter()
-                .find(|c| c.company_cd == line.company_cd)
+                .find(|c| c.company_cd == line.company_cd.unwrap_or(0))
                 .cloned();
             line.line_symbols = self.get_line_symbols(&line);
 
@@ -549,13 +549,13 @@ where
                         std::convert::Into::<crate::station_api::Station>::into(row.clone());
                     stop.line = Some(Box::new(crate::station_api::Line {
                         id: row.line_cd,
-                        name_short: row.line_name.clone(),
-                        name_katakana: row.line_name_k.clone(),
-                        name_full: row.line_name_h.clone(),
+                        name_short: row.line_name.clone().unwrap_or("".to_string()),
+                        name_katakana: row.line_name_k.clone().unwrap_or("".to_string()),
+                        name_full: row.line_name_h.clone().unwrap_or("".to_string()),
                         name_roman: row.line_name_r.clone(),
                         name_chinese: row.line_name_zh.clone(),
                         name_korean: row.line_name_ko.clone(),
-                        color: row.line_color_c.clone(),
+                        color: row.line_color_c.clone().unwrap_or("".to_string()),
                         line_type: row.line_type as i32,
                         line_symbols: vec![],
                         status: row.e_status as i32,
