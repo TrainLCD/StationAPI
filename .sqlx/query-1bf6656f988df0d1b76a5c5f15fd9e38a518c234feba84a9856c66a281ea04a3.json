@@ -178,7 +178,7 @@
         "name": "line_name",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "",
           "char_set": 224,
           "max_size": 1020
         }
@@ -188,7 +188,7 @@
         "name": "line_name_k",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "",
           "char_set": 224,
           "max_size": 1020
         }
@@ -198,7 +198,7 @@
         "name": "line_name_h",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "",
           "char_set": 224,
           "max_size": 1020
         }
@@ -208,7 +208,7 @@
         "name": "line_name_r",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "",
           "char_set": 224,
           "max_size": 1020
         }
@@ -238,7 +238,7 @@
         "name": "line_color_c",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL",
+          "flags": "",
           "char_set": 224,
           "max_size": 1020
         }
@@ -265,13 +265,13 @@
       false,
       false,
       false,
-      false,
-      false,
-      false,
-      false,
       true,
       true,
-      false
+      true,
+      true,
+      true,
+      true,
+      true
     ]
   },
   "hash": "1bf6656f988df0d1b76a5c5f15fd9e38a518c234feba84a9856c66a281ea04a3"

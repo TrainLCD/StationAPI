@@ -9,14 +9,14 @@ use crate::domain::{
 pub struct LineRow {
     pub line_cd: u32,
     pub company_cd: u32,
-    pub line_name: String,
-    pub line_name_k: String,
-    pub line_name_h: String,
+    pub line_type: u32,
+    pub line_name: Option<String>,
+    pub line_name_k: Option<String>,
+    pub line_name_h: Option<String>,
     pub line_name_r: Option<String>,
     pub line_name_zh: Option<String>,
     pub line_name_ko: Option<String>,
-    pub line_color_c: String,
-    pub line_type: u32,
+    pub line_color_c: Option<String>,
     pub line_symbol_primary: Option<String>,
     pub line_symbol_secondary: Option<String>,
     pub line_symbol_extra: Option<String>,
@@ -32,14 +32,14 @@ pub struct LineRow {
     pub line_group_cd: Option<u32>,
     #[sqlx(default)]
     pub station_g_cd: Option<u32>,
-    average_distance: f64,
+    pub average_distance: f64,
 }
 
 impl From<LineRow> for Line {
     fn from(row: LineRow) -> Self {
         Self {
             line_cd: row.line_cd,
-            company_cd: row.company_cd,
+            company_cd: Some(row.company_cd),
             company: None,
             line_name: row.line_name,
             line_name_k: row.line_name_k,
@@ -48,7 +48,7 @@ impl From<LineRow> for Line {
             line_name_zh: row.line_name_zh,
             line_name_ko: row.line_name_ko,
             line_color_c: row.line_color_c,
-            line_type: row.line_type,
+            line_type: Some(row.line_type),
             line_symbols: vec![],
             line_symbol_primary: row.line_symbol_primary,
             line_symbol_secondary: row.line_symbol_secondary,
