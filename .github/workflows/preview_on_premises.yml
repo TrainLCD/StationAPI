@@ -14,5 +14,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Init submodule
         run: git submodule update --init --remote
+      - name: Remove all containers
+        run: docker rm -f `docker ps -a -q`
       - name: docker compose build
         run: docker compose -f ./compose.prod.yml build
+      - name: docker compose up
+        run: docker compose -f ./compose.prod.yml up -d
