@@ -40,4 +40,9 @@ pub trait StationRepository: Send + Sync + 'static {
         longitude: f64,
         line_id: Option<u32>,
     ) -> Result<StationIdWithDistance, DomainError>;
+    async fn get_route_stops(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+    ) -> Result<Vec<Station>, DomainError>;
 }

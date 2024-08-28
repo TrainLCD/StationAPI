@@ -9,16 +9,16 @@ use sqlx::{MySql, MySqlConnection, Pool};
 pub struct TrainTypeRow {
     id: u32,
     station_cd: u32,
-    type_cd: u32,
-    line_group_cd: u32,
-    pass: u32,
-    type_name: String,
-    type_name_k: String,
+    type_cd: Option<u32>,
+    line_group_cd: Option<u32>,
+    pass: Option<u32>,
+    type_name: Option<String>,
+    type_name_k: Option<String>,
     type_name_r: Option<String>,
     type_name_zh: Option<String>,
     type_name_ko: Option<String>,
-    color: String,
-    direction: u32,
+    color: Option<String>,
+    direction: Option<u32>,
     kind: u32,
 }
 

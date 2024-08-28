@@ -21,17 +21,17 @@ impl From<TrainType> for GrpcTrainType {
         } = train_type;
         Self {
             id,
-            type_id: type_cd,
-            group_id: line_group_cd,
-            name: type_name,
-            name_katakana: type_name_k,
+            type_id: type_cd.unwrap_or_default(),
+            group_id: line_group_cd.unwrap_or_default(),
+            name: type_name.unwrap_or_default(),
+            name_katakana: type_name_k.unwrap_or_default(),
             name_roman: type_name_r,
             name_chinese: type_name_zh,
             name_korean: type_name_ko,
-            color,
+            color: color.unwrap_or_default(),
             line: line.map(|line| Box::new((*line).into())),
             lines: lines.into_iter().map(|line| line.into()).collect(),
-            direction: direction as i32,
+            direction: direction.unwrap_or_default() as i32,
             kind: kind as i32,
         }
     }

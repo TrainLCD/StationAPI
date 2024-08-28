@@ -62,6 +62,8 @@ struct StationRow {
     pub average_distance: f64,
     // station_station_typesからJOIN
     #[sqlx(default)]
+    pub type_id: Option<u32>,
+    #[sqlx(default)]
     pub type_cd: Option<u32>,
     #[sqlx(default)]
     pub line_group_cd: Option<u32>,
@@ -82,6 +84,8 @@ struct StationRow {
     pub color: Option<String>,
     #[sqlx(default)]
     pub direction: Option<u32>,
+    #[sqlx(default)]
+    pub kind: Option<u32>,
 }
 
 impl From<StationRow> for Station {
@@ -144,6 +148,7 @@ impl From<StationRow> for Station {
             line_symbol_secondary_shape: row.line_symbol_secondary_shape,
             line_symbol_extra_shape: row.line_symbol_extra_shape,
             average_distance: row.average_distance,
+            type_id: row.type_id,
             type_cd: row.type_cd,
             line_group_cd: row.line_group_cd,
             pass: row.pass,
@@ -154,6 +159,7 @@ impl From<StationRow> for Station {
             type_name_ko: row.type_name_ko,
             color: row.color,
             direction: row.direction,
+            kind: row.kind,
         }
     }
 }
@@ -269,6 +275,14 @@ impl StationRepository for MyStationRepository {
             }
         }
     }
+    async fn get_route_stops(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+    ) -> Result<Vec<Station>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalStationRepository::get_route_stops(from_station_id, to_station_id, &mut conn).await
+    }
 }
 
 struct InternalStationRepository {}
@@ -319,13 +333,15 @@ impl InternalStationRepository {
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types,
+            t.id AS type_id,
             t.type_name,
             t.type_name_k,
             t.type_name_r,
             t.type_name_zh,
             t.type_name_ko,
             t.color,
-            t.direction
+            t.direction,
+            t.kind
           FROM `stations` AS s
             JOIN `lines` AS l ON l.line_cd = s.line_cd
             AND l.e_status = 0
@@ -417,6 +433,7 @@ impl InternalStationRepository {
               l.line_symbol_secondary_shape,
               l.line_symbol_extra_shape,
               l.average_distance,
+              t.id AS type_id,
               t.type_cd,
               t.color,
               t.type_name,
@@ -425,6 +442,7 @@ impl InternalStationRepository {
               t.type_name_zh,
               t.type_name_ko,
               t.direction,
+              t.kind,
               sst.pass,
               COALESCE(a.line_name, l.line_name) AS line_name,
               COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
@@ -481,6 +499,7 @@ impl InternalStationRepository {
                           l.line_symbol_secondary_shape,
                           l.line_symbol_extra_shape,
                           l.average_distance,
+                          t.id AS type_id,
                           t.type_cd,
                           t.color,
                           t.type_name,
@@ -489,6 +508,7 @@ impl InternalStationRepository {
                           t.type_name_zh,
                           t.type_name_ko,
                           t.direction,
+                          t.kind,
                           sst.pass,
                           COALESCE(a.line_name, l.line_name) AS line_name,
                           COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
@@ -561,13 +581,15 @@ impl InternalStationRepository {
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types,
+            t.id AS type_id,
             t.type_name,
             t.type_name_k,
             t.type_name_r,
             t.type_name_zh,
             t.type_name_ko,
             t.color,
-            t.direction
+            t.direction,
+            t.kind
           FROM
             `stations` AS s
             JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
@@ -872,13 +894,15 @@ impl InternalStationRepository {
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types,
+            t.id AS type_id,
             t.type_name,
             t.type_name_k,
             t.type_name_r,
             t.type_name_zh,
             t.type_name_ko,
             t.color,
-            t.direction
+            t.direction,
+            t.kind
           FROM `stations` AS s
           JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
           LEFT JOIN `station_station_types` AS sst ON sst.line_group_cd = ?
@@ -890,6 +914,134 @@ impl InternalStationRepository {
             AND s.station_cd = sst.station_cd
             AND s.e_status = 0",
             line_group_id
+        )
+        .fetch_all(conn)
+        .await?;
+
+        let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
+
+        Ok(stations)
+    }
+
+    async fn get_route_stops(
+        from_station_id: u32,
+        to_station_id: u32,
+        conn: &mut MySqlConnection,
+    ) -> Result<Vec<Station>, DomainError> {
+        let rows = sqlx::query_as!(
+            StationRow,
+            "SELECT sta.*,
+          via_lines.company_cd,
+          via_lines.line_type,
+          via_lines.line_symbol_primary,
+          via_lines.line_symbol_secondary,
+          via_lines.line_symbol_extra,
+          via_lines.line_symbol_primary_color,
+          via_lines.line_symbol_secondary_color,
+          via_lines.line_symbol_extra_color,
+          via_lines.line_symbol_primary_shape,
+          via_lines.line_symbol_secondary_shape,
+          via_lines.line_symbol_extra_shape,
+          via_lines.average_distance,
+          sst.type_cd,
+          sst.line_group_cd,
+          sst.pass,
+          types.id AS type_id,
+          types.type_name,
+          types.type_name_k,
+          types.type_name_r,
+          types.type_name_zh,
+          types.type_name_ko,
+          types.color,
+          types.direction,
+          types.kind,
+          COALESCE(a.line_name, via_lines.line_name) AS line_name,
+          COALESCE(a.line_name_k, via_lines.line_name_k) AS line_name_k,
+          COALESCE(a.line_name_h, via_lines.line_name_h) AS line_name_h,
+          COALESCE(a.line_name_r, via_lines.line_name_r) AS line_name_r,
+          COALESCE(a.line_name_zh, via_lines.line_name_zh) AS line_name_zh,
+          COALESCE(a.line_name_ko, via_lines.line_name_ko) AS line_name_ko,
+          COALESCE(a.line_color_c, via_lines.line_color_c) AS line_color_c,
+          IFNULL(sta.station_cd = sst.station_cd, 0) AS has_train_types
+      FROM stations AS sta
+          JOIN station_station_types AS sst ON sta.station_cd = sst.station_cd
+          AND sst.line_group_cd IN (
+              SELECT _sst.line_group_cd
+              FROM station_station_types AS _sst
+              WHERE _sst.station_cd IN (
+                      SELECT s.station_cd
+                      FROM stations AS s
+                      WHERE s.station_g_cd = ?
+                  )
+          )
+          AND sst.line_group_cd IN (
+              SELECT _sst.line_group_cd
+              FROM station_station_types AS _sst
+              WHERE _sst.station_cd IN (
+                      SELECT s.station_cd
+                      FROM stations AS s
+                      WHERE s.station_g_cd = ?
+                  )
+          )
+          AND sta.station_cd = sst.station_cd
+          JOIN types ON sst.type_cd = types.type_cd
+          JOIN `lines` AS via_lines ON sta.line_cd = via_lines.line_cd
+          LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
+          LEFT JOIN `aliases` AS a ON a.id = la.alias_cd
+      UNION
+      SELECT sta.*,
+          via_lines.company_cd,
+          via_lines.line_type,
+          via_lines.line_symbol_primary,
+          via_lines.line_symbol_secondary,
+          via_lines.line_symbol_extra,
+          via_lines.line_symbol_primary_color,
+          via_lines.line_symbol_secondary_color,
+          via_lines.line_symbol_extra_color,
+          via_lines.line_symbol_primary_shape,
+          via_lines.line_symbol_secondary_shape,
+          via_lines.line_symbol_extra_shape,
+          via_lines.average_distance,
+          sst.type_cd,
+          sst.line_group_cd,
+          sst.pass,
+          types.id AS type_id,
+          types.type_name,
+          types.type_name_k,
+          types.type_name_r,
+          types.type_name_zh,
+          types.type_name_ko,
+          types.color,
+          types.direction,
+          types.kind,
+          COALESCE(a.line_name, via_lines.line_name) AS line_name,
+          COALESCE(a.line_name_k, via_lines.line_name_k) AS line_name_k,
+          COALESCE(a.line_name_h, via_lines.line_name_h) AS line_name_h,
+          COALESCE(a.line_name_r, via_lines.line_name_r) AS line_name_r,
+          COALESCE(a.line_name_zh, via_lines.line_name_zh) AS line_name_zh,
+          COALESCE(a.line_name_ko, via_lines.line_name_ko) AS line_name_ko,
+          COALESCE(a.line_color_c, via_lines.line_color_c) AS line_color_c,
+          IFNULL(sta.station_cd = sst.station_cd, 0) AS has_train_types
+      FROM stations AS sta
+          LEFT JOIN station_station_types AS sst ON sst.station_cd = NULL
+          LEFT JOIN types ON types.type_cd = NULL
+          JOIN `lines` AS via_lines ON via_lines.line_cd IN (
+              SELECT s.line_cd
+              FROM stations AS s
+              WHERE s.station_g_cd = ?
+          )
+          AND via_lines.line_cd IN (
+              SELECT s.line_cd
+              FROM stations AS s
+              WHERE s.station_g_cd = ?
+          )
+          LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
+          LEFT JOIN `aliases` AS a ON a.id = la.alias_cd
+      WHERE sta.line_cd = via_lines.line_cd",
+            from_station_id,
+            to_station_id,
+            from_station_id,
+            to_station_id,
         )
         .fetch_all(conn)
         .await?;
