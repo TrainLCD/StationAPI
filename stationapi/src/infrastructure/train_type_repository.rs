@@ -230,7 +230,7 @@ impl InternalTrainTypeRepository {
             JOIN `stations` AS s ON s.station_cd IN ( {} ) AND s.e_status = 0
             JOIN `station_station_types` AS sst ON sst.line_group_cd = ? AND sst.pass <> 1 AND sst.type_cd = t.type_cd
             WHERE 
-            CASE WHEN t.top_priority = 1
+            CASE WHEN t.top_priority = 1 AND sst.pass <> 1
             THEN
                 sst.type_cd = t.type_cd
             ELSE
