@@ -138,10 +138,11 @@ where
         &self,
         station_name: String,
         limit: Option<u32>,
+        from_station_group_id: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut stations = self
             .station_repository
-            .get_by_name(station_name, limit)
+            .get_by_name(station_name, limit, from_station_group_id)
             .await?;
 
         self.update_station_vec_with_attributes(&mut stations, None)
