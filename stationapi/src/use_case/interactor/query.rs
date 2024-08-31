@@ -455,10 +455,7 @@ where
             .get_by_station_id(station_id)
             .await?;
 
-        let train_type_ids = train_types
-            .iter()
-            .map(|tt| tt.line_group_cd.unwrap_or(0))
-            .collect();
+        let train_type_ids = train_types.iter().map(|tt| tt.line_group_cd).collect();
 
         let mut lines = self
             .line_repository
@@ -478,7 +475,7 @@ where
                 .iter_mut()
                 .map(|l| l.clone())
                 .filter(|l| l.line_group_cd.is_some())
-                .filter(|l| l.line_group_cd.unwrap() == tt.line_group_cd.unwrap_or(0))
+                .filter(|l| l.line_group_cd.unwrap() == tt.line_group_cd)
                 .collect::<Vec<Line>>();
 
             for line in lines.iter_mut() {
@@ -489,7 +486,7 @@ where
                 line.line_symbols = self.get_line_symbols(line);
                 let train_type: Option<TrainType> = self
                     .train_type_repository
-                    .find_by_line_group_id_and_line_id(tt.line_group_cd.unwrap_or(0), line.line_cd)
+                    .find_by_line_group_id_and_line_id(tt.line_group_cd, line.line_cd)
                     .await?;
                 line.train_type = train_type;
             }
@@ -618,23 +615,24 @@ where
 
                     if stop.has_train_types {
                         stop.train_type = Some(Box::new(TrainType {
-                            id: stop.type_id.unwrap_or(0),
-                            station_cd: stop.station_cd,
-                            type_cd: stop.type_cd,
-                            line_group_cd: stop.line_group_cd,
-                            pass: stop.pass,
-                            type_name: stop.type_name.clone(),
-                            type_name_k: stop.type_name_k.clone(),
-                            type_name_r: stop.type_name_r.clone(),
-                            type_name_zh: stop.type_name_zh.clone(),
-                            type_name_ko: stop.type_name_ko.clone(),
-                            color: stop.color.clone(),
-                            direction: stop.direction,
+                            id: row.type_id.unwrap(),
+                            station_cd: row.station_cd,
+                            type_cd: row.type_cd.unwrap(),
+                            line_group_cd: row.line_group_cd.unwrap(),
+                            pass: row.pass.unwrap(),
+                            type_name: row.type_name.clone().unwrap(),
+                            type_name_k: row.type_name_k.clone().unwrap(),
+                            type_name_r: row.type_name_r.clone(),
+                            type_name_zh: row.type_name_zh.clone(),
+                            type_name_ko: row.type_name_ko.clone(),
+                            color: row.color.clone().unwrap(),
+                            direction: row.direction.unwrap(),
+                            kind: row.kind.unwrap(),
                             line: Some(Box::new(
                                 locked_tt_lines
                                     .clone()
                                     .iter()
-                                    .find(|line| line.line_cd == stop.line_cd)
+                                    .find(|line| line.line_cd == row.line_cd)
                                     .unwrap()
                                     .clone(),
                             )),
@@ -645,15 +643,13 @@ where
                                     l.train_type = Arc::clone(&train_types)
                                         .iter()
                                         .filter(|tt| {
-                                            tt.line_group_cd.unwrap_or_default()
-                                                == stop.line_group_cd.unwrap_or_default()
+                                            tt.line_group_cd == stop.line_group_cd.unwrap()
                                         })
                                         .find(|tt| tt.station_cd == l.station_cd)
                                         .cloned();
                                     l.to_owned()
                                 })
                                 .collect(),
-                            kind: stop.kind.unwrap_or(0),
                         }));
                     }
                     stop.into()
