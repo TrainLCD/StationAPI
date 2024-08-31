@@ -1,4 +1,7 @@
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
+};
 
 use async_trait::async_trait;
 
@@ -526,14 +529,48 @@ where
             .station_repository
             .get_route_stops(from_station_id, to_station_id)
             .await?;
+        let rows = Arc::new(rows);
 
-        let route_row_tree_map: &BTreeMap<u32, Vec<Station>> = &rows.into_iter().fold(
+        let station_group_id_vec: Vec<u32> =
+            rows.clone().iter().map(|row| row.station_g_cd).collect();
+
+        let transfer_stations = self
+            .station_repository
+            .get_by_station_group_id_vec(station_group_id_vec.clone())
+            .await?;
+        let transfer_stations = Arc::new(Mutex::new(transfer_stations));
+
+        let rows_lines = self
+            .line_repository
+            .get_by_station_group_id_vec(station_group_id_vec)
+            .await?;
+        let rows_lines: Vec<Line> = rows_lines
+            .into_iter()
+            .map(|mut line| {
+                line.line_symbols = self.get_line_symbols(&line);
+                let transfer_stations = Arc::clone(&transfer_stations);
+                let mut transfer_stations = transfer_stations.lock().unwrap();
+                let station = transfer_stations
+                    .iter_mut()
+                    .find(|row| row.line_cd == line.line_cd)
+                    .map(|station| {
+                        station.station_numbers = self.get_station_numbers(station);
+                        station
+                    });
+                line.station = station.cloned();
+
+                line
+            })
+            .collect();
+        let rows_lines = Arc::new(rows_lines);
+
+        let route_row_tree_map: BTreeMap<u32, Vec<Station>> = Arc::clone(&rows).iter().fold(
             BTreeMap::new(),
             |mut acc: BTreeMap<u32, Vec<Station>>, value| {
                 if let Some(line_group_cd) = value.line_group_cd {
-                    acc.entry(line_group_cd).or_default().push(value);
+                    acc.entry(line_group_cd).or_default().push(value.clone());
                 } else {
-                    acc.entry(value.line_cd).or_default().push(value);
+                    acc.entry(value.line_cd).or_default().push(value.clone());
                 };
                 acc
             },
@@ -551,6 +588,13 @@ where
                         );
 
                     stop.line = Some(Box::new(self.extract_line_from_station(&stop)));
+                    stop.lines = rows_lines
+                        .clone()
+                        .iter()
+                        .filter(|&l| l.station_g_cd.is_some())
+                        .filter(|l| l.station_g_cd.unwrap() == stop.station_g_cd)
+                        .cloned()
+                        .collect();
                     stop.station_numbers = self.get_station_numbers(&stop);
 
                     if row.has_train_types {
@@ -576,7 +620,7 @@ where
                 })
                 .collect();
             let var_name = Route {
-                id: *id,
+                id,
                 stops: stops_with_line,
             };
             routes.push(var_name);
