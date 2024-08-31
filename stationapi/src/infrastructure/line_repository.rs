@@ -118,6 +118,14 @@ impl LineRepository for MyLineRepository {
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_line_group_id_vec(line_group_id_vec, &mut conn).await
     }
+    async fn get_by_line_group_id_vec_for_routes(
+        &self,
+        line_group_id_vec: Vec<u32>,
+    ) -> Result<Vec<Line>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalLineRepository::get_by_line_group_id_vec_for_routes(line_group_id_vec, &mut conn)
+            .await
+    }
 }
 
 pub struct InternalLineRepository {}
@@ -387,6 +395,49 @@ impl InternalLineRepository {
     }
 
     async fn get_by_line_group_id_vec(
+        line_group_id_vec: Vec<u32>,
+        conn: &mut MySqlConnection,
+    ) -> Result<Vec<Line>, DomainError> {
+        if line_group_id_vec.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let params = format!("?{}", ", ?".repeat(line_group_id_vec.len() - 1));
+        let query_str = format!(
+            "SELECT DISTINCT
+                l.*,
+                sst.line_group_cd,
+                COALESCE(a.line_name, l.line_name) AS line_name,
+                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+                s.station_cd,
+                s.station_g_cd
+            FROM `lines` AS l
+            JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} )
+            JOIN `stations` AS s ON s.station_cd = sst.station_cd AND s.e_status = 0
+            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
+            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+            WHERE
+                l.line_cd = s.line_cd
+                AND l.e_status = 0",
+            params
+        );
+
+        let mut query = sqlx::query_as::<_, LineRow>(&query_str);
+        for id in line_group_id_vec {
+            query = query.bind(id);
+        }
+
+        let rows = query.fetch_all(conn).await?;
+        let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
+
+        Ok(lines)
+    }
+    async fn get_by_line_group_id_vec_for_routes(
         line_group_id_vec: Vec<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Line>, DomainError> {

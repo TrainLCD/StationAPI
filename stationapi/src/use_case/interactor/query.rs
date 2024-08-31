@@ -535,7 +535,7 @@ where
         let line_group_id_vec = Arc::new(line_group_id_vec);
         let tt_lines = self
             .line_repository
-            .get_by_line_group_id_vec(Arc::clone(&line_group_id_vec).to_vec())
+            .get_by_line_group_id_vec_for_routes(Arc::clone(&line_group_id_vec).to_vec())
             .await?;
         let tt_lines = Arc::new(Mutex::new(tt_lines));
 
