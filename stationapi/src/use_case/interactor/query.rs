@@ -220,8 +220,7 @@ where
 
             let mut lines: Vec<Line> = lines
                 .iter()
-                .filter(|&l| l.station_g_cd.is_some())
-                .filter(|&l| l.station_g_cd.unwrap() == station.station_g_cd)
+                .filter(|&l| l.station_g_cd == station.station_g_cd)
                 .cloned()
                 .collect();
             for line in lines.iter_mut() {
@@ -378,7 +377,8 @@ where
             station: None,
             train_type: None,
             line_group_cd: None,
-            station_g_cd: None,
+            station_cd: station.station_cd,
+            station_g_cd: station.station_g_cd,
             average_distance: station.average_distance,
         }
     }
@@ -514,7 +514,7 @@ where
     ) -> Result<Vec<TrainType>, UseCaseError> {
         let train_types = self
             .train_type_repository
-            .get_types_by_station_id_vec(station_id_vec, line_group_id)
+            .get_by_station_id_vec(station_id_vec, line_group_id)
             .await?;
 
         Ok(train_types)
@@ -530,6 +530,23 @@ where
             .get_route_stops(from_station_id, to_station_id)
             .await?;
         let rows = Arc::new(rows);
+
+        let line_group_id_vec = Arc::clone(&rows)
+            .iter()
+            .filter_map(|row| row.line_group_cd)
+            .collect::<Vec<u32>>();
+        let line_group_id_vec = Arc::new(line_group_id_vec);
+        let tt_lines = self
+            .line_repository
+            .get_by_line_group_id_vec(Arc::clone(&line_group_id_vec).to_vec())
+            .await?;
+        let tt_lines = Arc::new(Mutex::new(tt_lines));
+
+        let train_types = self
+            .train_type_repository
+            .get_by_line_group_id_vec(Arc::clone(&line_group_id_vec).to_vec())
+            .await?;
+        let train_types = Arc::new(train_types);
 
         let station_group_id_vec: Vec<u32> =
             rows.clone().iter().map(|row| row.station_g_cd).collect();
@@ -587,33 +604,56 @@ where
                             row.clone(),
                         );
 
-                    stop.line = Some(Box::new(self.extract_line_from_station(&stop)));
+                    let extracted_line = Arc::new(self.extract_line_from_station(&stop));
+                    stop.line = Some(Box::new(Arc::clone(&extracted_line).as_ref().clone()));
                     stop.lines = rows_lines
                         .clone()
                         .iter()
-                        .filter(|&l| l.station_g_cd.is_some())
-                        .filter(|l| l.station_g_cd.unwrap() == stop.station_g_cd)
+                        .filter(|l| l.station_cd == stop.station_cd)
                         .cloned()
                         .collect();
                     stop.station_numbers = self.get_station_numbers(&stop);
 
-                    if row.has_train_types {
+                    let locked_tt_lines = tt_lines.lock().unwrap();
+
+                    if stop.has_train_types {
                         stop.train_type = Some(Box::new(TrainType {
-                            id: row.type_id.unwrap_or(0),
-                            station_cd: row.station_cd,
-                            type_cd: row.type_cd,
-                            line_group_cd: row.line_group_cd,
-                            pass: row.pass,
-                            type_name: row.type_name.clone(),
-                            type_name_k: row.type_name_k.clone(),
-                            type_name_r: row.type_name_r.clone(),
-                            type_name_zh: row.type_name_zh.clone(),
-                            type_name_ko: row.type_name_ko.clone(),
-                            color: row.color.clone(),
-                            direction: row.direction,
-                            line: None,
-                            lines: vec![],
-                            kind: row.kind.unwrap_or(0),
+                            id: stop.type_id.unwrap_or(0),
+                            station_cd: stop.station_cd,
+                            type_cd: stop.type_cd,
+                            line_group_cd: stop.line_group_cd,
+                            pass: stop.pass,
+                            type_name: stop.type_name.clone(),
+                            type_name_k: stop.type_name_k.clone(),
+                            type_name_r: stop.type_name_r.clone(),
+                            type_name_zh: stop.type_name_zh.clone(),
+                            type_name_ko: stop.type_name_ko.clone(),
+                            color: stop.color.clone(),
+                            direction: stop.direction,
+                            line: Some(Box::new(
+                                locked_tt_lines
+                                    .clone()
+                                    .iter()
+                                    .find(|line| line.line_cd == stop.line_cd)
+                                    .unwrap()
+                                    .clone(),
+                            )),
+                            lines: locked_tt_lines
+                                .clone()
+                                .iter_mut()
+                                .map(|l| {
+                                    l.train_type = Arc::clone(&train_types)
+                                        .iter()
+                                        .filter(|tt| {
+                                            tt.line_group_cd.unwrap_or_default()
+                                                == stop.line_group_cd.unwrap_or_default()
+                                        })
+                                        .find(|tt| tt.station_cd == l.station_cd)
+                                        .cloned();
+                                    l.to_owned()
+                                })
+                                .collect(),
+                            kind: stop.kind.unwrap_or(0),
                         }));
                     }
                     stop.into()

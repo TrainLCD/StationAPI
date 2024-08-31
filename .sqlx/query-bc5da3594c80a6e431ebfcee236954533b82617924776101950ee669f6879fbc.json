@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT DISTINCT l.line_cd,\n            l.company_cd,\n            l.line_type,\n            l.line_symbol_primary,\n            l.line_symbol_secondary,\n            l.line_symbol_extra,\n            l.line_symbol_primary_color,\n            l.line_symbol_secondary_color,\n            l.line_symbol_extra_color,\n            l.line_symbol_primary_shape,\n            l.line_symbol_secondary_shape,\n            l.line_symbol_extra_shape,\n            l.e_status,\n            l.e_sort,\n            l.average_distance,\n            s.station_g_cd,\n            sst.line_group_cd,\n            COALESCE(a.line_name, l.line_name) AS line_name,\n            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,\n            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,\n            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,\n            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,\n            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,\n            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c\n        FROM `lines` AS l\n            JOIN `stations` AS s ON s.station_cd = ?\n            JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd\n            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd\n            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id\n        WHERE l.line_cd = s.line_cd",
+  "query": "SELECT DISTINCT l.line_cd,\n            l.company_cd,\n            l.line_type,\n            l.line_symbol_primary,\n            l.line_symbol_secondary,\n            l.line_symbol_extra,\n            l.line_symbol_primary_color,\n            l.line_symbol_secondary_color,\n            l.line_symbol_extra_color,\n            l.line_symbol_primary_shape,\n            l.line_symbol_secondary_shape,\n            l.line_symbol_extra_shape,\n            l.e_status,\n            l.e_sort,\n            l.average_distance,\n            COALESCE(a.line_name, l.line_name) AS line_name,\n            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,\n            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,\n            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,\n            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,\n            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,\n            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,\n            sst.line_group_cd,\n            s.station_cd,\n            s.station_g_cd\n        FROM `lines` AS l\n        JOIN `stations` AS s ON s.station_g_cd = ?\n            AND s.e_status = 0\n        JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd\n        LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd\n        LEFT JOIN `aliases` AS a ON la.alias_cd = a.id\n        WHERE l.line_cd = s.line_cd\n            AND l.e_status = 0",
   "describe": {
     "columns": [
       {
@@ -155,26 +155,6 @@
       },
       {
         "ordinal": 15,
-        "name": "station_g_cd",
-        "type_info": {
-          "type": "Long",
-          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
-          "char_set": 63,
-          "max_size": 10
-        }
-      },
-      {
-        "ordinal": 16,
-        "name": "line_group_cd",
-        "type_info": {
-          "type": "Long",
-          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
-          "char_set": 63,
-          "max_size": 10
-        }
-      },
-      {
-        "ordinal": 17,
         "name": "line_name",
         "type_info": {
           "type": "VarString",
@@ -184,7 +164,7 @@
         }
       },
       {
-        "ordinal": 18,
+        "ordinal": 16,
         "name": "line_name_k",
         "type_info": {
           "type": "VarString",
@@ -194,7 +174,7 @@
         }
       },
       {
-        "ordinal": 19,
+        "ordinal": 17,
         "name": "line_name_h",
         "type_info": {
           "type": "VarString",
@@ -204,7 +184,7 @@
         }
       },
       {
-        "ordinal": 20,
+        "ordinal": 18,
         "name": "line_name_r",
         "type_info": {
           "type": "VarString",
@@ -214,7 +194,7 @@
         }
       },
       {
-        "ordinal": 21,
+        "ordinal": 19,
         "name": "line_name_zh",
         "type_info": {
           "type": "VarString",
@@ -224,7 +204,7 @@
         }
       },
       {
-        "ordinal": 22,
+        "ordinal": 20,
         "name": "line_name_ko",
         "type_info": {
           "type": "VarString",
@@ -234,13 +214,43 @@
         }
       },
       {
-        "ordinal": 23,
+        "ordinal": 21,
         "name": "line_color_c",
         "type_info": {
           "type": "VarString",
           "flags": "",
           "char_set": 224,
           "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 22,
+        "name": "line_group_cd",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 23,
+        "name": "station_cd",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | PRIMARY_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 24,
+        "name": "station_g_cd",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
         }
       }
     ],
@@ -263,16 +273,17 @@
       false,
       false,
       false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
       false,
       false,
-      true,
-      true,
-      true,
-      true,
-      true,
-      true,
-      true
+      false
     ]
   },
-  "hash": "dedd0bf74a3f5a52601f1ff7ff0ed6c188a738b9d2c87365bb09937406fdd4c5"
+  "hash": "bc5da3594c80a6e431ebfcee236954533b82617924776101950ee669f6879fbc"
 }

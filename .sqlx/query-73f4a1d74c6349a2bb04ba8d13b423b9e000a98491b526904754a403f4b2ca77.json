@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT \n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.direction,\n            t.kind,\n            sst.*\n            FROM  `types` AS t\n            JOIN `stations` AS s ON s.station_cd = ? AND s.e_status = 0\n            JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd AND sst.type_cd = t.type_cd AND sst.pass <> 1\n            ORDER BY t.kind, sst.id",
+  "query": "SELECT \n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.direction,\n            t.kind,\n            sst.*\n            FROM  `types` AS t\n            JOIN `stations` AS s ON s.station_cd = ? AND s.e_status = 0\n            JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd AND sst.type_cd = t.type_cd AND sst.pass <> 1\n            ORDER BY sst.id",
   "describe": {
     "columns": [
       {
@@ -153,5 +153,5 @@
       false
     ]
   },
-  "hash": "5737595113c91006be1bcb78ab6814ecd730583db715e09d61580b3105a079cb"
+  "hash": "73f4a1d74c6349a2bb04ba8d13b423b9e000a98491b526904754a403f4b2ca77"
 }
