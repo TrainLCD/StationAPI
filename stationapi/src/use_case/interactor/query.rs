@@ -514,7 +514,7 @@ where
     ) -> Result<Vec<TrainType>, UseCaseError> {
         let train_types = self
             .train_type_repository
-            .get_by_station_id_vec(station_id_vec, line_group_id)
+            .get_types_by_station_id_vec(station_id_vec, line_group_id)
             .await?;
 
         Ok(train_types)
