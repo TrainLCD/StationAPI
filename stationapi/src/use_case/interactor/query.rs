@@ -1,4 +1,7 @@
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
+};
 
 use async_trait::async_trait;
 
@@ -10,32 +13,28 @@ use crate::{
         },
         repository::{
             company_repository::CompanyRepository, line_repository::LineRepository,
-            routes_repository::RoutesRepository, station_repository::StationRepository,
-            train_type_repository::TrainTypeRepository,
+            station_repository::StationRepository, train_type_repository::TrainTypeRepository,
         },
     },
-    infrastructure::routes_repository::RouteRow,
     station_api::Route,
     use_case::{error::UseCaseError, traits::query::QueryUseCase},
 };
 
 #[derive(Clone)]
-pub struct QueryInteractor<SR, LR, TR, CR, RR> {
+pub struct QueryInteractor<SR, LR, TR, CR> {
     pub station_repository: SR,
     pub line_repository: LR,
     pub train_type_repository: TR,
     pub company_repository: CR,
-    pub routes_repository: RR,
 }
 
 #[async_trait]
-impl<SR, LR, TR, CR, RR> QueryUseCase for QueryInteractor<SR, LR, TR, CR, RR>
+impl<SR, LR, TR, CR> QueryUseCase for QueryInteractor<SR, LR, TR, CR>
 where
     SR: StationRepository,
     LR: LineRepository,
     TR: TrainTypeRepository,
     CR: CompanyRepository,
-    RR: RoutesRepository,
 {
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
         let Some(station) = self.station_repository.find_by_id(station_id).await? else {
@@ -142,10 +141,11 @@ where
         &self,
         station_name: String,
         limit: Option<u32>,
+        from_station_group_id: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut stations = self
             .station_repository
-            .get_by_name(station_name, limit)
+            .get_by_name(station_name, limit, from_station_group_id)
             .await?;
 
         self.update_station_vec_with_attributes(&mut stations, None)
@@ -220,8 +220,7 @@ where
 
             let mut lines: Vec<Line> = lines
                 .iter()
-                .filter(|&l| l.station_g_cd.is_some())
-                .filter(|&l| l.station_g_cd.unwrap() == station.station_g_cd)
+                .filter(|&l| l.station_g_cd == station.station_g_cd)
                 .cloned()
                 .collect();
             for line in lines.iter_mut() {
@@ -378,7 +377,8 @@ where
             station: None,
             train_type: None,
             line_group_cd: None,
-            station_g_cd: None,
+            station_cd: station.station_cd,
+            station_g_cd: station.station_g_cd,
             average_distance: station.average_distance,
         }
     }
@@ -523,71 +523,143 @@ where
         to_station_id: u32,
     ) -> Result<Vec<Route>, UseCaseError> {
         let rows = self
-            .routes_repository
-            .get_routes(from_station_id, to_station_id)
+            .station_repository
+            .get_route_stops(from_station_id, to_station_id)
             .await?;
+        let rows = Arc::new(rows);
 
-        let route_row_tree_map: &BTreeMap<u32, Vec<RouteRow>> = &rows.clone().into_iter().fold(
+        let line_group_id_vec = Arc::clone(&rows)
+            .iter()
+            .filter_map(|row| row.line_group_cd)
+            .collect::<Vec<u32>>();
+        let line_group_id_vec = Arc::new(line_group_id_vec);
+        let tt_lines = self
+            .line_repository
+            .get_by_line_group_id_vec_for_routes(Arc::clone(&line_group_id_vec).to_vec())
+            .await?;
+        let tt_lines = Arc::new(Mutex::new(tt_lines));
+
+        let train_types = self
+            .train_type_repository
+            .get_by_line_group_id_vec(Arc::clone(&line_group_id_vec).to_vec())
+            .await?;
+        let train_types = Arc::new(train_types);
+
+        let station_group_id_vec: Vec<u32> =
+            rows.clone().iter().map(|row| row.station_g_cd).collect();
+
+        let transfer_stations = self
+            .station_repository
+            .get_by_station_group_id_vec(station_group_id_vec.clone())
+            .await?;
+        let transfer_stations = Arc::new(Mutex::new(transfer_stations));
+
+        let rows_lines = self
+            .line_repository
+            .get_by_station_group_id_vec(station_group_id_vec)
+            .await?;
+        let rows_lines: Vec<Line> = rows_lines
+            .into_iter()
+            .map(|mut line| {
+                line.line_symbols = self.get_line_symbols(&line);
+                let transfer_stations = Arc::clone(&transfer_stations);
+                let mut transfer_stations = transfer_stations.lock().unwrap();
+                let station = transfer_stations
+                    .iter_mut()
+                    .find(|row| row.line_cd == line.line_cd)
+                    .map(|station| {
+                        station.station_numbers = self.get_station_numbers(station);
+                        station
+                    });
+                line.station = station.cloned();
+
+                line
+            })
+            .collect();
+        let rows_lines = Arc::new(rows_lines);
+
+        let route_row_tree_map: BTreeMap<u32, Vec<Station>> = Arc::clone(&rows).iter().fold(
             BTreeMap::new(),
-            |mut acc: BTreeMap<u32, Vec<RouteRow>>, value| {
+            |mut acc: BTreeMap<u32, Vec<Station>>, value| {
                 if let Some(line_group_cd) = value.line_group_cd {
-                    acc.entry(line_group_cd).or_default().push(value);
+                    acc.entry(line_group_cd).or_default().push(value.clone());
                 } else {
-                    acc.entry(value.line_cd).or_default().push(value);
+                    acc.entry(value.line_cd).or_default().push(value.clone());
                 };
                 acc
             },
         );
 
-        let mut routes = vec![];
+        let mut routes = Vec::with_capacity(route_row_tree_map.len());
 
         for (id, stops) in route_row_tree_map {
-            let stops_with_line = stops
+            let stops_with_line: Vec<crate::station_api::Station> = stops
                 .iter()
-                .map(|row| {
+                .map(|row: &Station| {
                     let mut stop =
-                        std::convert::Into::<crate::station_api::Station>::into(row.clone());
-                    stop.line = Some(Box::new(crate::station_api::Line {
-                        id: row.line_cd,
-                        name_short: row.line_name.clone().unwrap_or("".to_string()),
-                        name_katakana: row.line_name_k.clone().unwrap_or("".to_string()),
-                        name_full: row.line_name_h.clone().unwrap_or("".to_string()),
-                        name_roman: row.line_name_r.clone(),
-                        name_chinese: row.line_name_zh.clone(),
-                        name_korean: row.line_name_ko.clone(),
-                        color: row.line_color_c.clone().unwrap_or("".to_string()),
-                        line_type: row.line_type as i32,
-                        line_symbols: vec![],
-                        status: row.e_status as i32,
-                        station: None,
-                        company: None,
-                        train_type: None,
-                        average_distance: 0.0,
-                    }));
-                    if row.has_train_types != 0 {
-                        stop.train_type = Some(Box::new(crate::station_api::TrainType {
+                        std::convert::Into::<crate::domain::entity::station::Station>::into(
+                            row.clone(),
+                        );
+
+                    let extracted_line = Arc::new(self.extract_line_from_station(&stop));
+                    stop.line = Some(Box::new(Arc::clone(&extracted_line).as_ref().clone()));
+                    stop.lines = rows_lines
+                        .clone()
+                        .iter()
+                        .filter(|l| l.station_cd == stop.station_cd)
+                        .cloned()
+                        .collect();
+                    stop.station_numbers = self.get_station_numbers(&stop);
+
+                    let locked_tt_lines = tt_lines.lock().unwrap();
+
+                    if stop.has_train_types {
+                        stop.train_type = Some(Box::new(TrainType {
                             id: row.type_id.unwrap(),
-                            type_id: row.type_cd.unwrap(),
-                            group_id: row.line_group_cd.unwrap(),
-                            name: row.type_name.to_owned().unwrap(),
-                            name_katakana: row.type_name_k.to_owned().unwrap(),
-                            name_roman: row.type_name_r.to_owned(),
-                            name_chinese: row.type_name_zh.to_owned(),
-                            name_korean: row.type_name_ko.to_owned(),
-                            color: row.color.to_owned().unwrap(),
-                            lines: vec![],
-                            line: None,
-                            direction: row.direction.unwrap() as i32,
-                            kind: row.kind.unwrap() as i32,
+                            station_cd: row.station_cd,
+                            type_cd: row.type_cd.unwrap(),
+                            line_group_cd: row.line_group_cd.unwrap(),
+                            pass: row.pass.unwrap(),
+                            type_name: row.type_name.clone().unwrap(),
+                            type_name_k: row.type_name_k.clone().unwrap(),
+                            type_name_r: row.type_name_r.clone(),
+                            type_name_zh: row.type_name_zh.clone(),
+                            type_name_ko: row.type_name_ko.clone(),
+                            color: row.color.clone().unwrap(),
+                            direction: row.direction.unwrap(),
+                            kind: row.kind.unwrap(),
+                            line: Some(Box::new(
+                                locked_tt_lines
+                                    .clone()
+                                    .iter()
+                                    .find(|line| line.line_cd == row.line_cd)
+                                    .unwrap()
+                                    .clone(),
+                            )),
+                            lines: locked_tt_lines
+                                .clone()
+                                .iter_mut()
+                                .map(|l| {
+                                    l.train_type = Arc::clone(&train_types)
+                                        .iter()
+                                        .filter(|tt| {
+                                            tt.line_group_cd == stop.line_group_cd.unwrap()
+                                        })
+                                        .find(|tt| tt.station_cd == l.station_cd)
+                                        .cloned();
+                                    l.to_owned()
+                                })
+                                .collect(),
                         }));
                     }
-                    stop
+                    stop.into()
                 })
                 .collect();
-            routes.push(Route {
-                id: *id,
+            let var_name = Route {
+                id,
                 stops: stops_with_line,
-            });
+            };
+            routes.push(var_name);
         }
         Ok(routes)
     }

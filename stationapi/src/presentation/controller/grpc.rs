@@ -1,4 +1,3 @@
-use crate::infrastructure::routes_repository::MyRoutesRepository;
 use crate::infrastructure::{
     company_repository::MyCompanyRepository, line_repository::MyLineRepository,
     station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
@@ -24,7 +23,6 @@ pub struct MyApi {
         MyLineRepository,
         MyTrainTypeRepository,
         MyCompanyRepository,
-        MyRoutesRepository,
     >,
 }
 
@@ -140,10 +138,10 @@ impl StationApi for MyApi {
         let request_ref = request.get_ref();
         let query_station_name = request_ref.station_name.clone();
         let query_limit = request_ref.limit;
-
+        let from_station_group_id = request_ref.from_station_group_id;
         match self
             .query_use_case
-            .get_stations_by_name(query_station_name, query_limit)
+            .get_stations_by_name(query_station_name, query_limit, from_station_group_id)
             .await
         {
             Ok(stations) => {

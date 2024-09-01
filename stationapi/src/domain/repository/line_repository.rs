@@ -20,4 +20,9 @@ pub trait LineRepository: Send + Sync + 'static {
         &self,
         line_group_id_vec: Vec<u32>,
     ) -> Result<Vec<Line>, DomainError>;
+    // FIXME: もっとマシな命名
+    async fn get_by_line_group_id_vec_for_routes(
+        &self,
+        line_group_id_vec: Vec<u32>,
+    ) -> Result<Vec<Line>, DomainError>;
 }
