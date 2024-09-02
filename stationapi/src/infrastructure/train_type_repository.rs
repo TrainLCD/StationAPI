@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::domain::{
     entity::train_type::TrainType, error::DomainError,
     repository::train_type_repository::TrainTypeRepository,
@@ -141,7 +143,9 @@ impl InternalTrainTypeRepository {
     ) -> Result<Vec<TrainType>, DomainError> {
         let rows: Vec<TrainTypeRow> = sqlx::query_as!(
             TrainTypeRow,
-            "SELECT
+            "SELECT DISTINCT
+            sst.id,
+            t.type_cd,
             t.type_name,
             t.type_name_k,
             t.type_name_r,
@@ -150,12 +154,14 @@ impl InternalTrainTypeRepository {
             t.color,
             t.direction,
             t.kind,
-            sst.*
+            sst.station_cd,
+            sst.line_group_cd,
+            sst.pass
             FROM types as t
             JOIN `station_station_types` AS sst ON sst.line_group_cd = ?
             WHERE 
                 t.type_cd = sst.type_cd
-            ORDER BY t.kind, sst.id",
+            ORDER BY sst.id",
             line_group_id
         )
         .fetch_all(conn)
@@ -169,7 +175,9 @@ impl InternalTrainTypeRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         let rows: Vec<TrainTypeRow> = sqlx::query_as!(TrainTypeRow,
-            "SELECT 
+            "SELECT DISTINCT
+            sst.id,
+            t.type_cd,
             t.type_name,
             t.type_name_k,
             t.type_name_r,
@@ -178,7 +186,9 @@ impl InternalTrainTypeRepository {
             t.color,
             t.direction,
             t.kind,
-            sst.*
+            sst.station_cd,
+            sst.line_group_cd,
+            sst.pass
             FROM  `types` AS t
             JOIN `stations` AS s ON s.station_cd = ? AND s.e_status = 0
             JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd AND sst.type_cd = t.type_cd AND sst.pass <> 1
@@ -197,9 +207,20 @@ impl InternalTrainTypeRepository {
         conn: &mut MySqlConnection,
     ) -> Result<Option<TrainType>, DomainError> {
         let rows: Option<TrainTypeRow> = sqlx::query_as(
-            "SELECT 
-            t.*, 
-            sst.*
+            "SELECT DISTINCT
+            sst.id,
+            t.type_cd,
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
+            sst.station_cd,
+            sst.line_group_cd,
+            sst.pass
             FROM `types` as t
             JOIN `station_station_types` AS sst ON sst.line_group_cd = ? 
             WHERE 
@@ -238,11 +259,24 @@ impl InternalTrainTypeRepository {
             return Ok(vec![]);
         }
 
+        let station_id_vec: HashSet<u32> = station_id_vec.into_iter().collect();
+
         let params = format!("?{}", ", ?".repeat(station_id_vec.len() - 1));
         let query_str = format!(
-            "SELECT 
-            t.*, 
-            sst.*
+            "SELECT DISTINCT
+            sst.id,
+            t.type_cd,
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
+            sst.station_cd,
+            sst.line_group_cd,
+            sst.pass
             FROM 
             types as t
             JOIN `stations` AS s ON s.station_cd IN ( {} ) AND s.e_status = 0
@@ -272,12 +306,25 @@ impl InternalTrainTypeRepository {
             return Ok(vec![]);
         }
 
+        let station_id_vec: HashSet<u32> = station_id_vec.into_iter().collect();
+
         let params = format!("?{}", ", ?".repeat(station_id_vec.len() - 1));
         let query_str = format!(
-            "SELECT 
-            t.*, 
-            sst.*
-            FROM 
+            "SELECT DISTINCT
+            sst.id,
+            t.type_cd,
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
+            sst.station_cd,
+            sst.line_group_cd,
+            sst.pass
+            FROM
             station_station_types as sst, 
             stations as s, 
             types as t 
@@ -295,7 +342,7 @@ impl InternalTrainTypeRepository {
             AND s.e_status = 0
             AND sst.line_group_cd = ?
             AND sst.pass <> 1
-            ORDER BY t.kind, sst.id",
+            ORDER BY sst.id",
             params
         );
 
@@ -318,12 +365,24 @@ impl InternalTrainTypeRepository {
             return Ok(vec![]);
         }
 
+        let line_group_id_vec: HashSet<u32> = line_group_id_vec.into_iter().collect();
+
         let params = format!("?{}", ", ?".repeat(line_group_id_vec.len() - 1));
         let query_str = format!(
-            "SELECT 
-            t.*, 
-            s.*,
-            sst.*
+            "SELECT DISTINCT
+            sst.id,
+            t.type_cd,
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
+            sst.station_cd,
+            sst.line_group_cd,
+            sst.pass
             FROM 
             types as t
             JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} ) AND sst.pass <> 1 AND sst.type_cd = t.type_cd
