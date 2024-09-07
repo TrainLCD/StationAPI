@@ -50,25 +50,25 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 0,129,とっとりライナー,トットリライナー,Tottori Liner,鳥取Liner,돗토리 라이너,#DC143C,0,2,0,,NOT
 0,130,アクアライナー,アクアライナー,Aqua Liner,Aqua Liner,아쿠아 라이너,#DC143C,0,2,0,,NOT
 0,131,快速(青),カイソク（アオ）,Rapid(Blue),快车,쾌속,#0000FF,0,2,0,,NOT
-0,132,南武支線,ナンブシセン,Nambu Branch Line,南埠支线,난부 지선,#FFD400,0,1,0,,COMPLETE
-0,133,空港支線,クウコウシセン,Airport Branch Line,机场支线,공항 지선,#00B261,0,1,0,,COMPLETE
+0,132,各駅停車(南武支線),カクエキテイシャ,Local(Nambu Branch Line),每站停车(南埠支线),각역정차(난부 지선),#FFD400,0,1,0,,COMPLETE
+0,133,普通(成田空港方面),フツウ,Local(for Narita Airport),慢车(成田机场),보통(나리타 공항),#00B261,0,1,0,,COMPLETE
 0,134,区間快速(加茂方面),クカンカイソク,Regional Rapid(for Kamo),区域快速,구간쾌속,#02AD73,0,2,0,,COMPLETE
 0,135,区間快速(和歌山方面),クカンカイソク,Regional Rapid(for Wakayama),区域快速,구간쾌속,#F89C1C,0,2,0,,COMPLETE
 0,136,直通快速(和歌山方面),チョクツウカイソク,Direct Rapid(for Wakayama),直接快速,직통쾌속,#F89C1C,0,2,0,,COMPLETE
 0,137,直通快速(関西空港方面),チョクツウカイソク,Direct Rapid(for Kansai Airport),直接快速,직통쾌속,#007AC2,0,2,0,,COMPLETE
 0,138,新快速,シンカイソク,New Rapid,新快速,신쾌속,#FF4500,0,2,0,JR東海用,COMPLETE
-0,139,辰野支線,タツノシセン,Tatsuno Branch Line,辰野支线,다쓰노 지선,#0074BE,0,1,0,,COMPLETE
-0,140,我孫子支線,アビコシセン,Abiko Branch Line,我孫子支线,아비코 지선,#00B261,0,1,0,,COMPLETE
-0,141,利府支線,リフシセン,Rifu Branch Line,利府线,리후선,#3CB371,0,1,0,,COMPLETE
-0,142,長与支線,ナガヨシセン,Nagayo Branch Line,长与支线,나가요 경로,#FAAF18,0,1,0,,COMPLETE
-0,143,支線,シセン,Branch Line,支線,경로,#00B2EB,0,1,0,,COMPLETE
-0,144,砂原線,サワラセン,Sawara Branch Line,砂原支线,사와라 지선,#0072BC,0,1,0,,COMPLETE
-0,145,支線,シセン,Branch Line,支線,경로,#2CB431,0,1,0,,COMPLETE
+0,139,普通(辰野支線),フツウ,Local(Tatsuno Branch Line),慢车(辰野支线),보통(다쓰노 지선),#0074BE,0,1,0,,COMPLETE
+0,140,普通(我孫子支線),フツウ,Local(Abiko Branch Line),慢车(我孫子支线),보통(아비코 지선),#00B261,0,1,0,,COMPLETE
+0,141,普通(利府支線),フツウ,Local(Rifu Branch Line),慢车(利府线),보통(리후선),#3CB371,0,1,0,,COMPLETE
+0,142,普通(長与経由),フツウ,Local(Nagayo Branch Line),慢车(长与支线),보통(나가요 경로),#FAAF18,0,1,0,,COMPLETE
+0,143,普通(新千歳空港方面),フツウ,Local(for New Chitose Airport),慢车,보통,#00B2EB,0,1,0,,COMPLETE
+0,144,普通(砂原線経由),フツウ,Local(Sawara Branch Line),慢车(砂原支线),보통(사와라 지선),#0072BC,0,1,0,,COMPLETE
+0,145,普通(室蘭方面),フツウ,Local(for Muroran),慢车,보통,#2CB431,0,1,0,,COMPLETE
 0,146,シーサイドライナー,シーサイドライナー,Sea Side Liner,滨海快线,바다 사이드 라이너,#0095D9,0,2,0,,COMPLETE
 0,147,エアポート,エアポート,Airport,机场号,에어포트,#FF0080,0,2,0,,COMPLETE
 0,148,ニセコライナー,ニセコライナー,Niseko Liner,二世谷快车,니세코라이너,#0098E1,0,2,0,,COMPLETE
-0,149,美濃赤坂線,ミノアカサカセン,Mino-Akasaka Line,美浓赤坂线,미노아카사카 지선,#F68B1E,0,1,0,,COMPLETE
-0,150,本山支線,モトヤマシセン,Motoyama Branch Line,本山支线,모토야마 지선,#695FAA,0,1,0,小野田線,COMPLETE
+0,149,普通(美濃赤坂線),フツウ,Local(Mino-Akasaka Line),慢车(美浓赤坂线),보통(미노아카사카 지선),#F68B1E,0,1,0,,COMPLETE
+0,150,普通(本山支線),フツウ,Local(Motoyama Branch Line),慢车(本山支线),보통(모토야마 지선),#695FAA,0,1,0,小野田線,COMPLETE
 0,151,あきがわ号,アキガワゴウ,Akigawa,秋川号,아키가와호,#F15A22,0,2,0,,COMPLETE
 0,152,普通,フツウ,Local,慢车,보통,#1F63C6,1,0,0,上り系統,PARTIAL
 0,153,普通,フツウ,Local,慢车,보통,#1F63C6,2,0,0,下り系統,PARTIAL
@@ -130,6 +130,8 @@ Yokokawa","SL群马
 0,242,あしずり,アシズリ,Ashizuri,足折,아시즈리,#E25885,0,4,0,,COMPLETE
 0,243,しおかぜ,シオカゼ,Shiokaze,海風,바닷바람,#1CADCA,0,4,0,,COMPLETE
 0,244,いしづち,イシヅチ,Ishizuchi,石鎚,석진,#1CADCA,0,4,0,,COMPLETE
+0,245,おおぞら,オオゾラ,Ōzora,大空,큰 하늘,#2CB431,0,4,0,,COMPLETE
+0,246,とかち,トカチ,Tokachi,十勝,도카치,#2CB431,0,4,0,,COMPLETE
 0,300,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,廃止済み 100に移行,NOT
 0,301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,廃止済み 101に移行,NOT
 0,302,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,廃止済み 102に移行,NOT
