@@ -887,6 +887,7 @@ impl InternalStationRepository {
               	from_sst.line_group_cd = dst_sst.line_group_cd
               	OR s.line_cd IN (SELECT line_cd FROM stations WHERE station_g_cd = IFNULL(?, s.station_g_cd))
               )
+            GROUP BY s.station_g_cd
             LIMIT
               ?",
             from_station_group_id,
