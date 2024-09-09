@@ -563,12 +563,11 @@ where
                 let mut transfer_stations = transfer_stations.lock().unwrap();
                 let station = transfer_stations
                     .iter_mut()
-                    .find(|row| row.line_cd == line.line_cd)
-                    .map(|station| {
-                        station.station_numbers = self.get_station_numbers(station);
-                        station
-                    });
-                line.station = station.cloned();
+                    .find(|row| row.line_cd == line.line_cd);
+                if let Some(station) = station {
+                    station.station_numbers = self.get_station_numbers(station);
+                    line.station = Some(station.clone());
+                }
 
                 line
             })
