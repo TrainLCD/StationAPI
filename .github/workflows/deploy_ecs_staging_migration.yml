@@ -4,9 +4,8 @@ on:
   push:
     branches:
       - dev
-      - feature/ecs-cd-stg # TODO: マージ前に消す
-    # paths:
-    #   - "data/**"
+    paths:
+      - "data/**"
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
