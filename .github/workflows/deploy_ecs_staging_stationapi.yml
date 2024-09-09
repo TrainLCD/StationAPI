@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - dev
-      - feature/ecs-cd-stg # TODO: マージ前に消す
     paths:
       - "**"
       - "!data/**"
