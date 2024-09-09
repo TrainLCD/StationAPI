@@ -4,9 +4,8 @@ on:
   push:
     branches:
       - master
-      - feature/ecs-cd-prod
-    # paths:
-    #   - "data/**"
+    paths:
+      - "data/**"
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
