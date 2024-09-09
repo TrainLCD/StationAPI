@@ -8,17 +8,17 @@ on:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECR_REPOSITORY: ${{ secrets.ECR_STAGING_SAPI_REPOSITORY }}
-  ECS_SERVICE: ${{ secrets.ECS_STAGING_SAPI_SERVICE }}
-  ECS_CLUSTER: ${{ secrets.ECS_STAGING_SAPI_CLUSTER }}
-  ECS_TASK_DEFINITION: ${{ secrets.ECS_STAGING_SAPI_TASK_DEFINITION }}
-  CONTAINER_NAME: ${{ secrets.ECS_STAGING_SAPI_CONTAINER_NAME }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+  ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+  ECS_TASK_DEFINITION: ${{ secrets.ECS_TASK_DEFINITION }}
+  CONTAINER_NAME: ${{ secrets.ECS_CONTAINER_NAME }}
 
 jobs:
   deploy:
     name: Deploy StationAPI Canary
     runs-on: ubuntu-latest
-    environment: production
+    environment: staging
 
     steps:
       - name: Checkout
