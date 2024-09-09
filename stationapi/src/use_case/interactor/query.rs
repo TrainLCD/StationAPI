@@ -16,7 +16,7 @@ use crate::{
             station_repository::StationRepository, train_type_repository::TrainTypeRepository,
         },
     },
-    station_api::Route,
+    station_api::{self, Route},
     use_case::{error::UseCaseError, traits::query::QueryUseCase},
 };
 
@@ -315,38 +315,37 @@ where
             station.line_symbol_extra_shape.unwrap_or("".to_string()),
         ];
 
-        let mut station_numbers: Vec<StationNumber> = Vec::with_capacity(station_numbers_raw.len());
+        station_numbers_raw
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, station_number)| {
+                let sym_color = line_symbol_colors_raw[index].to_string();
+                let sym_shape = line_symbols_shape_raw[index].to_string();
 
-        for (index, station_number) in station_numbers_raw.into_iter().enumerate() {
-            let sym_color = line_symbol_colors_raw[index].to_string();
-            let sym_shape = line_symbols_shape_raw[index].to_string();
+                if station_number.is_empty() {
+                    return None;
+                }
 
-            if station_number.is_empty() {
-                continue;
-            }
+                if let Some(sym) = line_symbols_raw[index] {
+                    let station_number_string = format!("{}-{}", sym, station_number);
 
-            if let Some(sym) = line_symbols_raw[index] {
-                let station_number_string = format!("{}-{}", sym, station_number);
-
-                let station_number = StationNumber {
-                    line_symbol: sym.to_string(),
-                    line_symbol_color: sym_color,
-                    line_symbol_shape: sym_shape,
-                    station_number: station_number_string,
-                };
-                station_numbers.push(station_number);
-            } else {
+                    let station_number = StationNumber {
+                        line_symbol: sym.to_string(),
+                        line_symbol_color: sym_color,
+                        line_symbol_shape: sym_shape,
+                        station_number: station_number_string,
+                    };
+                    return Some(station_number);
+                }
                 let station_number = StationNumber {
                     line_symbol: "".to_string(),
                     line_symbol_color: sym_color,
                     line_symbol_shape: sym_shape,
                     station_number,
                 };
-                station_numbers.push(station_number);
-            }
-        }
-
-        station_numbers
+                Some(station_number)
+            })
+            .collect()
     }
     fn extract_line_from_station(&self, station: &Station) -> Line {
         let station = station.clone();
@@ -421,30 +420,28 @@ where
             return vec![];
         }
 
-        let mut line_symbols: Vec<LineSymbol> = Vec::with_capacity(line_symbols_raw.len());
+        (0..line_symbols_raw.len())
+            .filter_map(|index| {
+                let Some(symbol) = line_symbols_raw[index] else {
+                    return None;
+                };
+                let color = &line_symbol_colors_raw[index];
+                let shape = &line_symbols_shape_raw[index];
 
-        (0..line_symbols_raw.len()).for_each(|index| {
-            let Some(symbol) = line_symbols_raw[index] else {
-                return;
-            };
-            let color = &line_symbol_colors_raw[index];
-            let shape = &line_symbols_shape_raw[index];
+                if symbol.is_empty() {
+                    return None;
+                }
+                if shape.is_empty() {
+                    return None;
+                }
 
-            if symbol.is_empty() {
-                return;
-            }
-            if shape.is_empty() {
-                return;
-            }
-
-            line_symbols.push(LineSymbol {
-                symbol: symbol.to_string(),
-                color: color.to_string(),
-                shape: shape.to_string(),
-            });
-        });
-
-        line_symbols
+                Some(LineSymbol {
+                    symbol: symbol.to_string(),
+                    color: color.to_string(),
+                    shape: shape.to_string(),
+                })
+            })
+            .collect()
     }
     async fn get_train_types_by_station_id(
         &self,
@@ -590,77 +587,71 @@ where
             },
         );
 
-        let mut routes = Vec::with_capacity(route_row_tree_map.len());
+        let routes: Vec<Route> = route_row_tree_map
+            .iter()
+            .map(|(id, stops)| {
+                let stops = stops
+                    .iter()
+                    .map(|row| {
+                        let mut stop = row.clone();
 
-        for (id, stops) in route_row_tree_map {
-            let stops_with_line: Vec<crate::station_api::Station> = stops
-                .iter()
-                .map(|row: &Station| {
-                    let mut stop =
-                        std::convert::Into::<crate::domain::entity::station::Station>::into(
-                            row.clone(),
-                        );
+                        let extracted_line = Arc::new(self.extract_line_from_station(&stop));
+                        stop.line = Some(Box::new(Arc::clone(&extracted_line).as_ref().clone()));
+                        stop.lines = rows_lines
+                            .clone()
+                            .iter()
+                            .filter(|l| l.station_cd == stop.station_cd)
+                            .cloned()
+                            .collect();
+                        stop.station_numbers = self.get_station_numbers(&stop);
 
-                    let extracted_line = Arc::new(self.extract_line_from_station(&stop));
-                    stop.line = Some(Box::new(Arc::clone(&extracted_line).as_ref().clone()));
-                    stop.lines = rows_lines
-                        .clone()
-                        .iter()
-                        .filter(|l| l.station_cd == stop.station_cd)
-                        .cloned()
-                        .collect();
-                    stop.station_numbers = self.get_station_numbers(&stop);
+                        let locked_tt_lines = tt_lines.lock().unwrap();
 
-                    let locked_tt_lines = tt_lines.lock().unwrap();
-
-                    if stop.has_train_types {
-                        stop.train_type = Some(Box::new(TrainType {
-                            id: row.type_id.unwrap(),
-                            station_cd: row.station_cd,
-                            type_cd: row.type_cd.unwrap(),
-                            line_group_cd: row.line_group_cd.unwrap(),
-                            pass: row.pass.unwrap(),
-                            type_name: row.type_name.clone().unwrap(),
-                            type_name_k: row.type_name_k.clone().unwrap(),
-                            type_name_r: row.type_name_r.clone(),
-                            type_name_zh: row.type_name_zh.clone(),
-                            type_name_ko: row.type_name_ko.clone(),
-                            color: row.color.clone().unwrap(),
-                            direction: row.direction.unwrap(),
-                            kind: row.kind.unwrap(),
-                            line: Some(Box::new(
-                                locked_tt_lines
-                                    .clone()
-                                    .iter()
-                                    .find(|line| line.line_cd == row.line_cd)
-                                    .unwrap()
-                                    .clone(),
-                            )),
-                            lines: locked_tt_lines
-                                .clone()
-                                .iter_mut()
-                                .map(|l| {
-                                    l.train_type = Arc::clone(&train_types)
+                        if stop.has_train_types {
+                            stop.train_type = Some(Box::new(TrainType {
+                                id: row.type_id.unwrap(),
+                                station_cd: row.station_cd,
+                                type_cd: row.type_cd.unwrap(),
+                                line_group_cd: row.line_group_cd.unwrap(),
+                                pass: row.pass.unwrap(),
+                                type_name: row.type_name.clone().unwrap(),
+                                type_name_k: row.type_name_k.clone().unwrap(),
+                                type_name_r: row.type_name_r.clone(),
+                                type_name_zh: row.type_name_zh.clone(),
+                                type_name_ko: row.type_name_ko.clone(),
+                                color: row.color.clone().unwrap(),
+                                direction: row.direction.unwrap(),
+                                kind: row.kind.unwrap(),
+                                line: Some(Box::new(
+                                    locked_tt_lines
+                                        .clone()
                                         .iter()
-                                        .filter(|tt| {
-                                            tt.line_group_cd == stop.line_group_cd.unwrap()
-                                        })
-                                        .find(|tt| tt.station_cd == l.station_cd)
-                                        .cloned();
-                                    l.to_owned()
-                                })
-                                .collect(),
-                        }));
-                    }
-                    stop.into()
-                })
-                .collect();
-            let var_name = Route {
-                id,
-                stops: stops_with_line,
-            };
-            routes.push(var_name);
-        }
+                                        .find(|line| line.line_cd == row.line_cd)
+                                        .unwrap()
+                                        .clone(),
+                                )),
+                                lines: locked_tt_lines
+                                    .clone()
+                                    .iter_mut()
+                                    .map(|l| {
+                                        l.train_type = Arc::clone(&train_types)
+                                            .iter()
+                                            .filter(|tt| {
+                                                tt.line_group_cd == stop.line_group_cd.unwrap()
+                                            })
+                                            .find(|tt| tt.station_cd == l.station_cd)
+                                            .cloned();
+                                        l.to_owned()
+                                    })
+                                    .collect(),
+                            }));
+                        }
+                        stop.into()
+                    })
+                    .collect::<Vec<station_api::Station>>();
+                Route { id: *id, stops }
+            })
+            .collect();
         Ok(routes)
     }
 }
