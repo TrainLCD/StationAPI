@@ -973,173 +973,108 @@ impl InternalStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let rows = sqlx::query_as!(
             StationRow,
-            "(
-              SELECT
-                  sta.*,
-                  via_lines.company_cd,
-                  via_lines.line_type,
-                  via_lines.line_symbol_primary,
-                  via_lines.line_symbol_secondary,
-                  via_lines.line_symbol_extra,
-                  via_lines.line_symbol_primary_color,
-                  via_lines.line_symbol_secondary_color,
-                  via_lines.line_symbol_extra_color,
-                  via_lines.line_symbol_primary_shape,
-                  via_lines.line_symbol_secondary_shape,
-                  via_lines.line_symbol_extra_shape,
-                  via_lines.average_distance,
-                  sst.type_cd,
-                  sst.line_group_cd,
-                  sst.pass,
-                  types.id AS type_id,
-                  types.type_name,
-                  types.type_name_k,
-                  types.type_name_r,
-                  types.type_name_zh,
-                  types.type_name_ko,
-                  types.color,
-                  types.direction,
-                  types.kind,
-                  COALESCE(a.line_name, via_lines.line_name) AS line_name,
-                  COALESCE(a.line_name_k, via_lines.line_name_k) AS line_name_k,
-                  COALESCE(a.line_name_h, via_lines.line_name_h) AS line_name_h,
-                  COALESCE(a.line_name_r, via_lines.line_name_r) AS line_name_r,
-                  COALESCE(a.line_name_zh, via_lines.line_name_zh) AS line_name_zh,
-                  COALESCE(a.line_name_ko, via_lines.line_name_ko) AS line_name_ko,
-                  COALESCE(a.line_color_c, via_lines.line_color_c) AS line_color_c,
-                  IFNULL(
-                      sta.station_cd = sst.station_cd,
-                      0
-                  ) AS has_train_types
-              FROM
-                  stations AS sta
-                  JOIN
-                      station_station_types AS sst
-                  ON  sta.station_cd = sst.station_cd
-                  AND sst.line_group_cd IN(
-                          SELECT
-                              _sst.line_group_cd
-                          FROM
-                              station_station_types AS _sst
-                          WHERE
-                              _sst.station_cd IN(
-                                  SELECT
-                                      s.station_cd
-                                  FROM
-                                      stations AS s
-                                  WHERE
-                                      s.station_g_cd = ?
-                              )
-                              AND _sst.pass <> 1
-                      )
-                  AND sst.line_group_cd IN(
-                          SELECT
-                              _sst.line_group_cd
-                          FROM
-                              station_station_types AS _sst
-                          WHERE
-                              _sst.station_cd IN(
-                                  SELECT
-                                      s.station_cd
-                                  FROM
-                                      stations AS s
-                                  WHERE
-                                      s.station_g_cd = ?
-                              )
-                              AND _sst.pass <> 1
-                      )
-                  AND sta.station_cd = sst.station_cd
-                  JOIN
-                      types
-                  ON  sst.type_cd = types.type_cd
-                  JOIN
-                      `lines` AS via_lines
-                  ON  sta.line_cd = via_lines.line_cd
-                  LEFT JOIN
-                      `line_aliases` AS la
-                  ON  la.station_cd = sta.station_cd
-                  LEFT JOIN
-                      `aliases` AS a
-                  ON  a.id = la.alias_cd
-          )
-          UNION
-          (
-              SELECT
-                  sta.*,
-                  via_lines.company_cd,
-                  via_lines.line_type,
-                  via_lines.line_symbol_primary,
-                  via_lines.line_symbol_secondary,
-                  via_lines.line_symbol_extra,
-                  via_lines.line_symbol_primary_color,
-                  via_lines.line_symbol_secondary_color,
-                  via_lines.line_symbol_extra_color,
-                  via_lines.line_symbol_primary_shape,
-                  via_lines.line_symbol_secondary_shape,
-                  via_lines.line_symbol_extra_shape,
-                  via_lines.average_distance,
-                  sst.type_cd,
-                  sst.line_group_cd,
-                  sst.pass,
-                  types.id AS type_id,
-                  types.type_name,
-                  types.type_name_k,
-                  types.type_name_r,
-                  types.type_name_zh,
-                  types.type_name_ko,
-                  types.color,
-                  types.direction,
-                  types.kind,
-                  COALESCE(a.line_name, via_lines.line_name) AS line_name,
-                  COALESCE(a.line_name_k, via_lines.line_name_k) AS line_name_k,
-                  COALESCE(a.line_name_h, via_lines.line_name_h) AS line_name_h,
-                  COALESCE(a.line_name_r, via_lines.line_name_r) AS line_name_r,
-                  COALESCE(a.line_name_zh, via_lines.line_name_zh) AS line_name_zh,
-                  COALESCE(a.line_name_ko, via_lines.line_name_ko) AS line_name_ko,
-                  COALESCE(a.line_color_c, via_lines.line_color_c) AS line_color_c,
-                  IFNULL(
-                      sta.station_cd = sst.station_cd,
-                      0
-                  ) AS has_train_types
-              FROM
-                  stations AS sta
-                  LEFT JOIN
-                      station_station_types AS sst
-                  ON  sst.station_cd = NULL
-                  LEFT JOIN
-                      types
-                  ON  types.type_cd = NULL
-                  JOIN
-                      `lines` AS via_lines
-                  ON  via_lines.line_cd IN(
-                          SELECT
-                              s.line_cd
-                          FROM
-                              stations AS s
-                          WHERE
-                              s.station_g_cd = ?
-                      )
-                  AND via_lines.line_cd IN(
-                          SELECT
-                              s.line_cd
-                          FROM
-                              stations AS s
-                          WHERE
-                              s.station_g_cd = ?
-                      )
-                  LEFT JOIN
-                      `line_aliases` AS la
-                  ON  la.station_cd = sta.station_cd
-                  LEFT JOIN
-                      `aliases` AS a
-                  ON  a.id = la.alias_cd
-              WHERE
-                  sta.line_cd = via_lines.line_cd
-              AND sst.pass <> 1
-              ORDER BY
-                  sta.e_sort,
-                  sta.station_cd
-          )",
+            "SELECT
+            sta.*,
+            via_lines.company_cd,
+            via_lines.line_type,
+            via_lines.line_symbol_primary,
+            via_lines.line_symbol_secondary,
+            via_lines.line_symbol_extra,
+            via_lines.line_symbol_primary_color,
+            via_lines.line_symbol_secondary_color,
+            via_lines.line_symbol_extra_color,
+            via_lines.line_symbol_primary_shape,
+            via_lines.line_symbol_secondary_shape,
+            via_lines.line_symbol_extra_shape,
+            via_lines.average_distance,
+            sst.type_cd,
+            sst.line_group_cd,
+            sst.pass,
+            types.id AS type_id,
+            types.type_name,
+            types.type_name_k,
+            types.type_name_r,
+            types.type_name_zh,
+            types.type_name_ko,
+            types.color,
+            types.direction,
+            types.kind,
+            COALESCE(a.line_name, via_lines.line_name) AS line_name,
+            COALESCE(a.line_name_k, via_lines.line_name_k) AS line_name_k,
+            COALESCE(a.line_name_h, via_lines.line_name_h) AS line_name_h,
+            COALESCE(a.line_name_r, via_lines.line_name_r) AS line_name_r,
+            COALESCE(a.line_name_zh, via_lines.line_name_zh) AS line_name_zh,
+            COALESCE(a.line_name_ko, via_lines.line_name_ko) AS line_name_ko,
+            COALESCE(a.line_color_c, via_lines.line_color_c) AS line_color_c,
+            IFNULL(
+                sta.station_cd = sst.station_cd,
+                0
+            ) AS has_train_types
+            FROM
+            stations AS sta
+            LEFT JOIN
+                station_station_types AS sst
+            ON  sta.station_cd = sst.station_cd
+            AND sst.line_group_cd IN(
+                SELECT
+                    _sst.line_group_cd
+                FROM
+                    station_station_types AS _sst
+                WHERE
+                    _sst.station_cd IN(
+                    SELECT
+                        s.station_cd
+                    FROM
+                        stations AS s
+                    WHERE
+                        s.station_g_cd = ?
+                    )
+                AND _sst.pass <> 1
+                )
+            AND sst.line_group_cd IN(
+                SELECT
+                    _sst.line_group_cd
+                FROM
+                    station_station_types AS _sst
+                WHERE
+                    _sst.station_cd IN(
+                    SELECT
+                        s.station_cd
+                    FROM
+                        stations AS s
+                    WHERE
+                        s.station_g_cd = ?
+                    )
+                AND _sst.pass <> 1
+                )
+            AND sta.station_cd = sst.station_cd
+            LEFT JOIN
+                types
+            ON  sst.type_cd = types.type_cd
+            JOIN
+                `lines` AS via_lines
+            ON  sta.line_cd = via_lines.line_cd
+            LEFT JOIN
+                `line_aliases` AS la
+            ON  la.station_cd = sta.station_cd
+            LEFT JOIN
+                `aliases` AS a
+            ON  a.id = la.alias_cd
+            WHERE
+            via_lines.line_cd = IF(sst.type_cd IS NULL,(
+                SELECT
+                    l.line_cd
+                FROM
+                    `lines` AS l
+                    JOIN
+                    `stations` AS s1
+                    ON  s1.station_g_cd = ?
+                    JOIN
+                    `stations` AS s2
+                    ON  s2.station_g_cd = ?
+                    AND l.line_cd = s1.line_cd
+                    AND l.line_cd = s2.line_cd
+                ), sta.line_cd)",
             from_station_id,
             to_station_id,
             from_station_id,
