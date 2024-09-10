@@ -141,8 +141,8 @@ Yokokawa","SL群马
 0,307,エアポート快特,エアポートカイトク,Airport Limited Express,机场特快,공항쾌특,#FA9715,0,3,0,,COMPLETE
 0,308,快特(泉岳寺〜三崎口),カイトク,Limited Express(Sengakuji to Misakiguchi),特快,쾌특,#379412,0,3,0,,COMPLETE
 0,309,快特(泉岳寺〜羽田空港),カイトク,Limited Express(Sengakuji to Haneda Airport),特快,쾌특,#379412,0,3,0,,COMPLETE
-0,310,エアポート急行(泉岳寺〜羽田空港),エアポートキュウコウ,Airport Express(Haneda Airport to Sengakuji),机场特快,공항급행,#0D83C3,0,3,0,,COMPLETE
-0,311,エアポート急行(逗子・葉山〜羽田空港),エアポートキュウコウ,Airport Express(Haneda Airport to Zushi･Hayama),机场特快,공항급행,#0D83C3,0,3,0,,COMPLETE
+0,310,急行(泉岳寺〜羽田空港),キュウコウ,Express(Haneda Airport to Sengakuji),特快,급행,#0D83C3,0,3,0,,COMPLETE
+0,311,急行(逗子・葉山〜羽田空港),キュウコウ,Express(Haneda Airport to Zushi･Hayama),特快,급행,#0D83C3,0,3,0,,COMPLETE
 0,312,特急(泉岳寺〜三崎口),トッキュウ,Limited Express(Sengakuji to Misakiguchi),特快,특급,#EA0104,0,3,0,,COMPLETE
 0,313,特急(泉岳寺〜浦賀),トッキュウ,Limited Express(Sengakuji to Uraga),特快,특급,#EA0104,0,3,0,,PARTIAL
 0,314,通勤急行,ツウキンキュウコウ,Commuter Express,通勤快车,통근급행,#EEAA66,0,3,0,,PARTIAL
