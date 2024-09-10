@@ -592,7 +592,7 @@ where
                 let stops = stops
                     .iter()
                     .map(|row| {
-                        let extracted_line = Arc::new(self.extract_line_from_station(&row));
+                        let extracted_line = Arc::new(self.extract_line_from_station(row));
 
                         let locked_tt_lines = &tt_lines.lock().unwrap();
 
@@ -667,7 +667,7 @@ where
                             station_name_r: row.station_name_r.clone(),
                             station_name_zh: row.station_name_zh.clone(),
                             station_name_ko: row.station_name_ko.clone(),
-                            station_numbers: self.get_station_numbers(&row),
+                            station_numbers: self.get_station_numbers(row),
                             primary_station_number: row.primary_station_number.clone(),
                             secondary_station_number: row.secondary_station_number.clone(),
                             extra_station_number: row.extra_station_number.clone(),
