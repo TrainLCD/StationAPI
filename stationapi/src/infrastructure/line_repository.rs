@@ -448,7 +448,7 @@ impl InternalLineRepository {
 
         let params = format!("?{}", ", ?".repeat(line_group_id_vec.len() - 1));
         let query_str = format!(
-            "SELECT DISTINCT
+            "SELECT
                 l.*,
                 sst.line_group_cd,
                 COALESCE(a.line_name, l.line_name) AS line_name,
@@ -461,13 +461,11 @@ impl InternalLineRepository {
                 s.station_cd,
                 s.station_g_cd
             FROM `lines` AS l
-            LEFT JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} )
-            LEFT JOIN `stations` AS s ON s.station_cd = sst.station_cd AND s.e_status = 0
+            JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} )
+            JOIN `stations` AS s ON s.station_cd = sst.station_cd AND s.e_status = 0 AND s.line_cd = l.line_cd
             LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
-            WHERE
-                l.line_cd = s.line_cd
-                AND l.e_status = 0
+            WHERE l.e_status = 0
             GROUP BY l.line_cd",
             params
         );

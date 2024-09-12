@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
 
@@ -516,24 +519,25 @@ where
         from_station_id: u32,
         to_station_id: u32,
     ) -> Result<Vec<Route>, UseCaseError> {
-        let rows = self
+        let stops = self
             .station_repository
             .get_route_stops(from_station_id, to_station_id)
             .await?;
-        let rows = Arc::new(rows);
+        let stops = Arc::new(stops);
 
-        let line_group_id_vec = Arc::clone(&rows)
+        let line_group_id_vec = Arc::clone(&stops)
             .iter()
             .filter_map(|row| row.line_group_cd)
             .collect::<Vec<u32>>();
-        let line_group_id_vec = Arc::new(line_group_id_vec);
+        let line_group_id_set: HashSet<u32> = line_group_id_vec.into_iter().collect();
         let tt_lines = self
             .line_repository
-            .get_by_line_group_id_vec_for_routes(Arc::clone(&line_group_id_vec).to_vec())
+            .get_by_line_group_id_vec_for_routes(line_group_id_set.into_iter().collect())
             .await?;
+
         let tt_lines = Arc::new(tt_lines);
 
-        let route_row_tree_map: BTreeMap<u32, Vec<Station>> = Arc::clone(&rows).iter().fold(
+        let route_row_tree_map: BTreeMap<u32, Vec<Station>> = Arc::clone(&stops).iter().fold(
             BTreeMap::new(),
             |mut acc: BTreeMap<u32, Vec<Station>>, value| {
                 if let Some(line_group_cd) = value.line_group_cd {
