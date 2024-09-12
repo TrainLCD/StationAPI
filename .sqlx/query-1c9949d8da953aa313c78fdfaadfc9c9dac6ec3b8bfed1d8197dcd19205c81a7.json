@@ -1,0 +1,597 @@
+{
+  "db_name": "MySQL",
+  "query": "WITH cte1 AS (\n    SELECT s.station_cd\n    FROM stations AS s\n    WHERE s.station_g_cd = ?\n),\ncte2 AS (\n    SELECT s.station_cd\n    FROM stations AS s\n    WHERE s.station_g_cd = ?\n),\ncte3 AS (\n    SELECT sst.line_group_cd\n    FROM station_station_types AS sst\n\t\tJOIN cte1\n\t\tWHERE sst.station_cd = cte1.station_cd\n        AND sst.pass <> 1\n),\ncte4 AS (\n    SELECT sst.line_group_cd\n    FROM station_station_types AS sst\n\t\tJOIN cte2\n\t\tWHERE sst.station_cd = cte2.station_cd\n        AND sst.pass <> 1\n)\n\nSELECT\n        sta.*,\n        lin.company_cd,\n        lin.line_type,\n        lin.line_symbol_primary,\n        lin.line_symbol_secondary,\n        lin.line_symbol_extra,\n        lin.line_symbol_primary_color,\n        lin.line_symbol_secondary_color,\n        lin.line_symbol_extra_color,\n        lin.line_symbol_primary_shape,\n        lin.line_symbol_secondary_shape,\n        lin.line_symbol_extra_shape,\n        lin.average_distance,\n        sst.type_cd,\n        sst.line_group_cd,\n        sst.pass,\n        COALESCE(a.line_name, lin.line_name) AS line_name,\n        COALESCE(a.line_name_k, lin.line_name_k) AS line_name_k,\n        COALESCE(a.line_name_h, lin.line_name_h) AS line_name_h,\n        COALESCE(a.line_name_r, lin.line_name_r) AS line_name_r,\n        COALESCE(a.line_name_zh, lin.line_name_zh) AS line_name_zh,\n        COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,\n        COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,\n        IFNULL(sta.station_cd = sst.station_cd, 0) AS has_train_types,\n        tt.id AS type_id,\n        tt.type_name,\n        tt.type_name_k,\n        tt.type_name_r,\n        tt.type_name_zh,\n        tt.type_name_ko,\n        tt.color,\n        tt.direction,\n        tt.kind\n    FROM stations AS sta\n    JOIN cte3\n    JOIN cte4\n    LEFT JOIN\n        station_station_types AS sst\n            ON sst.line_group_cd = cte3.line_group_cd\n            AND sst.line_group_cd = cte4.line_group_cd\n\t\t\tAND sta.station_cd = sst.station_cd\n    LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd\n    JOIN `lines` AS lin ON sta.line_cd = lin.line_cd\n    LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd\n    LEFT JOIN `aliases` AS a ON la.alias_cd = a.id\nWHERE sst.line_group_cd = cte3.line_group_cd\n    AND sst.line_group_cd = cte3.line_group_cd\n    AND sta.station_cd = sta.station_cd\n    AND lin.line_cd = sta.line_cd",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "station_cd",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | PRIMARY_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "station_g_cd",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "station_name",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "station_name_k",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "station_name_r",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "station_name_zh",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "station_name_ko",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "primary_station_number",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "secondary_station_number",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "extra_station_number",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "three_letter_code",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "line_cd",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "pref_cd",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "post",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "address",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "lon",
+        "type_info": {
+          "type": "Double",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 22
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "lat",
+        "type_info": {
+          "type": "Double",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 22
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "open_ymd",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "close_ymd",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 19,
+        "name": "e_status",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 20,
+        "name": "e_sort",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 21,
+        "name": "company_cd",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 22,
+        "name": "line_type",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 23,
+        "name": "line_symbol_primary",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 24,
+        "name": "line_symbol_secondary",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 25,
+        "name": "line_symbol_extra",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 26,
+        "name": "line_symbol_primary_color",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 27,
+        "name": "line_symbol_secondary_color",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 28,
+        "name": "line_symbol_extra_color",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 29,
+        "name": "line_symbol_primary_shape",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 30,
+        "name": "line_symbol_secondary_shape",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 31,
+        "name": "line_symbol_extra_shape",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 32,
+        "name": "average_distance",
+        "type_info": {
+          "type": "Double",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 22
+        }
+      },
+      {
+        "ordinal": 33,
+        "name": "type_cd",
+        "type_info": {
+          "type": "Long",
+          "flags": "MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 34,
+        "name": "line_group_cd",
+        "type_info": {
+          "type": "Long",
+          "flags": "MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 35,
+        "name": "pass",
+        "type_info": {
+          "type": "Long",
+          "flags": "UNSIGNED",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 36,
+        "name": "line_name",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 37,
+        "name": "line_name_k",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 38,
+        "name": "line_name_h",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 39,
+        "name": "line_name_r",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 40,
+        "name": "line_name_zh",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 41,
+        "name": "line_name_ko",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 42,
+        "name": "line_color_c",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 43,
+        "name": "has_train_types",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | BINARY",
+          "char_set": 63,
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 44,
+        "name": "type_id",
+        "type_info": {
+          "type": "Long",
+          "flags": "PRIMARY_KEY | UNSIGNED | AUTO_INCREMENT",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 45,
+        "name": "type_name",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 46,
+        "name": "type_name_k",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 47,
+        "name": "type_name_r",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 48,
+        "name": "type_name_zh",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 49,
+        "name": "type_name_ko",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 50,
+        "name": "color",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 51,
+        "name": "direction",
+        "type_info": {
+          "type": "Long",
+          "flags": "UNSIGNED",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 52,
+        "name": "kind",
+        "type_info": {
+          "type": "Long",
+          "flags": "UNSIGNED",
+          "char_set": 63,
+          "max_size": 10
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "1c9949d8da953aa313c78fdfaadfc9c9dac6ec3b8bfed1d8197dcd19205c81a7"
+}
