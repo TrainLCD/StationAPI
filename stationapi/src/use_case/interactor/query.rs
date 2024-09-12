@@ -536,44 +536,6 @@ where
             .await?;
         let tt_lines = Arc::new(Mutex::new(tt_lines));
 
-        let train_types = self
-            .train_type_repository
-            .get_by_line_group_id_vec(Arc::clone(&line_group_id_vec).to_vec())
-            .await?;
-        let train_types = Arc::new(train_types);
-
-        let station_group_id_vec: Vec<u32> =
-            rows.clone().iter().map(|row| row.station_g_cd).collect();
-
-        let transfer_stations = self
-            .station_repository
-            .get_by_station_group_id_vec(station_group_id_vec.clone())
-            .await?;
-        let transfer_stations = Arc::new(Mutex::new(transfer_stations));
-
-        let rows_lines = self
-            .line_repository
-            .get_by_station_group_id_vec(station_group_id_vec)
-            .await?;
-        let rows_lines: Vec<Line> = rows_lines
-            .into_iter()
-            .map(|mut line| {
-                line.line_symbols = self.get_line_symbols(&line);
-                let transfer_stations = Arc::clone(&transfer_stations);
-                let mut transfer_stations = transfer_stations.lock().unwrap();
-                let station = transfer_stations
-                    .iter_mut()
-                    .find(|row| row.line_cd == line.line_cd);
-                if let Some(station) = station {
-                    station.station_numbers = self.get_station_numbers(station);
-                    line.station = Some(station.clone());
-                }
-
-                line
-            })
-            .collect();
-        let rows_lines = Arc::new(rows_lines);
-
         let route_row_tree_map: BTreeMap<u32, Vec<Station>> = Arc::clone(&rows).iter().fold(
             BTreeMap::new(),
             |mut acc: BTreeMap<u32, Vec<Station>>, value| {
@@ -629,11 +591,7 @@ where
                                 e_status: l.e_status,
                                 e_sort: l.e_sort,
                                 station: None,
-                                train_type: Arc::clone(&train_types)
-                                    .iter()
-                                    .filter(|tt| tt.line_group_cd == row.line_group_cd.unwrap())
-                                    .find(|tt| tt.station_cd == l.station_cd)
-                                    .cloned(),
+                                train_type: None,
                                 line_group_cd: l.line_group_cd,
                                 station_cd: l.station_cd,
                                 station_g_cd: l.station_g_cd,
@@ -674,12 +632,7 @@ where
                             three_letter_code: row.three_letter_code.clone(),
                             line_cd: row.line_cd,
                             line: Some(Box::new(Arc::clone(&extracted_line).as_ref().clone())),
-                            lines: rows_lines
-                                .clone()
-                                .iter()
-                                .filter(|l| l.station_cd == row.station_cd)
-                                .cloned()
-                                .collect(),
+                            lines: vec![],
                             pref_cd: row.pref_cd,
                             post: row.post.clone(),
                             address: row.address.clone(),
