@@ -1,7 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, Mutex},
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 use async_trait::async_trait;
 
@@ -534,7 +531,7 @@ where
             .line_repository
             .get_by_line_group_id_vec_for_routes(Arc::clone(&line_group_id_vec).to_vec())
             .await?;
-        let tt_lines = Arc::new(Mutex::new(tt_lines));
+        let tt_lines = Arc::new(tt_lines);
 
         let route_row_tree_map: BTreeMap<u32, Vec<Station>> = Arc::clone(&rows).iter().fold(
             BTreeMap::new(),
@@ -556,15 +553,13 @@ where
                     .map(|row| {
                         let extracted_line = Arc::new(self.extract_line_from_station(row));
 
-                        let locked_tt_lines = &tt_lines.lock().unwrap();
-
-                        let tt_line = locked_tt_lines
+                        let tt_line = Arc::clone(&tt_lines)
                             .iter()
                             .find(|line| line.line_cd == row.line_cd)
                             .unwrap()
                             .clone();
 
-                        let tt_lines: Vec<Line> = locked_tt_lines
+                        let tt_lines: Vec<Line> = Arc::clone(&tt_lines)
                             .iter()
                             .map(|l| Line {
                                 line_cd: l.line_cd,
