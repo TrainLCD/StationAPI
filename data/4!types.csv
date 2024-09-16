@@ -185,6 +185,16 @@ Yokokawa","SL群马
 0,352,急行(新松田より各駅停車),キュウコウ,Express(Local from Shin-Matsuda),特快,급행,#DC143C,0,3,0,,COMPLETE
 0,353,各駅停車(新松田より急行),カクエキテイシャ,Local(Express from Shin-Matsuda),每站停车,각역정차,#1F63C6,0,0,0,,COMPLETE
 0,354,特急,トッキュウ,Special Express,特快,특급,#DC143C,0,4,0,京王線用,COMPLETE
+0,355,普通,フツウ,Local,慢车,보통,#000000,0,0,0,京急京成用,COMPLETE
+0,356,普通(西馬込方面),フツウ,Local(For Nishi-magome),慢车,보통,#000000,0,0,0,都営浅草線用,COMPLETE
+0,357,普通(押上方面),フツウ,Local(For Oshiage),慢车,보통,#000000,0,0,0,都営浅草線用,COMPLETE
+0,358,急行,キュウコウ,Express,特快,급행,#0D83C3,0,3,0,都営浅草線用,COMPLETE
+0,359,快速,カイソク,Rapid,快车,쾌속,#ff69b4,0,2,0,都営浅草線用,COMPLETE
+0,360,通勤特急,ツウキントッキュウ,Commuter Express,通勤特快,통근특급,#00bfff,0,4,0,都営浅草線用,COMPLETE
+0,361,特急(泉岳寺方面),トッキュウ,Limited Express(For Sengakuji),特快,특급,#DC143C,0,4,0,都営浅草線用,COMPLETE
+0,362,特急(押上方面),トッキュウ,Limited Express(For Oshiage),特快,특급,#DC143C,0,4,0,都営浅草線用,COMPLETE
+0,363,快特(泉岳寺方面),カイトク,Limited Express(For Sengakuji),特快,쾌특,#379412,0,3,0,都営浅草線用,COMPLETE
+0,364,快速特急(押上方面),カイソクトッキュウ,Limited Express(For Oshiage),快速特快,쾌속특쾌,#049C5E,0,4,0,都営浅草線用,COMPLETE
 0,400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,2,0,,COMPLETE
 0,401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,2,0,,COMPLETE
 0,402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,2,0,,COMPLETE
