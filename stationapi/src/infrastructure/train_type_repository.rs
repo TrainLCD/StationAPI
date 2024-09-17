@@ -101,7 +101,7 @@ impl TrainTypeRepository for MyTrainTypeRepository {
 
     async fn get_by_station_id_vec(
         &self,
-        station_id_vec: Vec<u32>,
+        station_id_vec: &[u32],
         line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, DomainError> {
         let mut conn = self.pool.acquire().await?;
@@ -111,7 +111,7 @@ impl TrainTypeRepository for MyTrainTypeRepository {
 
     async fn get_types_by_station_id_vec(
         &self,
-        station_id_vec: Vec<u32>,
+        station_id_vec: &[u32],
         line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, DomainError> {
         let mut conn = self.pool.acquire().await?;
@@ -125,7 +125,7 @@ impl TrainTypeRepository for MyTrainTypeRepository {
 
     async fn get_by_line_group_id_vec(
         &self,
-        line_group_id_vec: Vec<u32>,
+        line_group_id_vec: &[u32],
     ) -> Result<Vec<TrainType>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_by_line_group_id_vec(line_group_id_vec, &mut conn).await
@@ -230,7 +230,7 @@ impl InternalTrainTypeRepository {
     }
 
     async fn get_by_station_id_vec(
-        station_id_vec: Vec<u32>,
+        station_id_vec: &[u32],
         line_group_id: Option<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
@@ -264,7 +264,7 @@ impl InternalTrainTypeRepository {
     }
 
     async fn get_types_by_station_id_vec(
-        station_id_vec: Vec<u32>,
+        station_id_vec: &[u32],
         line_group_id: Option<u32>,
         conn: &mut MySqlConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
@@ -311,7 +311,7 @@ impl InternalTrainTypeRepository {
     }
 
     async fn get_by_line_group_id_vec(
-        line_group_id_vec: Vec<u32>,
+        line_group_id_vec: &[u32],
         conn: &mut MySqlConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         if line_group_id_vec.is_empty() {

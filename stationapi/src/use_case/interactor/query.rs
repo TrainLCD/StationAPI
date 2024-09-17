@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 use async_trait::async_trait;
 
@@ -49,7 +46,7 @@ where
     }
     async fn get_stations_by_id_vec(
         &self,
-        station_ids: Vec<u32>,
+        station_ids: &[u32],
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut stations = self.station_repository.get_by_id_vec(station_ids).await?;
         self.update_station_vec_with_attributes(&mut stations, None)
@@ -73,7 +70,7 @@ where
     }
     async fn get_stations_by_group_id_vec(
         &self,
-        station_group_id_vec: Vec<u32>,
+        station_group_id_vec: &[u32],
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
@@ -84,7 +81,7 @@ where
     }
     async fn get_lines_by_station_group_id_vec(
         &self,
-        station_group_id_vec: Vec<u32>,
+        station_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, UseCaseError> {
         let lines = self
             .line_repository
@@ -155,7 +152,7 @@ where
     }
     async fn find_company_by_id_vec(
         &self,
-        company_id_vec: Vec<u32>,
+        company_id_vec: &[u32],
     ) -> Result<Vec<Company>, UseCaseError> {
         let companies = self
             .company_repository
@@ -175,7 +172,7 @@ where
             .collect::<Vec<u32>>();
 
         let stations_by_group_ids = self
-            .get_stations_by_group_id_vec(station_group_ids.clone())
+            .get_stations_by_group_id_vec(&station_group_ids)
             .await?;
 
         let station_ids = stations_by_group_ids
@@ -183,18 +180,18 @@ where
             .map(|station| station.station_cd)
             .collect::<Vec<u32>>();
 
-        let lines = self
-            .get_lines_by_station_group_id_vec(station_group_ids.clone())
+        let lines = &self
+            .get_lines_by_station_group_id_vec(&station_group_ids)
             .await?;
 
-        let company_ids = lines
+        let company_ids = &lines
             .iter()
             .filter_map(|station| station.company_cd)
             .collect::<Vec<u32>>();
         let companies = self.find_company_by_id_vec(company_ids).await?;
 
         let train_types = self
-            .get_train_types_by_station_id_vec(station_ids, line_group_id)
+            .get_train_types_by_station_id_vec(&station_ids, line_group_id)
             .await?;
 
         for station in stations_ref.iter_mut() {
@@ -447,20 +444,27 @@ where
         &self,
         station_id: u32,
     ) -> Result<Vec<TrainType>, UseCaseError> {
-        let mut train_types: Vec<TrainType> = self
+        let mut train_types = self
             .train_type_repository
             .get_by_station_id(station_id)
             .await?;
 
-        let train_type_ids = train_types.iter().map(|tt| tt.line_group_cd).collect();
+        let train_type_ids = train_types
+            .iter()
+            .map(|tt| tt.line_group_cd)
+            .collect::<Vec<u32>>();
 
         let mut lines = self
             .line_repository
-            .get_by_line_group_id_vec(train_type_ids)
+            .get_by_line_group_id_vec(&train_type_ids)
             .await?;
 
-        let company_ids = lines.iter().filter_map(|l| l.company_cd).collect();
-        let companies = self.company_repository.find_by_id_vec(company_ids).await?;
+        let company_ids = lines
+            .iter()
+            .filter_map(|l| l.company_cd)
+            .collect::<Vec<u32>>();
+
+        let companies = self.company_repository.find_by_id_vec(&company_ids).await?;
 
         let line = self.line_repository.find_by_station_id(station_id).await?;
         let Some(mut line) = line else {
@@ -503,7 +507,7 @@ where
 
     async fn get_train_types_by_station_id_vec(
         &self,
-        station_id_vec: Vec<u32>,
+        station_id_vec: &[u32],
         line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, UseCaseError> {
         let train_types = self
@@ -529,10 +533,10 @@ where
             .iter()
             .filter_map(|row| row.line_group_cd)
             .collect::<Vec<u32>>();
-        let line_group_id_set: HashSet<u32> = line_group_id_vec.into_iter().collect();
+
         let tt_lines = self
             .line_repository
-            .get_by_line_group_id_vec_for_routes(line_group_id_set.into_iter().collect())
+            .get_by_line_group_id_vec_for_routes(&line_group_id_vec)
             .await?;
 
         let tt_lines = Arc::new(tt_lines);
