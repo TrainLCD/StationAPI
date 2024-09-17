@@ -92,7 +92,7 @@ impl LineRepository for MyLineRepository {
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::find_by_station_id(station_id, &mut conn).await
     }
-    async fn get_by_ids(&self, ids: Vec<u32>) -> Result<Vec<Line>, DomainError> {
+    async fn get_by_ids(&self, ids: &[u32]) -> Result<Vec<Line>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_ids(ids, &mut conn).await
     }
@@ -102,7 +102,7 @@ impl LineRepository for MyLineRepository {
     }
     async fn get_by_station_group_id_vec(
         &self,
-        station_group_id_vec: Vec<u32>,
+        station_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_station_group_id_vec(station_group_id_vec, &mut conn).await
@@ -113,14 +113,14 @@ impl LineRepository for MyLineRepository {
     }
     async fn get_by_line_group_id_vec(
         &self,
-        line_group_id_vec: Vec<u32>,
+        line_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_line_group_id_vec(line_group_id_vec, &mut conn).await
     }
     async fn get_by_line_group_id_vec_for_routes(
         &self,
-        line_group_id_vec: Vec<u32>,
+        line_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_line_group_id_vec_for_routes(line_group_id_vec, &mut conn)
@@ -228,10 +228,7 @@ impl InternalLineRepository {
         Ok(Some(line))
     }
 
-    async fn get_by_ids(
-        ids: Vec<u32>,
-        conn: &mut MySqlConnection,
-    ) -> Result<Vec<Line>, DomainError> {
+    async fn get_by_ids(ids: &[u32], conn: &mut MySqlConnection) -> Result<Vec<Line>, DomainError> {
         if ids.is_empty() {
             return Ok(vec![]);
         }
@@ -302,7 +299,7 @@ impl InternalLineRepository {
     }
 
     async fn get_by_station_group_id_vec(
-        station_group_id_vec: Vec<u32>,
+        station_group_id_vec: &[u32],
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Line>, DomainError> {
         if station_group_id_vec.is_empty() {
@@ -336,7 +333,7 @@ impl InternalLineRepository {
         );
 
         let mut query = sqlx::query_as::<_, LineRow>(&query_str);
-        for id in &station_group_id_vec {
+        for id in station_group_id_vec {
             query = query.bind(id);
         }
 
@@ -395,7 +392,7 @@ impl InternalLineRepository {
     }
 
     async fn get_by_line_group_id_vec(
-        line_group_id_vec: Vec<u32>,
+        line_group_id_vec: &[u32],
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Line>, DomainError> {
         if line_group_id_vec.is_empty() {
@@ -439,7 +436,7 @@ impl InternalLineRepository {
         Ok(lines)
     }
     async fn get_by_line_group_id_vec_for_routes(
-        line_group_id_vec: Vec<u32>,
+        line_group_id_vec: &[u32],
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Line>, DomainError> {
         if line_group_id_vec.is_empty() {

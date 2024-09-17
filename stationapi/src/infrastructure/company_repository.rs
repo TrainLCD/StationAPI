@@ -53,7 +53,7 @@ impl MyCompanyRepository {
 
 #[async_trait]
 impl CompanyRepository for MyCompanyRepository {
-    async fn find_by_id_vec(&self, id_vec: Vec<u32>) -> Result<Vec<Company>, DomainError> {
+    async fn find_by_id_vec(&self, id_vec: &[u32]) -> Result<Vec<Company>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalCompanyRepository::find_by_id_vec(id_vec, &mut conn).await
     }
@@ -63,7 +63,7 @@ pub struct InternalCompanyRepository {}
 
 impl InternalCompanyRepository {
     async fn find_by_id_vec(
-        id_vec: Vec<u32>,
+        id_vec: &[u32],
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Company>, DomainError> {
         if id_vec.is_empty() {
