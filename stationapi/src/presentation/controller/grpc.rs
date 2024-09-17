@@ -61,7 +61,7 @@ impl StationApi for MyApi {
 
         let stations = match self
             .query_use_case
-            .get_stations_by_id_vec(station_ids.to_vec())
+            .get_stations_by_id_vec(station_ids)
             .await
         {
             Ok(stations) => stations,

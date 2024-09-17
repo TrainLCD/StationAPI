@@ -190,7 +190,7 @@ impl StationRepository for MyStationRepository {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::find_by_id(id, &mut conn).await
     }
-    async fn get_by_id_vec(&self, ids: Vec<u32>) -> Result<Vec<Station>, DomainError> {
+    async fn get_by_id_vec(&self, ids: &[u32]) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::get_by_id_vec(ids, &mut conn).await
     }
@@ -222,7 +222,7 @@ impl StationRepository for MyStationRepository {
     }
     async fn get_by_station_group_id_vec(
         &self,
-        station_group_id_vec: Vec<u32>,
+        station_group_id_vec: &[u32],
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn: sqlx::pool::PoolConnection<MySql> = self.pool.acquire().await?;
         InternalStationRepository::get_by_station_group_id_vec(station_group_id_vec, &mut conn)
@@ -372,7 +372,7 @@ impl InternalStationRepository {
     }
 
     async fn get_by_id_vec(
-        ids: Vec<u32>,
+        ids: &[u32],
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         if ids.is_empty() {
@@ -408,7 +408,7 @@ impl InternalStationRepository {
         );
 
         let mut query = sqlx::query_as::<_, StationRow>(&query_str);
-        for id in ids.clone() {
+        for id in ids {
             query = query.bind(id);
         }
         for id in ids {
@@ -619,7 +619,7 @@ impl InternalStationRepository {
     }
 
     async fn get_by_station_group_id_vec(
-        group_id_vec: Vec<u32>,
+        group_id_vec: &[u32],
         conn: &mut MySqlConnection,
     ) -> Result<Vec<Station>, DomainError> {
         if group_id_vec.is_empty() {

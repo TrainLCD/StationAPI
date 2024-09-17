@@ -8,7 +8,7 @@ use crate::domain::{
 #[async_trait]
 pub trait StationRepository: Send + Sync + 'static {
     async fn find_by_id(&self, id: u32) -> Result<Option<Station>, DomainError>;
-    async fn get_by_id_vec(&self, ids: Vec<u32>) -> Result<Vec<Station>, DomainError>;
+    async fn get_by_id_vec(&self, ids: &[u32]) -> Result<Vec<Station>, DomainError>;
     async fn get_by_line_id(
         &self,
         line_id: u32,
@@ -20,7 +20,7 @@ pub trait StationRepository: Send + Sync + 'static {
     ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_station_group_id_vec(
         &self,
-        station_group_id_vec: Vec<u32>,
+        station_group_id_vec: &[u32],
     ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_coordinates(
         &self,

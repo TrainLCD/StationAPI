@@ -14,7 +14,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError>;
     async fn get_stations_by_id_vec(
         &self,
-        station_ids: Vec<u32>,
+        station_ids: &[u32],
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_group_id(
         &self,
@@ -22,7 +22,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_group_id_vec(
         &self,
-        station_group_id_vec: Vec<u32>,
+        station_group_id_vec: &[u32],
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_coordinates(
         &self,
@@ -43,7 +43,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn find_company_by_id_vec(
         &self,
-        company_id_vec: Vec<u32>,
+        company_id_vec: &[u32],
     ) -> Result<Vec<Company>, UseCaseError>;
     async fn update_station_vec_with_attributes(
         &self,
@@ -56,7 +56,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
     ) -> Result<Vec<Line>, UseCaseError>;
     async fn get_lines_by_station_group_id_vec(
         &self,
-        station_group_id_vec: Vec<u32>,
+        station_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, UseCaseError>;
     fn get_station_numbers(&self, station: &Station) -> Vec<StationNumber>;
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol>;
@@ -71,7 +71,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
     ) -> Result<Vec<TrainType>, UseCaseError>;
     async fn get_train_types_by_station_id_vec(
         &self,
-        station_id_vec: Vec<u32>,
+        station_id_vec: &[u32],
         line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, UseCaseError>;
     async fn get_station_id_and_distance_by_coordinates(
