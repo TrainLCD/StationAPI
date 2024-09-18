@@ -72,7 +72,7 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 0,151,あきがわ号,アキガワゴウ,Akigawa,秋川号,아키가와호,#F15A22,0,2,0,,COMPLETE
 0,152,普通,フツウ,Local,慢车,보통,#1F63C6,1,0,0,上り系統,PARTIAL
 0,153,普通,フツウ,Local,慢车,보통,#1F63C6,2,0,0,下り系統,PARTIAL
-0,154,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,1,自動選択用,COMPLETE
+0,154,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,0,1,自動選択用,COMPLETE
 0,155,区間快速エアポート,クカンカイソクエアポート,Semi Rapid Airport,区域快车机场号,구간쾌속에어포트,#33ff33,0,2,0,,COMPLETE
 0,156,快速エアポート,カイソクエアポート,Rapid Airport,快车机场号,쾌속에어포트,#FF6600,0,2,0,,COMPLETE
 0,157,特別快速エアポート,トクベツカイソクエアポート,Special Rapid Airport,特别快车机场号,특별쾌속에어포트,#FF3300,0,2,0,,COMPLETE
@@ -132,6 +132,46 @@ Yokokawa","SL群马
 0,244,いしづち,イシヅチ,Ishizuchi,石鎚,석진,#1CADCA,0,4,0,,COMPLETE
 0,245,おおぞら,オオゾラ,Ōzora,大空,큰 하늘,#2CB431,0,4,0,,COMPLETE
 0,246,とかち,トカチ,Tokachi,十勝,도카치,#2CB431,0,4,0,,COMPLETE
+0,247,きのさき,キノサキ,Kinosaki,城崎,시로사키,#800080,0,4,0,,COMPLETE
+0,248,はしだて,ハシダテ,Hashidate,橋立,하시다테,#ff0000,0,4,0,,COMPLETE
+0,249,まいづる,マイヅル,Maizuru,舞鶴,마이즈루,#ff8c00,0,4,0,,COMPLETE
+0,250,しらさぎ,シラサギ,Shirasagi,白鷺,백로,#f0e68c,0,4,0,,COMPLETE
+0,251,くろしお,クロシオ,Kuroshio,黑潮,구로시오,#40e0d0,0,4,0,,COMPLETE
+0,252,はるか,ハルカ,Haruka,遙,하루카,#00008b,0,4,0,,COMPLETE
+0,253,スーパーはくと,スーパーハクト,Super Hakuto,超級白兔,슈퍼 하쿠토,#0000ff,0,4,0,,COMPLETE
+0,254,スーパーいなば,スーパーイナバ,Super Inaba,超級因幡,슈퍼 요시만,#7cfc00,0,4,0,,COMPLETE
+0,255,宇和海,ウワカイ,Uwakai,宇和海,우와해,#00bfff,0,4,0,,COMPLETE
+0,256,剣山,ツルギサン,Tsurugisan,劍山,검산,#00008b,0,4,0,,COMPLETE
+0,257,むろと,ムロト,Muroto,室戶,무로토,#00bfff,0,4,0,,COMPLETE
+0,258,みどり,ミドリ,Midori,綠,미도리의,#008000,0,4,0,,COMPLETE
+0,259,ハウステンボス,ハウステンボス,Huis Ten Bosch,豪斯登堡,하우스텐보스,#ff8c00,0,4,0,,COMPLETE
+0,260,かささぎ,カササギ,Kasasagi,喜鵲,가사기,#dc143c,0,4,0,,COMPLETE
+0,261,きらめき,キラメキ,Kirameki,閃耀,반짝임,#ff0000,0,4,0,,COMPLETE
+0,262,にちりん,ニチリン,Nichirin,日輪,일륜,#ffa500,0,4,0,,COMPLETE
+0,263,にちりんシーガイア,ニチリンシーガイア,Nichirin Sea Gaia,日輪喜凱亞,일륜 시가이아,#ffa500,0,4,0,,COMPLETE
+0,264,ひゅうが,ヒュウガ,Hyuga,日向,휴가,#ff0000,0,4,0,,COMPLETE
+0,265,きりしま,キリシマ,Kirishima,霧島,기리시마,#006400,0,4,0,,COMPLETE
+0,266,かいおう,カイオウ,Kaiō,魁皇,카이오,#8b0000,0,4,0,,COMPLETE
+0,267,ゆふ,ユフ,Yufu,由布,유후,#ffff00,0,4,0,,COMPLETE
+0,268,ゆふいんの森,ユフインノモリ,Yufuin no Mori,由布院之森,유후인노모리,#228b22,0,4,0,,COMPLETE
+0,269,有明,アリアケ,Ariake,有明,아리아케,#daa520,0,4,0,,COMPLETE
+0,270,九州横断特急,キュウシュウオウダントッキュウ,Trans-Kyushu Limited Express,九州橫斷特急,규슈 횡단 특급,#dc143c,0,4,0,,COMPLETE
+0,271,南紀,ナンキ,Nanki,南紀,난키,#00bfff,0,4,0,,COMPLETE
+0,272,伊那路,イナジ,Inaji,伊那路,이나로,#228b22,0,4,0,,COMPLETE
+0,273,東海,トウカイ,Tōkai,東海,도카이,#ff8c00,0,4,0,,COMPLETE
+0,274,ふじかわ,フジカワ,Fujikawa,富士川,후지카와,#90ee90,0,4,0,,COMPLETE
+0,275,わかしお,ワカシオ,Wakashio,若潮,와카시오,#ff0000,0,4,0,,COMPLETE
+0,276,新宿わかしお,シンジュクワカシオ,Shinjuku Wakashio,新宿若潮,신주쿠와카시오의,#ff0000,0,4,0,,COMPLETE
+0,277,さざなみ,サザナミ,Sazanami,细波,사자나미,#00bfff,0,4,0,,COMPLETE
+0,278,新宿さざなみ,シンジュクサザナミ,Shinjuku Sazanami,新宿细波,신주쿠사자나미,#00bfff,0,4,0,,COMPLETE
+0,279,しおさい,シオサイ,Shiosai,潮骚,시오사이,#ffff00,0,4,0,,COMPLETE
+0,280,あやめ,アヤメ,Ayame,菖蒲,아야메,#ffd700,0,4,0,,COMPLETE
+0,281,つがる,ツガル,Tsugaru,津輕,쓰가루,#ff0000,0,4,0,,COMPLETE
+0,282,いなほ,イナホ,Inaho,稻穗,이나호,#ffa500,0,4,0,,COMPLETE
+0,283,北越,ホクエツ,Hokuetsu,北越,호쿠코시,#00ffff,0,4,0,,COMPLETE
+0,284,しらゆき,シラユキ,Shirayuki,白雪,백설,#800080,0,4,0,,COMPLETE
+0,285,ダイナスター,ダイナスター,Dinostar,恐龍星,다이노스타,#191970,0,4,0,,COMPLETE
+0,286,能登かがり火,ノトカガリビ,Noto Kagaribi,能登篝火,노토 카오리 불,#dc143c,0,4,0,,COMPLETE
 0,300,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,廃止済み 100に移行,NOT
 0,301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,廃止済み 101に移行,NOT
 0,302,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,廃止済み 102に移行,NOT
@@ -232,3 +272,4 @@ Yokokawa","SL群马
 0,522,会津,アイヅ,Aizu,会津,아이즈,#009F49,0,4,0,,COMPLETE
 0,523,スペーシアX(7号・8号),スペーシアX(7ゴウ・8ゴウ),SPACIA X(No.7/No.8),SPACIA X(7号/8号),SPACIA X(7호/8호),#221614,0,4,0,,COMPLETE
 0,524,スペーシアX(1号〜6号),スペーシアX(1ゴウ〜6ゴウ),SPACIA X(No.1 through No.6),SPACIA X(1号~6号),SPACIA X(7호~8호),#221614,0,4,0,,COMPLETE
+0,525,日光,ニッコウ,Nikkō,日光,햇빛,#378640,0,4,0,,COMPLETE
