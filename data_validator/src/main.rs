@@ -4,6 +4,8 @@ use std::path::Path;
 use csv::{ReaderBuilder, StringRecord};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut has_err = false;
+
     let data_path: &Path = Path::new("data");
     let mut rdr = ReaderBuilder::new().from_path(data_path.join("3!stations.csv"))?;
     let records: Vec<StringRecord> = rdr.records().filter_map(|row| row.ok()).collect();
@@ -26,20 +28,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .iter()
         .find(|row| !station_ids.contains(&row.get(1).unwrap().parse::<u32>().unwrap()))
     {
-        panic!(
+        println!(
             "[INVALID] Unrecognized Station ID {:?} Found!",
             invalid_record.get(1).unwrap()
         );
+        has_err = true;
     }
 
     if let Some(invalid_record) = records
         .iter()
         .find(|row| !type_ids.contains(&row.get(2).unwrap().parse::<u32>().unwrap()))
     {
-        panic!(
+        println!(
             "[INVALID] Unrecognized Type ID {:?} Found!",
             invalid_record.get(2).unwrap()
         );
+        has_err = true;
+    }
+
+    if has_err {
+        panic!("[FATAL] Verification hasn't been passed!");
     }
 
     println!("[VALID] No errors reported.");
