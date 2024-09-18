@@ -1,0 +1,14 @@
+on:
+  push:
+    paths:
+      - data/*.csv
+
+name: Verify station data integrity
+
+jobs:
+  verify_migration_data:
+    name: Verify pushed migration data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo run --bin data_validator
