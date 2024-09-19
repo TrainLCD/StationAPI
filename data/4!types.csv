@@ -241,14 +241,14 @@ Yokokawa","SL群马
 0,401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,2,0,,COMPLETE
 0,402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,2,0,,COMPLETE
 0,403,イブニングウィング号,イブニングウィングゴウ,Evening Wing(Shinagawa to Misakiguchi),Evening Wing,이브닝윙호,#379412,2,2,0,,COMPLETE
-0,404,方南町支線,ホウナンチョウシセン,Honancho Branch Line,方南町支线,호난초 지선,#E60012,0,1,0,,COMPLETE
+0,404,普通(方南町支線),フツウ,Local(Honancho Branch Line),慢车(方南町支线),보통(호난초 지선),#E60012,0,1,0,,COMPLETE
 0,405,拝島ライナー,ハイジマライナー,Haijima Liner,拜岛Liner,하이지마 라이너,#B4C300,0,2,0,,COMPLETE
 0,406,TJライナー(下り),TJライナー,TJ Liner(Ikebukuro to Ogawamachi),TJ Liner,TJ Liner,#FF710A,2,2,0,,COMPLETE
 0,407,TJライナー(上り),TJライナー,TJ Liner(Ogawamachi to Ikebukuro),TJ Liner,TJ Liner,#008CD6,1,2,0,,COMPLETE
-0,408,支線,シセン,Branch Line,支線,경로,#9686BD,0,1,0,ポートアイランド線用,COMPLETE
+0,408,各駅停車(北埠頭方面),カクエキテイシャ,Local,每站停车,각역정차,#9686BD,0,1,0,ポートアイランド線用,COMPLETE
 0,409,各駅停車(田園都市線経由),カクエキテイシャ,Local,每站停车,각역정차,#1F63C7,0,0,0,大井町線用,COMPLETE
 0,410,泉北ライナー,センボクライナー,Semboku Liner,泉北Liner,센보쿠라이너,#E6B422,0,2,0,,COMPLETE
-0,411,支線,シセン,Branch Line,支線,경로,#009944,0,1,0,北綾瀬支線,COMPLETE
+0,411,各駅停車(北綾瀬支線),カクエキテイシャ,Local,每站停车,각역정차,#009944,0,1,0,北綾瀬支線,COMPLETE
 0,500,りょうもう(浅草〜伊勢崎),リョウモウ,Ryomo(Asakusa to Isesaki),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
 0,501,りょうもう(浅草〜葛生),リョウモウ,Ryomo(Asakusa to Kuzū),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
 0,502,りょうもう(浅草〜赤城),リョウモウ,Ryomo(Asakusa to Akagi),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
