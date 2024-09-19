@@ -72,7 +72,7 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 0,151,あきがわ号,アキガワゴウ,Akigawa,秋川号,아키가와호,#F15A22,0,2,0,,COMPLETE
 0,152,普通,フツウ,Local,慢车,보통,#1F63C6,1,0,0,上り系統,PARTIAL
 0,153,普通,フツウ,Local,慢车,보통,#1F63C6,2,0,0,下り系統,PARTIAL
-0,154,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,0,1,自動選択用,COMPLETE
+0,154,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,1,自動選択用,COMPLETE
 0,155,区間快速エアポート,クカンカイソクエアポート,Semi Rapid Airport,区域快车机场号,구간쾌속에어포트,#33ff33,0,2,0,,COMPLETE
 0,156,快速エアポート,カイソクエアポート,Rapid Airport,快车机场号,쾌속에어포트,#FF6600,0,2,0,,COMPLETE
 0,157,特別快速エアポート,トクベツカイソクエアポート,Special Rapid Airport,特别快车机场号,특별쾌속에어포트,#FF3300,0,2,0,,COMPLETE
