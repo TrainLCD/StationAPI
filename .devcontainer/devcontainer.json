@@ -1,0 +1,19 @@
+{
+  "name": "StationAPI",
+  "dockerComposeFile": [
+    "./compose.yml"
+  ],
+  "service": "api-dc",
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspace",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "1YiB.rust-bundle",
+        "zxh404.vscode-proto3",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-mysql"
+      ]
+    }
+  }
+}
