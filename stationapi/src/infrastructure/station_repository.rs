@@ -300,12 +300,18 @@ impl InternalStationRepository {
         conn: &mut MySqlConnection,
     ) -> Result<bool, DomainError> {
         let row: TrainTypesCountRow = sqlx::query_as!(
-          TrainTypesCountRow,
-        "SELECT COUNT(sst.line_group_cd) AS train_types_count FROM station_station_types AS sst JOIN `types` AS t ON t.type_cd = sst.type_cd AND t.kind IN (0, 1) WHERE sst.station_cd = ? LIMIT 1",
-        id,
-    )
-    .fetch_one(conn)
-    .await?;
+            TrainTypesCountRow,
+            "SELECT COUNT(sst.line_group_cd) AS train_types_count
+            FROM station_station_types AS sst
+                JOIN `types` AS t ON t.type_cd = sst.type_cd
+                AND t.kind IN (0, 1)
+                OR t.top_priority = 1
+            WHERE sst.station_cd = ?
+            LIMIT 1",
+            id,
+        )
+        .fetch_one(conn)
+        .await?;
 
         Ok(row.train_types_count > 0)
     }
