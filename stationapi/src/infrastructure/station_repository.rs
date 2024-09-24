@@ -304,10 +304,11 @@ impl InternalStationRepository {
             "SELECT COUNT(sst.line_group_cd) AS train_types_count
             FROM station_station_types AS sst
                 JOIN `types` AS t ON t.type_cd = sst.type_cd
-                AND t.kind IN (0, 1)
-                OR t.top_priority = 1
-            WHERE sst.station_cd = ?
-            LIMIT 1",
+                AND (
+                    t.kind IN (0, 1)
+                    OR t.top_priority = 1
+                )
+            WHERE sst.station_cd = ?",
             id,
         )
         .fetch_one(conn)

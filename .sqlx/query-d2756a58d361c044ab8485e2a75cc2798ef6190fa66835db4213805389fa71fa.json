@@ -1,0 +1,25 @@
+{
+  "db_name": "MySQL",
+  "query": "SELECT COUNT(sst.line_group_cd) AS train_types_count\n            FROM station_station_types AS sst\n                JOIN `types` AS t ON t.type_cd = sst.type_cd\n                AND (\n                    t.kind IN (0, 1)\n                    OR t.top_priority = 1\n                )\n            WHERE sst.station_cd = ?",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "train_types_count",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | BINARY",
+          "char_set": 63,
+          "max_size": 21
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d2756a58d361c044ab8485e2a75cc2798ef6190fa66835db4213805389fa71fa"
+}
