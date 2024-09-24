@@ -172,6 +172,12 @@ Yokokawa","SL群马
 0,284,しらゆき,シラユキ,Shirayuki,白雪,백설,#800080,0,4,0,,COMPLETE
 0,285,ダイナスター,ダイナスター,Dinostar,恐龍星,다이노스타,#191970,0,4,0,,COMPLETE
 0,286,能登かがり火,ノトカガリビ,Noto Kagaribi,能登篝火,노토 카오리 불,#dc143c,0,4,0,,COMPLETE
+0,287,サフィール踊り子,サフィールオドリコ,Saphir Odoriko,蓝宝石踊子,사필 무희,#035D67,0,4,0,,COMPLETE
+0,288,はまかぜ,ハマカゼ,Hamakaze,濱風,하마카제,#b22222,0,4,0,,COMPLETE
+0,289,らくラクはりま,ラクラクハリマ,Rakuraku Harima,简单播磨,라쿠 라쿠 하리마,#00bfff,0,4,0,,COMPLETE
+0,290,らくラクびわこ,ラクラクビワコ,Rakuraku Biwako,简单琵琶湖,라쿠 라쿠 비와코,#0000ff,0,4,0,,COMPLETE
+0,291,らくラクやまと,ラクラクヤマト,Rakuraku Yamato,简单大和,라쿠 라쿠 야마토,#90ee90,0,4,0,,COMPLETE
+0,292,まほろば,マホロバ,Mahoroba,真秀场,마호로바,#008000,0,4,0,,COMPLETE
 0,300,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,廃止済み 100に移行,NOT
 0,301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,廃止済み 101に移行,NOT
 0,302,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,廃止済み 102に移行,NOT
@@ -249,6 +255,7 @@ Yokokawa","SL群马
 0,409,各駅停車(田園都市線経由),カクエキテイシャ,Local,每站停车,각역정차,#1F63C7,0,0,0,大井町線用,COMPLETE
 0,410,泉北ライナー,センボクライナー,Semboku Liner,泉北Liner,센보쿠라이너,#E6B422,0,2,0,,COMPLETE
 0,411,各駅停車(北綾瀬支線),カクエキテイシャ,Local,每站停车,각역정차,#009944,0,1,0,北綾瀬支線,COMPLETE
+0,412,ライナー,ライナー,Liner,Liner,정기선,#DC143C,0,2,0,,COMPLETE
 0,500,りょうもう(浅草〜伊勢崎),リョウモウ,Ryomo(Asakusa to Isesaki),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
 0,501,りょうもう(浅草〜葛生),リョウモウ,Ryomo(Asakusa to Kuzū),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
 0,502,りょうもう(浅草〜赤城),リョウモウ,Ryomo(Asakusa to Akagi),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE

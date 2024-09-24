@@ -129,7 +129,16 @@ where
             .get_by_line_id(line_id, station_id)
             .await?;
 
-        self.update_station_vec_with_attributes(&mut stations, None)
+        let line_group_id = if let Some(sta) = stations
+            .iter()
+            .find(|sta| sta.station_cd == station_id.unwrap_or(0))
+        {
+            sta.line_group_cd
+        } else {
+            None
+        };
+
+        self.update_station_vec_with_attributes(&mut stations, line_group_id)
             .await?;
 
         Ok(stations)

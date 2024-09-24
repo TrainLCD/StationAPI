@@ -1,10 +1,19 @@
 {
-  "image": "mcr.microsoft.com/devcontainers/universal:2",
-  "features": {
-    "ghcr.io/devcontainers/features/rust:1": {
-      "profile": "default"
-    },
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/devcontainers-contrib/features/protoc:1": {}
+  "name": "StationAPI",
+  "dockerComposeFile": [
+    "./compose.yml"
+  ],
+  "service": "api-dc",
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspace",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "1YiB.rust-bundle",
+        "zxh404.vscode-proto3",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-mysql"
+      ]
+    }
   }
 }

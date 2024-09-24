@@ -1,0 +1,48 @@
+services:
+  api-dc:
+    build:
+      context: ..
+      dockerfile: ./.devcontainer/Dockerfile
+    command: sleep infinity
+    depends_on:
+      - db-dc
+    volumes:
+      - ..:/workspace:cached
+    environment:
+      DATABASE_URL: mariadb://stationapi:password@db-dc/stationapi
+      ACCEPT_HTTP1: true
+      HOST: 0.0.0.0
+    ports:
+      - 50051:50051
+    networks:
+      - sapi-link
+
+  db-dc:
+    image: mariadb:11.5.2
+    environment:
+      MARIADB_RANDOM_ROOT_PASSWORD: true
+      MARIADB_USER: stationapi
+      MARIADB_PASSWORD: password
+      MARIADB_DATABASE: stationapi
+    ports:
+      - 3306:3306
+    networks:
+      - sapi-link
+
+  migration-dc:
+    build:
+      context: ..
+      dockerfile: ./docker/migration/Dockerfile
+    command: ["./wait-for-it.sh", "db-dc:3306", "--", "./migration"]
+    depends_on:
+      - db-dc
+    environment:
+      MYSQL_USER: stationapi
+      MYSQL_PASSWORD: password
+      MYSQL_HOST: db-dc
+      MYSQL_DATABASE: stationapi
+    networks:
+      - sapi-link
+
+networks:
+  sapi-link:
