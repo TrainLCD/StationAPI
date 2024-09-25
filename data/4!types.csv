@@ -212,7 +212,7 @@ Yokokawa","SL群马
 0,328,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,(片瀬江ノ島〜新宿),COMPLETE
 0,330,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,小田急用,COMPLETE
 0,331,快速特急,カイソクトッキュウ,Limited Express,快速特快,쾌속특쾌,#049C5E,0,4,0,,COMPLETE
-0,332,アクセス特急,アクセストッキュウ,Access Express,访问特快,액세스 특급,#ED7D00,0,4,0,,PARTIAL
+0,332,アクセス特急,アクセストッキュウ,Access Express,访问特快,액세스 특급,#ED7D00,0,4,1,,PARTIAL
 0,333,準急,ジュンキュウ,Semi-Express,准急,준급,#2A9B50,0,3,0,堺筋準急,PARTIAL
 0,334,直通特急,チョクツウトッキュウ,Limited Express,直通特急,직통특급,#DD2E1E,0,4,0,山陽電車,COMPLETE
 0,335,区間快速,クカンカイソク,Semi Rapid,区间快速,구간쾌속,#000084,0,2,0,TX用,COMPLETE
