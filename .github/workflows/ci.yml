@@ -2,11 +2,11 @@ on:
   pull_request:
   push:
     paths:
-      - "/stationapi/**"
-      - "/migration/**"
-      - "/data_validator/**"
-      - "/Cargo.lock"
-      - "/Cargo.toml"
+      - "stationapi/**"
+      - "migration/**"
+      - "data_validator/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
 
 name: Continuous integration
 

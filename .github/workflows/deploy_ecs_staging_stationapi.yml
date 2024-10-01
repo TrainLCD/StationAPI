@@ -5,12 +5,12 @@ on:
     branches:
       - dev
     paths:
-      - "/.sqlx/**"
-      - "/docker/api/Dockerfile.prod"
-      - "/scripts/**"
-      - "/stationapi/**"
-      - "/Cargo.lock"
-      - "/Cargo.toml"
+      - ".sqlx/**"
+      - "docker/api/Dockerfile.prod"
+      - "scripts/**"
+      - "stationapi/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
