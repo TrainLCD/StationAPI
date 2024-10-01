@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev
+      - data/preview
     paths:
       - "data/**"
 
