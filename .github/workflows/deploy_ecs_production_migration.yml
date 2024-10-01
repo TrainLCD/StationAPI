@@ -5,7 +5,11 @@ on:
     branches:
       - master
     paths:
-      - "data/**"
+      - "/data/**"
+      - "/docker/migration/Dockerfile"
+      - "/migration/**"
+      - "/Cargo.lock"
+      - "/Cargo.toml"
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
