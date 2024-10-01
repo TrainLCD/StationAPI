@@ -1,6 +1,7 @@
 name: Deploy StationAPI to Staging Environment on Amazon ECS
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - dev
