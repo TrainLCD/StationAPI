@@ -1,11 +1,17 @@
 name: Deploy Migration to Staging Environment on Amazon ECS
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - dev
+      - data/preview
     paths:
-      - "data/**"
+      - "data/*.csv"
+      - "docker/migration/Dockerfile"
+      - "migration/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
