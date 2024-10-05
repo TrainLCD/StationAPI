@@ -28,11 +28,10 @@ pub struct LineRow {
     pub line_symbol_extra_shape: Option<String>,
     pub e_status: u32,
     pub e_sort: u32,
-    #[sqlx(default)]
-    pub line_group_cd: Option<u32>,
-    pub station_cd: u32,
-    pub station_g_cd: u32,
     pub average_distance: f64,
+    pub line_group_cd: Option<u32>,
+    pub station_cd: Option<u32>,
+    pub station_g_cd: Option<u32>,
 }
 
 impl From<LineRow> for Line {
@@ -126,6 +125,14 @@ impl LineRepository for MyLineRepository {
         InternalLineRepository::get_by_line_group_id_vec_for_routes(line_group_id_vec, &mut conn)
             .await
     }
+    async fn get_by_name(
+        &self,
+        line_name: String,
+        limit: Option<u32>,
+    ) -> Result<Vec<Line>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalLineRepository::get_by_name(line_name, limit, &mut conn).await
+    }
 }
 
 pub struct InternalLineRepository {}
@@ -134,37 +141,13 @@ impl InternalLineRepository {
     async fn find_by_id(id: u32, conn: &mut MySqlConnection) -> Result<Option<Line>, DomainError> {
         let rows: Option<LineRow> = sqlx::query_as!(
             LineRow,
-            "SELECT DISTINCT l.line_cd,
-            l.company_cd,
-            l.line_type,
-            l.line_symbol_primary,
-            l.line_symbol_secondary,
-            l.line_symbol_extra,
-            l.line_symbol_primary_color,
-            l.line_symbol_secondary_color,
-            l.line_symbol_extra_color,
-            l.line_symbol_primary_shape,
-            l.line_symbol_secondary_shape,
-            l.line_symbol_extra_shape,
-            l.e_status,
-            l.e_sort,
-            l.average_distance,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            s.station_cd,
-            s.station_g_cd,
-            sst.line_group_cd
-        FROM `lines` AS l
-            JOIN `stations` AS s ON s.station_cd = ?
-            JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
-            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
-        WHERE l.line_cd = s.line_cd",
+            "SELECT *,
+            CAST(NULL AS UNSIGNED INT) AS line_group_cd,
+            CAST(NULL AS UNSIGNED INT) AS station_cd,
+            CAST(NULL AS UNSIGNED INT) AS station_g_cd
+            FROM `lines` AS l
+            WHERE l.line_cd = ?
+            AND l.e_status = 0",
             id
         )
         .fetch_optional(conn)
@@ -473,6 +456,44 @@ impl InternalLineRepository {
         }
 
         let rows = query.fetch_all(conn).await?;
+        let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
+
+        Ok(lines)
+    }
+
+    async fn get_by_name(
+        line_name: String,
+        limit: Option<u32>,
+        conn: &mut MySqlConnection,
+    ) -> Result<Vec<Line>, DomainError> {
+        let line_name = format!("%{}%", line_name);
+
+        let rows: Vec<LineRow> = sqlx::query_as!(
+            LineRow,
+            "SELECT *,
+            CAST(NULL AS UNSIGNED INT) AS line_group_cd,
+            CAST(NULL AS UNSIGNED INT) AS station_cd,
+            CAST(NULL AS UNSIGNED INT) AS station_g_cd
+            FROM `lines` AS l
+            WHERE (
+                    l.line_name LIKE ?
+                    OR l.line_name_r LIKE ?
+                    OR l.line_name_k LIKE ?
+                    OR l.line_name_zh LIKE ?
+                    OR l.line_name_ko LIKE ?
+                )
+                AND l.e_status = 0
+            LIMIT ?",
+            &line_name,
+            &line_name,
+            &line_name,
+            &line_name,
+            &line_name,
+            limit.unwrap_or(1)
+        )
+        .fetch_all(conn)
+        .await?;
+
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(lines)

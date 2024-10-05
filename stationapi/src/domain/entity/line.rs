@@ -27,12 +27,12 @@ pub struct Line {
     pub line_symbol_extra_shape: Option<String>,
     pub e_status: u32,
     pub e_sort: u32,
+    pub average_distance: f64,
     pub station: Option<Station>,
     pub train_type: Option<TrainType>,
     pub line_group_cd: Option<u32>,
-    pub station_cd: u32,
-    pub station_g_cd: u32,
-    pub average_distance: f64,
+    pub station_cd: Option<u32>,
+    pub station_g_cd: Option<u32>,
 }
 
 impl Line {
@@ -64,8 +64,8 @@ impl Line {
         station: Option<Station>,
         train_type: Option<TrainType>,
         line_group_cd: Option<u32>,
-        station_cd: u32,
-        station_g_cd: u32,
+        station_cd: Option<u32>,
+        station_g_cd: Option<u32>,
         average_distance: f64,
     ) -> Self {
         Self {
