@@ -182,8 +182,6 @@ impl MyStationRepository {
     }
 }
 
-const DEFAULT_COLUMN_COUNT: u32 = 1;
-
 #[async_trait]
 impl StationRepository for MyStationRepository {
     async fn find_by_id(&self, id: u32) -> Result<Option<Station>, DomainError> {
@@ -718,7 +716,7 @@ impl InternalStationRepository {
         .bind(latitude)
         .bind(longitude)
         .bind(latitude)
-        .bind(limit.unwrap_or(DEFAULT_COLUMN_COUNT))
+        .bind(limit.unwrap_or(1))
         .fetch_all(conn)
         .await?;
 
@@ -904,7 +902,7 @@ impl InternalStationRepository {
             &station_name,
             &station_name,
             from_station_group_id,
-            limit.unwrap_or(DEFAULT_COLUMN_COUNT)
+            limit.unwrap_or(1)
         )
         .fetch_all(conn)
         .await?;
