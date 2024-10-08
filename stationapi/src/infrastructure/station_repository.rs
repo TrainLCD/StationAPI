@@ -1104,8 +1104,8 @@ impl InternalStationRepository {
                 tt.direction,
                 tt.kind
             FROM local_cte AS sta
-                LEFT JOIN `sst_cte` AS sst ON sst.station_cd = sta.station_cd
-                LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
+                LEFT JOIN `sst_cte` AS sst ON sst.station_cd IS NULL
+                LEFT JOIN `types` AS tt ON tt.type_cd IS NULL
                 LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
                 LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
                 LEFT JOIN `lines` AS lin ON lin.line_cd = sta.line_cd",
