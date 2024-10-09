@@ -1069,6 +1069,7 @@ impl InternalStationRepository {
                 LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
                 LEFT JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
             WHERE sta.station_cd = sst.station_cd
+                AND sta.e_status = 0
             UNION ALL
             SELECT sta.*,
                 lin.company_cd,
@@ -1093,7 +1094,7 @@ impl InternalStationRepository {
                 COALESCE(a.line_name_zh, lin.line_name_zh) AS line_name_zh,
                 COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
                 COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
-                IFNULL(sta.station_cd = sst.station_cd, 0) AS has_train_types,
+                0 AS has_train_types,
                 tt.id AS type_id,
                 tt.type_name,
                 tt.type_name_k,
@@ -1104,11 +1105,13 @@ impl InternalStationRepository {
                 tt.direction,
                 tt.kind
             FROM local_cte AS sta
-                LEFT JOIN `sst_cte` AS sst ON sst.station_cd IS NULL
-                LEFT JOIN `types` AS tt ON tt.type_cd IS NULL
+                LEFT JOIN `sst_cte` AS sst ON sst.station_cd = sta.station_cd
+                LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
                 LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
                 LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
-                LEFT JOIN `lines` AS lin ON lin.line_cd = sta.line_cd",
+                JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
+            WHERE sst.line_group_cd IS NULL
+                AND sta.e_status = 0",
             from_station_id,
             to_station_id,
             from_station_id,
