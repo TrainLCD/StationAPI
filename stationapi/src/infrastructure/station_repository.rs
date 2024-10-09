@@ -1093,7 +1093,7 @@ impl InternalStationRepository {
                 COALESCE(a.line_name_zh, lin.line_name_zh) AS line_name_zh,
                 COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
                 COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
-                IFNULL(sta.station_cd = sst.station_cd, 0) AS has_train_types,
+                0 AS has_train_types,
                 tt.id AS type_id,
                 tt.type_name,
                 tt.type_name_k,

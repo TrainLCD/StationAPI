@@ -613,23 +613,26 @@ where
                                 })
                                 .collect();
 
-                            let train_type = Some(Box::new(TrainType {
-                                id: row.type_id.unwrap_or_default(),
-                                station_cd: row.station_cd,
-                                type_cd: row.type_cd.unwrap_or_default(),
-                                line_group_cd: row.line_group_cd.unwrap_or_default(),
-                                pass: row.pass.unwrap_or_default(),
-                                type_name: row.type_name.clone().unwrap_or_default(),
-                                type_name_k: row.type_name_k.clone().unwrap_or_default(),
-                                type_name_r: row.type_name_r.clone(),
-                                type_name_zh: row.type_name_zh.clone(),
-                                type_name_ko: row.type_name_ko.clone(),
-                                color: row.color.clone().unwrap_or_default(),
-                                direction: row.direction.unwrap_or_default(),
-                                kind: row.kind.unwrap_or_default(),
-                                line: Some(Box::new(tt_line.clone())),
-                                lines: tt_lines,
-                            }));
+                            let train_type = match row.type_id.is_some() {
+                                true => Some(Box::new(TrainType {
+                                    id: row.type_id.unwrap(),
+                                    station_cd: row.station_cd,
+                                    type_cd: row.type_cd.unwrap(),
+                                    line_group_cd: row.line_group_cd.unwrap(),
+                                    pass: row.pass.unwrap(),
+                                    type_name: row.type_name.clone().unwrap(),
+                                    type_name_k: row.type_name_k.clone().unwrap(),
+                                    type_name_r: row.type_name_r.clone(),
+                                    type_name_zh: row.type_name_zh.clone(),
+                                    type_name_ko: row.type_name_ko.clone(),
+                                    color: row.color.clone().unwrap(),
+                                    direction: row.direction.unwrap(),
+                                    kind: row.kind.unwrap(),
+                                    line: Some(Box::new(tt_line.clone())),
+                                    lines: tt_lines,
+                                })),
+                                false => None,
+                            };
 
                             let stop = Station {
                                 station_cd: row.station_cd,
