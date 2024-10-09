@@ -564,7 +564,7 @@ where
 
         let routes: Vec<Route> = route_row_tree_map
             .iter()
-            .map(|(id, stops)| {
+            .filter_map(|(id, stops)| {
                 let stops = stops
                     .iter()
                     .map(|row| {
@@ -768,7 +768,16 @@ where
                         stop.into()
                     })
                     .collect::<Vec<station_api::Station>>();
-                Route { id: *id, stops }
+
+                // TODO: SQLで同等の処理を行う
+                let includes_requested_station = stops
+                    .iter()
+                    .any(|stop| stop.group_id == from_station_id || stop.group_id == to_station_id);
+                if !includes_requested_station {
+                    return None;
+                }
+
+                Some(Route { id: *id, stops })
             })
             .collect();
         Ok(routes)
