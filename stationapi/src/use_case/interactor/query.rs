@@ -564,70 +564,144 @@ where
 
         let routes: Vec<Route> = route_row_tree_map
             .iter()
-            .map(|(id, stops)| {
+            .filter_map(|(id, stops)| {
                 let stops = stops
                     .iter()
                     .map(|row| {
                         let extracted_line = Arc::new(self.extract_line_from_station(row));
 
-                        let tt_line = Arc::clone(&tt_lines)
+                        if let Some(tt_line) = Arc::clone(&tt_lines)
                             .iter()
                             .find(|line| line.line_cd == row.line_cd)
-                            .unwrap()
-                            .clone();
+                        {
+                            let tt_lines: Vec<Line> = Arc::clone(&tt_lines)
+                                .iter()
+                                .map(|l| Line {
+                                    line_cd: l.line_cd,
+                                    company_cd: l.company_cd,
+                                    company: None,
+                                    line_name: l.line_name.clone(),
+                                    line_name_k: l.line_name_k.clone(),
+                                    line_name_h: l.line_name_h.clone(),
+                                    line_name_r: l.line_name_r.clone(),
+                                    line_name_zh: l.line_name_zh.clone(),
+                                    line_name_ko: l.line_name_ko.clone(),
+                                    line_color_c: l.line_color_c.clone(),
+                                    line_type: l.line_type,
+                                    line_symbols: l.line_symbols.clone(),
+                                    line_symbol_primary: l.line_symbol_primary.clone(),
+                                    line_symbol_secondary: l.line_symbol_secondary.clone(),
+                                    line_symbol_extra: l.line_symbol_extra.clone(),
+                                    line_symbol_primary_color: l.line_symbol_primary_color.clone(),
+                                    line_symbol_secondary_color: l
+                                        .line_symbol_secondary_color
+                                        .clone(),
+                                    line_symbol_extra_color: l.line_symbol_extra_color.clone(),
+                                    line_symbol_primary_shape: l.line_symbol_primary_shape.clone(),
+                                    line_symbol_secondary_shape: l
+                                        .line_symbol_secondary_shape
+                                        .clone(),
+                                    line_symbol_extra_shape: l.line_symbol_extra_shape.clone(),
+                                    e_status: l.e_status,
+                                    e_sort: l.e_sort,
+                                    station: None,
+                                    train_type: None,
+                                    line_group_cd: l.line_group_cd,
+                                    station_cd: l.station_cd,
+                                    station_g_cd: l.station_g_cd,
+                                    average_distance: l.average_distance,
+                                })
+                                .collect();
 
-                        let tt_lines: Vec<Line> = Arc::clone(&tt_lines)
-                            .iter()
-                            .map(|l| Line {
-                                line_cd: l.line_cd,
-                                company_cd: l.company_cd,
-                                company: None,
-                                line_name: l.line_name.clone(),
-                                line_name_k: l.line_name_k.clone(),
-                                line_name_h: l.line_name_h.clone(),
-                                line_name_r: l.line_name_r.clone(),
-                                line_name_zh: l.line_name_zh.clone(),
-                                line_name_ko: l.line_name_ko.clone(),
-                                line_color_c: l.line_color_c.clone(),
-                                line_type: l.line_type,
-                                line_symbols: l.line_symbols.clone(),
-                                line_symbol_primary: l.line_symbol_primary.clone(),
-                                line_symbol_secondary: l.line_symbol_secondary.clone(),
-                                line_symbol_extra: l.line_symbol_extra.clone(),
-                                line_symbol_primary_color: l.line_symbol_primary_color.clone(),
-                                line_symbol_secondary_color: l.line_symbol_secondary_color.clone(),
-                                line_symbol_extra_color: l.line_symbol_extra_color.clone(),
-                                line_symbol_primary_shape: l.line_symbol_primary_shape.clone(),
-                                line_symbol_secondary_shape: l.line_symbol_secondary_shape.clone(),
-                                line_symbol_extra_shape: l.line_symbol_extra_shape.clone(),
-                                e_status: l.e_status,
-                                e_sort: l.e_sort,
-                                station: None,
-                                train_type: None,
-                                line_group_cd: l.line_group_cd,
-                                station_cd: l.station_cd,
-                                station_g_cd: l.station_g_cd,
-                                average_distance: l.average_distance,
-                            })
-                            .collect();
+                            let train_type = match row.type_id.is_some() {
+                                true => Some(Box::new(TrainType {
+                                    id: row.type_id.unwrap(),
+                                    station_cd: row.station_cd,
+                                    type_cd: row.type_cd.unwrap(),
+                                    line_group_cd: row.line_group_cd.unwrap(),
+                                    pass: row.pass.unwrap(),
+                                    type_name: row.type_name.clone().unwrap(),
+                                    type_name_k: row.type_name_k.clone().unwrap(),
+                                    type_name_r: row.type_name_r.clone(),
+                                    type_name_zh: row.type_name_zh.clone(),
+                                    type_name_ko: row.type_name_ko.clone(),
+                                    color: row.color.clone().unwrap(),
+                                    direction: row.direction.unwrap(),
+                                    kind: row.kind.unwrap(),
+                                    line: Some(Box::new(tt_line.clone())),
+                                    lines: tt_lines,
+                                })),
+                                false => None,
+                            };
 
-                        let train_type = Some(Box::new(TrainType {
-                            id: row.type_id.unwrap(),
-                            station_cd: row.station_cd,
-                            type_cd: row.type_cd.unwrap(),
-                            line_group_cd: row.line_group_cd.unwrap(),
-                            pass: row.pass.unwrap(),
-                            type_name: row.type_name.clone().unwrap(),
-                            type_name_k: row.type_name_k.clone().unwrap(),
-                            type_name_r: row.type_name_r.clone(),
-                            type_name_zh: row.type_name_zh.clone(),
-                            type_name_ko: row.type_name_ko.clone(),
-                            color: row.color.clone().unwrap(),
-                            direction: row.direction.unwrap(),
-                            kind: row.kind.unwrap(),
-                            line: Some(Box::new(tt_line)),
-                            lines: tt_lines,
-                        }));
+                            let stop = Station {
+                                station_cd: row.station_cd,
+                                station_g_cd: row.station_g_cd,
+                                station_name: row.station_name.clone(),
+                                station_name_k: row.station_name_k.clone(),
+                                station_name_r: row.station_name_r.clone(),
+                                station_name_zh: row.station_name_zh.clone(),
+                                station_name_ko: row.station_name_ko.clone(),
+                                station_numbers: self.get_station_numbers(row),
+                                primary_station_number: row.primary_station_number.clone(),
+                                secondary_station_number: row.secondary_station_number.clone(),
+                                extra_station_number: row.extra_station_number.clone(),
+                                three_letter_code: row.three_letter_code.clone(),
+                                line_cd: row.line_cd,
+                                line: Some(Box::new(Arc::clone(&extracted_line).as_ref().clone())),
+                                lines: vec![],
+                                pref_cd: row.pref_cd,
+                                post: row.post.clone(),
+                                address: row.address.clone(),
+                                lon: row.lon,
+                                lat: row.lat,
+                                open_ymd: row.open_ymd.clone(),
+                                close_ymd: row.close_ymd.clone(),
+                                e_status: row.e_status,
+                                e_sort: row.e_sort,
+                                stop_condition: row.stop_condition,
+                                distance: row.distance,
+                                train_type,
+                                has_train_types: row.has_train_types,
+                                company_cd: row.company_cd,
+                                line_name: row.line_name.clone(),
+                                line_name_k: row.line_name_k.clone(),
+                                line_name_h: row.line_name_h.clone(),
+                                line_name_r: row.line_name_r.clone(),
+                                line_name_zh: row.line_name_zh.clone(),
+                                line_name_ko: row.line_name_ko.clone(),
+                                line_color_c: row.line_color_c.clone(),
+                                line_type: row.line_type,
+                                line_symbol_primary: row.line_symbol_primary.clone(),
+                                line_symbol_secondary: row.line_symbol_secondary.clone(),
+                                line_symbol_extra: row.line_symbol_extra.clone(),
+                                line_symbol_primary_color: row.line_symbol_primary_color.clone(),
+                                line_symbol_secondary_color: row
+                                    .line_symbol_secondary_color
+                                    .clone(),
+                                line_symbol_extra_color: row.line_symbol_extra_color.clone(),
+                                line_symbol_primary_shape: row.line_symbol_primary_shape.clone(),
+                                line_symbol_secondary_shape: row
+                                    .line_symbol_secondary_shape
+                                    .clone(),
+                                line_symbol_extra_shape: row.line_symbol_extra_shape.clone(),
+                                average_distance: row.average_distance,
+                                type_id: row.type_id,
+                                type_cd: row.type_cd,
+                                line_group_cd: row.line_group_cd,
+                                pass: row.pass,
+                                type_name: row.type_name.clone(),
+                                type_name_k: row.type_name_k.clone(),
+                                type_name_r: row.type_name_r.clone(),
+                                type_name_zh: row.type_name_zh.clone(),
+                                type_name_ko: row.type_name_ko.clone(),
+                                color: row.color.clone(),
+                                direction: row.direction,
+                                kind: row.kind,
+                            };
+
+                            return stop.into();
+                        }
 
                         let stop = Station {
                             station_cd: row.station_cd,
@@ -656,7 +730,7 @@ where
                             e_sort: row.e_sort,
                             stop_condition: row.stop_condition,
                             distance: row.distance,
-                            train_type,
+                            train_type: None,
                             has_train_types: row.has_train_types,
                             company_cd: row.company_cd,
                             line_name: row.line_name.clone(),
@@ -694,7 +768,16 @@ where
                         stop.into()
                     })
                     .collect::<Vec<station_api::Station>>();
-                Route { id: *id, stops }
+
+                // TODO: SQLで同等の処理を行う
+                let includes_requested_station = stops
+                    .iter()
+                    .any(|stop| stop.group_id == from_station_id || stop.group_id == to_station_id);
+                if !includes_requested_station {
+                    return None;
+                }
+
+                Some(Route { id: *id, stops })
             })
             .collect();
         Ok(routes)
