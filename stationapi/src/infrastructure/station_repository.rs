@@ -1063,11 +1063,11 @@ impl InternalStationRepository {
                 tt.direction,
                 tt.kind
             FROM stations AS sta
-                LEFT JOIN `sst_cte` AS sst ON sst.station_cd = sta.station_cd
-                LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
+                JOIN `sst_cte` AS sst ON sst.station_cd = sta.station_cd
+                JOIN `types` AS tt ON tt.type_cd = sst.type_cd
                 LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
                 LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
-                LEFT JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
+                JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
             WHERE sta.station_cd = sst.station_cd
                 AND sta.e_status = 0
             UNION ALL
