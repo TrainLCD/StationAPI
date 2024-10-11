@@ -580,45 +580,6 @@ where
                             .iter()
                             .find(|line| line.line_cd == row.line_cd)
                         {
-                            let tt_lines: Vec<Line> = Arc::clone(&tt_lines)
-                                .iter()
-                                .map(|l| Line {
-                                    line_cd: l.line_cd,
-                                    company_cd: l.company_cd,
-                                    company: None,
-                                    line_name: l.line_name.clone(),
-                                    line_name_k: l.line_name_k.clone(),
-                                    line_name_h: l.line_name_h.clone(),
-                                    line_name_r: l.line_name_r.clone(),
-                                    line_name_zh: l.line_name_zh.clone(),
-                                    line_name_ko: l.line_name_ko.clone(),
-                                    line_color_c: l.line_color_c.clone(),
-                                    line_type: l.line_type,
-                                    line_symbols: l.line_symbols.clone(),
-                                    line_symbol_primary: l.line_symbol_primary.clone(),
-                                    line_symbol_secondary: l.line_symbol_secondary.clone(),
-                                    line_symbol_extra: l.line_symbol_extra.clone(),
-                                    line_symbol_primary_color: l.line_symbol_primary_color.clone(),
-                                    line_symbol_secondary_color: l
-                                        .line_symbol_secondary_color
-                                        .clone(),
-                                    line_symbol_extra_color: l.line_symbol_extra_color.clone(),
-                                    line_symbol_primary_shape: l.line_symbol_primary_shape.clone(),
-                                    line_symbol_secondary_shape: l
-                                        .line_symbol_secondary_shape
-                                        .clone(),
-                                    line_symbol_extra_shape: l.line_symbol_extra_shape.clone(),
-                                    e_status: l.e_status,
-                                    e_sort: l.e_sort,
-                                    station: None,
-                                    train_type: None,
-                                    line_group_cd: l.line_group_cd,
-                                    station_cd: l.station_cd,
-                                    station_g_cd: l.station_g_cd,
-                                    average_distance: l.average_distance,
-                                })
-                                .collect();
-
                             let train_type = match row.type_id.is_some() {
                                 true => Some(Box::new(TrainType {
                                     id: row.type_id.unwrap(),
@@ -635,7 +596,7 @@ where
                                     direction: row.direction.unwrap(),
                                     kind: row.kind.unwrap(),
                                     line: Some(Box::new(tt_line.clone())),
-                                    lines: tt_lines,
+                                    lines: vec![],
                                 })),
                                 false => None,
                             };
