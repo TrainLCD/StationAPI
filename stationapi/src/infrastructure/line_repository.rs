@@ -310,7 +310,6 @@ impl InternalLineRepository {
             LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
         WHERE l.line_cd = s.line_cd
             AND l.e_status = 0
-            AND IFNULL(sst.pass, 0) <> 1
         GROUP BY s.station_cd",
             params
         );
