@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
 
@@ -542,6 +545,9 @@ where
             .iter()
             .filter_map(|row| row.line_group_cd)
             .collect::<Vec<u32>>();
+
+        let line_group_id_vec: HashSet<u32> = line_group_id_vec.into_iter().collect();
+        let line_group_id_vec: Vec<u32> = line_group_id_vec.iter().copied().collect();
 
         let tt_lines = self
             .line_repository
