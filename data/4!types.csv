@@ -263,7 +263,7 @@ Yokokawa","SL群马
 0,500,りょうもう(浅草〜伊勢崎),リョウモウ,Ryomo(Asakusa to Isesaki),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
 0,501,りょうもう(浅草〜葛生),リョウモウ,Ryomo(Asakusa to Kuzū),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
 0,502,りょうもう(浅草〜赤城),リョウモウ,Ryomo(Asakusa to Akagi),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
-0,503,スカイライナー,スカイライナー,Skyliner,Skyliner,Skyliner,#0A3788,0,4,0,,COMPLETE
+0,503,スカイライナー,スカイライナー,Skyliner,Skyliner,스카이라이너,#0A3788,0,4,0,,COMPLETE
 0,504,小江戸号,コエドゴウ,Koedo,小江户,고에도,#E73042,0,4,0,,COMPLETE
 0,505,川越特急,カワゴエトッキュウ,Kawagoe Limited Express,川越特快,가와고에 특급,#E73799,0,4,0,,COMPLETE
 0,506,サザン,サザン,Southern,南方,남부,#3366CC,0,4,0,,COMPLETE
@@ -286,3 +286,18 @@ Yokokawa","SL群马
 0,523,スペーシアX(7号・8号),スペーシアX(7ゴウ・8ゴウ),SPACIA X(No.7/No.8),SPACIA X(7号/8号),SPACIA X(7호/8호),#221614,0,4,0,,COMPLETE
 0,524,スペーシアX(1号〜6号),スペーシアX(1ゴウ〜6ゴウ),SPACIA X(No.1 through No.6),SPACIA X(1号~6号),SPACIA X(7호~8호),#221614,0,4,0,,COMPLETE
 0,525,日光,ニッコウ,Nikkō,日光,햇빛,#378640,0,4,0,,COMPLETE
+0,526,さがみ,サガミ,Sagami,相模,사가미,#2288CC,0,4,0,,COMPLETE
+0,527,モーニングウェイ,モーニングウェイ,Morning Way,早晨的方式,모닝웨이,#2288CC,0,4,0,,COMPLETE
+0,528,ホームウェイ,ホームウェイ,Home way,回家的路,홈웨이,#2288CC,0,4,0,,COMPLETE
+0,529,メトロモーニングウェイ,メトロモーニングウェイ,Metro Morning Way,地下铁早晨的方式,메트로 모닝웨이,#2288CC,0,4,0,,COMPLETE
+0,530,メトロホームウェイ,メトロホームウェイ,Metro Home way,地下铁回家的路,메트로 홈웨이,#2288CC,0,4,0,,COMPLETE
+0,531,えのしま,エノシマ,Enoshima,江之岛,에노시마,#2288CC,0,4,0,,COMPLETE
+0,532,メトロえのしま,メトロエノシマ,Metro Enoshima,地下铁江之岛,메트로 에노시마,#2288CC,0,4,0,,COMPLETE
+0,533,ふじさん,フジサン,Mt. Fuji,富士山,후지 씨,#2288CC,0,4,0,,COMPLETE
+0,534,スカイツリーライナー,スカイツリーライナー,Skytree Liner,天空树衬里,스카이 트리 라이너,#87ceeb,0,4,0,,COMPLETE
+0,535,むさし,ムサシ,Musashi,武藏,무사시,#FF6600,0,4,0,,COMPLETE
+0,536,ドーム,ドーム,dome,圆顶,돔,#696969,0,4,0,,COMPLETE
+0,537,シティライナー,シティライナー,City Liner,City Liner,시티 라이너,#1e90ff,0,4,0,,COMPLETE
+0,538,モーニングライナー,モーニングライナー,Morning Liner,Morning Liner,모닝 라이너,#9400d3,0,4,0,,COMPLETE
+0,539,イブニングライナー,イブニングライナー,Evening Liner,Evening Liner,이브닝 라이너,#9400d3,0,4,0,,COMPLETE
+0,540,臨時ライナー,リンジライナー,Special Liner,临时Liner,임시 라이너,#add8e6,0,4,0,,COMPLETE
