@@ -1042,6 +1042,7 @@ impl InternalStationRepository {
                 lin.line_symbol_secondary_shape,
                 lin.line_symbol_extra_shape,
                 IFNULL(lin.average_distance, 0.0) AS average_distance,
+                sst.id AS type_id,
                 sst.type_cd,
                 sst.line_group_cd,
                 sst.pass,
@@ -1053,7 +1054,6 @@ impl InternalStationRepository {
                 COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
                 COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
                 IFNULL(sta.station_cd = sst.station_cd, 0) AS has_train_types,
-                tt.id AS type_id,
                 tt.type_name,
                 tt.type_name_k,
                 tt.type_name_r,
@@ -1084,6 +1084,7 @@ impl InternalStationRepository {
                 lin.line_symbol_secondary_shape,
                 lin.line_symbol_extra_shape,
                 IFNULL(lin.average_distance, 0.0) AS average_distance,
+                sst.id AS type_id,
                 sst.type_cd,
                 sst.line_group_cd,
                 sst.pass,
@@ -1095,7 +1096,6 @@ impl InternalStationRepository {
                 COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
                 COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
                 0 AS has_train_types,
-                tt.id AS type_id,
                 tt.type_name,
                 tt.type_name_k,
                 tt.type_name_r,
@@ -1111,7 +1111,8 @@ impl InternalStationRepository {
                 LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
                 JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
             WHERE sst.line_group_cd IS NULL
-                AND sta.e_status = 0",
+                AND sta.e_status = 0
+            ORDER BY CASE WHEN line_group_cd IS NOT NULL THEN type_id ELSE CONCAT(e_sort, station_cd) END",
             from_station_id,
             to_station_id,
             from_station_id,
