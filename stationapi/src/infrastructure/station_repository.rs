@@ -1123,7 +1123,7 @@ impl InternalStationRepository {
                 JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
             WHERE sst.line_group_cd IS NULL
                 AND sta.e_status = 0
-            ORDER BY CASE WHEN line_group_cd IS NOT NULL THEN type_id ELSE CONCAT(e_sort, station_cd) END",
+            ORDER BY CASE WHEN line_group_cd IS NOT NULL THEN sst_id ELSE CONCAT(e_sort, station_cd) END",
             from_station_id,
             to_station_id,
             from_station_id,
