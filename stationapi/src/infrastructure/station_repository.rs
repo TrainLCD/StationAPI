@@ -1006,6 +1006,7 @@ impl InternalStationRepository {
                         )
                     )
                 WHERE s.line_cd = l.line_cd
+                ORDER BY s.e_sort, s.station_cd ASC 
             ),
             sst_cte_c1 AS (
                 SELECT sst.line_group_cd
