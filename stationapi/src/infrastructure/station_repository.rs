@@ -1111,7 +1111,8 @@ impl InternalStationRepository {
                 LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
                 JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
             WHERE sst.line_group_cd IS NULL
-                AND sta.e_status = 0",
+                AND sta.e_status = 0
+            ORDER BY sta.e_sort, sta.station_cd ASC",
             from_station_id,
             to_station_id,
             from_station_id,
