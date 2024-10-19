@@ -1,19 +1,19 @@
-use crate::infrastructure::{
-    company_repository::MyCompanyRepository, line_repository::MyLineRepository,
-    station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
-};
-use crate::station_api::GetRouteRequest;
-use crate::station_api::RouteResponse;
-use crate::station_api::{CoordinatesRequest, DistanceResponse, DistanceResponseState};
-use crate::use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase};
 use crate::{
+    infrastructure::{
+        company_repository::MyCompanyRepository, line_repository::MyLineRepository,
+        station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
+    },
     presentation::error::PresentationalError,
     station_api::{
-        station_api_server::StationApi, GetStationByCoordinatesRequest, GetStationByGroupIdRequest,
-        GetStationByIdListRequest, GetStationByIdRequest, GetStationByLineIdRequest,
-        GetStationsByLineGroupIdRequest, GetStationsByNameRequest, GetTrainTypesByStationIdRequest,
-        MultipleStationResponse, MultipleTrainTypeResponse, SingleStationResponse,
+        station_api_server::StationApi, CoordinatesRequest, DistanceResponse,
+        DistanceResponseState, GetLineByIdRequest, GetLinesByNameRequest, GetRouteRequest,
+        GetStationByCoordinatesRequest, GetStationByGroupIdRequest, GetStationByIdListRequest,
+        GetStationByIdRequest, GetStationByLineIdRequest, GetStationsByLineGroupIdRequest,
+        GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleLineResponse,
+        MultipleStationResponse, MultipleTrainTypeResponse, RouteResponse, SingleLineResponse,
+        SingleStationResponse,
     },
+    use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
 use tonic::Response;
 
@@ -249,6 +249,52 @@ impl StationApi for MyApi {
         match self.query_use_case.get_routes(from_id, to_id).await {
             Ok(routes) => {
                 return Ok(Response::new(RouteResponse { routes }));
+            }
+            Err(err) => Err(PresentationalError::from(err).into()),
+        }
+    }
+
+    async fn get_line_by_id(
+        &self,
+        request: tonic::Request<GetLineByIdRequest>,
+    ) -> Result<tonic::Response<SingleLineResponse>, tonic::Status> {
+        let line_id = request.get_ref().line_id;
+
+        let line = match self.query_use_case.find_line_by_id(line_id).await {
+            Ok(Some(line)) => line,
+            Ok(None) => {
+                return Err(PresentationalError::NotFound(format!(
+                    "Line with id {} not found",
+                    line_id
+                ))
+                .into())
+            }
+            Err(err) => {
+                return Err(PresentationalError::OtherError(anyhow::anyhow!(err).into()).into())
+            }
+        };
+
+        Ok(Response::new(SingleLineResponse {
+            line: Some(line.into()),
+        }))
+    }
+
+    async fn get_lines_by_name(
+        &self,
+        request: tonic::Request<GetLinesByNameRequest>,
+    ) -> Result<tonic::Response<MultipleLineResponse>, tonic::Status> {
+        let line_name = request.get_ref().line_name.clone();
+        let limit = request.get_ref().limit;
+
+        match self
+            .query_use_case
+            .get_lines_by_name(line_name, limit)
+            .await
+        {
+            Ok(lines) => {
+                return Ok(Response::new(MultipleLineResponse {
+                    lines: lines.into_iter().map(|line| line.into()).collect(),
+                }));
             }
             Err(err) => Err(PresentationalError::from(err).into()),
         }

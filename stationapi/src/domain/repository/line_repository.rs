@@ -25,4 +25,9 @@ pub trait LineRepository: Send + Sync + 'static {
         &self,
         line_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError>;
+    async fn get_by_name(
+        &self,
+        line_name: String,
+        limit: Option<u32>,
+    ) -> Result<Vec<Line>, DomainError>;
 }

@@ -226,7 +226,7 @@ where
 
             let mut lines: Vec<Line> = lines
                 .iter()
-                .filter(|&l| l.station_g_cd == station.station_g_cd)
+                .filter(|&l| l.station_g_cd.unwrap_or(0) == station.station_g_cd)
                 .cloned()
                 .collect();
             for line in lines.iter_mut() {
@@ -382,8 +382,8 @@ where
             station: None,
             train_type: None,
             line_group_cd: None,
-            station_cd: station.station_cd,
-            station_g_cd: station.station_g_cd,
+            station_cd: Some(station.station_cd),
+            station_g_cd: Some(station.station_g_cd),
             average_distance: station.average_distance,
         }
     }
@@ -698,5 +698,19 @@ where
             })
             .collect();
         Ok(routes)
+    }
+
+    async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError> {
+        let line = self.line_repository.find_by_id(line_id).await?;
+        Ok(line)
+    }
+
+    async fn get_lines_by_name(
+        &self,
+        line_name: String,
+        limit: Option<u32>,
+    ) -> Result<Vec<Line>, UseCaseError> {
+        let lines = self.line_repository.get_by_name(line_name, limit).await?;
+        Ok(lines)
     }
 }
