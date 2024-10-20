@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - preview
+      - feature/preview-env
     paths:
       - "data/*.csv"
       - "docker/migration/Dockerfile"
