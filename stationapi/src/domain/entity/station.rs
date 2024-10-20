@@ -56,6 +56,7 @@ pub struct Station {
     pub average_distance: f64,
     // station_station_typesからJOIN
     pub type_id: Option<u32>,
+    pub sst_id: Option<u32>,
     pub type_cd: Option<u32>,
     pub line_group_cd: Option<u32>,
     pub pass: Option<u32>,
@@ -123,6 +124,7 @@ impl Station {
         average_distance: f64,
         pass: Option<u32>,
         type_id: Option<u32>,
+        sst_id: Option<u32>,
         type_cd: Option<u32>,
         type_name: Option<String>,
         type_name_k: Option<String>,
@@ -184,6 +186,7 @@ impl Station {
             pass,
             average_distance,
             type_id,
+            sst_id,
             type_cd,
             type_name,
             type_name_k,

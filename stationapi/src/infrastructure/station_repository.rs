@@ -64,6 +64,8 @@ struct StationRow {
     #[sqlx(default)]
     pub type_id: Option<u32>,
     #[sqlx(default)]
+    pub sst_id: Option<u32>,
+    #[sqlx(default)]
     pub type_cd: Option<u32>,
     #[sqlx(default)]
     pub line_group_cd: Option<u32>,
@@ -149,6 +151,7 @@ impl From<StationRow> for Station {
             line_symbol_extra_shape: row.line_symbol_extra_shape,
             average_distance: row.average_distance,
             type_id: row.type_id,
+            sst_id: row.sst_id,
             type_cd: row.type_cd,
             line_group_cd: row.line_group_cd,
             pass: row.pass,
@@ -334,6 +337,7 @@ impl InternalStationRepository {
             l.line_symbol_secondary_shape,
             l.line_symbol_extra_shape,
             l.average_distance,
+            sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
             sst.pass,
@@ -455,6 +459,7 @@ impl InternalStationRepository {
               t.type_name_ko,
               t.direction,
               t.kind,
+              sst.id AS sst_id,
               sst.pass,
               COALESCE(a.line_name, l.line_name) AS line_name,
               COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
@@ -529,6 +534,7 @@ impl InternalStationRepository {
                           COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
                           COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
                           COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+                          sst.id AS sst_id,
                           sst.line_group_cd,
                           IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types
                           FROM `stations` AS s
@@ -582,6 +588,7 @@ impl InternalStationRepository {
             l.line_symbol_secondary_shape,
             l.line_symbol_extra_shape,
             l.average_distance,
+            sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
             sst.pass,
@@ -848,6 +855,7 @@ impl InternalStationRepository {
             l.line_symbol_secondary_shape,
             l.line_symbol_extra_shape,
             l.average_distance,
+            dst_sst.id AS sst_id,
             dst_sst.type_cd,
             dst_sst.line_group_cd,
             dst_sst.pass,
@@ -931,6 +939,7 @@ impl InternalStationRepository {
             l.line_symbol_secondary_shape,
             l.line_symbol_extra_shape,
             l.average_distance,
+            sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
             sst.pass,
@@ -978,81 +987,145 @@ impl InternalStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let rows = sqlx::query_as!(
             StationRow,
-            "WITH cte1 AS (
-    SELECT s.station_cd
-    FROM stations AS s
-    WHERE s.station_g_cd = ?
-),
-cte2 AS (
-    SELECT s.station_cd
-    FROM stations AS s
-    WHERE s.station_g_cd = ?
-),
-cte3 AS (
-    SELECT sst.line_group_cd
-    FROM station_station_types AS sst
-		JOIN cte1
-		WHERE sst.station_cd = cte1.station_cd
-        AND sst.pass <> 1
-),
-cte4 AS (
-    SELECT sst.line_group_cd
-    FROM station_station_types AS sst
-		JOIN cte2
-		WHERE sst.station_cd = cte2.station_cd
-        AND sst.pass <> 1
-)
-
-SELECT
-        sta.*,
-        lin.company_cd,
-        lin.line_type,
-        lin.line_symbol_primary,
-        lin.line_symbol_secondary,
-        lin.line_symbol_extra,
-        lin.line_symbol_primary_color,
-        lin.line_symbol_secondary_color,
-        lin.line_symbol_extra_color,
-        lin.line_symbol_primary_shape,
-        lin.line_symbol_secondary_shape,
-        lin.line_symbol_extra_shape,
-        lin.average_distance,
-        sst.type_cd,
-        sst.line_group_cd,
-        sst.pass,
-        COALESCE(a.line_name, lin.line_name) AS line_name,
-        COALESCE(a.line_name_k, lin.line_name_k) AS line_name_k,
-        COALESCE(a.line_name_h, lin.line_name_h) AS line_name_h,
-        COALESCE(a.line_name_r, lin.line_name_r) AS line_name_r,
-        COALESCE(a.line_name_zh, lin.line_name_zh) AS line_name_zh,
-        COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
-        COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
-        IFNULL(sta.station_cd = sst.station_cd, 0) AS has_train_types,
-        tt.id AS type_id,
-        tt.type_name,
-        tt.type_name_k,
-        tt.type_name_r,
-        tt.type_name_zh,
-        tt.type_name_ko,
-        tt.color,
-        tt.direction,
-        tt.kind
-    FROM stations AS sta
-    JOIN cte3
-    JOIN cte4
-    LEFT JOIN
-        station_station_types AS sst
-            ON sst.line_group_cd = cte3.line_group_cd
-            AND sst.line_group_cd = cte4.line_group_cd
-			AND sta.station_cd = sst.station_cd
-    LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
-    JOIN `lines` AS lin ON sta.line_cd = lin.line_cd
-    LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
-    LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
-WHERE sst.line_group_cd = cte3.line_group_cd
-    AND sst.line_group_cd = cte3.line_group_cd
-    AND sta.station_cd = sta.station_cd
-    AND lin.line_cd = sta.line_cd",
+            "WITH from_cte AS (
+                SELECT s.station_cd,
+                    s.line_cd
+                FROM stations AS s
+                WHERE s.station_g_cd = ?
+            ),
+            to_cte AS (
+                SELECT s.station_cd,
+                    s.line_cd
+                FROM stations AS s
+                WHERE s.station_g_cd = ?
+            ),
+            local_cte AS (
+                SELECT s.*
+                FROM `stations` AS s
+                    JOIN `lines` AS l ON l.line_cd IN (
+                        SELECT line_cd
+                        FROM `stations`
+                        WHERE station_g_cd = ?
+                    )
+                    AND l.line_cd IN (
+                        (
+                            SELECT line_cd
+                            FROM `stations`
+                            WHERE station_g_cd = ?
+                        )
+                    )
+                WHERE s.line_cd = l.line_cd
+            ),
+            sst_cte_c1 AS (
+                SELECT sst.line_group_cd
+                FROM station_station_types AS sst
+                    JOIN from_cte
+                WHERE sst.station_cd = from_cte.station_cd
+                    AND sst.pass <> 1
+            ),
+            sst_cte_c2 AS (
+                SELECT sst.line_group_cd
+                FROM station_station_types AS sst
+                    JOIN to_cte
+                WHERE sst.station_cd = to_cte.station_cd
+                    AND sst.pass <> 1
+            ),
+            sst_cte AS (
+                SELECT sst.*
+                FROM `station_station_types` AS sst
+                    JOIN sst_cte_c1
+                    JOIN sst_cte_c2
+                WHERE sst.line_group_cd = sst_cte_c1.line_group_cd
+                    AND sst.line_group_cd = sst_cte_c2.line_group_cd
+            )
+            SELECT sta.*,
+                lin.company_cd,
+                lin.line_type,
+                lin.line_symbol_primary,
+                lin.line_symbol_secondary,
+                lin.line_symbol_extra,
+                lin.line_symbol_primary_color,
+                lin.line_symbol_secondary_color,
+                lin.line_symbol_extra_color,
+                lin.line_symbol_primary_shape,
+                lin.line_symbol_secondary_shape,
+                lin.line_symbol_extra_shape,
+                IFNULL(lin.average_distance, 0.0) AS average_distance,
+                sst.id AS sst_id,
+                sst.type_cd,
+                sst.line_group_cd,
+                sst.pass,
+                COALESCE(a.line_name, lin.line_name) AS line_name,
+                COALESCE(a.line_name_k, lin.line_name_k) AS line_name_k,
+                COALESCE(a.line_name_h, lin.line_name_h) AS line_name_h,
+                COALESCE(a.line_name_r, lin.line_name_r) AS line_name_r,
+                COALESCE(a.line_name_zh, lin.line_name_zh) AS line_name_zh,
+                COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
+                COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
+                IFNULL(sta.station_cd = sst.station_cd, 0) AS has_train_types,
+                tt.id AS type_id,
+                tt.type_name,
+                tt.type_name_k,
+                tt.type_name_r,
+                tt.type_name_zh,
+                tt.type_name_ko,
+                tt.color,
+                tt.direction,
+                tt.kind
+            FROM stations AS sta
+                LEFT JOIN `sst_cte` AS sst ON sst.station_cd = sta.station_cd
+                LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
+                LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
+                LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+                LEFT JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
+            WHERE sta.station_cd = sst.station_cd
+                AND sta.e_status = 0
+            UNION ALL
+            SELECT sta.*,
+                lin.company_cd,
+                lin.line_type,
+                lin.line_symbol_primary,
+                lin.line_symbol_secondary,
+                lin.line_symbol_extra,
+                lin.line_symbol_primary_color,
+                lin.line_symbol_secondary_color,
+                lin.line_symbol_extra_color,
+                lin.line_symbol_primary_shape,
+                lin.line_symbol_secondary_shape,
+                lin.line_symbol_extra_shape,
+                IFNULL(lin.average_distance, 0.0) AS average_distance,
+                sst.id AS sst_id,
+                sst.type_cd,
+                sst.line_group_cd,
+                sst.pass,
+                COALESCE(a.line_name, lin.line_name) AS line_name,
+                COALESCE(a.line_name_k, lin.line_name_k) AS line_name_k,
+                COALESCE(a.line_name_h, lin.line_name_h) AS line_name_h,
+                COALESCE(a.line_name_r, lin.line_name_r) AS line_name_r,
+                COALESCE(a.line_name_zh, lin.line_name_zh) AS line_name_zh,
+                COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
+                COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
+                0 AS has_train_types,
+                tt.id AS type_id,
+                tt.type_name,
+                tt.type_name_k,
+                tt.type_name_r,
+                tt.type_name_zh,
+                tt.type_name_ko,
+                tt.color,
+                tt.direction,
+                tt.kind
+            FROM local_cte AS sta
+                LEFT JOIN `sst_cte` AS sst ON sst.station_cd = sta.station_cd
+                LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
+                LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
+                LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+                JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
+            WHERE sst.line_group_cd IS NULL
+                AND sta.e_status = 0
+            ORDER BY CASE WHEN line_group_cd IS NOT NULL THEN sst_id ELSE CONCAT(e_sort, station_cd) END",
+            from_station_id,
+            to_station_id,
             from_station_id,
             to_station_id,
         )
