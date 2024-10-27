@@ -1,10 +1,10 @@
-use std::sync::Arc;
 use crate::domain::{
     entity::train_type::TrainType, error::DomainError,
     repository::train_type_repository::TrainTypeRepository,
 };
 use async_trait::async_trait;
 use sqlx::{MySql, MySqlConnection, Pool};
+use std::sync::Arc;
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct TrainTypeRow {

@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use async_trait::async_trait;
 use sqlx::{MySql, MySqlConnection, Pool};
+use std::sync::Arc;
 
 use crate::domain::{
     entity::company::Company, error::DomainError, repository::company_repository::CompanyRepository,
