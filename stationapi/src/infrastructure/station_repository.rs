@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use sqlx::{MySql, MySqlConnection, Pool};
+use std::sync::Arc;
 
 use crate::{
     domain::{
@@ -174,13 +175,12 @@ struct DistanceWithIdRow {
     average_distance: f64,
 }
 
-#[derive(Debug, Clone)]
 pub struct MyStationRepository {
-    pool: Pool<MySql>,
+    pool: Arc<Pool<MySql>>,
 }
 
 impl MyStationRepository {
-    pub fn new(pool: Pool<MySql>) -> Self {
+    pub fn new(pool: Arc<Pool<MySql>>) -> Self {
         Self { pool }
     }
 }
