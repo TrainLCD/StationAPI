@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use crate::domain::{
     entity::train_type::TrainType, error::DomainError,
     repository::train_type_repository::TrainTypeRepository,
@@ -59,13 +60,12 @@ impl From<TrainTypeRow> for TrainType {
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct MyTrainTypeRepository {
-    pool: Pool<MySql>,
+    pool: Arc<Pool<MySql>>,
 }
 
 impl MyTrainTypeRepository {
-    pub fn new(pool: Pool<MySql>) -> Self {
+    pub fn new(pool: Arc<Pool<MySql>>) -> Self {
         Self { pool }
     }
 }

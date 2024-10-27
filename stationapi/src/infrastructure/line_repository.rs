@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use async_trait::async_trait;
 use sqlx::{MySql, MySqlConnection, Pool};
 
@@ -70,13 +71,12 @@ impl From<LineRow> for Line {
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct MyLineRepository {
-    pool: Pool<MySql>,
+    pool: Arc<Pool<MySql>>,
 }
 
 impl MyLineRepository {
-    pub fn new(pool: Pool<MySql>) -> Self {
+    pub fn new(pool: Arc<Pool<MySql>>) -> Self {
         Self { pool }
     }
 }
