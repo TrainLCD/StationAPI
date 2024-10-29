@@ -9,9 +9,11 @@ services:
       - db
       - migration
     environment:
-      DATABASE_URL: mysql://stationapi:password@db/stationapi
+      DATABASE_URL: mariadb://stationapi:password@db/stationapi
+      REDIS_URL: redis://cache:6379
       ACCEPT_HTTP1: true
       HOST: 0.0.0.0
+      ENABLE_CACHE: true
     ports:
       - 50051:50051
     restart: always
@@ -44,8 +46,6 @@ services:
     restart: on-failure
     networks:
       - sapi-link
-
-
 
   cache:
     image: redis:7.4

@@ -11,8 +11,10 @@ services:
       - ..:/workspace:cached
     environment:
       DATABASE_URL: mariadb://stationapi:password@db-dc/stationapi
+      REDIS_URL: redis://cache-dc:6379
       ACCEPT_HTTP1: true
       HOST: 0.0.0.0
+      ENABLE_CACHE: true
     ports:
       - 50051:50051
     networks:

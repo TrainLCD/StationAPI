@@ -13,9 +13,10 @@ services:
       - .:/app
     environment:
       DATABASE_URL: mariadb://stationapi:password@db/stationapi
+      REDIS_URL: redis://cache:6379
       ACCEPT_HTTP1: true
-      ENABLE_ALL_STATIONS_RPC: true
       HOST: 0.0.0.0
+      ENABLE_CACHE: true
     ports:
       - 50051:50051
     networks:
