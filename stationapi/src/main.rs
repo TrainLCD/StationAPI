@@ -63,11 +63,14 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     let train_type_repository = MyTrainTypeRepository::new(Arc::clone(&pool));
     let company_repository = MyCompanyRepository::new(Arc::clone(&pool));
 
+    let cache_client = connect_to_redis()?;
+
     let query_use_case = QueryInteractor {
         station_repository,
         line_repository,
         train_type_repository,
         company_repository,
+        cache_client,
     };
 
     let my_api = MyApi { query_use_case };
@@ -126,4 +129,39 @@ fn fetch_http1_flag() -> bool {
         }
         Err(VarError::NotUnicode(_)) => panic!("$ACCEPT_HTTP1 should be written in Unicode."),
     }
+}
+
+fn fetch_redis_url() -> String {
+    match env::var("REDIS_URL") {
+        Ok(s) => s.parse().expect("Failed to parse $REDIS_URL"),
+        Err(VarError::NotPresent) => {
+            warn!("REDIS_URL is not set.");
+            "".to_string()
+        }
+        Err(VarError::NotUnicode(_)) => panic!("$REDIS_URL should be written in Unicode."),
+    }
+}
+
+fn fetch_enable_cache_flag() -> bool {
+    match env::var("ENABLE_CACHE") {
+        Ok(s) => s.parse().expect("Failed to parse $ENABLE_CACHE"),
+        Err(env::VarError::NotPresent) => {
+            warn!("$ENABLE_CACHE is not set. Falling back to false.");
+            false
+        }
+        Err(VarError::NotUnicode(_)) => panic!("$ENABLE_CACHE should be written in Unicode."),
+    }
+}
+
+fn connect_to_redis() -> Result<Option<redis::Client>, anyhow::Error> {
+    let redis_url = fetch_redis_url();
+    let enable_cache = fetch_enable_cache_flag();
+    if !enable_cache {
+        warn!("In-memory cache is disabled by an environment variable.");
+        return Ok(None);
+    }
+
+    let client = redis::Client::open(redis_url)?;
+
+    Ok(Some(client))
 }

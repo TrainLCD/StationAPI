@@ -1,10 +1,9 @@
+use super::{line::Line, station_number::StationNumber, train_type::TrainType as TrainTypeEntity};
+use crate::station_api::StopCondition;
+use redis_macros::{FromRedisValue, ToRedisArgs};
 use serde::{Deserialize, Serialize};
 
-use crate::station_api::StopCondition;
-
-use super::{line::Line, station_number::StationNumber, train_type::TrainType as TrainTypeEntity};
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, FromRedisValue, ToRedisArgs)]
 pub struct Station {
     pub station_cd: u32,
     pub station_g_cd: u32,

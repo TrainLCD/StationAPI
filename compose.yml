@@ -8,6 +8,7 @@ services:
     command: cargo watch -s "cargo run -p stationapi"
     depends_on:
       - db
+      - cache
     volumes:
       - .:/app
     environment:
@@ -44,6 +45,13 @@ services:
       MYSQL_PASSWORD: password
       MYSQL_HOST: db
       MYSQL_DATABASE: stationapi
+    networks:
+      - sapi-link
+
+  cache:
+    image: redis:7.4
+    ports:
+      - 6379:6379
     networks:
       - sapi-link
 

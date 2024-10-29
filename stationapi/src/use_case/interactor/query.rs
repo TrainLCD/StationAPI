@@ -1,7 +1,3 @@
-use std::{collections::BTreeMap, sync::Arc};
-
-use async_trait::async_trait;
-
 use crate::{
     domain::{
         entity::{
@@ -16,13 +12,16 @@ use crate::{
     station_api::{self, Route},
     use_case::{error::UseCaseError, traits::query::QueryUseCase},
 };
+use async_trait::async_trait;
+use redis::Commands;
+use std::{collections::BTreeMap, sync::Arc};
 
-#[derive(Clone)]
 pub struct QueryInteractor<SR, LR, TR, CR> {
     pub station_repository: SR,
     pub line_repository: LR,
     pub train_type_repository: TR,
     pub company_repository: CR,
+    pub cache_client: Option<redis::Client>,
 }
 
 #[async_trait]
@@ -532,13 +531,32 @@ where
         from_station_id: u32,
         to_station_id: u32,
     ) -> Result<Vec<Route>, UseCaseError> {
-        let stops = self
-            .station_repository
-            .get_route_stops(from_station_id, to_station_id)
-            .await?;
+        let cache_key = format!("{}:{}", from_station_id, to_station_id);
+
+        let cached_stops: Vec<Station> = match self.cache_client.clone() {
+            Some(mut client) => {
+                let json_str = client
+                    .hget::<&str, &str, String>("route_stops", &cache_key)
+                    .unwrap_or_default();
+                serde_json::from_str::<Vec<Station>>(&json_str).unwrap_or_default()
+            }
+            _ => vec![],
+        };
+
+        let cached_stops = Arc::new(cached_stops);
+
+        let stops = match cached_stops.is_empty() {
+            true => {
+                self.station_repository
+                    .get_route_stops(from_station_id, to_station_id)
+                    .await?
+            }
+            false => cached_stops.to_vec(),
+        };
+
         let stops = Arc::new(stops);
 
-        let line_group_id_vec = Arc::clone(&stops)
+        let line_group_id_vec = stops
             .iter()
             .filter_map(|row| row.line_group_cd)
             .collect::<Vec<u32>>();
@@ -550,7 +568,7 @@ where
 
         let tt_lines = Arc::new(tt_lines);
 
-        let route_row_tree_map: BTreeMap<u32, Vec<Station>> = Arc::clone(&stops).iter().fold(
+        let route_row_tree_map: BTreeMap<u32, Vec<Station>> = stops.iter().fold(
             BTreeMap::new(),
             |mut acc: BTreeMap<u32, Vec<Station>>, value| {
                 if let Some(line_group_cd) = value.line_group_cd {
@@ -570,11 +588,10 @@ where
                     .map(|row| {
                         let extracted_line = Arc::new(self.extract_line_from_station(row));
 
-                        if let Some(tt_line) = Arc::clone(&tt_lines)
-                            .iter()
-                            .find(|line| line.line_cd == row.line_cd)
+                        if let Some(tt_line) =
+                            tt_lines.iter().find(|line| line.line_cd == row.line_cd)
                         {
-                            let tt_lines: Vec<Line> = Arc::clone(&tt_lines)
+                            let tt_lines: Vec<Line> = tt_lines
                                 .iter()
                                 .map(|l| Line {
                                     line_cd: l.line_cd,
@@ -648,7 +665,7 @@ where
                                 extra_station_number: row.extra_station_number.clone(),
                                 three_letter_code: row.three_letter_code.clone(),
                                 line_cd: row.line_cd,
-                                line: Some(Box::new(Arc::clone(&extracted_line).as_ref().clone())),
+                                line: Some(Box::new(extracted_line.as_ref().clone())),
                                 lines: vec![],
                                 pref_cd: row.pref_cd,
                                 post: row.post.clone(),
@@ -718,7 +735,7 @@ where
                             extra_station_number: row.extra_station_number.clone(),
                             three_letter_code: row.three_letter_code.clone(),
                             line_cd: row.line_cd,
-                            line: Some(Box::new(Arc::clone(&extracted_line).as_ref().clone())),
+                            line: Some(Box::new(extracted_line.as_ref().clone())),
                             lines: vec![],
                             pref_cd: row.pref_cd,
                             post: row.post.clone(),
@@ -782,6 +799,17 @@ where
                 Some(Route { id: *id, stops })
             })
             .collect();
+
+        if cached_stops.is_empty() {
+            if let Some(mut cache_client) = self.cache_client.clone() {
+                let json = serde_json::to_string(&stops).unwrap_or_default();
+
+                cache_client
+                    .hset::<&str, &str, String, String>("route_stops", &cache_key, json)
+                    .unwrap();
+            }
+        }
+
         Ok(routes)
     }
 

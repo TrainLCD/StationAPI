@@ -45,5 +45,13 @@ services:
     networks:
       - sapi-link
 
+
+
+  cache:
+    image: redis:7.4
+    restart: always
+    networks:
+      - sapi-link
+
 networks:
   sapi-link:
