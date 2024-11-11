@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use sqlx::{MySql, MySqlConnection, Pool};
+use std::sync::Arc;
 
 use crate::{
     domain::{
@@ -63,6 +64,8 @@ struct StationRow {
     // station_station_typesからJOIN
     #[sqlx(default)]
     pub type_id: Option<u32>,
+    #[sqlx(default)]
+    pub sst_id: Option<u32>,
     #[sqlx(default)]
     pub type_cd: Option<u32>,
     #[sqlx(default)]
@@ -149,6 +152,7 @@ impl From<StationRow> for Station {
             line_symbol_extra_shape: row.line_symbol_extra_shape,
             average_distance: row.average_distance,
             type_id: row.type_id,
+            sst_id: row.sst_id,
             type_cd: row.type_cd,
             line_group_cd: row.line_group_cd,
             pass: row.pass,
@@ -171,13 +175,12 @@ struct DistanceWithIdRow {
     average_distance: f64,
 }
 
-#[derive(Debug, Clone)]
 pub struct MyStationRepository {
-    pool: Pool<MySql>,
+    pool: Arc<Pool<MySql>>,
 }
 
 impl MyStationRepository {
-    pub fn new(pool: Pool<MySql>) -> Self {
+    pub fn new(pool: Arc<Pool<MySql>>) -> Self {
         Self { pool }
     }
 }
@@ -334,6 +337,7 @@ impl InternalStationRepository {
             l.line_symbol_secondary_shape,
             l.line_symbol_extra_shape,
             l.average_distance,
+            sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
             sst.pass,
@@ -455,6 +459,7 @@ impl InternalStationRepository {
               t.type_name_ko,
               t.direction,
               t.kind,
+              sst.id AS sst_id,
               sst.pass,
               COALESCE(a.line_name, l.line_name) AS line_name,
               COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
@@ -529,6 +534,7 @@ impl InternalStationRepository {
                           COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
                           COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
                           COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+                          sst.id AS sst_id,
                           sst.line_group_cd,
                           IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types
                           FROM `stations` AS s
@@ -582,6 +588,7 @@ impl InternalStationRepository {
             l.line_symbol_secondary_shape,
             l.line_symbol_extra_shape,
             l.average_distance,
+            sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
             sst.pass,
@@ -848,6 +855,7 @@ impl InternalStationRepository {
             l.line_symbol_secondary_shape,
             l.line_symbol_extra_shape,
             l.average_distance,
+            dst_sst.id AS sst_id,
             dst_sst.type_cd,
             dst_sst.line_group_cd,
             dst_sst.pass,
@@ -931,6 +939,7 @@ impl InternalStationRepository {
             l.line_symbol_secondary_shape,
             l.line_symbol_extra_shape,
             l.average_distance,
+            sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
             sst.pass,
@@ -1042,7 +1051,7 @@ impl InternalStationRepository {
                 lin.line_symbol_secondary_shape,
                 lin.line_symbol_extra_shape,
                 IFNULL(lin.average_distance, 0.0) AS average_distance,
-                sst.id AS type_id,
+                sst.id AS sst_id,
                 sst.type_cd,
                 sst.line_group_cd,
                 sst.pass,
@@ -1054,6 +1063,7 @@ impl InternalStationRepository {
                 COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
                 COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
                 IFNULL(sta.station_cd = sst.station_cd, 0) AS has_train_types,
+                tt.id AS type_id,
                 tt.type_name,
                 tt.type_name_k,
                 tt.type_name_r,
@@ -1084,7 +1094,7 @@ impl InternalStationRepository {
                 lin.line_symbol_secondary_shape,
                 lin.line_symbol_extra_shape,
                 IFNULL(lin.average_distance, 0.0) AS average_distance,
-                sst.id AS type_id,
+                sst.id AS sst_id,
                 sst.type_cd,
                 sst.line_group_cd,
                 sst.pass,
@@ -1096,6 +1106,7 @@ impl InternalStationRepository {
                 COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
                 COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
                 0 AS has_train_types,
+                tt.id AS type_id,
                 tt.type_name,
                 tt.type_name_k,
                 tt.type_name_r,
@@ -1112,7 +1123,7 @@ impl InternalStationRepository {
                 JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
             WHERE sst.line_group_cd IS NULL
                 AND sta.e_status = 0
-            ORDER BY CASE WHEN line_group_cd IS NOT NULL THEN type_id ELSE CONCAT(e_sort, station_cd) END",
+            ORDER BY CASE WHEN line_group_cd IS NOT NULL THEN sst_id ELSE CONCAT(e_sort, station_cd) END",
             from_station_id,
             to_station_id,
             from_station_id,

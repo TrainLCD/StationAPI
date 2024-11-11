@@ -8,6 +8,7 @@ use stationapi::{
     station_api::station_api_server::StationApiServer,
     use_case::interactor::query::QueryInteractor,
 };
+use std::sync::Arc;
 use std::{
     env::{self, VarError},
     net::{AddrParseError, SocketAddr},
@@ -55,12 +56,12 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     let addr = fetch_addr()?;
 
     let db_url = fetch_database_url();
-    let pool = MySqlPool::connect(db_url.as_str()).await?;
+    let pool = Arc::new(MySqlPool::connect(db_url.as_str()).await?);
 
-    let station_repository = MyStationRepository::new(pool.clone());
-    let line_repository = MyLineRepository::new(pool.clone());
-    let train_type_repository = MyTrainTypeRepository::new(pool.clone());
-    let company_repository = MyCompanyRepository::new(pool.clone());
+    let station_repository = MyStationRepository::new(Arc::clone(&pool));
+    let line_repository = MyLineRepository::new(Arc::clone(&pool));
+    let train_type_repository = MyTrainTypeRepository::new(Arc::clone(&pool));
+    let company_repository = MyCompanyRepository::new(Arc::clone(&pool));
 
     let query_use_case = QueryInteractor {
         station_repository,

@@ -4,6 +4,7 @@ use crate::domain::{
 };
 use async_trait::async_trait;
 use sqlx::{MySql, MySqlConnection, Pool};
+use std::sync::Arc;
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct TrainTypeRow {
@@ -59,13 +60,12 @@ impl From<TrainTypeRow> for TrainType {
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct MyTrainTypeRepository {
-    pool: Pool<MySql>,
+    pool: Arc<Pool<MySql>>,
 }
 
 impl MyTrainTypeRepository {
-    pub fn new(pool: Pool<MySql>) -> Self {
+    pub fn new(pool: Arc<Pool<MySql>>) -> Self {
         Self { pool }
     }
 }

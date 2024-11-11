@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "SELECT s.*,\n            l.company_cd,\n            l.line_type,\n            l.line_symbol_primary,\n            l.line_symbol_secondary,\n            l.line_symbol_extra,\n            l.line_symbol_primary_color,\n            l.line_symbol_secondary_color,\n            l.line_symbol_extra_color,\n            l.line_symbol_primary_shape,\n            l.line_symbol_secondary_shape,\n            l.line_symbol_extra_shape,\n            l.average_distance,\n            dst_sst.type_cd,\n            dst_sst.line_group_cd,\n            dst_sst.pass,\n            COALESCE(a.line_name, l.line_name) AS line_name,\n            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,\n            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,\n            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,\n            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,\n            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,\n            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,\n            IFNULL(s.station_cd = dst_sst.station_cd, 0) AS has_train_types,\n            t.id AS type_id,\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.direction,\n            t.kind\n            FROM `stations` AS s\n            JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0\n            LEFT JOIN `station_station_types` AS from_sst\n              ON from_sst.station_cd IN (SELECT station_cd FROM stations WHERE station_g_cd = ?)\n              AND from_sst.pass <> 1\n            LEFT JOIN `station_station_types` AS dst_sst\n              ON dst_sst.station_cd = s.station_cd\n              AND dst_sst.pass <> 1\n            LEFT JOIN `types` AS t ON t.type_cd = dst_sst.type_cd\n            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd\n            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id\n            WHERE\n              (\n                s.station_name LIKE ?\n                OR s.station_name_r LIKE ?\n                OR s.station_name_k LIKE ?\n                OR s.station_name_zh LIKE ?\n                OR s.station_name_ko LIKE ?\n              )\n              AND s.e_status = 0\n              AND (\n              \tfrom_sst.line_group_cd = dst_sst.line_group_cd\n              \tOR s.line_cd IN (SELECT line_cd FROM stations WHERE station_g_cd = IFNULL(?, s.station_g_cd))\n              )\n            GROUP BY s.station_g_cd\n            LIMIT\n              ?",
+  "query": "SELECT DISTINCT s.*,\n            l.company_cd,\n            l.line_type,\n            l.line_symbol_primary,\n            l.line_symbol_secondary,\n            l.line_symbol_extra,\n            l.line_symbol_primary_color,\n            l.line_symbol_secondary_color,\n            l.line_symbol_extra_color,\n            l.line_symbol_primary_shape,\n            l.line_symbol_secondary_shape,\n            l.line_symbol_extra_shape,\n            l.average_distance,\n            sst.id AS sst_id,\n            sst.type_cd,\n            sst.line_group_cd,\n            sst.pass,\n            COALESCE(a.line_name, l.line_name) AS line_name,\n            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,\n            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,\n            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,\n            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,\n            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,\n            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,\n            IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types,\n            t.id AS type_id,\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.direction,\n            t.kind\n          FROM `stations` AS s\n          JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0\n          LEFT JOIN `station_station_types` AS sst ON sst.line_group_cd = ?\n          LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd\n          LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd\n          LEFT JOIN `aliases` AS a ON la.alias_cd = a.id\n          WHERE\n            s.line_cd = l.line_cd\n            AND s.station_cd = sst.station_cd\n            AND s.e_status = 0",
   "describe": {
     "columns": [
       {
@@ -335,6 +335,16 @@
       },
       {
         "ordinal": 33,
+        "name": "sst_id",
+        "type_info": {
+          "type": "Long",
+          "flags": "PRIMARY_KEY | UNSIGNED | AUTO_INCREMENT",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 34,
         "name": "type_cd",
         "type_info": {
           "type": "Long",
@@ -344,7 +354,7 @@
         }
       },
       {
-        "ordinal": 34,
+        "ordinal": 35,
         "name": "line_group_cd",
         "type_info": {
           "type": "Long",
@@ -354,7 +364,7 @@
         }
       },
       {
-        "ordinal": 35,
+        "ordinal": 36,
         "name": "pass",
         "type_info": {
           "type": "Long",
@@ -364,7 +374,7 @@
         }
       },
       {
-        "ordinal": 36,
+        "ordinal": 37,
         "name": "line_name",
         "type_info": {
           "type": "VarString",
@@ -374,7 +384,7 @@
         }
       },
       {
-        "ordinal": 37,
+        "ordinal": 38,
         "name": "line_name_k",
         "type_info": {
           "type": "VarString",
@@ -384,7 +394,7 @@
         }
       },
       {
-        "ordinal": 38,
+        "ordinal": 39,
         "name": "line_name_h",
         "type_info": {
           "type": "VarString",
@@ -394,7 +404,7 @@
         }
       },
       {
-        "ordinal": 39,
+        "ordinal": 40,
         "name": "line_name_r",
         "type_info": {
           "type": "VarString",
@@ -404,7 +414,7 @@
         }
       },
       {
-        "ordinal": 40,
+        "ordinal": 41,
         "name": "line_name_zh",
         "type_info": {
           "type": "VarString",
@@ -414,7 +424,7 @@
         }
       },
       {
-        "ordinal": 41,
+        "ordinal": 42,
         "name": "line_name_ko",
         "type_info": {
           "type": "VarString",
@@ -424,7 +434,7 @@
         }
       },
       {
-        "ordinal": 42,
+        "ordinal": 43,
         "name": "line_color_c",
         "type_info": {
           "type": "VarString",
@@ -434,7 +444,7 @@
         }
       },
       {
-        "ordinal": 43,
+        "ordinal": 44,
         "name": "has_train_types",
         "type_info": {
           "type": "Long",
@@ -444,7 +454,7 @@
         }
       },
       {
-        "ordinal": 44,
+        "ordinal": 45,
         "name": "type_id",
         "type_info": {
           "type": "Long",
@@ -454,7 +464,7 @@
         }
       },
       {
-        "ordinal": 45,
+        "ordinal": 46,
         "name": "type_name",
         "type_info": {
           "type": "VarString",
@@ -464,7 +474,7 @@
         }
       },
       {
-        "ordinal": 46,
+        "ordinal": 47,
         "name": "type_name_k",
         "type_info": {
           "type": "VarString",
@@ -474,7 +484,7 @@
         }
       },
       {
-        "ordinal": 47,
+        "ordinal": 48,
         "name": "type_name_r",
         "type_info": {
           "type": "VarString",
@@ -484,7 +494,7 @@
         }
       },
       {
-        "ordinal": 48,
+        "ordinal": 49,
         "name": "type_name_zh",
         "type_info": {
           "type": "VarString",
@@ -494,7 +504,7 @@
         }
       },
       {
-        "ordinal": 49,
+        "ordinal": 50,
         "name": "type_name_ko",
         "type_info": {
           "type": "VarString",
@@ -504,7 +514,7 @@
         }
       },
       {
-        "ordinal": 50,
+        "ordinal": 51,
         "name": "color",
         "type_info": {
           "type": "VarString",
@@ -514,7 +524,7 @@
         }
       },
       {
-        "ordinal": 51,
+        "ordinal": 52,
         "name": "direction",
         "type_info": {
           "type": "Long",
@@ -524,7 +534,7 @@
         }
       },
       {
-        "ordinal": 52,
+        "ordinal": 53,
         "name": "kind",
         "type_info": {
           "type": "Long",
@@ -535,7 +545,7 @@
       }
     ],
     "parameters": {
-      "Right": 8
+      "Right": 1
     },
     "nullable": [
       false,
@@ -581,6 +591,7 @@
       true,
       true,
       true,
+      true,
       false,
       true,
       true,
@@ -593,5 +604,5 @@
       true
     ]
   },
-  "hash": "4a2a0c68b0cfce58622af3ebf5bf4c9af48e8b23f987620769af90edcdd04242"
+  "hash": "58c78cf89e98ce37b37e95641e101d9873ca6f6b8c0f0a4422a05c0025783353"
 }
