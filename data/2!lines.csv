@@ -545,7 +545,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99633,204,三田線,サンダセン,神鉄三田線,Sanda Line,,,#D53924,2,KB,,,#DD0033,,,HANSHIN,,,0,99633,1239.584115
 99634,204,公園都市線,コウエントシセン,神鉄公園都市線,Koen-Toshi Line,,,#D53924,2,KB,,,#DD0033,,,HANSHIN,,,0,99634,1369.524035
 99635,204,粟生線,アオセン,神鉄粟生線,Ao Line,,,#D53924,2,KB,,,#DD0033,,,HANSHIN,,,0,99635,1452.67416
-99636,211,神戸市営地下鉄北神線,コウベシエイチカテツホクシンセン,神戸市営地下鉄北神線,Kobe Municipal Subway Hokushin Line,,,#D59A00,2,S,,,#01AF98,#01AF98,,SQUARE,REVERSED_SQUARE_WEST,,0,99636,6524.405724
+99636,211,神戸市営地下鉄北神線,コウベシエイチカテツホクシンセン,神戸市営地下鉄北神線,Kobe Municipal Subway Hokushin Line,,,#D59A00,2,S,S,,#01AF98,#01AF98,,SQUARE,REVERSED_SQUARE_WEST,,0,99636,6524.405724
 99637,206,山陽電鉄本線,サンヨウデンテツホンセン,山陽電鉄本線,Sanyo Electric Railway Main Line,,,#F45757,2,SY,,,#ED1A3D,,,SANYO,,,0,99637,1277.22504
 99638,206,山陽電鉄網干線,サンヨウデンテツアボシセン,山陽電鉄網干線,Sanyo Electric Railway Aboshi Line,,,#F45757,2,SY,,,#ED1A3D,,,SANYO,,,0,99638,1391.340232
 99615,207,能勢電鉄妙見線,ノセデンテツミョウケンセン,能勢電鉄妙見線,Nose Electric Railway Myoken Line,,,#B72142,2,NS,,,#B72142,,,REVERSED_ROUND,,,0,99640,892.754581
