@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use sqlx::{MySql, MySqlConnection, Pool};
+use std::sync::Arc;
 
 use crate::domain::{
     entity::company::Company, error::DomainError, repository::company_repository::CompanyRepository,
@@ -40,13 +41,12 @@ impl From<CompanyRow> for Company {
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct MyCompanyRepository {
-    pool: Pool<MySql>,
+    pool: Arc<Pool<MySql>>,
 }
 
 impl MyCompanyRepository {
-    pub fn new(pool: Pool<MySql>) -> Self {
+    pub fn new(pool: Arc<Pool<MySql>>) -> Self {
         Self { pool }
     }
 }

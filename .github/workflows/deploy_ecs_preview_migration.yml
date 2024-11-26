@@ -1,10 +1,10 @@
-name: Deploy Migration to Staging Environment on Amazon ECS
+name: Deploy Migration to Preview Environment on Amazon ECS
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - dev
+      - preview
     paths:
       - "data/*.csv"
       - "docker/migration/Dockerfile"
@@ -22,9 +22,9 @@ env:
 
 jobs:
   deploy:
-    name: Deploy StationAPI Canary Migration
+    name: Deploy StationAPI Preview Migration
     runs-on: self-hosted
-    environment: staging
+    environment: preview
 
     steps:
       - name: Checkout
