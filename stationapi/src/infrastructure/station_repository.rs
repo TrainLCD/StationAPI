@@ -1031,6 +1031,7 @@ impl InternalStationRepository {
                     )
                 WHERE
                     s.line_cd = l.line_cd
+                ORDER BY s.e_sort, s.station_cd
             ),
             sst_cte_c1 AS (
                 SELECT
@@ -1104,7 +1105,7 @@ impl InternalStationRepository {
                     LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
                     LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
                     LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
-                    LEFT JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
+                    JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
                 WHERE
                     sta.station_cd = sst.station_cd
                     AND sta.e_status = 0
@@ -1158,9 +1159,6 @@ impl InternalStationRepository {
                 WHERE
                     sst.line_group_cd IS NULL
                     AND sta.e_status = 0
-                ORDER BY
-                    sta.e_sort,
-                    sta.station_cd
             )",
             from_station_id,
             to_station_id,
