@@ -74,8 +74,8 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     let my_api = MyApi { query_use_case };
 
     let svc = StationApiServer::new(my_api)
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Zstd)
+        .send_compressed(CompressionEncoding::Zstd);
 
     info!("StationAPI Server listening on {}", addr);
 
