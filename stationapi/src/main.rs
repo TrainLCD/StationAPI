@@ -76,7 +76,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     info!("StationAPI Server listening on {}", addr);
 
-    if disable_grpc_web == true {
+    if disable_grpc_web {
         Server::builder()
             .add_service(health_service)
             .add_service(svc)
