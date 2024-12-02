@@ -52,7 +52,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     tokio::spawn(station_api_service_status(health_reporter.clone()));
 
-    let accept_http1 = fetch_http1_flag();
+    let disable_grpc_web = fetch_disable_grpc_web_flag();
     let addr = fetch_addr()?;
 
     let db_url = fetch_database_url();
@@ -76,12 +76,20 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     info!("StationAPI Server listening on {}", addr);
 
-    Server::builder()
-        .accept_http1(accept_http1)
-        .add_service(tonic_web::enable(health_service))
-        .add_service(tonic_web::enable(svc))
-        .serve(addr)
-        .await?;
+    if disable_grpc_web == true {
+        Server::builder()
+            .add_service(health_service)
+            .add_service(svc)
+            .serve(addr)
+            .await?;
+    } else {
+        Server::builder()
+            .accept_http1(true)
+            .add_service(tonic_web::enable(health_service))
+            .add_service(tonic_web::enable(svc))
+            .serve(addr)
+            .await?;
+    }
 
     Ok(())
 }
@@ -117,13 +125,13 @@ fn fetch_database_url() -> String {
         Err(VarError::NotUnicode(_)) => panic!("$DATABASE_URL should be written in Unicode."),
     }
 }
-fn fetch_http1_flag() -> bool {
-    match env::var("ACCEPT_HTTP1") {
-        Ok(s) => s.parse().expect("Failed to parse $ACCEPT_HTTP1"),
+fn fetch_disable_grpc_web_flag() -> bool {
+    match env::var("DISABLE_GRPC_WEB") {
+        Ok(s) => s.parse().expect("Failed to parse $DISABLE_GRPC_WEB"),
         Err(env::VarError::NotPresent) => {
-            warn!("$ACCEPT_HTTP1 is not set. Falling back to false.");
+            warn!("$DISABLE_GRPC_WEB is not set. Falling back to false.");
             false
         }
-        Err(VarError::NotUnicode(_)) => panic!("$ACCEPT_HTTP1 should be written in Unicode."),
+        Err(VarError::NotUnicode(_)) => panic!("$DISABLE_GRPC_WEB should be written in Unicode."),
     }
 }
