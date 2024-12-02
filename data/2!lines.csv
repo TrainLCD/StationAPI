@@ -545,7 +545,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99633,204,三田線,サンダセン,神鉄三田線,Sanda Line,,,#D53924,2,KB,,,#DD0033,,,HANSHIN,,,0,99633,1239.584115
 99634,204,公園都市線,コウエントシセン,神鉄公園都市線,Koen-Toshi Line,,,#D53924,2,KB,,,#DD0033,,,HANSHIN,,,0,99634,1369.524035
 99635,204,粟生線,アオセン,神鉄粟生線,Ao Line,,,#D53924,2,KB,,,#DD0033,,,HANSHIN,,,0,99635,1452.67416
-99636,211,神戸市営地下鉄北神線,コウベシエイチカテツホクシンセン,神戸市営地下鉄北神線,Kobe Municipal Subway Hokushin Line,,,#D59A00,2,S,,,#01AF98,,,SQUARE,,,0,99636,6524.405724
+99636,211,神戸市営地下鉄北神線,コウベシエイチカテツホクシンセン,神戸市営地下鉄北神線,Kobe Municipal Subway Hokushin Line,,,#D59A00,2,S,S,,#01AF98,#01AF98,,SQUARE,REVERSED_SQUARE_WEST,,0,99636,6524.405724
 99637,206,山陽電鉄本線,サンヨウデンテツホンセン,山陽電鉄本線,Sanyo Electric Railway Main Line,,,#F45757,2,SY,,,#ED1A3D,,,SANYO,,,0,99637,1277.22504
 99638,206,山陽電鉄網干線,サンヨウデンテツアボシセン,山陽電鉄網干線,Sanyo Electric Railway Aboshi Line,,,#F45757,2,SY,,,#ED1A3D,,,SANYO,,,0,99638,1391.340232
 99615,207,能勢電鉄妙見線,ノセデンテツミョウケンセン,能勢電鉄妙見線,Nose Electric Railway Myoken Line,,,#B72142,2,NS,,,#B72142,,,REVERSED_ROUND,,,0,99640,892.754581
@@ -565,8 +565,8 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 99703,216,大社線,タイシャセン,一畑電車大社線,Taisha Line,,,#EB5C02,2,,,,,,,,,,0,99703,2044.195461
 99704,217,水島本線,ミズシマホンセン,水島臨海鉄道水島本線,Mizushima Main Line,,,#3B82C5,2,MR,,,#3B82C5,,,REVERSED_ROUND,,,0,99704,1126.374424
 99705,218,井原線,イバラセン,井原鉄道井原線,Ibara Line,,,#00AD66,2,,,,,,,,,,0,99705,2869.876875
-99706,219,東山線,ヒガシヤマセン,岡山電軌東山本線,Higashiyama Line,,,#0A50A1,4,H,,,#EF1731,,,ROUND,,,0,99706,321.472682
-99707,219,清輝橋線,セイキバシセン,岡山電軌清輝橋線,Seikibashi Line,,,#9E49A1,4,S,,,#07502B,,,ROUND,,,0,99707,256.5629164
+99706,219,東山線,ヒガシヤマセン,岡山電軌東山本線,Higashiyama Line,,,#EF1731,4,H,,,#EF1731,,,ROUND,,,0,99706,321.472682
+99707,219,清輝橋線,セイキバシセン,岡山電軌清輝橋線,Seikibashi Line,,,#07502B,4,S,,,#07502B,,,ROUND,,,0,99707,256.5629164
 99708,220,スカイレールみどり坂線,スカイレールミドリザカセン,広島短距離交通瀬野線,Skyrail Midorizaka Line,,,#F9F9F9,5,,,,,,,,,,0,99708,591.7263347
 99709,221,アストラムライン,アストラムライン,広島高速交通広島新交通1号線,Astram Line,,,#FFA500,5,,,,,,,,,,0,99709,850.3427213
 99710,222,広電１号線,ヒロデンイチゴウセン,広電１号線,Hiroden Ujina Line,,,#FF5900,4,M,U,,#00A85F,#0092D7,,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,,0,99710,297.6649521
