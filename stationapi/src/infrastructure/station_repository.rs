@@ -1109,7 +1109,7 @@ impl InternalStationRepository {
                     sta.station_cd = sst.station_cd
                     AND sta.e_status = 0
                 ORDER BY
-                    sst_id
+                    sst.id
             )
         UNION ALL
             (
@@ -1159,8 +1159,8 @@ impl InternalStationRepository {
                     sst.line_group_cd IS NULL
                     AND sta.e_status = 0
                 ORDER BY
-                    e_sort,
-                    station_cd
+                    sta.e_sort,
+                    sta.station_cd
             )",
             from_station_id,
             to_station_id,
