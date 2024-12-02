@@ -987,143 +987,181 @@ impl InternalStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let rows = sqlx::query_as!(
             StationRow,
-            "WITH from_cte AS (
-                SELECT s.station_cd,
+            "WITH
+            from_cte AS (
+                SELECT
+                    s.station_cd,
                     s.line_cd
-                FROM stations AS s
-                WHERE s.station_g_cd = ?
+                FROM
+                    stations AS s
+                WHERE
+                    s.station_g_cd = ?
             ),
             to_cte AS (
-                SELECT s.station_cd,
+                SELECT
+                    s.station_cd,
                     s.line_cd
-                FROM stations AS s
-                WHERE s.station_g_cd = ?
+                FROM
+                    stations AS s
+                WHERE
+                    s.station_g_cd = ?
             ),
             local_cte AS (
-                SELECT s.*
-                FROM `stations` AS s
+                SELECT
+                    s.*
+                FROM
+                    `stations` AS s
                     JOIN `lines` AS l ON l.line_cd IN (
-                        SELECT line_cd
-                        FROM `stations`
-                        WHERE station_g_cd = ?
+                        SELECT
+                            line_cd
+                        FROM
+                            `stations`
+                        WHERE
+                            station_g_cd = ?
                     )
                     AND l.line_cd IN (
                         (
-                            SELECT line_cd
-                            FROM `stations`
-                            WHERE station_g_cd = ?
+                            SELECT
+                                line_cd
+                            FROM
+                                `stations`
+                            WHERE
+                                station_g_cd = ?
                         )
                     )
-                WHERE s.line_cd = l.line_cd
+                WHERE
+                    s.line_cd = l.line_cd
             ),
             sst_cte_c1 AS (
-                SELECT sst.line_group_cd
-                FROM station_station_types AS sst
+                SELECT
+                    sst.line_group_cd
+                FROM
+                    station_station_types AS sst
                     JOIN from_cte
-                WHERE sst.station_cd = from_cte.station_cd
+                WHERE
+                    sst.station_cd = from_cte.station_cd
                     AND sst.pass <> 1
             ),
             sst_cte_c2 AS (
-                SELECT sst.line_group_cd
-                FROM station_station_types AS sst
+                SELECT
+                    sst.line_group_cd
+                FROM
+                    station_station_types AS sst
                     JOIN to_cte
-                WHERE sst.station_cd = to_cte.station_cd
+                WHERE
+                    sst.station_cd = to_cte.station_cd
                     AND sst.pass <> 1
             ),
             sst_cte AS (
-                SELECT sst.*
-                FROM `station_station_types` AS sst
+                SELECT
+                    sst.*
+                FROM
+                    `station_station_types` AS sst
                     JOIN sst_cte_c1
                     JOIN sst_cte_c2
-                WHERE sst.line_group_cd = sst_cte_c1.line_group_cd
+                WHERE
+                    sst.line_group_cd = sst_cte_c1.line_group_cd
                     AND sst.line_group_cd = sst_cte_c2.line_group_cd
+            ) (
+                SELECT
+                    sta.*,
+                    lin.company_cd,
+                    lin.line_type,
+                    lin.line_symbol_primary,
+                    lin.line_symbol_secondary,
+                    lin.line_symbol_extra,
+                    lin.line_symbol_primary_color,
+                    lin.line_symbol_secondary_color,
+                    lin.line_symbol_extra_color,
+                    lin.line_symbol_primary_shape,
+                    lin.line_symbol_secondary_shape,
+                    lin.line_symbol_extra_shape,
+                    IFNULL (lin.average_distance, 0.0) AS average_distance,
+                    sst.id AS sst_id,
+                    sst.type_cd,
+                    sst.line_group_cd,
+                    sst.pass,
+                    COALESCE(a.line_name, lin.line_name) AS line_name,
+                    COALESCE(a.line_name_k, lin.line_name_k) AS line_name_k,
+                    COALESCE(a.line_name_h, lin.line_name_h) AS line_name_h,
+                    COALESCE(a.line_name_r, lin.line_name_r) AS line_name_r,
+                    COALESCE(a.line_name_zh, lin.line_name_zh) AS line_name_zh,
+                    COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
+                    COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
+                    1 AS has_train_types,
+                    tt.id AS type_id,
+                    tt.type_name,
+                    tt.type_name_k,
+                    tt.type_name_r,
+                    tt.type_name_zh,
+                    tt.type_name_ko,
+                    tt.color,
+                    tt.direction,
+                    tt.kind
+                FROM
+                    stations AS sta
+                    LEFT JOIN `sst_cte` AS sst ON sst.station_cd = sta.station_cd
+                    LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
+                    LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
+                    LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+                    LEFT JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
+                WHERE
+                    sta.station_cd = sst.station_cd
+                    AND sta.e_status = 0
+                ORDER BY
+                    sst_id
             )
-            SELECT sta.*,
-                lin.company_cd,
-                lin.line_type,
-                lin.line_symbol_primary,
-                lin.line_symbol_secondary,
-                lin.line_symbol_extra,
-                lin.line_symbol_primary_color,
-                lin.line_symbol_secondary_color,
-                lin.line_symbol_extra_color,
-                lin.line_symbol_primary_shape,
-                lin.line_symbol_secondary_shape,
-                lin.line_symbol_extra_shape,
-                IFNULL(lin.average_distance, 0.0) AS average_distance,
-                sst.id AS sst_id,
-                sst.type_cd,
-                sst.line_group_cd,
-                sst.pass,
-                COALESCE(a.line_name, lin.line_name) AS line_name,
-                COALESCE(a.line_name_k, lin.line_name_k) AS line_name_k,
-                COALESCE(a.line_name_h, lin.line_name_h) AS line_name_h,
-                COALESCE(a.line_name_r, lin.line_name_r) AS line_name_r,
-                COALESCE(a.line_name_zh, lin.line_name_zh) AS line_name_zh,
-                COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
-                COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
-                IFNULL(sta.station_cd = sst.station_cd, 0) AS has_train_types,
-                tt.id AS type_id,
-                tt.type_name,
-                tt.type_name_k,
-                tt.type_name_r,
-                tt.type_name_zh,
-                tt.type_name_ko,
-                tt.color,
-                tt.direction,
-                tt.kind
-            FROM stations AS sta
-                LEFT JOIN `sst_cte` AS sst ON sst.station_cd = sta.station_cd
-                LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
-                LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
-                LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
-                LEFT JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
-            WHERE sta.station_cd = sst.station_cd
-                AND sta.e_status = 0
-            UNION ALL
-            SELECT sta.*,
-                lin.company_cd,
-                lin.line_type,
-                lin.line_symbol_primary,
-                lin.line_symbol_secondary,
-                lin.line_symbol_extra,
-                lin.line_symbol_primary_color,
-                lin.line_symbol_secondary_color,
-                lin.line_symbol_extra_color,
-                lin.line_symbol_primary_shape,
-                lin.line_symbol_secondary_shape,
-                lin.line_symbol_extra_shape,
-                IFNULL(lin.average_distance, 0.0) AS average_distance,
-                sst.id AS sst_id,
-                sst.type_cd,
-                sst.line_group_cd,
-                sst.pass,
-                COALESCE(a.line_name, lin.line_name) AS line_name,
-                COALESCE(a.line_name_k, lin.line_name_k) AS line_name_k,
-                COALESCE(a.line_name_h, lin.line_name_h) AS line_name_h,
-                COALESCE(a.line_name_r, lin.line_name_r) AS line_name_r,
-                COALESCE(a.line_name_zh, lin.line_name_zh) AS line_name_zh,
-                COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
-                COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
-                0 AS has_train_types,
-                tt.id AS type_id,
-                tt.type_name,
-                tt.type_name_k,
-                tt.type_name_r,
-                tt.type_name_zh,
-                tt.type_name_ko,
-                tt.color,
-                tt.direction,
-                tt.kind
-            FROM local_cte AS sta
-                LEFT JOIN `sst_cte` AS sst ON sst.station_cd = sta.station_cd
-                LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
-                LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
-                LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
-                JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
-            WHERE sst.line_group_cd IS NULL
-                AND sta.e_status = 0
-            ORDER BY CASE WHEN line_group_cd IS NOT NULL THEN sst_id ELSE CONCAT(e_sort, station_cd) END",
+        UNION ALL
+            (
+                SELECT
+                    sta.*,
+                    lin.company_cd,
+                    lin.line_type,
+                    lin.line_symbol_primary,
+                    lin.line_symbol_secondary,
+                    lin.line_symbol_extra,
+                    lin.line_symbol_primary_color,
+                    lin.line_symbol_secondary_color,
+                    lin.line_symbol_extra_color,
+                    lin.line_symbol_primary_shape,
+                    lin.line_symbol_secondary_shape,
+                    lin.line_symbol_extra_shape,
+                    IFNULL (lin.average_distance, 0.0) AS average_distance,
+                    sst.id AS sst_id,
+                    sst.type_cd,
+                    sst.line_group_cd,
+                    sst.pass,
+                    COALESCE(a.line_name, lin.line_name) AS line_name,
+                    COALESCE(a.line_name_k, lin.line_name_k) AS line_name_k,
+                    COALESCE(a.line_name_h, lin.line_name_h) AS line_name_h,
+                    COALESCE(a.line_name_r, lin.line_name_r) AS line_name_r,
+                    COALESCE(a.line_name_zh, lin.line_name_zh) AS line_name_zh,
+                    COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
+                    COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
+                    0 AS has_train_types,
+                    tt.id AS type_id,
+                    tt.type_name,
+                    tt.type_name_k,
+                    tt.type_name_r,
+                    tt.type_name_zh,
+                    tt.type_name_ko,
+                    tt.color,
+                    tt.direction,
+                    tt.kind
+                FROM
+                    local_cte AS sta
+                    LEFT JOIN `sst_cte` AS sst ON sst.station_cd = sta.station_cd
+                    LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
+                    LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
+                    LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+                    JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
+                WHERE
+                    sst.line_group_cd IS NULL
+                    AND sta.e_status = 0
+                ORDER BY
+                    e_sort,
+                    station_cd
+            )",
             from_station_id,
             to_station_id,
             from_station_id,
