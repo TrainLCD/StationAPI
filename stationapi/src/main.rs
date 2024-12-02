@@ -13,6 +13,7 @@ use std::{
     env::{self, VarError},
     net::{AddrParseError, SocketAddr},
 };
+use tonic::codec::CompressionEncoding;
 use tonic::transport::Server;
 use tonic_health::server::HealthReporter;
 use tracing::{info, warn};
@@ -72,7 +73,9 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     let my_api = MyApi { query_use_case };
 
-    let svc = StationApiServer::new(my_api);
+    let svc = StationApiServer::new(my_api)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
 
     info!("StationAPI Server listening on {}", addr);
 
