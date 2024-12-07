@@ -195,7 +195,7 @@ where
 
         let company_ids = &lines
             .iter()
-            .filter_map(|station| station.company_cd)
+            .map(|station| station.company_cd)
             .collect::<Vec<u32>>();
         let companies = self.find_company_by_id_vec(company_ids).await?;
 
@@ -208,7 +208,7 @@ where
             line.line_symbols = self.get_line_symbols(&line);
             line.company = companies
                 .iter()
-                .find(|c| c.company_cd == line.company_cd.unwrap_or(0))
+                .find(|c| c.company_cd == line.company_cd)
                 .cloned();
             line.station = Some(station.clone());
 
@@ -232,7 +232,7 @@ where
             for line in lines.iter_mut() {
                 line.company = companies
                     .iter()
-                    .find(|c| c.company_cd == line.company_cd.unwrap_or(0))
+                    .find(|c| c.company_cd == line.company_cd)
                     .cloned();
                 line.line_symbols = self.get_line_symbols(line);
                 if let Some(station) = stations_by_group_ids
@@ -357,11 +357,11 @@ where
         let station = station.clone();
         Line {
             line_cd: station.line_cd,
-            company_cd: station.company_cd,
+            company_cd: station.company_cd.unwrap_or_default(),
             company: None,
-            line_name: station.line_name,
-            line_name_k: station.line_name_k,
-            line_name_h: station.line_name_h,
+            line_name: station.line_name.unwrap_or_default(),
+            line_name_k: station.line_name_k.unwrap_or_default(),
+            line_name_h: station.line_name_h.unwrap_or_default(),
             line_name_r: station.line_name_r,
             line_name_zh: station.line_name_zh,
             line_name_ko: station.line_name_ko,
@@ -388,33 +388,37 @@ where
         }
     }
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol> {
-        let line_symbol_primary = &line.line_symbol_primary;
-        let line_symbol_secondary = &line.line_symbol_secondary;
-        let line_symbol_extra = &line.line_symbol_extra;
+        let line = Arc::new(line);
+
+        let line_symbol_primary = &Arc::clone(&line).line_symbol_primary;
+        let line_symbol_secondary = &Arc::clone(&line).line_symbol_secondary;
+        let line_symbol_extra = &Arc::clone(&line).line_symbol_extra;
         let line_symbols_raw = [
             line_symbol_primary,
             line_symbol_secondary,
             line_symbol_extra,
         ];
 
-        let line_symbol_primary_color = match line.line_symbol_primary_color {
-            Some(ref color) => color.to_string(),
-            None => line.line_color_c.clone().unwrap_or("".to_string()),
-        };
-        let line_symbol_secondary_color =
-            line.line_symbol_secondary_color.clone().unwrap_or_default();
-        let line_symbol_extra_color = line.line_symbol_extra_color.clone().unwrap_or_default();
+        let line_color = &Arc::clone(&line).line_color_c;
 
-        let line_symbol_colors_raw: Vec<String> = vec![
+        let line_symbol_primary_color = &Arc::clone(&line).line_symbol_primary_color;
+        let line_symbol_primary_color = match line_symbol_primary_color.is_some() {
+            true => line_symbol_primary_color,
+            false => line_color,
+        };
+
+        let line_symbol_secondary_color = &Arc::clone(&line).line_symbol_secondary_color;
+        let line_symbol_extra_color = &Arc::clone(&line).line_symbol_extra_color;
+
+        let line_symbol_colors_raw = [
             line_symbol_primary_color,
             line_symbol_secondary_color,
             line_symbol_extra_color,
         ];
 
-        let line_symbol_primary_shape = line.line_symbol_primary_shape.clone().unwrap_or_default();
-        let line_symbol_secondary_shape =
-            line.line_symbol_secondary_shape.clone().unwrap_or_default();
-        let line_symbol_extra_shape = line.line_symbol_extra_shape.clone().unwrap_or_default();
+        let line_symbol_primary_shape = &Arc::clone(&line).line_symbol_primary_shape;
+        let line_symbol_secondary_shape = &Arc::clone(&line).line_symbol_secondary_shape;
+        let line_symbol_extra_shape = &Arc::clone(&line).line_symbol_extra_shape;
 
         let line_symbols_shape_raw = [
             line_symbol_primary_shape,
@@ -428,23 +432,21 @@ where
 
         (0..line_symbols_raw.len())
             .filter_map(|index| {
-                let Some(symbol) = line_symbols_raw[index] else {
-                    return None;
-                };
-                let color = &line_symbol_colors_raw[index];
-                let shape = &line_symbols_shape_raw[index];
+                let symbol = line_symbols_raw[index];
+                let color = line_symbol_colors_raw[index];
+                let shape = line_symbols_shape_raw[index];
 
-                if symbol.is_empty() {
+                if symbol.is_none() {
                     return None;
                 }
-                if shape.is_empty() {
+                if shape.is_none() {
                     return None;
                 }
 
                 Some(LineSymbol {
-                    symbol: symbol.to_string(),
-                    color: color.to_string(),
-                    shape: shape.to_string(),
+                    symbol: symbol.clone().unwrap_or_default(),
+                    color: color.clone().unwrap_or_default(),
+                    shape: shape.clone().unwrap_or_default(),
                 })
             })
             .collect()
@@ -468,10 +470,7 @@ where
             .get_by_line_group_id_vec(&train_type_ids)
             .await?;
 
-        let company_ids = lines
-            .iter()
-            .filter_map(|l| l.company_cd)
-            .collect::<Vec<u32>>();
+        let company_ids = lines.iter().map(|l| l.company_cd).collect::<Vec<u32>>();
 
         let companies = self.company_repository.find_by_id_vec(&company_ids).await?;
 
@@ -491,7 +490,7 @@ where
             for line in lines.iter_mut() {
                 line.company = companies
                     .iter()
-                    .find(|c| c.company_cd == line.company_cd.unwrap_or(0))
+                    .find(|c| c.company_cd == line.company_cd)
                     .cloned();
                 line.line_symbols = self.get_line_symbols(line);
                 let train_type: Option<TrainType> = self
@@ -503,7 +502,7 @@ where
 
             line.company = companies
                 .iter()
-                .find(|c| c.company_cd == line.company_cd.unwrap_or(0))
+                .find(|c| c.company_cd == line.company_cd)
                 .cloned();
             line.line_symbols = self.get_line_symbols(&line);
 
@@ -568,7 +567,9 @@ where
                 let stops = stops
                     .iter()
                     .map(|row| {
-                        let extracted_line = Arc::new(self.extract_line_from_station(row));
+                        let row = Arc::new(row);
+                        let extracted_line =
+                            Arc::new(self.extract_line_from_station(&Arc::clone(&row)));
 
                         if let Some(tt_line) = Arc::clone(&tt_lines)
                             .iter()
@@ -615,19 +616,27 @@ where
 
                             let train_type = match row.type_id.is_some() {
                                 true => Some(Box::new(TrainType {
-                                    id: row.type_id.unwrap(),
-                                    station_cd: row.station_cd,
-                                    type_cd: row.type_cd.unwrap(),
-                                    line_group_cd: row.line_group_cd.unwrap(),
-                                    pass: row.pass.unwrap(),
-                                    type_name: row.type_name.clone().unwrap(),
-                                    type_name_k: row.type_name_k.clone().unwrap(),
-                                    type_name_r: row.type_name_r.clone(),
-                                    type_name_zh: row.type_name_zh.clone(),
-                                    type_name_ko: row.type_name_ko.clone(),
-                                    color: row.color.clone().unwrap(),
-                                    direction: row.direction.unwrap(),
-                                    kind: row.kind.unwrap(),
+                                    id: Arc::clone(&row).type_id.unwrap_or_default(),
+                                    station_cd: Arc::clone(&row).station_cd,
+                                    type_cd: Arc::clone(&row).type_cd.unwrap_or_default(),
+                                    line_group_cd: Arc::clone(&row)
+                                        .line_group_cd
+                                        .unwrap_or_default(),
+                                    pass: Arc::clone(&row).pass.unwrap_or_default(),
+                                    type_name: Arc::clone(&row)
+                                        .type_name
+                                        .clone()
+                                        .unwrap_or_default(),
+                                    type_name_k: Arc::clone(&row)
+                                        .type_name_k
+                                        .clone()
+                                        .unwrap_or_default(),
+                                    type_name_r: Arc::clone(&row).type_name_r.clone(),
+                                    type_name_zh: Arc::clone(&row).type_name_zh.clone(),
+                                    type_name_ko: Arc::clone(&row).type_name_ko.clone(),
+                                    color: Arc::clone(&row).color.clone().unwrap_or_default(),
+                                    direction: Arc::clone(&row).direction.unwrap_or_default(),
+                                    kind: Arc::clone(&row).kind.unwrap_or_default(),
                                     line: Some(Box::new(tt_line.clone())),
                                     lines: tt_lines,
                                 })),
@@ -642,7 +651,7 @@ where
                                 station_name_r: row.station_name_r.clone(),
                                 station_name_zh: row.station_name_zh.clone(),
                                 station_name_ko: row.station_name_ko.clone(),
-                                station_numbers: self.get_station_numbers(row),
+                                station_numbers: self.get_station_numbers(&Arc::clone(&row)),
                                 primary_station_number: row.primary_station_number.clone(),
                                 secondary_station_number: row.secondary_station_number.clone(),
                                 extra_station_number: row.extra_station_number.clone(),
@@ -712,7 +721,7 @@ where
                             station_name_r: row.station_name_r.clone(),
                             station_name_zh: row.station_name_zh.clone(),
                             station_name_ko: row.station_name_ko.clone(),
-                            station_numbers: self.get_station_numbers(row),
+                            station_numbers: self.get_station_numbers(&Arc::clone(&row)),
                             primary_station_number: row.primary_station_number.clone(),
                             secondary_station_number: row.secondary_station_number.clone(),
                             extra_station_number: row.extra_station_number.clone(),
