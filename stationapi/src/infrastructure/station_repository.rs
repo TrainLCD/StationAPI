@@ -1110,6 +1110,7 @@ impl InternalStationRepository {
             JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
         WHERE
             sst.line_group_cd IS NULL
+            AND lin.e_status = 0
             AND sta.e_status = 0
             ORDER BY sta.e_sort, sta.station_cd",
             from_station_id,
@@ -1245,6 +1246,7 @@ impl InternalStationRepository {
             JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
         WHERE
             sta.station_cd = sst.station_cd
+            AND lin.e_status = 0
             AND sta.e_status = 0
         ORDER BY
             sst.id",
