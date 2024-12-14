@@ -5,11 +5,11 @@ use super::{company::Company, line_symbol::LineSymbol, station::Station, train_t
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Line {
     pub line_cd: u32,
-    pub company_cd: Option<u32>,
+    pub company_cd: u32,
     pub company: Option<Company>,
-    pub line_name: Option<String>,
-    pub line_name_k: Option<String>,
-    pub line_name_h: Option<String>,
+    pub line_name: String,
+    pub line_name_k: String,
+    pub line_name_h: String,
     pub line_name_r: Option<String>,
     pub line_name_zh: Option<String>,
     pub line_name_ko: Option<String>,
@@ -39,11 +39,11 @@ impl Line {
     #![allow(clippy::too_many_arguments)]
     pub fn new(
         line_cd: u32,
-        company_cd: Option<u32>,
+        company_cd: u32,
         company: Option<Company>,
-        line_name: Option<String>,
-        line_name_k: Option<String>,
-        line_name_h: Option<String>,
+        line_name: String,
+        line_name_k: String,
+        line_name_h: String,
         line_name_r: Option<String>,
         line_name_zh: Option<String>,
         line_name_ko: Option<String>,
