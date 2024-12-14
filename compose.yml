@@ -12,8 +12,7 @@ services:
       - .:/app
     environment:
       DATABASE_URL: mariadb://stationapi:password@db/stationapi
-      ACCEPT_HTTP1: true
-      ENABLE_ALL_STATIONS_RPC: true
+      DISABLE_GRPC_WEB: false
       HOST: 0.0.0.0
     ports:
       - 50051:50051
