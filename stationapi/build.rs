@@ -20,6 +20,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "#[derive(serde::Serialize, serde::Deserialize)]",
         )
         .protoc_arg("--experimental_allow_proto3_optional")
-        .compile(&["proto/stationapi.proto"], &["proto"])?;
+        .compile_protos(&["proto/stationapi.proto"], &["proto"])?;
     Ok(())
 }
