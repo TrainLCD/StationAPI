@@ -1,18 +1,20 @@
 ci/cd:
-  - .github/workflows/*
-  - .github/*.yml
+  - ".github/workflows/*"
+  - ".github/*.yml"
 rust:
-  - src/*
-  - src/**/*
+  - "src/*"
+  - "src/**/*"
 protobuf:
-  - proto/*
-  - proto/**/*
+  - "proto/*"
+  - "proto/**/*"
 deploy-prod:
-  - master
+  - "master"
 deploy-staging:
-  - staging
+  - "staging"
 deploy-dev:
-  - dev
+  - "dev"
 documentation:
-  - .github/ISSUE_TEMPLATE/*
-  - pull_request_template.md
+  - ".github/ISSUE_TEMPLATE/*"
+  - "pull_request_template.md"
+data:
+  - "*.csv"
