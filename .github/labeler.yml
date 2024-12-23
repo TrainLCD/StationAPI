@@ -16,3 +16,5 @@ deploy-dev:
 documentation:
   - .github/ISSUE_TEMPLATE/*
   - pull_request_template.md
+data:
+  - *.csv
