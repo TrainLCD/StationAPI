@@ -7,6 +7,7 @@ on:
       - "data_validator/**"
       - "Cargo.lock"
       - "Cargo.toml"
+      - "!*.csv"
 
 name: Continuous integration
 
