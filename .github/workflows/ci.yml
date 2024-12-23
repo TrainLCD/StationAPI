@@ -1,5 +1,12 @@
 on:
   pull_request:
+    paths:
+      - "stationapi/**"
+      - "migration/**"
+      - "data_validator/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "!*.csv"
   push:
     paths:
       - "stationapi/**"
@@ -7,6 +14,7 @@ on:
       - "data_validator/**"
       - "Cargo.lock"
       - "Cargo.toml"
+      - "!*.csv"
 
 name: Continuous integration
 

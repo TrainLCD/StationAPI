@@ -2,7 +2,10 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - data/*.csv
+      - "data/*.csv"
+  push:
+    paths:
+      - "data/*.csv"
 
 name: Verify station data integrity
 
