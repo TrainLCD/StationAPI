@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Company {
     pub company_cd: u32,
     pub rr_cd: u32,
@@ -46,5 +46,45 @@ impl Company {
             e_status,
             e_sort,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Company;
+
+    #[test]
+    fn new() {
+        let company = Company::new(
+            1,
+            2,
+            "JR東日本".to_string(),
+            "ジェイアールヒガシニホン".to_string(),
+            "東日本旅客鉄道株式会社".to_string(),
+            "JR東日本".to_string(),
+            "JR East".to_string(),
+            "East Japan Railway Company".to_string(),
+            Some("https://www.jreast.co.jp/".to_string()),
+            1,
+            0,
+            1,
+        );
+        assert_eq!(
+            company,
+            Company {
+                company_cd: 1,
+                rr_cd: 2,
+                company_name: "JR東日本".to_string(),
+                company_name_k: "ジェイアールヒガシニホン".to_string(),
+                company_name_h: "東日本旅客鉄道株式会社".to_string(),
+                company_name_r: "JR東日本".to_string(),
+                company_name_en: "JR East".to_string(),
+                company_name_full_en: "East Japan Railway Company".to_string(),
+                company_url: Some("https://www.jreast.co.jp/".to_string()),
+                company_type: 1,
+                e_status: 0,
+                e_sort: 1
+            }
+        );
     }
 }
