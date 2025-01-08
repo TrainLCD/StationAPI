@@ -12,5 +12,5 @@ RUN cargo install cargo-watch
 COPY . .
 RUN mkdir -p $HOME/.config/git
 RUN echo '.DS_Store\n.envrc\n.vscode/settings.json' >> $HOME/.config/git/ignore
-ENV PORT 50051
+ENV PORT=50051
 EXPOSE $PORT

@@ -8,6 +8,6 @@ RUN curl -L --proto '=https' --tlsv1.2 -sSf https://github.com/cargo-bins/cargo-
 RUN tar xvf binstall.tgz
 RUN rm -f binstall.tgz
 RUN echo yes | ./cargo-binstall cargo-watch
-ENV PORT 50051
+ENV PORT=50051
 EXPOSE $PORT
 CMD ["cargo", "run", "-p", "stationapi"]
