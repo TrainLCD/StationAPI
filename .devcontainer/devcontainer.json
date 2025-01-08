@@ -3,7 +3,7 @@
   "dockerComposeFile": [
     "./compose.yml"
   ],
-  "service": "api-dc",
+  "service": "api",
   "remoteUser": "vscode",
   "workspaceFolder": "/workspace",
   "customizations": {
