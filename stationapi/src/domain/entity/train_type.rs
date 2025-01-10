@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::line::Line;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct TrainType {
     pub id: u32,
     pub station_cd: u32,
@@ -55,5 +55,45 @@ impl TrainType {
             lines: vec![],
             kind,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TrainType;
+
+    #[test]
+    fn new() {
+        let train_type = TrainType::new(
+            1,
+            100201,
+            1,
+            1,
+            0,
+            "のぞみ".to_string(),
+            "ノゾミ".to_string(),
+            Some("Nozomi".to_string()),
+            Some("希望".to_string()),
+            Some("노조미".to_string()),
+            "#FFD400".to_string(),
+            0,
+            4,
+        );
+
+        assert_eq!(train_type.id, 1);
+        assert_eq!(train_type.station_cd, 100201);
+        assert_eq!(train_type.type_cd, 1);
+        assert_eq!(train_type.line_group_cd, 1);
+        assert_eq!(train_type.pass, 0);
+        assert_eq!(train_type.type_name, "のぞみ");
+        assert_eq!(train_type.type_name_k, "ノゾミ");
+        assert_eq!(train_type.type_name_r, Some("Nozomi".to_string()));
+        assert_eq!(train_type.type_name_zh, Some("希望".to_string()));
+        assert_eq!(train_type.type_name_ko, Some("노조미".to_string()));
+        assert_eq!(train_type.color, "#FFD400");
+        assert_eq!(train_type.direction, 0);
+        assert_eq!(train_type.kind, 4);
+        assert_eq!(train_type.line, None);
+        assert!(train_type.lines.is_empty());
     }
 }
