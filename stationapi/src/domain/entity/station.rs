@@ -4,7 +4,7 @@ use crate::station_api::StopCondition;
 
 use super::{line::Line, station_number::StationNumber, train_type::TrainType as TrainTypeEntity};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Station {
     pub station_cd: u32,
     pub station_g_cd: u32,
@@ -197,5 +197,166 @@ impl Station {
             direction,
             kind,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Station;
+    use crate::domain::entity::{line::Line, station_number::StationNumber};
+    use crate::station_api::StopCondition;
+
+    #[test]
+    fn new() {
+        let station_numbers = vec![StationNumber::new(
+            "JY".to_string(),
+            "#80C241".to_string(),
+            "SQUARE".to_string(),
+            "01".to_string(),
+        )];
+
+        let lines = vec![Line::new(
+            11302,
+            1,
+            None,
+            "山手線".to_string(),
+            "ヤマノテセン".to_string(),
+            "Yamanote Line".to_string(),
+            Some("山手線".to_string()),
+            Some("山手线".to_string()),
+            Some("야마노테선".to_string()),
+            Some("#80C241".to_string()),
+            Some(1),
+            vec![],
+            Some("JY".to_string()),
+            None,
+            None,
+            Some("#80C241".to_string()),
+            None,
+            None,
+            Some("SQUARE".to_string()),
+            None,
+            None,
+            0,
+            1,
+            None,
+            None,
+            None,
+            None,
+            None,
+            29.0,
+        )];
+
+        let station = Station::new(
+            1130208,
+            1130208,
+            "渋谷".to_string(),
+            "シブヤ".to_string(),
+            Some("渋谷".to_string()),
+            Some("涩谷".to_string()),
+            Some("시부야".to_string()),
+            station_numbers,
+            Some("20".to_string()),
+            None,
+            None,
+            Some("SBY".to_string()),
+            11302,
+            None,
+            lines,
+            13,
+            "150-0043".to_string(),
+            "東京都渋谷区道玄坂一丁目1-1".to_string(),
+            139.701238,
+            35.658871,
+            "1885-03-01".to_string(),
+            "0000-00-00".to_string(),
+            0,
+            1130205,
+            StopCondition::All,
+            None,
+            true,
+            None,
+            Some(2),
+            Some("山手線".to_string()),
+            Some("ヤマノテセン".to_string()),
+            Some("山手線".to_string()),
+            Some("Yamanote Line".to_string()),
+            Some("山手线".to_string()),
+            Some("야마노테선".to_string()),
+            Some("#80C241".to_string()),
+            Some(2),
+            Some("JY".to_string()),
+            None,
+            None,
+            Some("#80C241".to_string()),
+            None,
+            None,
+            Some("SQUARE".to_string()),
+            None,
+            None,
+            Some(11302),
+            1075.968412,
+            Some(0),
+            Some(20),
+            Some(99999), // NOTE: あえて存在しない前提の値にしている
+            Some(100),
+            Some("普通".to_string()),
+            Some("フツウ".to_string()),
+            Some("Local".to_string()),
+            Some("慢车".to_string()),
+            Some("보통".to_string()),
+            Some("#1F63C6".to_string()),
+            Some(0),
+            Some(0),
+        );
+
+        assert_eq!(station.station_cd, 1130208);
+        assert_eq!(station.station_g_cd, 1130208);
+        assert_eq!(station.station_name, "渋谷");
+        assert_eq!(station.station_name_k, "シブヤ");
+        assert_eq!(station.station_name_r, Some("渋谷".to_string()));
+        assert_eq!(station.station_name_zh, Some("涩谷".to_string()));
+        assert_eq!(station.station_name_ko, Some("시부야".to_string()));
+        assert_eq!(station.primary_station_number, Some("20".to_string()));
+        assert_eq!(station.three_letter_code, Some("SBY".to_string()));
+        assert_eq!(station.line_cd, 11302);
+        assert_eq!(station.pref_cd, 13);
+        assert_eq!(station.post, "150-0043");
+        assert_eq!(station.address, "東京都渋谷区道玄坂一丁目1-1");
+        assert_eq!(station.lon, 139.701238);
+        assert_eq!(station.lat, 35.658871);
+        assert_eq!(station.open_ymd, "1885-03-01");
+        assert_eq!(station.close_ymd, "0000-00-00");
+        assert_eq!(station.e_status, 0);
+        assert_eq!(station.e_sort, 1130205);
+        assert_eq!(station.stop_condition, StopCondition::All);
+        assert_eq!(station.distance, None);
+        assert!(station.has_train_types);
+        assert_eq!(station.company_cd, Some(2));
+        assert_eq!(station.line_name, Some("山手線".to_string()));
+        assert_eq!(station.line_name_k, Some("ヤマノテセン".to_string()));
+        assert_eq!(station.line_name_h, Some("山手線".to_string()));
+        assert_eq!(station.line_name_r, Some("Yamanote Line".to_string()));
+        assert_eq!(station.line_name_zh, Some("山手线".to_string()));
+        assert_eq!(station.line_name_ko, Some("야마노테선".to_string()));
+        assert_eq!(station.line_color_c, Some("#80C241".to_string()));
+        assert_eq!(station.line_type, Some(2));
+        assert_eq!(station.line_symbol_primary, Some("JY".to_string()));
+        assert_eq!(station.line_symbol_secondary, None);
+        assert_eq!(station.line_symbol_extra, None);
+        assert_eq!(
+            station.line_symbol_primary_color,
+            Some("#80C241".to_string())
+        );
+        assert_eq!(station.line_symbol_secondary_color, None);
+        assert_eq!(station.line_symbol_extra_color, None);
+        assert_eq!(
+            station.line_symbol_primary_shape,
+            Some("SQUARE".to_string())
+        );
+        assert_eq!(station.line_symbol_secondary_shape, None);
+        assert_eq!(station.line_symbol_extra_shape, None);
+        assert_eq!(station.average_distance, 1075.968412);
+        assert_eq!(station.type_id, Some(20));
     }
 }

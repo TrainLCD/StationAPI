@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{company::Company, line_symbol::LineSymbol, station::Station, train_type::TrainType};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Line {
     pub line_cd: u32,
     pub company_cd: u32,
@@ -99,5 +99,85 @@ impl Line {
             station_g_cd,
             average_distance,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Line;
+    use crate::domain::entity::company::Company;
+    use crate::domain::entity::line_symbol::LineSymbol;
+
+    #[test]
+    fn new() {
+        let company = Company::new(
+            2,
+            2,
+            "JR東日本".to_string(),
+            "ジェイアールヒガシニホン".to_string(),
+            "東日本旅客鉄道株式会社".to_string(),
+            "JR東日本".to_string(),
+            "JR East".to_string(),
+            "East Japan Railway Company".to_string(),
+            Some("https://www.jreast.co.jp/".to_string()),
+            1,
+            0,
+            1,
+        );
+
+        let line_symbols = vec![LineSymbol::new(
+            "JY".to_string(),
+            "#80C241".to_string(),
+            "SQUARE".to_string(),
+        )];
+
+        let line = Line::new(
+            11302,
+            2,
+            Some(company),
+            "山手線".to_string(),
+            "ヤマノテセン".to_string(),
+            "山手線".to_string(),
+            Some("Yamanote Line".to_string()),
+            Some("山手线".to_string()),
+            Some("야마노테선".to_string()),
+            Some("#80C241".to_string()),
+            Some(2),
+            line_symbols,
+            Some("JY".to_string()),
+            None,
+            None,
+            Some("#80C241".to_string()),
+            None,
+            None,
+            Some("SQUARE".to_string()),
+            None,
+            None,
+            0,
+            11302,
+            None,
+            None,
+            None,
+            None,
+            None,
+            1075.968412,
+        );
+
+        assert_eq!(line.line_cd, 11302);
+        assert_eq!(line.company_cd, 2);
+        assert_eq!(line.line_name, "山手線");
+        assert_eq!(line.line_name_k, "ヤマノテセン");
+        assert_eq!(line.line_name_h, "山手線");
+        assert_eq!(line.line_name_r, Some("Yamanote Line".to_string()));
+        assert_eq!(line.line_name_zh, Some("山手线".to_string()));
+        assert_eq!(line.line_name_ko, Some("야마노테선".to_string()));
+        assert_eq!(line.line_color_c, Some("#80C241".to_string()));
+        assert_eq!(line.line_type, Some(2));
+        assert_eq!(line.line_symbol_primary, Some("JY".to_string()));
+        assert_eq!(line.line_symbol_primary_color, Some("#80C241".to_string()));
+        assert_eq!(line.line_symbol_primary_shape, Some("SQUARE".to_string()));
+        assert_eq!(line.e_status, 0);
+        assert_eq!(line.e_sort, 11302);
+        assert_eq!(line.average_distance, 1075.968412);
     }
 }
