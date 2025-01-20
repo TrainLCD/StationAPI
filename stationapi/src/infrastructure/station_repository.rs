@@ -988,7 +988,25 @@ impl InternalStationRepository {
         let mut rows = sqlx::query_as!(
             StationRow,
             "WITH
-            local_cte AS (
+                from_cte AS (
+                    SELECT
+                        s.station_cd,
+                        s.line_cd
+                    FROM
+                        stations AS s
+                    WHERE
+                        s.station_g_cd = ?
+                ),
+                to_cte AS (
+                    SELECT
+                        s.station_cd,
+                        s.line_cd
+                    FROM
+                        stations AS s
+                    WHERE
+                        s.station_g_cd = ?
+                ),
+                local_cte AS (
                     SELECT
                         s.*
                     FROM
@@ -1024,8 +1042,9 @@ impl InternalStationRepository {
                         sst.line_group_cd
                     FROM
                         station_station_types AS sst
+                        JOIN from_cte
                     WHERE
-                        sst.station_cd = ?
+                        sst.station_cd = from_cte.station_cd
                         AND sst.pass <> 1
                 ),
                 sst_cte_c2 AS (
@@ -1033,8 +1052,9 @@ impl InternalStationRepository {
                         sst.line_group_cd
                     FROM
                         station_station_types AS sst
+                        JOIN to_cte
                     WHERE
-                        sst.station_cd = ?
+                        sst.station_cd = to_cte.station_cd
                         AND sst.pass <> 1
                 ),
                 sst_cte AS (
