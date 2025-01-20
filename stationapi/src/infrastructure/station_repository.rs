@@ -988,25 +988,7 @@ impl InternalStationRepository {
         let mut rows = sqlx::query_as!(
             StationRow,
             "WITH
-                from_cte AS (
-                    SELECT
-                        s.station_cd,
-                        s.line_cd
-                    FROM
-                        stations AS s
-                    WHERE
-                        s.station_g_cd = ?
-                ),
-                to_cte AS (
-                    SELECT
-                        s.station_cd,
-                        s.line_cd
-                    FROM
-                        stations AS s
-                    WHERE
-                        s.station_g_cd = ?
-                ),
-                local_cte AS (
+            local_cte AS (
                     SELECT
                         s.*
                     FROM
@@ -1018,6 +1000,7 @@ impl InternalStationRepository {
                                 `stations`
                             WHERE
                                 station_g_cd = ?
+                                AND e_status = 0
                         )
                         AND l.line_cd IN (
                             (
@@ -1027,6 +1010,7 @@ impl InternalStationRepository {
                                     `stations`
                                 WHERE
                                     station_g_cd = ?
+                                    AND e_status = 0
                             )
                         )
                     WHERE
@@ -1040,9 +1024,8 @@ impl InternalStationRepository {
                         sst.line_group_cd
                     FROM
                         station_station_types AS sst
-                        JOIN from_cte
                     WHERE
-                        sst.station_cd = from_cte.station_cd
+                        sst.station_cd = ?
                         AND sst.pass <> 1
                 ),
                 sst_cte_c2 AS (
@@ -1050,9 +1033,8 @@ impl InternalStationRepository {
                         sst.line_group_cd
                     FROM
                         station_station_types AS sst
-                        JOIN to_cte
                     WHERE
-                        sst.station_cd = to_cte.station_cd
+                        sst.station_cd = ?
                         AND sst.pass <> 1
                 ),
                 sst_cte AS (
@@ -1124,61 +1106,13 @@ impl InternalStationRepository {
         let mut typed_rows = sqlx::query_as!(
             StationRow,
             "WITH
-                from_cte AS (
-                    SELECT
-                        s.station_cd,
-                        s.line_cd
-                    FROM
-                        stations AS s
-                    WHERE
-                        s.station_g_cd = ?
-                ),
-                to_cte AS (
-                    SELECT
-                        s.station_cd,
-                        s.line_cd
-                    FROM
-                        stations AS s
-                    WHERE
-                        s.station_g_cd = ?
-                ),
-                local_cte AS (
-                    SELECT
-                        s.*
-                    FROM
-                        `stations` AS s
-                        JOIN `lines` AS l ON l.line_cd IN (
-                            SELECT
-                                line_cd
-                            FROM
-                                `stations`
-                            WHERE
-                                station_g_cd = ?
-                        )
-                        AND l.line_cd IN (
-                            (
-                                SELECT
-                                    line_cd
-                                FROM
-                                    `stations`
-                                WHERE
-                                    station_g_cd = ?
-                            )
-                        )
-                    WHERE
-                        s.line_cd = l.line_cd
-                    ORDER BY
-                        s.e_sort,
-                        s.station_cd
-                ),
                 sst_cte_c1 AS (
                     SELECT
                         sst.line_group_cd
                     FROM
                         station_station_types AS sst
-                        JOIN from_cte
                     WHERE
-                        sst.station_cd = from_cte.station_cd
+                        sst.station_cd = ?
                         AND sst.pass <> 1
                 ),
                 sst_cte_c2 AS (
@@ -1186,9 +1120,8 @@ impl InternalStationRepository {
                         sst.line_group_cd
                     FROM
                         station_station_types AS sst
-                        JOIN to_cte
                     WHERE
-                        sst.station_cd = to_cte.station_cd
+                        sst.station_cd = ?
                         AND sst.pass <> 1
                 ),
                 sst_cte AS (
@@ -1250,8 +1183,6 @@ impl InternalStationRepository {
                 AND sta.e_status = 0
             ORDER BY
                 sst.id",
-            from_station_id,
-            to_station_id,
             from_station_id,
             to_station_id,
         )
