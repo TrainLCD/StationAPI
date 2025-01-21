@@ -1018,6 +1018,7 @@ impl InternalStationRepository {
                                 `stations`
                             WHERE
                                 station_g_cd = ?
+                                AND e_status = 0
                         )
                         AND l.line_cd IN (
                             (
@@ -1027,6 +1028,7 @@ impl InternalStationRepository {
                                     `stations`
                                 WHERE
                                     station_g_cd = ?
+                                    AND e_status = 0
                             )
                         )
                     WHERE
@@ -1142,35 +1144,6 @@ impl InternalStationRepository {
                     WHERE
                         s.station_g_cd = ?
                 ),
-                local_cte AS (
-                    SELECT
-                        s.*
-                    FROM
-                        `stations` AS s
-                        JOIN `lines` AS l ON l.line_cd IN (
-                            SELECT
-                                line_cd
-                            FROM
-                                `stations`
-                            WHERE
-                                station_g_cd = ?
-                        )
-                        AND l.line_cd IN (
-                            (
-                                SELECT
-                                    line_cd
-                                FROM
-                                    `stations`
-                                WHERE
-                                    station_g_cd = ?
-                            )
-                        )
-                    WHERE
-                        s.line_cd = l.line_cd
-                    ORDER BY
-                        s.e_sort,
-                        s.station_cd
-                ),
                 sst_cte_c1 AS (
                     SELECT
                         sst.line_group_cd
@@ -1250,8 +1223,6 @@ impl InternalStationRepository {
                 AND sta.e_status = 0
             ORDER BY
                 sst.id",
-            from_station_id,
-            to_station_id,
             from_station_id,
             to_station_id,
         )
