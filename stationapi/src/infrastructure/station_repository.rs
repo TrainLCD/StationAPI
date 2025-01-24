@@ -879,7 +879,7 @@ impl InternalStationRepository {
             FROM `stations` AS s
             JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
             LEFT JOIN `station_station_types` AS from_sst
-              ON from_sst.station_cd IN (SELECT station_cd FROM stations WHERE station_g_cd = ?)
+              ON from_sst.station_cd IN (SELECT station_cd FROM stations WHERE station_g_cd = ? AND e_status = 0)
               AND from_sst.pass <> 1
             LEFT JOIN `station_station_types` AS dst_sst
               ON dst_sst.station_cd = s.station_cd
@@ -898,7 +898,7 @@ impl InternalStationRepository {
               AND s.e_status = 0
               AND (
               	from_sst.line_group_cd = dst_sst.line_group_cd
-              	OR s.line_cd IN (SELECT line_cd FROM stations WHERE station_g_cd = IFNULL(?, s.station_g_cd))
+              	OR s.line_cd IN (SELECT line_cd FROM stations WHERE station_g_cd = IFNULL(?, s.station_g_cd) AND e_status = 0)
               )
             GROUP BY s.station_g_cd
             LIMIT
@@ -1134,6 +1134,7 @@ impl InternalStationRepository {
                         stations AS s
                     WHERE
                         s.station_g_cd = ?
+                        AND s.e_status = 0
                 ),
                 to_cte AS (
                     SELECT
@@ -1143,6 +1144,7 @@ impl InternalStationRepository {
                         stations AS s
                     WHERE
                         s.station_g_cd = ?
+                        AND s.e_status = 0
                 ),
                 sst_cte_c1 AS (
                     SELECT
