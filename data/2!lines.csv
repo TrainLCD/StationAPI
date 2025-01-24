@@ -294,7 +294,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 28010,18,東京メトロ副都心線,トウキョウメトロフクトシンセン,東京メトロ副都心線,Tokyo Metro Fukutoshin Line,副都心线,후쿠토신선,#BB641D,3,F,,,#BB641D,,,ROUND,,,0,28010,1281.310659
 29001,19,相鉄本線,ソウテツホンセン,相鉄本線,Sotetsu Main Line,相铁本线,소테쓰 본선,#000080,2,SO,,,#0967B4,,,REVERSED_SQUARE,,,0,29001,1402.813923
 29002,19,相鉄いずみ野線,ソウテツイズミノセン,相鉄いずみ野線,Sotetsu Izumino Line,相铁泉野线,소테쓰 이즈미노선,#000080,2,SO,,,#0967B4,,,REVERSED_SQUARE,,,0,29002,1457.079
-29003,19,相鉄・JR直通線,ソウテツ・ジェイアールチョクツウセン,相鉄・JR直通線,Sotetsu- Link Line,相铁·直通线,소테츠·직통선,#000080,2,SO,JS,JA,#0967B4,#E31F26,#00B48D,REVERSED_SQUARE,SQUARE,SQUARE,0,29003,2844.978049
+29003,19,相鉄・JR直通線,ソウテツ・ジェイアールチョクツウセン,相鉄・JR直通線,Sotetsu-JR Link Line,相铁·JR直通线,소테츠·JR직통선,#000080,2,SO,JS,JA,#0967B4,#E31F26,#00B48D,REVERSED_SQUARE,SQUARE,SQUARE,0,29003,2844.978049
 29004,19,相鉄新横浜線,ソウテツシンヨコハマセン,相鉄新横浜線,Sotetsu Shin-yokohama Line,相铁新横滨线,소테츠 신요코하마선,#000080,2,SO,,,#0967B4,,,REVERSED_SQUARE,,,0,29004,3039.779394
 30001,20,名鉄名古屋本線,メイテツナゴヤホンセン,名鉄名古屋本線,Meitetsu Nagoya Main Line,名古屋本线,나고야 본선,#D12027,2,NH,,,#D12027,,,HALF_SQUARE,,,0,30001,1655.795356
 30002,20,名鉄豊川線,メイテツトヨカワセン,名鉄豊川線,Meitetsu Toyokawa Line,丰川线,도요카와 선,#D12027,2,TK,NH,,#D12027,#D12027,,HALF_SQUARE,HALF_SQUARE,,0,30002,1674.838845
