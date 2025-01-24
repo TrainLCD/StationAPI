@@ -11,7 +11,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 1010,6,九州新幹線,キュウシュウシンカンセン,九州新幹線,Kyushu Shinkansen,九州新干线,규슈 신칸센,#FF0000,1,,,,,,,NOOP,,,0,1010,22194.20317
 1011,1,北海道新幹線,ホッカイドウシンカンセン,北海道新幹線,Hokkaido Shinkansen,北海道新干线,홋카이도 신칸센,#6E5CA5,1,,,,,,,NOOP,,,0,1011,41348.26789
 1012,6,西九州新幹線,ニシキュウシュウシンカンセン,西九州新幹線,Nishi-Kyushu Shinkansen,西九州新干线,니시큐슈 신칸센,#E10017,1,,,,,,,NOOP,,,0,1012,15341.17416
-11101,1,函館本線,ハコダテホンセン,函館本線,Hakodate Main Line,函馆本线,하코다테 본선,#0072BC,2,H,N,S,#0072BC,#0072BC,#ED1C23,ROUND,ROUND,,0,11101,3903.385168
+11101,1,函館本線,ハコダテホンセン,函館本線,Hakodate Main Line,函馆本线,하코다테 본선,#0072BC,2,H,N,S,#0072BC,#0072BC,#ED1C23,ROUND,ROUND,ROUND,0,11101,3903.385168
 11102,1,函館本線,ハコダテホンセン,函館本線,Hakodate Main Line,函馆本线,하코다테 본선,#ED1C23,2,S,H,,#ED1C23,#0072BC,,ROUND,ROUND,,0,11102,6677.035278
 11103,1,函館本線,ハコダテホンセン,函館本線,Hakodate Main Line,函馆本线,하코다테 본선,#F7931D,2,A,H,,#F7931D,#0072BC,#000000,ROUND,ROUND,MONOCHROME_ROUND,0,11103,4042.295583
 11104,1,室蘭本線,ムロランホンセン,室蘭本線,Muroran Main Line,室兰本线,무로란 본선,#0072BC,2,H,M,,#0072BC,#0072BC,,ROUND,ROUND,,0,11104,4060.244108
