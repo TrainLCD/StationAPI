@@ -61,7 +61,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 11228,2,ゆうゆうあぶくまライン,ユウユウアブクマライン,磐越東線,Yuyu Abukuma Line,磐越东线,반에쓰토선,#C71585,2,,,,,,,,,,0,11228,5005.807963
 11229,2,常磐線,ジョウバンセン,常磐線(取手～いわき),Joban Line,常磐线,조반선,#007AC0,2,JJ,,,#00B261,,,SQUARE,,,0,11229,4818.898964
 11230,2,常磐線,ジョウバンセン,常磐線(いわき～仙台),Joban Line,常磐线,조반선,#007AC0,2,,,,,,,,,,0,11230,4217.124183
-11301,2,東海道線,トウカイドウホンセン,東海道本線(東京～熱海),Tokaido Line,东海道线,도카이도선,#F68B1E,2,,,,,,,,,,0,11232,0
+11301,2,東海道線,トウカイドウホンセン,東海道本線(東京～熱海),Tokaido Line,东海道线,도카이도선,#F68B1E,2,JT,,,#F68B1E,,,SQUARE,,,0,11232,4994.602073
 11302,2,山手線,ヤマノテセン,山手線,Yamanote Line,山手线,야마노테선,#80C241,2,JY,,,#80C241,,,SQUARE,,,0,11302,1075.968412
 11303,2,南武線,ナンブセン,南武線,Nambu Line,南武线,난부선,#FFD400,2,JN,,,#FFD400,,,SQUARE,,,0,11303,1284.309043
 11304,2,鶴見線,ツルミセン,鶴見線,Tsurumi Line,鹤见线,쓰루미선,#FFD400,2,JI,,,#FFD400,,,SQUARE,,,0,11304,859.8298091
@@ -138,11 +138,11 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 11512,3,参宮線,サングウセン,参宮線,Sangu Line,参宫线,산구선,#4D2E8C,2,,,,,,,,,,0,11512,2685.141942
 11513,3,名松線,メイショウセン,名松線,Meisho Line,名松线,메이쇼선,#E9E343,2,,,,,,,,,,0,11513,2806.316563
 11601,4,琵琶湖線,ビワコセン,東海道本線(米原～京都),Biwako Line,琵琶湖线,비와코선,#0072BC,2,A,,,#0072BC,,,REVERSED_SQUARE_WEST,,,0,11601,3504.002841
-11602,4,JR京都線,ジェーアールキョウトセン,東海道本線(京都～大阪), Kyoto Line,京都线, 교토선,#0072BC,2,A,,,#0072BC,,,REVERSED_SQUARE_WEST,,,0,11602,2610.255768
-11603,4,JR神戸線,ジェーアールコウベセン,東海道本線(大阪～神戸), Kobe Line,神户线, 고베선,#0072BC,2,A,,,#0072BC,,,REVERSED_SQUARE_WEST,,,0,11603,1987.400516
+11602,4,JR京都線,ジェーアールキョウトセン,東海道本線(京都～大阪),Kyoto Line,京都线,교토선,#0072BC,2,A,,,#0072BC,,,REVERSED_SQUARE_WEST,,,0,11602,2610.255768
+11603,4,JR神戸線,ジェーアールコウベセン,東海道本線(大阪～神戸),Kobe Line,神户线,고베선,#0072BC,2,A,,,#0072BC,,,REVERSED_SQUARE_WEST,,,0,11603,1987.400516
 11605,4,湖西線,コセイセン,湖西線,Kosei Line,湖西线,고세이선,#576290,2,B,,,#00ACD1,,,REVERSED_SQUARE_WEST,,,0,11605,3661.34487
 11607,4,大和路線,ヤマトジセン,関西本線(加茂～ＪＲ難波),Yamatoji Line,大和路线,야마토지선,#009933,2,Q,,,#009933,,,REVERSED_SQUARE_WEST,,,0,11607,2418.324393
-11608,4,JR神戸線,ジェーアールコウベセン,山陽本線(神戸～姫路), Kobe Line,神户线, 고베선,#0072BC,2,A,,,#0072BC,,,REVERSED_SQUARE_WEST,,,0,11608,2466.633838
+11608,4,JR神戸線,ジェーアールコウベセン,山陽本線(神戸～姫路),Kobe Line,神户线,고베선,#0072BC,2,A,,,#0072BC,,,REVERSED_SQUARE_WEST,,,0,11608,2466.633838
 11609,4,山陽本線,サンヨウホンセン,山陽本線(姫路～岡山),San’yo Main Line,山阳本线,산요 본선,#009966,2,S,,,,,,REVERSED_SQUARE_WEST,,,0,11609,4545.316831
 11610,4,山陽本線,サンヨウホンセン,山陽本線(岡山～三原),San’yo Main Line,山阳本线,산요 본선,#009966,2,W,X,,,,,REVERSED_SQUARE_WEST,REVERSED_SQUARE_WEST,,0,11610,4441.158781
 11611,4,山陽本線,サンヨウホンセン,山陽本線(三原～岩国),San’yo Main Line,山阳本线,산요 본선,#0072BC,2,G,R,,,,,REVERSED_SQUARE_WEST,REVERSED_SQUARE_WEST,,0,11611,3436.124416
@@ -155,12 +155,12 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_zh,li
 11618,4,奈良線,ナラセン,奈良線,Nara Line,奈良线,나라선,#A52A2A,2,D,,,#A52A2A,,,REVERSED_SQUARE_WEST,,,0,11618,1978.343361
 11622,4,舞鶴線,マイヅルセン,舞鶴線,Maizuru Line,舞鹤线,마이즈루선,#7BA1C5,2,L,,,#7BA1C5,,,REVERSED_SQUARE_WEST,,,0,11622,4599.944161
 11623,4,大阪環状線,オオサカカンジョウセン,大阪環状線,Osaka Loop Line,大阪环状线,오사카 순환선,#FF0000,2,O,,,#FF0000,,,REVERSED_SQUARE_WEST,,,0,11623,1104.772855
-11624,4,JRゆめ咲線,ジェーアールユメサキセン,桜島線, Yumesaki Line,梦咲线, 유메사키선,#0A318E,2,P,,,#0A318E,,,REVERSED_SQUARE_WEST,,,0,11624,1331.58277
-11625,4,JR東西線,ジェーアールトウザイセン,東西線, Tozai Line,东西线, 도자이선,#FF1493,2,H,,,#FF1493,,,REVERSED_SQUARE_WEST,,,0,11625,1499.570272
+11624,4,JRゆめ咲線,ジェーアールユメサキセン,桜島線,Yumesaki Line,梦咲线,유메사키선,#0A318E,2,P,,,#0A318E,,,REVERSED_SQUARE_WEST,,,0,11624,1331.58277
+11625,4,JR東西線,ジェーアールトウザイセン,東西線,Tozai Line,东西线,도자이선,#FF1493,2,H,,,#FF1493,,,REVERSED_SQUARE_WEST,,,0,11625,1499.570272
 11626,4,阪和線,ハンワセン,阪和線(天王寺～和歌山),Hanwa Line,阪和线,한와선,#FF6600,2,R,,,#FF9600,,,REVERSED_SQUARE_WEST_DARK_TEXT,,,0,11626,1734.488904
 11627,4,羽衣線,ハゴロモセン,阪和線(鳳～東羽衣),Hagoromo Line,羽衣线,하고로모선,#FF6600,2,,,,,,,,,,0,11627,1507.263954
 11628,4,関西空港線,カンサイクウコウセン,関西空港線,Kansai Airport Line,关西机场线,간사이 공항선,#0000FF,2,S,,,#0000FF,,,REVERSED_SQUARE_WEST,,,0,11628,4768.240941
-11629,4,JR宝塚線,ジェーアールタカラヅカセン,福知山線(新大阪～篠山口), Takarazuka Line,宝冢线,다카라즈카선,#FFCC00,2,G,A,,#FFBA00,#0072BC,,REVERSED_SQUARE_WEST_DARK_TEXT,REVERSED_SQUARE_WEST,,0,11629,2799.170851
+11629,4,JR宝塚線,ジェーアールタカラヅカセン,福知山線(新大阪～篠山口),Takarazuka Line,宝冢线,다카라즈카선,#FFCC00,2,G,A,,#FFBA00,#0072BC,,REVERSED_SQUARE_WEST_DARK_TEXT,REVERSED_SQUARE_WEST,,0,11629,2799.170851
 11630,4,福知山線,フクチヤマセン,福知山線(篠山口～福知山),Fukuchiyama Line,福知山线,후쿠치야마선,#FFCC00,2,G,,,#FFBA00,,,REVERSED_SQUARE_WEST_DARK_TEXT,,,0,11630,4496.664315
 11631,4,赤穂線,アコウセン,赤穂線,Ako Line,赤穗线,아코선,#F16369,2,N,A,,#F16369,#0072BC,,REVERSED_SQUARE_WEST,REVERSED_SQUARE_WEST,,0,11631,2902.350166
 11632,4,加古川線,カコガワセン,加古川線,Kakogawa Line,加古川线,가코가와선,#3CB371,2,I,,,#3CB371,,,REVERSED_SQUARE_WEST,,,0,11632,2286.127723
