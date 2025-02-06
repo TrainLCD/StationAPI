@@ -248,6 +248,7 @@ Yokokawa","SL群马
 0,365,通勤快急,ツウキンカイキュウ,Commuter Rapid Express,通勤快急,통근쾌급,#C05EC4,0,3,0,,COMPLETE
 0,366,特快速,トッカイソク,Special Rapid Express,特快车,특쾌속,#DC143C,0,3,0,,COMPLETE
 0,367,快速(芝山千代田方面),カイソク,Rapid(For Shibayama-Chiyoda),快车,쾌속,#ff69b4,0,2,0,都営浅草線用,COMPLETE
+0,368,ノンストップ,ノンストップ,Nonstop,马不停蹄,논스톱,#4169e1,0,2,0,,COMPLETE
 0,400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,2,0,,COMPLETE
 0,401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,2,0,,COMPLETE
 0,402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,2,0,,COMPLETE
