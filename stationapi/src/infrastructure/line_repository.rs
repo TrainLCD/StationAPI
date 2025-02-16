@@ -194,7 +194,7 @@ impl InternalLineRepository {
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
         FROM `lines` AS l
             JOIN `stations` AS s ON s.station_cd = ?
-            JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
+            JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1
             LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
         WHERE l.line_cd = s.line_cd",
@@ -310,6 +310,7 @@ impl InternalLineRepository {
             LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
         WHERE l.line_cd = s.line_cd
             AND l.e_status = 0
+            AND IF(sst.line_group_cd IS NOT NULL, sst.pass <> 1, 1)
         GROUP BY s.station_cd",
             params
         );
@@ -357,7 +358,7 @@ impl InternalLineRepository {
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
         FROM `lines` AS l
-            JOIN `station_station_types` AS sst ON sst.line_group_cd = ?
+            JOIN `station_station_types` AS sst ON sst.line_group_cd = ? AND sst.pass <> 1
             JOIN `stations` AS s ON s.station_cd = sst.station_cd
             AND s.e_status = 0
             LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
@@ -396,7 +397,7 @@ impl InternalLineRepository {
                 s.station_cd,
                 s.station_g_cd
             FROM `lines` AS l
-            JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} )
+            JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} ) AND sst.pass <> 1
             JOIN `stations` AS s ON s.station_cd = sst.station_cd AND s.e_status = 0
             LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
@@ -440,7 +441,7 @@ impl InternalLineRepository {
                 s.station_cd,
                 s.station_g_cd
             FROM `lines` AS l
-            JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} )
+            JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} ) AND sst.pass <> 1
             JOIN `stations` AS s ON s.station_cd = sst.station_cd AND s.e_status = 0 AND s.line_cd = l.line_cd
             LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
