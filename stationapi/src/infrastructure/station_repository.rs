@@ -283,6 +283,7 @@ impl StationRepository for MyStationRepository {
             }
         }
     }
+
     async fn get_route_stops(
         &self,
         from_station_id: u32,
@@ -391,7 +392,7 @@ impl InternalStationRepository {
         let params = format!("?{}", ", ?".repeat(ids.len() - 1));
 
         let query_str = format!(
-            "SELECT
+            "SELECT DISTINCT
               l.*,
               s.*,
               COALESCE(a.line_name, l.line_name) AS line_name,

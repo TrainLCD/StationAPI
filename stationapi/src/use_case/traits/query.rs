@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
+use petgraph::{graph::NodeIndex, Graph, Undirected};
 
 use crate::{
     domain::entity::{
@@ -91,4 +94,24 @@ pub trait QueryUseCase: Send + Sync + 'static {
         line_name: String,
         limit: Option<u32>,
     ) -> Result<Vec<Line>, UseCaseError>;
+
+    fn dijkstra_with_path(
+        &self,
+        graph: &Graph<i32, f64, Undirected>,
+        start: NodeIndex,
+    ) -> (
+        HashMap<NodeIndex, f64>,
+        HashMap<NodeIndex, Option<NodeIndex>>,
+    );
+    fn reconstruct_path(
+        &self,
+        prev_map: &HashMap<NodeIndex, Option<NodeIndex>>,
+        start: NodeIndex,
+        goal: NodeIndex,
+    ) -> Option<Vec<NodeIndex>>;
+    async fn get_connected_stations(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+    ) -> Result<Vec<Station>, UseCaseError>;
 }

@@ -1,9 +1,7 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BinaryHeap, HashMap},
     sync::{Arc, Mutex},
 };
-
-use async_trait::async_trait;
 
 use crate::{
     domain::{
@@ -12,29 +10,61 @@ use crate::{
             station::Station, station_number::StationNumber, train_type::TrainType,
         },
         repository::{
-            company_repository::CompanyRepository, line_repository::LineRepository,
-            station_repository::StationRepository, train_type_repository::TrainTypeRepository,
+            company_repository::CompanyRepository, connection_repository::ConnectionRepository,
+            line_repository::LineRepository, station_repository::StationRepository,
+            train_type_repository::TrainTypeRepository,
         },
     },
     station_api::{self, Route},
     use_case::{error::UseCaseError, traits::query::QueryUseCase},
 };
+use async_trait::async_trait;
+use petgraph::visit::EdgeRef;
+use petgraph::{
+    graph::{NodeIndex, UnGraph},
+    Graph, Undirected,
+};
 
 #[derive(Clone)]
-pub struct QueryInteractor<SR, LR, TR, CR> {
+pub struct QueryInteractor<SR, LR, TR, CR, CNR> {
     pub station_repository: SR,
     pub line_repository: LR,
     pub train_type_repository: TR,
     pub company_repository: CR,
+    pub connection_repository: CNR,
+}
+
+#[derive(Copy, Clone, PartialEq)]
+struct DijkstraState {
+    cost: f64,
+    node: NodeIndex,
+}
+
+impl Eq for DijkstraState {}
+
+impl Ord for DijkstraState {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other
+            .cost
+            .partial_cmp(&self.cost)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    }
+}
+
+impl PartialOrd for DijkstraState {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 #[async_trait]
-impl<SR, LR, TR, CR> QueryUseCase for QueryInteractor<SR, LR, TR, CR>
+impl<SR, LR, TR, CR, CNR> QueryUseCase for QueryInteractor<SR, LR, TR, CR, CNR>
 where
     SR: StationRepository,
     LR: LineRepository,
     TR: TrainTypeRepository,
     CR: CompanyRepository,
+    CNR: ConnectionRepository,
 {
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
         let Some(station) = self.station_repository.find_by_id(station_id).await? else {
@@ -825,5 +855,102 @@ where
     ) -> Result<Vec<Line>, UseCaseError> {
         let lines = self.line_repository.get_by_name(line_name, limit).await?;
         Ok(lines)
+    }
+
+    fn dijkstra_with_path(
+        &self,
+        graph: &Graph<i32, f64, Undirected>,
+        start: NodeIndex,
+    ) -> (
+        HashMap<NodeIndex, f64>,
+        HashMap<NodeIndex, Option<NodeIndex>>,
+    ) {
+        let mut dist_map = HashMap::new();
+        let mut prev_map = HashMap::new();
+
+        for node in graph.node_indices() {
+            dist_map.insert(node, f64::INFINITY);
+            prev_map.insert(node, None);
+        }
+        *dist_map.get_mut(&start).unwrap() = 0.0;
+
+        let mut heap = BinaryHeap::new();
+        heap.push(DijkstraState {
+            cost: 0.0,
+            node: start,
+        });
+
+        while let Some(DijkstraState { cost, node }) = heap.pop() {
+            if cost > dist_map[&node] {
+                continue;
+            }
+            for edge in graph.edges(node) {
+                let next = edge.target();
+                let next_cost = cost + edge.weight();
+
+                if next_cost < dist_map[&next] {
+                    *dist_map.get_mut(&next).unwrap() = next_cost;
+                    *prev_map.get_mut(&next).unwrap() = Some(node);
+                    heap.push(DijkstraState {
+                        cost: next_cost,
+                        node: next,
+                    });
+                }
+            }
+        }
+
+        (dist_map, prev_map)
+    }
+
+    fn reconstruct_path(
+        &self,
+        prev_map: &HashMap<NodeIndex, Option<NodeIndex>>,
+        start: NodeIndex,
+        goal: NodeIndex,
+    ) -> Option<Vec<NodeIndex>> {
+        let mut path = Vec::new();
+        let mut current = goal;
+        while let Some(&Some(prev)) = prev_map.get(&current) {
+            path.push(current);
+            current = prev;
+
+            if current == start {
+                path.push(start);
+                path.reverse();
+                return Some(path);
+            }
+        }
+        None
+    }
+
+    async fn get_connected_stations(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+    ) -> Result<Vec<Station>, UseCaseError> {
+        let conns = self.connection_repository.get_all().await?;
+
+        let edges = conns.into_iter().map(|conn| {
+            let start = conn.station_cd1;
+            let goal = conn.station_cd2;
+            let weight = conn.distance;
+            (start, goal, weight)
+        });
+
+        let graph = UnGraph::<i32, f64>::from_edges(edges);
+        let (_dist_map, prev_map) = self.dijkstra_with_path(&graph, from_station_id.into());
+
+        if let Some(path) =
+            self.reconstruct_path(&prev_map, from_station_id.into(), to_station_id.into())
+        {
+            let node_ids: Vec<u32> = path.to_vec().iter().map(|x| x.index() as u32).collect();
+            let stations = self.station_repository.get_by_id_vec(&node_ids).await?;
+            let stations = self
+                .update_station_vec_with_attributes(stations, None)
+                .await?;
+            return Ok(stations);
+        }
+
+        Ok(vec![])
     }
 }
