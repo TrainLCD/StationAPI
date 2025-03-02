@@ -48,7 +48,10 @@ pub struct InternalConnectionRepository {}
 
 impl InternalConnectionRepository {
     async fn get_all(conn: &mut MySqlConnection) -> Result<Vec<Connection>, DomainError> {
-        let query = sqlx::query_as!(ConnectionRow, "SELECT * FROM `connections`");
+        let query = sqlx::query_as!(
+            ConnectionRow,
+            "SELECT id, station_cd1, station_cd2, distance FROM `connections`"
+        );
         let rows = query.fetch_all(conn).await?;
         let conns: Vec<Connection> = rows.into_iter().map(|row| row.into()).collect();
         Ok(conns)
