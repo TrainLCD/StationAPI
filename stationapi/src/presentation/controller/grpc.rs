@@ -12,7 +12,7 @@ use crate::{
         GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
         GetStationByLineIdRequest, GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
         GetTrainTypesByStationIdRequest, MultipleLineResponse, MultipleStationResponse,
-        MultipleTrainTypeResponse, RouteResponse, SingleLineResponse, SingleStationResponse,
+        MultipleTrainTypeResponse, Route, RouteResponse, SingleLineResponse, SingleStationResponse,
     },
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
@@ -302,10 +302,10 @@ impl StationApi for MyApi {
         }
     }
 
-    async fn get_connected_stations(
+    async fn get_connected_routes(
         &self,
         request: tonic::Request<GetConnectedStationsRequest>,
-    ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
+    ) -> Result<tonic::Response<RouteResponse>, tonic::Status> {
         let from_station_group_id = request.get_ref().from_station_group_id;
         let to_station_group_id = request.get_ref().to_station_group_id;
 
@@ -314,8 +314,11 @@ impl StationApi for MyApi {
             .get_connected_stations(from_station_group_id, to_station_group_id)
             .await
         {
-            Ok(stations) => Ok(Response::new(MultipleStationResponse {
-                stations: stations.into_iter().map(|station| station.into()).collect(),
+            Ok(stations) => Ok(Response::new(RouteResponse {
+                routes: vec![Route {
+                    id: 0,
+                    stops: stations.into_iter().map(|station| station.into()).collect(),
+                }],
             })),
             Err(err) => {
                 return Err(PresentationalError::OtherError(anyhow::anyhow!(err).into()).into())
