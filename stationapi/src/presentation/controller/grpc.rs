@@ -1,17 +1,18 @@
 use crate::{
     infrastructure::{
-        company_repository::MyCompanyRepository, line_repository::MyLineRepository,
-        station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
+        company_repository::MyCompanyRepository, connection_repository::MyConnectionRepository,
+        line_repository::MyLineRepository, station_repository::MyStationRepository,
+        train_type_repository::MyTrainTypeRepository,
     },
     presentation::error::PresentationalError,
     station_api::{
         station_api_server::StationApi, CoordinatesRequest, DistanceResponse,
-        DistanceResponseState, GetLineByIdRequest, GetLinesByNameRequest, GetRouteRequest,
-        GetStationByCoordinatesRequest, GetStationByGroupIdRequest, GetStationByIdListRequest,
-        GetStationByIdRequest, GetStationByLineIdRequest, GetStationsByLineGroupIdRequest,
-        GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleLineResponse,
-        MultipleStationResponse, MultipleTrainTypeResponse, RouteResponse, SingleLineResponse,
-        SingleStationResponse,
+        DistanceResponseState, GetConnectedStationsRequest, GetLineByIdRequest,
+        GetLinesByNameRequest, GetRouteRequest, GetStationByCoordinatesRequest,
+        GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
+        GetStationByLineIdRequest, GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
+        GetTrainTypesByStationIdRequest, MultipleLineResponse, MultipleStationResponse,
+        MultipleTrainTypeResponse, Route, RouteResponse, SingleLineResponse, SingleStationResponse,
     },
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
@@ -23,6 +24,7 @@ pub struct MyApi {
         MyLineRepository,
         MyTrainTypeRepository,
         MyCompanyRepository,
+        MyConnectionRepository,
     >,
 }
 
@@ -297,6 +299,30 @@ impl StationApi for MyApi {
                 }));
             }
             Err(err) => Err(PresentationalError::from(err).into()),
+        }
+    }
+
+    async fn get_connected_routes(
+        &self,
+        request: tonic::Request<GetConnectedStationsRequest>,
+    ) -> Result<tonic::Response<RouteResponse>, tonic::Status> {
+        let from_station_group_id = request.get_ref().from_station_group_id;
+        let to_station_group_id = request.get_ref().to_station_group_id;
+
+        match self
+            .query_use_case
+            .get_connected_stations(from_station_group_id, to_station_group_id)
+            .await
+        {
+            Ok(stations) => Ok(Response::new(RouteResponse {
+                routes: vec![Route {
+                    id: 0,
+                    stops: stations.into_iter().map(|station| station.into()).collect(),
+                }],
+            })),
+            Err(err) => {
+                return Err(PresentationalError::OtherError(anyhow::anyhow!(err).into()).into())
+            }
         }
     }
 }

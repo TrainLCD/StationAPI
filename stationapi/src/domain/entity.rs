@@ -1,4 +1,5 @@
 pub mod company;
+pub mod connection;
 pub mod line;
 pub mod line_symbol;
 pub mod misc;
