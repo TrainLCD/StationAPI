@@ -77,6 +77,7 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 0,156,快速エアポート,カイソクエアポート,Rapid Airport,快车机场号,쾌속에어포트,#FF6600,0,2,0,,COMPLETE
 0,157,特別快速エアポート,トクベツカイソクエアポート,Special Rapid Airport,特别快车机场号,특별쾌속에어포트,#FF3300,0,2,0,,COMPLETE
 0,158,快速サンポート,カイソクサンポート,Rapid Sunport,快车太陽港号,쾌속선포트,#F39800,0,2,0,,PARTIAL
+0,159,普通(桜島方面),フツウ,Local(For Sakurajima),慢车,보통,#1F63C6,0,1,0,,COMPLETE
 0,200,踊り子(池袋〜伊豆急下田),オドリコ,Odoriko(Ikebukuro to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
 0,201,踊り子(東京〜伊豆急下田),オドリコ,Odoriko(Tokyo to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
 0,202,踊り子(池袋〜修善寺),オドリコ,Odoriko(Ikebukuro to Shuzenji),踊子,무희,#035D67,0,4,0,,COMPLETE
@@ -249,6 +250,7 @@ Yokokawa","SL群马
 0,366,特快速,トッカイソク,Special Rapid Express,特快车,특쾌속,#DC143C,0,3,0,,COMPLETE
 0,367,快速(芝山千代田方面),カイソク,Rapid(For Shibayama-Chiyoda),快车,쾌속,#ff69b4,0,2,0,都営浅草線用,COMPLETE
 0,368,ノンストップ,ノンストップ,Nonstop,马不停蹄,논스톱,#4169e1,0,2,0,,COMPLETE
+0,369,普通(名古屋港方面),フツウ,Local(For Nagoyako),慢车,보통,#1F63C6,0,1,0,,COMPLETE
 0,400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,2,0,,COMPLETE
 0,401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,2,0,,COMPLETE
 0,402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,2,0,,COMPLETE
