@@ -15,7 +15,7 @@ use crate::{
             train_type_repository::TrainTypeRepository,
         },
     },
-    station_api::{self, Route},
+    proto::{self, Route},
     use_case::{error::UseCaseError, traits::query::QueryUseCase},
 };
 use async_trait::async_trait;
@@ -827,7 +827,7 @@ where
 
                         stop.into()
                     })
-                    .collect::<Vec<station_api::Station>>();
+                    .collect::<Vec<proto::Station>>();
 
                 // TODO: SQLで同等の処理を行う
                 let includes_requested_station = stops
