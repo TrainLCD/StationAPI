@@ -8,7 +8,7 @@ use crate::{
         company::Company, line::Line, line_symbol::LineSymbol, misc::StationIdWithDistance,
         station::Station, station_number::StationNumber, train_type::TrainType,
     },
-    station_api::Route,
+    proto::Route,
     use_case::error::UseCaseError,
 };
 

@@ -6,7 +6,7 @@ use stationapi::{
         train_type_repository::MyTrainTypeRepository,
     },
     presentation::controller::grpc::MyApi,
-    station_api::station_api_server::StationApiServer,
+    proto::{self, station_api_server::StationApiServer},
     use_case::interactor::query::QueryInteractor,
 };
 use std::sync::Arc;
@@ -80,12 +80,18 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
         .accept_compressed(CompressionEncoding::Zstd)
         .send_compressed(CompressionEncoding::Zstd);
 
+    let reflection_svc = tonic_reflection::server::Builder::configure()
+        .register_encoded_file_descriptor_set(proto::FILE_DESCRIPTOR_SET)
+        .build_v1()
+        .unwrap();
+
     info!("StationAPI Server listening on {}", addr);
 
     if disable_grpc_web {
         Server::builder()
             .add_service(health_service)
             .add_service(svc)
+            .add_service(reflection_svc)
             .serve(addr)
             .await?;
     } else {
@@ -93,6 +99,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
             .accept_http1(true)
             .add_service(tonic_web::enable(health_service))
             .add_service(tonic_web::enable(svc))
+            .add_service(tonic_web::enable(reflection_svc))
             .serve(addr)
             .await?;
     }

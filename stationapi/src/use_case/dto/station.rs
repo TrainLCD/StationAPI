@@ -1,4 +1,4 @@
-use crate::{domain::entity::station::Station, station_api::Station as GrpcStation};
+use crate::{domain::entity::station::Station, proto::Station as GrpcStation};
 
 impl From<Station> for GrpcStation {
     fn from(station: Station) -> Self {

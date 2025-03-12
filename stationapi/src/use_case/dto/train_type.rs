@@ -1,4 +1,4 @@
-use crate::{domain::entity::train_type::TrainType, station_api::TrainType as GrpcTrainType};
+use crate::{domain::entity::train_type::TrainType, proto::TrainType as GrpcTrainType};
 
 impl From<TrainType> for GrpcTrainType {
     fn from(train_type: TrainType) -> Self {

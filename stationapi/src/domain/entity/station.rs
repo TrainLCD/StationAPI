@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::station_api::StopCondition;
+use crate::proto::StopCondition;
 
 use super::{line::Line, station_number::StationNumber, train_type::TrainType as TrainTypeEntity};
 
@@ -204,7 +204,7 @@ impl Station {
 mod tests {
     use super::Station;
     use crate::domain::entity::{line::Line, station_number::StationNumber};
-    use crate::station_api::StopCondition;
+    use crate::proto::StopCondition;
 
     #[test]
     fn new() {
