@@ -8,7 +8,7 @@ use crate::{
         error::DomainError,
         repository::station_repository::StationRepository,
     },
-    station_api::StopCondition,
+    proto::StopCondition,
 };
 
 #[derive(sqlx::FromRow)]

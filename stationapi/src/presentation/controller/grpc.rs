@@ -5,7 +5,7 @@ use crate::{
         train_type_repository::MyTrainTypeRepository,
     },
     presentation::error::PresentationalError,
-    station_api::{
+    proto::{
         station_api_server::StationApi, CoordinatesRequest, DistanceResponse,
         DistanceResponseState, GetConnectedStationsRequest, GetLineByIdRequest,
         GetLinesByNameRequest, GetRouteRequest, GetStationByCoordinatesRequest,
