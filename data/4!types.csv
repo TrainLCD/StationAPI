@@ -80,7 +80,7 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 0,159,普通(桜島方面),フツウ,Local(For Sakurajima),慢车,보통,#1F63C6,0,1,0,,COMPLETE
 0,160,快速きたみ,カイソクキタミ,Rapid Kitami,快车北见,쾌속니시기타미,#FF6600,0,2,0,,COMPLETE
 0,161,特別快速大雪,トクベツカイソクタイセツ,Special Rapid Taisetsu,特别快车大雪,특별쾌속타이세츠,#FF3300,0,2,0,,COMPLETE
-0,162,エキスポライナー,エキスポライナー,Expo Liner,世博会Liner,박람회 라이너,#0000ff,0,2,0,,PARTIAL
+0,162,エキスポライナー,エキスポライナー,Expo Liner,世博会Liner,박람회 라이너,#0000ff,0,2,0,,COMPLETE
 0,200,踊り子(池袋〜伊豆急下田),オドリコ,Odoriko(Ikebukuro to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
 0,201,踊り子(東京〜伊豆急下田),オドリコ,Odoriko(Tokyo to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
 0,202,踊り子(池袋〜修善寺),オドリコ,Odoriko(Ikebukuro to Shuzenji),踊子,무희,#035D67,0,4,0,,COMPLETE
