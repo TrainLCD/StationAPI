@@ -32,7 +32,7 @@ services:
   migration:
     build:
       context: ..
-      dockerfile: ./docker/migration/Dockerfile
+      dockerfile: ./docker/migration/Dockerfile.dev
     command: ["./wait-for-it.sh", "db:3306", "--", "./migration"]
     depends_on:
       - db
