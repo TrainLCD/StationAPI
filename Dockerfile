@@ -5,7 +5,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 COPY . .
 RUN SQLX_OFFLINE=true cargo build -p stationapi --release
-ENV DATABASE_URL=file::memory:?cache=shared
+ENV DATABASE_URL=file:memdb?mode=memory&cache=shared
 ENV HOST=0.0.0.0
 ENV PORT=50051
 EXPOSE $PORT
