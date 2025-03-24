@@ -841,6 +841,14 @@ impl InternalStationRepository {
                     OR s.station_name_ko LIKE ?
                 )
                 AND s.e_status = 0
+                AND (CASE (
+                        from_sst.id IS NOT NULL
+                        AND dst_sst.id IS NOT NULL
+                    )
+                    WHEN 1 THEN from_sst.line_group_cd = dst_sst.line_group_cd
+                    AND dst_sst.pass <> 1
+                    ELSE s.line_cd = IFNULL(fs.line_cd, s.line_cd)
+                END)
             GROUP BY s.station_g_cd
             LIMIT ?",
             from_station_group_id,
