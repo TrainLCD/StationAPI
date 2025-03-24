@@ -6,7 +6,6 @@ on:
       - master
     paths:
       - ".sqlx/**"
-      - "docker/api/Dockerfile.prod"
       - "scripts/**"
       - "stationapi/**"
       - "Cargo.lock"
