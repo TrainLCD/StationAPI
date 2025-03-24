@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Company {
-    pub company_cd: u32,
-    pub rr_cd: u32,
+    pub company_cd: i64,
+    pub rr_cd: i64,
     pub company_name: String,
     pub company_name_k: String,
     pub company_name_h: String,
@@ -11,16 +11,16 @@ pub struct Company {
     pub company_name_en: String,
     pub company_name_full_en: String,
     pub company_url: Option<String>,
-    pub company_type: u32,
-    pub e_status: u32,
-    pub e_sort: u32,
+    pub company_type: i64,
+    pub e_status: i64,
+    pub e_sort: i64,
 }
 
 impl Company {
     #![allow(clippy::too_many_arguments)]
     pub fn new(
-        company_cd: u32,
-        rr_cd: u32,
+        company_cd: i64,
+        rr_cd: i64,
         company_name: String,
         company_name_k: String,
         company_name_h: String,
@@ -28,9 +28,9 @@ impl Company {
         company_name_en: String,
         company_name_full_en: String,
         company_url: Option<String>,
-        company_type: u32,
-        e_status: u32,
-        e_sort: u32,
+        company_type: i64,
+        e_status: i64,
+        e_sort: i64,
     ) -> Self {
         Self {
             company_cd,

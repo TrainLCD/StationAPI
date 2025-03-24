@@ -1,5 +1,7 @@
 use async_trait::async_trait;
-use sqlx::{MySql, MySqlConnection, Pool};
+use sqlx::Pool;
+use sqlx::Sqlite;
+use sqlx::SqliteConnection;
 use std::sync::Arc;
 
 use crate::{
@@ -16,10 +18,11 @@ struct TrainTypesCountRow {
     train_types_count: i64,
 }
 
-#[derive(sqlx::FromRow, Clone)]
+#[derive(sqlx::FromRow, Default, Clone)]
+#[sqlx(default)]
 struct StationRow {
-    pub station_cd: u32,
-    pub station_g_cd: u32,
+    pub station_cd: i64,
+    pub station_g_cd: i64,
     pub station_name: String,
     pub station_name_k: String,
     pub station_name_r: Option<String>,
@@ -29,20 +32,17 @@ struct StationRow {
     pub secondary_station_number: Option<String>,
     pub extra_station_number: Option<String>,
     pub three_letter_code: Option<String>,
-    pub line_cd: u32,
-    pub pref_cd: u32,
+    pub line_cd: i64,
+    pub pref_cd: i64,
     pub post: String,
     pub address: String,
     pub lon: f64,
     pub lat: f64,
     pub open_ymd: String,
     pub close_ymd: String,
-    pub e_status: u32,
-    pub e_sort: u32,
-    #[sqlx(default)]
-    pub has_train_types: i64,
-    // linesからJOIN
-    pub company_cd: Option<u32>,
+    pub e_status: i64,
+    pub e_sort: i64,
+    pub company_cd: Option<i64>,
     pub line_name: Option<String>,
     pub line_name_k: Option<String>,
     pub line_name_h: Option<String>,
@@ -50,7 +50,7 @@ struct StationRow {
     pub line_name_zh: Option<String>,
     pub line_name_ko: Option<String>,
     pub line_color_c: Option<String>,
-    pub line_type: Option<u32>,
+    pub line_type: Option<i64>,
     pub line_symbol_primary: Option<String>,
     pub line_symbol_secondary: Option<String>,
     pub line_symbol_extra: Option<String>,
@@ -60,35 +60,20 @@ struct StationRow {
     pub line_symbol_primary_shape: Option<String>,
     pub line_symbol_secondary_shape: Option<String>,
     pub line_symbol_extra_shape: Option<String>,
-    pub average_distance: f64,
-    // station_station_typesからJOIN
-    #[sqlx(default)]
-    pub type_id: Option<u32>,
-    #[sqlx(default)]
-    pub sst_id: Option<u32>,
-    #[sqlx(default)]
-    pub type_cd: Option<u32>,
-    #[sqlx(default)]
-    pub line_group_cd: Option<u32>,
-    #[sqlx(default)]
-    pub pass: Option<u32>,
-    // typesからJOIN
-    #[sqlx(default)]
+    pub average_distance: Option<f64>,
+    pub type_id: Option<i64>,
+    pub sst_id: Option<i64>,
+    pub type_cd: Option<i64>,
+    pub line_group_cd: Option<i64>,
+    pub pass: Option<i64>,
     pub type_name: Option<String>,
-    #[sqlx(default)]
     pub type_name_k: Option<String>,
-    #[sqlx(default)]
     pub type_name_r: Option<String>,
-    #[sqlx(default)]
     pub type_name_zh: Option<String>,
-    #[sqlx(default)]
     pub type_name_ko: Option<String>,
-    #[sqlx(default)]
     pub color: Option<String>,
-    #[sqlx(default)]
-    pub direction: Option<u32>,
-    #[sqlx(default)]
-    pub kind: Option<u32>,
+    pub direction: Option<i64>,
+    pub kind: Option<i64>,
 }
 
 impl From<StationRow> for Station {
@@ -131,7 +116,7 @@ impl From<StationRow> for Station {
             stop_condition,
             distance: None,
             train_type: None,
-            has_train_types: row.has_train_types != 0,
+            has_train_types: row.line_group_cd.is_some(),
             company_cd: row.company_cd,
             line_name: row.line_name,
             line_name_k: row.line_name_k,
@@ -150,7 +135,7 @@ impl From<StationRow> for Station {
             line_symbol_primary_shape: row.line_symbol_primary_shape,
             line_symbol_secondary_shape: row.line_symbol_secondary_shape,
             line_symbol_extra_shape: row.line_symbol_extra_shape,
-            average_distance: row.average_distance,
+            average_distance: row.average_distance.unwrap_or(0.0),
             type_id: row.type_id,
             sst_id: row.sst_id,
             type_cd: row.type_cd,
@@ -170,17 +155,17 @@ impl From<StationRow> for Station {
 
 #[derive(sqlx::FromRow, Clone)]
 struct DistanceWithIdRow {
-    station_cd: u32,
+    station_cd: i64,
     distance: f64,
     average_distance: f64,
 }
 
 pub struct MyStationRepository {
-    pool: Arc<Pool<MySql>>,
+    pool: Arc<Pool<Sqlite>>,
 }
 
 impl MyStationRepository {
-    pub fn new(pool: Arc<Pool<MySql>>) -> Self {
+    pub fn new(pool: Arc<Pool<Sqlite>>) -> Self {
         Self { pool }
     }
 }
@@ -218,14 +203,14 @@ impl StationRepository for MyStationRepository {
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Station>, DomainError> {
-        let mut conn: sqlx::pool::PoolConnection<MySql> = self.pool.acquire().await?;
+        let mut conn: sqlx::pool::PoolConnection<Sqlite> = self.pool.acquire().await?;
         InternalStationRepository::get_by_station_group_id(station_group_id, &mut conn).await
     }
     async fn get_by_station_group_id_vec(
         &self,
         station_group_id_vec: &[u32],
     ) -> Result<Vec<Station>, DomainError> {
-        let mut conn: sqlx::pool::PoolConnection<MySql> = self.pool.acquire().await?;
+        let mut conn: sqlx::pool::PoolConnection<Sqlite> = self.pool.acquire().await?;
         InternalStationRepository::get_by_station_group_id_vec(station_group_id_vec, &mut conn)
             .await
     }
@@ -299,7 +284,7 @@ struct InternalStationRepository {}
 impl InternalStationRepository {
     async fn fetch_has_local_train_types_by_station_id(
         id: u32,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<bool, DomainError> {
         let row: TrainTypesCountRow = sqlx::query_as!(
             TrainTypesCountRow,
@@ -321,7 +306,7 @@ impl InternalStationRepository {
 
     async fn find_by_id(
         id: u32,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Option<Station>, DomainError> {
         let rows: Option<StationRow> = sqlx::query_as!(
             StationRow,
@@ -338,18 +323,17 @@ impl InternalStationRepository {
             l.line_symbol_secondary_shape,
             l.line_symbol_extra_shape,
             l.average_distance,
+            l.line_name,
+            l.line_name_k,
+            l.line_name_h,
+            l.line_name_r,
+            l.line_name_zh,
+            l.line_name_ko,
+            l.line_color_c,
             sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
             sst.pass,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types,
             t.id AS type_id,
             t.type_name,
             t.type_name_k,
@@ -364,8 +348,6 @@ impl InternalStationRepository {
             AND l.e_status = 0
             LEFT JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
             LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd
-            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
           WHERE s.station_cd = ?
             AND s.e_status = 0",
             id,
@@ -383,7 +365,7 @@ impl InternalStationRepository {
 
     async fn get_by_id_vec(
         ids: &[u32],
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
         if ids.is_empty() {
             return Ok(vec![]);
@@ -394,21 +376,11 @@ impl InternalStationRepository {
         let query_str = format!(
             "SELECT DISTINCT
               l.*,
-              s.*,
-              COALESCE(a.line_name, l.line_name) AS line_name,
-              COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-              COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-              COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-              COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-              COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-              COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-              IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types
+              s.*
             FROM `stations` AS s
             JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
             LEFT JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
             LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd
-            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
             WHERE
               s.station_cd IN ( {} )
               AND s.line_cd = l.line_cd
@@ -433,11 +405,18 @@ impl InternalStationRepository {
 
     async fn get_by_line_id_without_train_types(
         line_id: u32,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let rows: Vec<StationRow> = sqlx::query_as!(
+        let rows = sqlx::query_as!(
             StationRow,
             "SELECT s.*,
+            l.line_name,
+            l.line_name_k,
+            l.line_name_h,
+            l.line_name_r,
+            l.line_name_zh,
+            l.line_name_ko,
+            l.line_color_c,
               l.company_cd,
               l.line_type,
               l.line_symbol_primary,
@@ -462,22 +441,12 @@ impl InternalStationRepository {
               t.kind,
               sst.id AS sst_id,
               sst.pass,
-              COALESCE(a.line_name, l.line_name) AS line_name,
-              COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-              COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-              COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-              COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-              COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-              COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-              sst.line_group_cd,
-              IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types
+              sst.line_group_cd
               FROM `stations` AS s
               JOIN `lines` AS l ON l.line_cd = s.line_cd
                 AND l.e_status = 0
               LEFT JOIN `station_station_types` AS sst ON 1 <> 1
               LEFT JOIN `types` AS t ON 1 <> 1
-              LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-              LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
             WHERE l.line_cd = ?
               AND s.e_status = 0
             ORDER BY s.e_sort, s.station_cd ASC",
@@ -494,7 +463,7 @@ impl InternalStationRepository {
     async fn get_by_line_id_and_station_id(
         line_id: u32,
         station_id: u32,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let stations: Vec<Station> = match Self::fetch_has_local_train_types_by_station_id(
             station_id, conn,
@@ -502,7 +471,7 @@ impl InternalStationRepository {
         .await?
         {
             true => {
-                let rows: Vec<StationRow> = sqlx::query_as!(
+                let rows = sqlx::query_as!(
                         StationRow,
                         "SELECT s.*,
                           l.company_cd,
@@ -527,17 +496,16 @@ impl InternalStationRepository {
                           t.type_name_ko,
                           t.direction,
                           t.kind,
-                          sst.pass,
-                          COALESCE(a.line_name, l.line_name) AS line_name,
-                          COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-                          COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-                          COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-                          COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-                          COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-                          COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+                          l.line_name,
+                          l.line_name_k,
+                          l.line_name_h,
+                          l.line_name_r,
+                          l.line_name_zh,
+                          l.line_name_ko,
+                          l.line_color_c,
                           sst.id AS sst_id,
                           sst.line_group_cd,
-                          IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types
+                          sst.pass
                           FROM `stations` AS s
                           JOIN `station_station_types` AS sst ON sst.line_group_cd = (
                             SELECT sst.line_group_cd
@@ -555,8 +523,6 @@ impl InternalStationRepository {
                           JOIN `types` AS t ON t.type_cd = sst.type_cd
                           JOIN `lines` AS l ON l.line_cd = s.line_cd
                             AND l.e_status = 0
-                          LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-                          LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
                         ORDER BY sst.id",
                         station_id
                     )
@@ -572,9 +538,9 @@ impl InternalStationRepository {
 
     async fn get_by_station_group_id(
         group_id: u32,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let rows: Vec<StationRow> = sqlx::query_as!(
+        let rows = sqlx::query_as!(
             StationRow,
             "SELECT s.*,
             l.company_cd,
@@ -593,14 +559,13 @@ impl InternalStationRepository {
             sst.type_cd,
             sst.line_group_cd,
             sst.pass,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types,
+            l.line_name,
+            l.line_name_k,
+            l.line_name_h,
+            l.line_name_r,
+            l.line_name_zh,
+            l.line_name_ko,
+            l.line_color_c,
             t.id AS type_id,
             t.type_name,
             t.type_name_k,
@@ -615,8 +580,6 @@ impl InternalStationRepository {
             JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
             LEFT JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
             LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd
-            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT JOIN `aliases` AS a ON a.id = la.alias_cd
           WHERE
             s.station_g_cd = ?
             AND s.line_cd = l.line_cd
@@ -633,7 +596,7 @@ impl InternalStationRepository {
 
     async fn get_by_station_group_id_vec(
         group_id_vec: &[u32],
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
         if group_id_vec.is_empty() {
             return Ok(vec![]);
@@ -644,21 +607,18 @@ impl InternalStationRepository {
             "SELECT
             l.*,
             s.*,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types
+            l.line_name,
+            l.line_name_k,
+            l.line_name_h,
+            l.line_name_r,
+            l.line_name_zh,
+            l.line_name_ko,
+            l.line_color_c
           FROM
             `stations` AS s
             JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
             LEFT JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
             LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd  
-            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT JOIN `aliases` AS a ON a.id = la.alias_cd
           WHERE
             s.station_g_cd IN ( {} )
             AND s.line_cd = l.line_cd
@@ -681,38 +641,18 @@ impl InternalStationRepository {
         latitude: f64,
         longitude: f64,
         limit: Option<u32>,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let rows = sqlx::query_as::<_, StationRow>(
             "SELECT 
                 s.*, 
                 l.*,
-                COALESCE(a.line_name, l.line_name) AS line_name, 
-                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k, 
-                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h, 
-                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r, 
-                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh, 
-                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko, 
-                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c, 
-                (
-                  6371 * acos(
-                    cos(
-                      radians(s.lat)
-                    ) * cos(
-                      radians(?)
-                    ) * cos(
-                      radians(?) - radians(s.lon)
-                    ) + sin(
-                      radians(s.lat)
-                    ) * sin(
-                      radians(?)
-                    )
-                  )
+                sqrt(
+                    pow((6378137.0 * (1 - 0.00669438002301188 )) / pow(1 - 0.00669438002301188  * pow(sin(radians((s.lat + ?) / 2)), 2), 1.5) * radians(s.lat - ?), 2) +
+                    pow(6378137.0 / sqrt(1 - 0.00669438002301188  * pow(sin(radians((s.lat + ?) / 2)), 2)) * cos(radians((s.lat + ?) / 2)) * radians(s.lon - ?), 2)
                 ) AS distance
               FROM `stations` AS s
               JOIN `lines` AS l ON s.line_cd = l.line_cd
-              LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd 
-              LEFT JOIN `aliases` AS a ON a.id = la.alias_cd 
               WHERE
                 s.station_cd = s.station_g_cd
                 AND s.e_status = 0
@@ -722,8 +662,10 @@ impl InternalStationRepository {
                 ?",
         )
         .bind(latitude)
-        .bind(longitude)
         .bind(latitude)
+        .bind(latitude)
+        .bind(latitude)
+        .bind(longitude)
         .bind(limit.unwrap_or(1))
         .fetch_all(conn)
         .await?;
@@ -737,7 +679,7 @@ impl InternalStationRepository {
         latitude: f64,
         longitude: f64,
         line_id: u32,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<StationIdWithDistance, DomainError> {
         let row = sqlx::query_as::<_, DistanceWithIdRow>(
             "SELECT
@@ -777,7 +719,7 @@ impl InternalStationRepository {
         .fetch_one(conn)
         .await?;
         let id_with_distance = StationIdWithDistance {
-            station_id: row.station_cd,
+            station_id: row.station_cd as u32,
             distance: row.distance,
             average_distance: row.average_distance,
         };
@@ -788,7 +730,7 @@ impl InternalStationRepository {
     async fn get_station_id_and_distance_by_coordinates(
         latitude: f64,
         longitude: f64,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<StationIdWithDistance, DomainError> {
         let row = sqlx::query_as::<_, DistanceWithIdRow>(
             "SELECT
@@ -825,7 +767,7 @@ impl InternalStationRepository {
         .fetch_one(conn)
         .await?;
         let id_with_distance = StationIdWithDistance {
-            station_id: row.station_cd,
+            station_id: row.station_cd as u32,
             distance: row.distance,
             average_distance: row.average_distance,
         };
@@ -837,11 +779,12 @@ impl InternalStationRepository {
         station_name: String,
         limit: Option<u32>,
         from_station_group_id: Option<u32>,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let station_name = format!("%{}%", station_name);
+        let station_name = &(format!("%{}%", station_name));
+        let limit = &limit.unwrap_or(1);
 
-        let rows: Vec<StationRow> = sqlx::query_as!(
+        let rows = sqlx::query_as!(
             StationRow,
             "WITH from_stations AS (
                 SELECT s.station_cd,
@@ -867,14 +810,13 @@ impl InternalStationRepository {
                 dst_sst.type_cd,
                 dst_sst.line_group_cd,
                 dst_sst.pass,
-                COALESCE(a.line_name, l.line_name) AS line_name,
-                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-                IFNULL(s.station_cd = dst_sst.station_cd, 0) AS has_train_types,
+                l.line_name,
+                l.line_name_k,
+                l.line_name_h,
+                l.line_name_r,
+                l.line_name_zh,
+                l.line_name_ko,
+                l.line_color_c,
                 t.id AS type_id,
                 t.type_name,
                 t.type_name_k,
@@ -889,8 +831,6 @@ impl InternalStationRepository {
                 LEFT JOIN `station_station_types` AS from_sst ON from_sst.station_cd = fs.station_cd
                 LEFT JOIN `station_station_types` AS dst_sst ON dst_sst.station_cd = s.station_cd
                 LEFT JOIN `types` AS t ON t.type_cd = dst_sst.type_cd
-                LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-                LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
                 JOIN `lines` AS l ON l.line_cd = s.line_cd
                 AND l.e_status = 0
             WHERE (
@@ -901,22 +841,15 @@ impl InternalStationRepository {
                     OR s.station_name_ko LIKE ?
                 )
                 AND s.e_status = 0
-                AND IF(
-                    from_sst.id IS NOT NULL
-                    AND dst_sst.id IS NOT NULL,
-                    from_sst.line_group_cd = dst_sst.line_group_cd
-                    AND dst_sst.pass <> 1,
-                    s.line_cd = IFNULL(fs.line_cd, s.line_cd)
-                )
             GROUP BY s.station_g_cd
             LIMIT ?",
             from_station_group_id,
-            &station_name,
-            &station_name,
-            &station_name,
-            &station_name,
-            &station_name,
-            limit.unwrap_or(1)
+            station_name,
+            station_name,
+            station_name,
+            station_name,
+            station_name,
+            limit
         )
         .fetch_all(conn)
         .await?;
@@ -928,11 +861,18 @@ impl InternalStationRepository {
 
     async fn get_by_line_group_id(
         line_group_id: u32,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let rows: Vec<StationRow> = sqlx::query_as!(
+        let rows = sqlx::query_as!(
             StationRow,
             "SELECT DISTINCT s.*,
+            l.line_name,
+            l.line_name_k,
+            l.line_name_h,
+            l.line_name_r,
+            l.line_name_zh,
+            l.line_name_ko,
+            l.line_color_c,
             l.company_cd,
             l.line_type,
             l.line_symbol_primary,
@@ -949,14 +889,6 @@ impl InternalStationRepository {
             sst.type_cd,
             sst.line_group_cd,
             sst.pass,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
-            IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types,
             t.id AS type_id,
             t.type_name,
             t.type_name_k,
@@ -970,8 +902,6 @@ impl InternalStationRepository {
           JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
           LEFT JOIN `station_station_types` AS sst ON sst.line_group_cd = ?
           LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd
-          LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-          LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
           WHERE
             s.line_cd = l.line_cd
             AND s.station_cd = sst.station_cd
@@ -989,7 +919,7 @@ impl InternalStationRepository {
     async fn get_route_stops(
         from_station_id: u32,
         to_station_id: u32,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let mut rows = sqlx::query_as!(
             StationRow,
@@ -1075,46 +1005,43 @@ impl InternalStationRepository {
                         AND sst.line_group_cd = sst_cte_c2.line_group_cd
                 )
             SELECT
-                sta.*,
-                lin.company_cd,
-                lin.line_type,
-                lin.line_symbol_primary,
-                lin.line_symbol_secondary,
-                lin.line_symbol_extra,
-                lin.line_symbol_primary_color,
-                lin.line_symbol_secondary_color,
-                lin.line_symbol_extra_color,
-                lin.line_symbol_primary_shape,
-                lin.line_symbol_secondary_shape,
-                lin.line_symbol_extra_shape,
-                IFNULL (lin.average_distance, 0.0) AS average_distance,
-                sst.id AS sst_id,
-                sst.type_cd,
-                sst.line_group_cd,
-                sst.pass,
-                COALESCE(a.line_name, lin.line_name) AS line_name,
-                COALESCE(a.line_name_k, lin.line_name_k) AS line_name_k,
-                COALESCE(a.line_name_h, lin.line_name_h) AS line_name_h,
-                COALESCE(a.line_name_r, lin.line_name_r) AS line_name_r,
-                COALESCE(a.line_name_zh, lin.line_name_zh) AS line_name_zh,
-                COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
-                COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
-                0 AS has_train_types,
-                tt.id AS type_id,
-                tt.type_name,
-                tt.type_name_k,
-                tt.type_name_r,
-                tt.type_name_zh,
-                tt.type_name_ko,
-                tt.color,
-                tt.direction,
-                tt.kind
+            sta.*,
+            lin.line_name,
+            lin.line_name_k,
+            lin.line_name_h,
+            lin.line_name_r,
+            lin.line_name_zh,
+            lin.line_name_ko,
+            lin.line_color_c,
+            lin.company_cd,
+            lin.line_type,
+            lin.line_symbol_primary,
+            lin.line_symbol_secondary,
+            lin.line_symbol_extra,
+            lin.line_symbol_primary_color,
+            lin.line_symbol_secondary_color,
+            lin.line_symbol_extra_color,
+            lin.line_symbol_primary_shape,
+            lin.line_symbol_secondary_shape,
+            lin.line_symbol_extra_shape,
+            lin.average_distance,
+            sst.id AS sst_id,
+            sst.type_cd,
+            sst.line_group_cd,
+            sst.pass,
+            tt.id AS type_id,
+            tt.type_name,
+            tt.type_name_k,
+            tt.type_name_r,
+            tt.type_name_zh,
+            tt.type_name_ko,
+            tt.color,
+            tt.direction,
+            tt.kind
             FROM
                 local_cte AS sta
                 LEFT JOIN `sst_cte` AS sst ON sst.station_cd = sta.station_cd
                 LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
-                LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
-                LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
                 JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
             WHERE
                 sst.line_group_cd IS NULL
@@ -1196,19 +1123,18 @@ impl InternalStationRepository {
                 lin.line_symbol_primary_shape,
                 lin.line_symbol_secondary_shape,
                 lin.line_symbol_extra_shape,
-                IFNULL (lin.average_distance, 0.0) AS average_distance,
+                lin.average_distance,
                 sst.id AS sst_id,
                 sst.type_cd,
                 sst.line_group_cd,
                 sst.pass,
-                COALESCE(a.line_name, lin.line_name) AS line_name,
-                COALESCE(a.line_name_k, lin.line_name_k) AS line_name_k,
-                COALESCE(a.line_name_h, lin.line_name_h) AS line_name_h,
-                COALESCE(a.line_name_r, lin.line_name_r) AS line_name_r,
-                COALESCE(a.line_name_zh, lin.line_name_zh) AS line_name_zh,
-                COALESCE(a.line_name_ko, lin.line_name_ko) AS line_name_ko,
-                COALESCE(a.line_color_c, lin.line_color_c) AS line_color_c,
-                1 AS has_train_types,
+                lin.line_name,
+                lin.line_name_k,
+                lin.line_name_h,
+                lin.line_name_r,
+                lin.line_name_zh,
+                lin.line_name_ko,
+                lin.line_color_c,
                 tt.id AS type_id,
                 tt.type_name,
                 tt.type_name_k,
@@ -1222,8 +1148,6 @@ impl InternalStationRepository {
                 stations AS sta
                 LEFT JOIN `sst_cte` AS sst ON sst.station_cd = sta.station_cd
                 LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
-                LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
-                LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
                 JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
             WHERE
                 sta.station_cd = sst.station_cd

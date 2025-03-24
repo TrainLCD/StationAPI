@@ -3,7 +3,7 @@ use crate::{domain::entity::line::Line, proto::Line as GrpcLine};
 impl From<Line> for GrpcLine {
     fn from(line: Line) -> Self {
         Self {
-            id: line.line_cd,
+            id: line.line_cd as u32,
             name_short: line.line_name,
             name_katakana: line.line_name_k,
             name_full: line.line_name_h,

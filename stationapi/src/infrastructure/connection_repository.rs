@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::{MySql, MySqlConnection, Pool};
+use sqlx::{Pool, Sqlite, SqliteConnection};
 use std::sync::Arc;
 
 use crate::domain::{
@@ -9,29 +9,29 @@ use crate::domain::{
 
 #[derive(sqlx::FromRow, Clone, Debug)]
 pub struct ConnectionRow {
-    pub id: u32,
-    pub station_cd1: u32,
-    pub station_cd2: u32,
+    pub id: i64,
+    pub station_cd1: i64,
+    pub station_cd2: i64,
     pub distance: f64,
 }
 
 impl From<ConnectionRow> for Connection {
     fn from(row: ConnectionRow) -> Self {
         Self {
-            id: row.id,
-            station_cd1: row.station_cd1,
-            station_cd2: row.station_cd2,
+            id: row.id as u32,
+            station_cd1: row.station_cd1 as u32,
+            station_cd2: row.station_cd2 as u32,
             distance: row.distance,
         }
     }
 }
 
 pub struct MyConnectionRepository {
-    pool: Arc<Pool<MySql>>,
+    pool: Arc<Pool<Sqlite>>,
 }
 
 impl MyConnectionRepository {
-    pub fn new(pool: Arc<Pool<MySql>>) -> Self {
+    pub fn new(pool: Arc<Pool<Sqlite>>) -> Self {
         Self { pool }
     }
 }
@@ -47,7 +47,7 @@ impl ConnectionRepository for MyConnectionRepository {
 pub struct InternalConnectionRepository {}
 
 impl InternalConnectionRepository {
-    async fn get_all(conn: &mut MySqlConnection) -> Result<Vec<Connection>, DomainError> {
+    async fn get_all(conn: &mut SqliteConnection) -> Result<Vec<Connection>, DomainError> {
         let query = sqlx::query_as!(
             ConnectionRow,
             "SELECT id, station_cd1, station_cd2, distance FROM `connections`"

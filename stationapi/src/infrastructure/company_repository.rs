@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::{MySql, MySqlConnection, Pool};
+use sqlx::{Pool, Sqlite, SqliteConnection};
 use std::sync::Arc;
 
 use crate::domain::{
@@ -8,8 +8,8 @@ use crate::domain::{
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct CompanyRow {
-    pub company_cd: u32,
-    pub rr_cd: u32,
+    pub company_cd: i64,
+    pub rr_cd: i64,
     pub company_name: String,
     pub company_name_k: String,
     pub company_name_h: String,
@@ -17,9 +17,9 @@ pub struct CompanyRow {
     pub company_name_en: String,
     pub company_name_full_en: String,
     pub company_url: Option<String>,
-    pub company_type: u32,
-    pub e_status: u32,
-    pub e_sort: u32,
+    pub company_type: i64,
+    pub e_status: i64,
+    pub e_sort: i64,
 }
 
 impl From<CompanyRow> for Company {
@@ -42,11 +42,11 @@ impl From<CompanyRow> for Company {
 }
 
 pub struct MyCompanyRepository {
-    pool: Arc<Pool<MySql>>,
+    pool: Arc<Pool<Sqlite>>,
 }
 
 impl MyCompanyRepository {
-    pub fn new(pool: Arc<Pool<MySql>>) -> Self {
+    pub fn new(pool: Arc<Pool<Sqlite>>) -> Self {
         Self { pool }
     }
 }
@@ -54,8 +54,9 @@ impl MyCompanyRepository {
 #[async_trait]
 impl CompanyRepository for MyCompanyRepository {
     async fn find_by_id_vec(&self, id_vec: &[u32]) -> Result<Vec<Company>, DomainError> {
+        let id_vec: Vec<i64> = id_vec.iter().map(|x| *x as i64).collect();
         let mut conn = self.pool.acquire().await?;
-        InternalCompanyRepository::find_by_id_vec(id_vec, &mut conn).await
+        InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await
     }
 }
 
@@ -63,8 +64,8 @@ pub struct InternalCompanyRepository {}
 
 impl InternalCompanyRepository {
     async fn find_by_id_vec(
-        id_vec: &[u32],
-        conn: &mut MySqlConnection,
+        id_vec: &[i64],
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Company>, DomainError> {
         if id_vec.is_empty() {
             return Ok(vec![]);

@@ -1,5 +1,7 @@
 use async_trait::async_trait;
-use sqlx::{MySql, MySqlConnection, Pool};
+use sqlx::Pool;
+use sqlx::Sqlite;
+use sqlx::SqliteConnection;
 use std::sync::Arc;
 
 use crate::domain::{
@@ -8,9 +10,9 @@ use crate::domain::{
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct LineRow {
-    pub line_cd: u32,
-    pub company_cd: u32,
-    pub line_type: Option<u32>,
+    pub line_cd: i64,
+    pub company_cd: i64,
+    pub line_type: Option<i64>,
     pub line_name: Option<String>,
     pub line_name_k: Option<String>,
     pub line_name_h: Option<String>,
@@ -27,12 +29,12 @@ pub struct LineRow {
     pub line_symbol_primary_shape: Option<String>,
     pub line_symbol_secondary_shape: Option<String>,
     pub line_symbol_extra_shape: Option<String>,
-    pub e_status: u32,
-    pub e_sort: u32,
-    pub average_distance: f64,
-    pub line_group_cd: Option<u32>,
-    pub station_cd: Option<u32>,
-    pub station_g_cd: Option<u32>,
+    pub e_status: i64,
+    pub e_sort: i64,
+    pub average_distance: Option<f64>,
+    pub line_group_cd: Option<i64>,
+    pub station_cd: Option<i64>,
+    pub station_g_cd: Option<i64>,
 }
 
 impl From<LineRow> for Line {
@@ -66,17 +68,17 @@ impl From<LineRow> for Line {
             line_group_cd: row.line_group_cd,
             station_cd: row.station_cd,
             station_g_cd: row.station_g_cd,
-            average_distance: row.average_distance,
+            average_distance: row.average_distance.unwrap_or(0.0),
         }
     }
 }
 
 pub struct MyLineRepository {
-    pool: Arc<Pool<MySql>>,
+    pool: Arc<Pool<Sqlite>>,
 }
 
 impl MyLineRepository {
-    pub fn new(pool: Arc<Pool<MySql>>) -> Self {
+    pub fn new(pool: Arc<Pool<Sqlite>>) -> Self {
         Self { pool }
     }
 }
@@ -84,18 +86,22 @@ impl MyLineRepository {
 #[async_trait]
 impl LineRepository for MyLineRepository {
     async fn find_by_id(&self, id: u32) -> Result<Option<Line>, DomainError> {
+        let id: i64 = id as i64;
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::find_by_id(id, &mut conn).await
     }
     async fn find_by_station_id(&self, station_id: u32) -> Result<Option<Line>, DomainError> {
+        let station_id: i64 = station_id as i64;
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::find_by_station_id(station_id, &mut conn).await
     }
     async fn get_by_ids(&self, ids: &[u32]) -> Result<Vec<Line>, DomainError> {
+        let ids: Vec<i64> = ids.iter().map(|x| *x as i64).collect();
         let mut conn = self.pool.acquire().await?;
-        InternalLineRepository::get_by_ids(ids, &mut conn).await
+        InternalLineRepository::get_by_ids(&ids, &mut conn).await
     }
     async fn get_by_station_group_id(&self, id: u32) -> Result<Vec<Line>, DomainError> {
+        let id: i64 = id as i64;
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_station_group_id(id, &mut conn).await
     }
@@ -103,10 +109,13 @@ impl LineRepository for MyLineRepository {
         &self,
         station_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
+        let station_group_id_vec: Vec<i64> =
+            station_group_id_vec.iter().map(|x| *x as i64).collect();
         let mut conn = self.pool.acquire().await?;
-        InternalLineRepository::get_by_station_group_id_vec(station_group_id_vec, &mut conn).await
+        InternalLineRepository::get_by_station_group_id_vec(&station_group_id_vec, &mut conn).await
     }
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Line>, DomainError> {
+        let line_group_id: i64 = line_group_id as i64;
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_line_group_id(line_group_id, &mut conn).await
     }
@@ -114,15 +123,17 @@ impl LineRepository for MyLineRepository {
         &self,
         line_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
+        let line_group_id_vec: Vec<i64> = line_group_id_vec.iter().map(|x| *x as i64).collect();
         let mut conn = self.pool.acquire().await?;
-        InternalLineRepository::get_by_line_group_id_vec(line_group_id_vec, &mut conn).await
+        InternalLineRepository::get_by_line_group_id_vec(&line_group_id_vec, &mut conn).await
     }
     async fn get_by_line_group_id_vec_for_routes(
         &self,
         line_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
+        let line_group_id_vec: Vec<i64> = line_group_id_vec.iter().map(|x| *x as i64).collect();
         let mut conn = self.pool.acquire().await?;
-        InternalLineRepository::get_by_line_group_id_vec_for_routes(line_group_id_vec, &mut conn)
+        InternalLineRepository::get_by_line_group_id_vec_for_routes(&line_group_id_vec, &mut conn)
             .await
     }
     async fn get_by_name(
@@ -130,6 +141,7 @@ impl LineRepository for MyLineRepository {
         line_name: String,
         limit: Option<u32>,
     ) -> Result<Vec<Line>, DomainError> {
+        let limit = limit.map(|l| l as i64);
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_name(line_name, limit, &mut conn).await
     }
@@ -138,13 +150,35 @@ impl LineRepository for MyLineRepository {
 pub struct InternalLineRepository {}
 
 impl InternalLineRepository {
-    async fn find_by_id(id: u32, conn: &mut MySqlConnection) -> Result<Option<Line>, DomainError> {
+    async fn find_by_id(id: i64, conn: &mut SqliteConnection) -> Result<Option<Line>, DomainError> {
         let rows: Option<LineRow> = sqlx::query_as!(
             LineRow,
-            "SELECT *,
-            CAST(NULL AS UNSIGNED INT) AS line_group_cd,
-            CAST(NULL AS UNSIGNED INT) AS station_cd,
-            CAST(NULL AS UNSIGNED INT) AS station_g_cd
+            "SELECT 
+            l.line_cd,
+            l.company_cd,
+            l.line_type,
+            l.line_name,
+            l.line_name_k,
+            l.line_name_h,
+            l.line_name_r,
+            l.line_name_zh,
+            l.line_name_ko,
+            l.line_color_c,
+            l.line_symbol_primary,
+            l.line_symbol_secondary,
+            l.line_symbol_extra,
+            l.line_symbol_primary_color,
+            l.line_symbol_secondary_color,
+            l.line_symbol_extra_color,
+            l.line_symbol_primary_shape,
+            l.line_symbol_secondary_shape,
+            l.line_symbol_extra_shape,
+            l.e_status,
+            l.e_sort,
+            l.average_distance,
+            CAST(NULL AS INTEGER) AS line_group_cd,
+            CAST(NULL AS INTEGER) AS station_cd,
+            CAST(NULL AS INTEGER) AS station_g_cd
             FROM `lines` AS l
             WHERE l.line_cd = ?
             AND l.e_status = 0",
@@ -162,8 +196,8 @@ impl InternalLineRepository {
     }
 
     async fn find_by_station_id(
-        station_id: u32,
-        conn: &mut MySqlConnection,
+        station_id: i64,
+        conn: &mut SqliteConnection,
     ) -> Result<Option<Line>, DomainError> {
         let rows: Option<LineRow> = sqlx::query_as!(
             LineRow,
@@ -211,14 +245,43 @@ impl InternalLineRepository {
         Ok(Some(line))
     }
 
-    async fn get_by_ids(ids: &[u32], conn: &mut MySqlConnection) -> Result<Vec<Line>, DomainError> {
+    async fn get_by_ids(
+        ids: &[i64],
+        conn: &mut SqliteConnection,
+    ) -> Result<Vec<Line>, DomainError> {
         if ids.is_empty() {
             return Ok(vec![]);
         }
 
         let params = format!("?{}", ", ?".repeat(ids.len() - 1));
         let query_str = format!(
-            "SELECT * FROM `lines` WHERE line_cd IN ( {} ) AND e_status = 0",
+            "SELECT 
+                line_cd,
+                company_cd,
+                line_type,
+                line_name,
+                line_name_k,
+                line_name_h,
+                line_name_r,
+                line_name_zh,
+                line_name_ko,
+                line_color_c,
+                line_symbol_primary,
+                line_symbol_secondary,
+                line_symbol_extra,
+                line_symbol_primary_color,
+                line_symbol_secondary_color,
+                line_symbol_extra_color,
+                line_symbol_primary_shape,
+                line_symbol_secondary_shape,
+                line_symbol_extra_shape,
+                e_status,
+                e_sort,
+                average_distance,
+                CAST(NULL AS INTEGER) AS line_group_cd,
+                CAST(NULL AS INTEGER) AS station_cd,
+                CAST(NULL AS INTEGER) AS station_g_cd
+            FROM `lines` WHERE line_cd IN ( {} ) AND e_status = 0",
             params
         );
 
@@ -234,12 +297,19 @@ impl InternalLineRepository {
     }
 
     async fn get_by_station_group_id(
-        station_group_id: u32,
-        conn: &mut MySqlConnection,
+        station_group_id: i64,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Line>, DomainError> {
-        let rows: Vec<LineRow> = sqlx::query_as!(
+        let rows = sqlx::query_as!(
             LineRow,
             "SELECT DISTINCT l.line_cd,
+            l.line_name,
+            l.line_name_k,
+            l.line_name_h,
+            l.line_name_r,
+            l.line_name_zh,
+            l.line_name_ko,
+            l.line_color_c,
             l.company_cd,
             l.line_type,
             l.line_symbol_primary,
@@ -254,13 +324,6 @@ impl InternalLineRepository {
             l.e_status,
             l.e_sort,
             l.average_distance,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
             sst.line_group_cd,
             s.station_cd,
             s.station_g_cd
@@ -268,8 +331,6 @@ impl InternalLineRepository {
         JOIN `stations` AS s ON s.station_g_cd = ?
             AND s.e_status = 0
         JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1
-        LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-        LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
         WHERE l.line_cd = s.line_cd
             AND l.e_status = 0",
             station_group_id
@@ -282,8 +343,8 @@ impl InternalLineRepository {
     }
 
     async fn get_by_station_group_id_vec(
-        station_group_id_vec: &[u32],
-        conn: &mut MySqlConnection,
+        station_group_id_vec: &[i64],
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Line>, DomainError> {
         if station_group_id_vec.is_empty() {
             return Ok(vec![]);
@@ -291,27 +352,48 @@ impl InternalLineRepository {
 
         let params = format!("?{}", ", ?".repeat(station_group_id_vec.len() - 1));
         let query_str = format!(
-            "SELECT l.*,
-            s.station_cd,
-            s.station_g_cd,
-            sst.line_group_cd,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
-        FROM `lines` AS l
+            "SELECT 
+                l.line_cd,
+                l.company_cd,
+                l.line_type,
+                l.line_name,
+                l.line_name_k,
+                l.line_name_h,
+                l.line_name_r,
+                l.line_name_zh,
+                l.line_name_ko,
+                l.line_color_c,
+                l.line_symbol_primary,
+                l.line_symbol_secondary,
+                l.line_symbol_extra,
+                l.line_symbol_primary_color,
+                l.line_symbol_secondary_color,
+                l.line_symbol_extra_color,
+                l.line_symbol_primary_shape,
+                l.line_symbol_secondary_shape,
+                l.line_symbol_extra_shape,
+                l.e_status,
+                l.e_sort,
+                l.average_distance,
+                s.station_cd,
+                s.station_g_cd,
+                sst.line_group_cd,
+                COALESCE(a.line_name, l.line_name) AS line_name,
+                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
+            FROM `lines` AS l
             JOIN `stations` AS s ON s.station_g_cd IN ( {} )
             AND s.e_status = 0
             LEFT JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
             LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
-        WHERE l.line_cd = s.line_cd
+            WHERE l.line_cd = s.line_cd
             AND l.e_status = 0
-            AND IF(sst.line_group_cd IS NOT NULL, sst.pass <> 1, 1)
-        GROUP BY s.station_cd",
+            GROUP BY s.station_cd",
             params
         );
 
@@ -327,10 +409,10 @@ impl InternalLineRepository {
     }
 
     async fn get_by_line_group_id(
-        line_group_id: u32,
-        conn: &mut MySqlConnection,
+        line_group_id: i64,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Line>, DomainError> {
-        let rows: Vec<LineRow> = sqlx::query_as!(
+        let rows = sqlx::query_as!(
             LineRow,
             "SELECT DISTINCT l.line_cd,
             l.company_cd,
@@ -350,13 +432,13 @@ impl InternalLineRepository {
             s.station_cd,
             s.station_g_cd,
             sst.line_group_cd,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
+            l.line_name,
+            l.line_name_k,
+            l.line_name_h,
+            l.line_name_r,
+            l.line_name_zh,
+            l.line_name_ko,
+            l.line_color_c
         FROM `lines` AS l
             JOIN `station_station_types` AS sst ON sst.line_group_cd = ? AND sst.pass <> 1
             JOIN `stations` AS s ON s.station_cd = sst.station_cd
@@ -375,8 +457,8 @@ impl InternalLineRepository {
     }
 
     async fn get_by_line_group_id_vec(
-        line_group_id_vec: &[u32],
-        conn: &mut MySqlConnection,
+        line_group_id_vec: &[i64],
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Line>, DomainError> {
         if line_group_id_vec.is_empty() {
             return Ok(vec![]);
@@ -385,15 +467,29 @@ impl InternalLineRepository {
         let params = format!("?{}", ", ?".repeat(line_group_id_vec.len() - 1));
         let query_str = format!(
             "SELECT DISTINCT
-                l.*,
+                l.line_cd,
+                l.company_cd,
+                l.line_type,
+                l.line_name,
+                l.line_name_k,
+                l.line_name_h,
+                l.line_name_r,
+                l.line_name_zh,
+                l.line_name_ko,
+                l.line_color_c,
+                l.line_symbol_primary,
+                l.line_symbol_secondary,
+                l.line_symbol_extra,
+                l.line_symbol_primary_color,
+                l.line_symbol_secondary_color,
+                l.line_symbol_extra_color,
+                l.line_symbol_primary_shape,
+                l.line_symbol_secondary_shape,
+                l.line_symbol_extra_shape,
+                l.e_status,
+                l.e_sort,
+                l.average_distance,
                 sst.line_group_cd,
-                COALESCE(a.line_name, l.line_name) AS line_name,
-                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
                 s.station_cd,
                 s.station_g_cd
             FROM `lines` AS l
@@ -419,8 +515,8 @@ impl InternalLineRepository {
         Ok(lines)
     }
     async fn get_by_line_group_id_vec_for_routes(
-        line_group_id_vec: &[u32],
-        conn: &mut MySqlConnection,
+        line_group_id_vec: &[i64],
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Line>, DomainError> {
         if line_group_id_vec.is_empty() {
             return Ok(vec![]);
@@ -429,15 +525,29 @@ impl InternalLineRepository {
         let params = format!("?{}", ", ?".repeat(line_group_id_vec.len() - 1));
         let query_str = format!(
             "SELECT
-                l.*,
+                l.line_cd,
+                l.company_cd,
+                l.line_type,
+                l.line_name,
+                l.line_name_k,
+                l.line_name_h,
+                l.line_name_r,
+                l.line_name_zh,
+                l.line_name_ko,
+                l.line_color_c,
+                l.line_symbol_primary,
+                l.line_symbol_secondary,
+                l.line_symbol_extra,
+                l.line_symbol_primary_color,
+                l.line_symbol_secondary_color,
+                l.line_symbol_extra_color,
+                l.line_symbol_primary_shape,
+                l.line_symbol_secondary_shape,
+                l.line_symbol_extra_shape,
+                l.e_status,
+                l.e_sort,
+                l.average_distance,
                 sst.line_group_cd,
-                COALESCE(a.line_name, l.line_name) AS line_name,
-                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
                 s.station_cd,
                 s.station_g_cd
             FROM `lines` AS l
@@ -463,17 +573,40 @@ impl InternalLineRepository {
 
     async fn get_by_name(
         line_name: String,
-        limit: Option<u32>,
-        conn: &mut MySqlConnection,
+        limit: Option<i64>,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<Line>, DomainError> {
-        let line_name = format!("%{}%", line_name);
+        let limit = limit.unwrap_or(1);
+        let line_name = &format!("%{}%", line_name);
 
-        let rows: Vec<LineRow> = sqlx::query_as!(
+        let rows = sqlx::query_as!(
             LineRow,
-            "SELECT *,
-            CAST(NULL AS UNSIGNED INT) AS line_group_cd,
-            CAST(NULL AS UNSIGNED INT) AS station_cd,
-            CAST(NULL AS UNSIGNED INT) AS station_g_cd
+            "SELECT 
+            l.line_cd,
+            l.company_cd,
+            l.line_type,
+            l.line_name,
+            l.line_name_k,
+            l.line_name_h,
+            l.line_name_r,
+            l.line_name_zh,
+            l.line_name_ko,
+            l.line_color_c,
+            l.line_symbol_primary,
+            l.line_symbol_secondary,
+            l.line_symbol_extra,
+            l.line_symbol_primary_color,
+            l.line_symbol_secondary_color,
+            l.line_symbol_extra_color,
+            l.line_symbol_primary_shape,
+            l.line_symbol_secondary_shape,
+            l.line_symbol_extra_shape,
+            l.e_status,
+            l.e_sort,
+            l.average_distance,
+            CAST(NULL AS INTEGER) AS line_group_cd,
+            CAST(NULL AS INTEGER) AS station_cd,
+            CAST(NULL AS INTEGER) AS station_g_cd
             FROM `lines` AS l
             WHERE (
                     l.line_name LIKE ?
@@ -484,12 +617,12 @@ impl InternalLineRepository {
                 )
                 AND l.e_status = 0
             LIMIT ?",
-            &line_name,
-            &line_name,
-            &line_name,
-            &line_name,
-            &line_name,
-            limit.unwrap_or(1)
+            line_name,
+            line_name,
+            line_name,
+            line_name,
+            line_name,
+            limit
         )
         .fetch_all(conn)
         .await?;

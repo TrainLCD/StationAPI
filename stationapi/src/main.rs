@@ -1,4 +1,8 @@
-use sqlx::MySqlPool;
+use csv::{ReaderBuilder, StringRecord};
+use sqlx::{
+    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+    ConnectOptions, Sqlite,
+};
 use stationapi::{
     infrastructure::{
         company_repository::MyCompanyRepository, connection_repository::MyConnectionRepository,
@@ -9,19 +13,115 @@ use stationapi::{
     proto::{self, station_api_server::StationApiServer},
     use_case::interactor::query::QueryInteractor,
 };
-use std::sync::Arc;
 use std::{
     env::{self, VarError},
+    fs,
     net::{AddrParseError, SocketAddr},
+    str::FromStr,
 };
+use std::{path::Path, sync::Arc};
 use tonic::codec::CompressionEncoding;
 use tonic::transport::Server;
 use tonic_health::server::HealthReporter;
 use tracing::{info, warn};
 
+async fn import_csv(db_url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let data_path = Path::new("data");
+
+    let mut conn = SqliteConnectOptions::from_str(db_url)?.connect().await?;
+
+    let create_sql: String =
+        String::from_utf8_lossy(&fs::read(data_path.join("create_table.sql"))?).parse()?;
+    sqlx::query(&create_sql).execute(&mut conn).await.unwrap();
+
+    let entries = fs::read_dir(data_path).expect("The `data` directory could not be found.");
+    let mut file_list: Vec<_> = entries
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            if path.is_file() && path.extension()? == "csv" {
+                Some(path.file_name()?.to_string_lossy().into_owned())
+            } else {
+                None
+            }
+        })
+        .collect();
+    file_list.sort();
+
+    for file_name in &file_list {
+        if file_name
+            .split('!')
+            .nth(1)
+            .unwrap_or_default()
+            .split('.')
+            .nth(1)
+            .unwrap_or_default()
+            != "csv"
+        {
+            continue;
+        }
+
+        let mut rdr = ReaderBuilder::new().from_path(data_path.join(file_name))?;
+        let headers_record = rdr.headers()?;
+        let headers: Vec<String> = headers_record
+            .into_iter()
+            .map(|row| row.to_string())
+            .collect();
+
+        let mut csv_data: Vec<StringRecord> = Vec::new();
+        let mut rdr = ReaderBuilder::new().from_path(data_path.join(file_name))?;
+        let records: Vec<StringRecord> = rdr.records().filter_map(|row| row.ok()).collect();
+        csv_data.extend(records);
+
+        let table_name = file_name
+            .split('!')
+            .nth(1)
+            .unwrap_or_default()
+            .split('.')
+            .next()
+            .unwrap_or_default();
+
+        let mut sql_lines_inner = Vec::new();
+        sql_lines_inner.push(format!("INSERT INTO `{}` VALUES ", table_name));
+
+        for (idx, data) in csv_data.iter().enumerate() {
+            let cols: Vec<_> = data
+                .iter()
+                .enumerate()
+                .filter_map(|(col_idx, col)| {
+                    if headers
+                        .get(col_idx)
+                        .unwrap_or(&String::new())
+                        .starts_with('#')
+                    {
+                        return None;
+                    }
+
+                    if col.is_empty() {
+                        Some("NULL".to_string())
+                    } else {
+                        Some(format!("'{}'", col.replace('\'', "''")))
+                    }
+                })
+                .collect();
+
+            sql_lines_inner.push(if idx == csv_data.len() - 1 {
+                format!("({});", cols.join(","))
+            } else {
+                format!("({}),", cols.join(","))
+            });
+        }
+
+        sqlx::query(&sql_lines_inner.concat())
+            .execute(&mut conn)
+            .await?;
+    }
+
+    Ok(())
+}
+
 async fn station_api_service_status(mut reporter: HealthReporter) {
     let db_url = fetch_database_url();
-    let pool: sqlx::Pool<sqlx::MySql> = MySqlPool::connect(db_url.as_str()).await.unwrap();
+    let pool: sqlx::Pool<Sqlite> = SqlitePoolOptions::new().connect(&db_url).await.unwrap();
     // NOTE: 今までの障害でDBのデータが一部だけ消えたという現象はなかったので駅数だけ見ればいい
     let row = sqlx::query!("SELECT COUNT(`stations`.station_cd) <> 0 AS alive FROM `stations`")
         .fetch_one(&pool)
@@ -47,6 +147,11 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
         warn!("Could not load .env.local");
     };
 
+    let db_url = &fetch_database_url();
+    let pool = Arc::new(SqlitePoolOptions::new().connect(db_url).await.unwrap());
+
+    import_csv(db_url).await.expect("Failed to import CSV");
+
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter
         .set_serving::<StationApiServer<MyApi>>()
@@ -56,9 +161,6 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     let disable_grpc_web = fetch_disable_grpc_web_flag();
     let addr = fetch_addr()?;
-
-    let db_url = fetch_database_url();
-    let pool = Arc::new(MySqlPool::connect(db_url.as_str()).await?);
 
     let station_repository = MyStationRepository::new(Arc::clone(&pool));
     let line_repository = MyLineRepository::new(Arc::clone(&pool));
@@ -138,6 +240,7 @@ fn fetch_database_url() -> String {
         Err(VarError::NotUnicode(_)) => panic!("$DATABASE_URL should be written in Unicode."),
     }
 }
+
 fn fetch_disable_grpc_web_flag() -> bool {
     match env::var("DISABLE_GRPC_WEB") {
         Ok(s) => s.parse().expect("Failed to parse $DISABLE_GRPC_WEB"),

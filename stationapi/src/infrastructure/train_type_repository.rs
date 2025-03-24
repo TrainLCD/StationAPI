@@ -3,24 +3,26 @@ use crate::domain::{
     repository::train_type_repository::TrainTypeRepository,
 };
 use async_trait::async_trait;
-use sqlx::{MySql, MySqlConnection, Pool};
+use sqlx::Pool;
+use sqlx::Sqlite;
+use sqlx::SqliteConnection;
 use std::sync::Arc;
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct TrainTypeRow {
-    id: u32,
-    station_cd: u32,
-    type_cd: u32,
-    line_group_cd: u32,
-    pass: u32,
+    id: Option<i64>,
+    station_cd: Option<i64>,
+    type_cd: Option<i64>,
+    line_group_cd: Option<i64>,
+    pass: Option<i64>,
     type_name: String,
     type_name_k: String,
     type_name_r: Option<String>,
     type_name_zh: Option<String>,
     type_name_ko: Option<String>,
     color: String,
-    direction: u32,
-    kind: u32,
+    direction: Option<i64>,
+    kind: Option<i64>,
 }
 
 impl From<TrainTypeRow> for TrainType {
@@ -61,11 +63,11 @@ impl From<TrainTypeRow> for TrainType {
 }
 
 pub struct MyTrainTypeRepository {
-    pool: Arc<Pool<MySql>>,
+    pool: Arc<Pool<Sqlite>>,
 }
 
 impl MyTrainTypeRepository {
-    pub fn new(pool: Arc<Pool<MySql>>) -> Self {
+    pub fn new(pool: Arc<Pool<Sqlite>>) -> Self {
         Self { pool }
     }
 }
@@ -137,9 +139,9 @@ pub struct InternalTrainTypeRepository {}
 impl InternalTrainTypeRepository {
     async fn get_by_line_group_id(
         line_group_id: u32,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let rows: Vec<TrainTypeRow> = sqlx::query_as!(
+        let rows = sqlx::query_as!(
             TrainTypeRow,
             "SELECT
             t.type_name,
@@ -166,10 +168,10 @@ impl InternalTrainTypeRepository {
     }
     async fn get_by_station_id(
         station_id: u32,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let rows: Vec<TrainTypeRow> = sqlx::query_as!(TrainTypeRow,
-            "SELECT 
+        let rows = sqlx::query_as!(TrainTypeRow,
+            "SELECT
             t.type_name,
             t.type_name_k,
             t.type_name_r,
@@ -194,7 +196,7 @@ impl InternalTrainTypeRepository {
     async fn get_by_line_group_id_and_line_id(
         line_group_id: u32,
         line_id: u32,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Option<TrainType>, DomainError> {
         let rows: Option<TrainTypeRow> = sqlx::query_as(
             "SELECT 
@@ -232,7 +234,7 @@ impl InternalTrainTypeRepository {
     async fn get_by_station_id_vec(
         station_id_vec: &[u32],
         line_group_id: Option<u32>,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         if station_id_vec.is_empty() {
             return Ok(vec![]);
@@ -266,7 +268,7 @@ impl InternalTrainTypeRepository {
     async fn get_types_by_station_id_vec(
         station_id_vec: &[u32],
         line_group_id: Option<u32>,
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         if station_id_vec.is_empty() {
             return Ok(vec![]);
@@ -312,7 +314,7 @@ impl InternalTrainTypeRepository {
 
     async fn get_by_line_group_id_vec(
         line_group_id_vec: &[u32],
-        conn: &mut MySqlConnection,
+        conn: &mut SqliteConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         if line_group_id_vec.is_empty() {
             return Ok(vec![]);
