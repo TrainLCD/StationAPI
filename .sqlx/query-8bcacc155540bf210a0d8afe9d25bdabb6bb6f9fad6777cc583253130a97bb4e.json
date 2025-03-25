@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT \n            l.line_cd,\n            l.company_cd,\n            l.line_type,\n            l.line_name,\n            l.line_name_k,\n            l.line_name_h,\n            l.line_name_r,\n            l.line_name_zh,\n            l.line_name_ko,\n            l.line_color_c,\n            l.line_symbol_primary,\n            l.line_symbol_secondary,\n            l.line_symbol_extra,\n            l.line_symbol_primary_color,\n            l.line_symbol_secondary_color,\n            l.line_symbol_extra_color,\n            l.line_symbol_primary_shape,\n            l.line_symbol_secondary_shape,\n            l.line_symbol_extra_shape,\n            l.e_status,\n            l.e_sort,\n            l.average_distance,\n            CAST(NULL AS INTEGER) AS line_group_cd,\n            CAST(NULL AS INTEGER) AS station_cd,\n            CAST(NULL AS INTEGER) AS station_g_cd\n            FROM `lines` AS l\n            WHERE (\n                    l.line_name LIKE ?\n                    OR l.line_name_r LIKE ?\n                    OR l.line_name_k LIKE ?\n                    OR l.line_name_zh LIKE ?\n                    OR l.line_name_ko LIKE ?\n                )\n                AND l.e_status = 0\n            LIMIT ?",
+  "query": "SELECT \n            l.line_cd,\n            l.company_cd,\n            l.line_type,\n            l.line_name,\n            l.line_name_k,\n            l.line_name_h,\n            l.line_name_r,\n            l.line_name_zh,\n            l.line_name_ko,\n            l.line_color_c,\n            l.line_symbol_primary,\n            l.line_symbol_secondary,\n            l.line_symbol_extra,\n            l.line_symbol_primary_color,\n            l.line_symbol_secondary_color,\n            l.line_symbol_extra_color,\n            l.line_symbol_primary_shape,\n            l.line_symbol_secondary_shape,\n            l.line_symbol_extra_shape,\n            l.e_status,\n            l.e_sort,\n            l.average_distance,\n            CAST(NULL AS INTEGER) AS line_group_cd,\n            CAST(NULL AS INTEGER) AS station_cd,\n            CAST(NULL AS INTEGER) AS station_g_cd\n            FROM `lines` AS l\n            WHERE (\n                    l.line_name LIKE ?\n                    OR l.line_name_rn LIKE ?\n                    OR l.line_name_k LIKE ?\n                    OR l.line_name_zh LIKE ?\n                    OR l.line_name_ko LIKE ?\n                )\n                AND l.e_status = 0\n            LIMIT ?",
   "describe": {
     "columns": [
       {
@@ -160,5 +160,5 @@
       true
     ]
   },
-  "hash": "e4e96b66bc959d1d3bb30d70f4f665790c497b7fb0fd07d82f9cab53cde4cbd8"
+  "hash": "8bcacc155540bf210a0d8afe9d25bdabb6bb6f9fad6777cc583253130a97bb4e"
 }

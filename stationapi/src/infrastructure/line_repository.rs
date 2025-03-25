@@ -1,8 +1,7 @@
 use async_trait::async_trait;
-use sqlx::Pool;
-use sqlx::Sqlite;
 use sqlx::SqliteConnection;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use crate::domain::{
     entity::line::Line, error::DomainError, repository::line_repository::LineRepository,
@@ -74,12 +73,12 @@ impl From<LineRow> for Line {
 }
 
 pub struct MyLineRepository {
-    pool: Arc<Pool<Sqlite>>,
+    conn: Arc<Mutex<SqliteConnection>>,
 }
 
 impl MyLineRepository {
-    pub fn new(pool: Arc<Pool<Sqlite>>) -> Self {
-        Self { pool }
+    pub fn new(conn: Arc<Mutex<SqliteConnection>>) -> Self {
+        Self { conn }
     }
 }
 
@@ -87,22 +86,22 @@ impl MyLineRepository {
 impl LineRepository for MyLineRepository {
     async fn find_by_id(&self, id: u32) -> Result<Option<Line>, DomainError> {
         let id: i64 = id as i64;
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalLineRepository::find_by_id(id, &mut conn).await
     }
     async fn find_by_station_id(&self, station_id: u32) -> Result<Option<Line>, DomainError> {
         let station_id: i64 = station_id as i64;
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalLineRepository::find_by_station_id(station_id, &mut conn).await
     }
     async fn get_by_ids(&self, ids: &[u32]) -> Result<Vec<Line>, DomainError> {
         let ids: Vec<i64> = ids.iter().map(|x| *x as i64).collect();
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalLineRepository::get_by_ids(&ids, &mut conn).await
     }
     async fn get_by_station_group_id(&self, id: u32) -> Result<Vec<Line>, DomainError> {
         let id: i64 = id as i64;
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalLineRepository::get_by_station_group_id(id, &mut conn).await
     }
     async fn get_by_station_group_id_vec(
@@ -111,12 +110,12 @@ impl LineRepository for MyLineRepository {
     ) -> Result<Vec<Line>, DomainError> {
         let station_group_id_vec: Vec<i64> =
             station_group_id_vec.iter().map(|x| *x as i64).collect();
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalLineRepository::get_by_station_group_id_vec(&station_group_id_vec, &mut conn).await
     }
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Line>, DomainError> {
         let line_group_id: i64 = line_group_id as i64;
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalLineRepository::get_by_line_group_id(line_group_id, &mut conn).await
     }
     async fn get_by_line_group_id_vec(
@@ -124,7 +123,7 @@ impl LineRepository for MyLineRepository {
         line_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
         let line_group_id_vec: Vec<i64> = line_group_id_vec.iter().map(|x| *x as i64).collect();
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalLineRepository::get_by_line_group_id_vec(&line_group_id_vec, &mut conn).await
     }
     async fn get_by_line_group_id_vec_for_routes(
@@ -132,7 +131,7 @@ impl LineRepository for MyLineRepository {
         line_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
         let line_group_id_vec: Vec<i64> = line_group_id_vec.iter().map(|x| *x as i64).collect();
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalLineRepository::get_by_line_group_id_vec_for_routes(&line_group_id_vec, &mut conn)
             .await
     }
@@ -142,7 +141,7 @@ impl LineRepository for MyLineRepository {
         limit: Option<u32>,
     ) -> Result<Vec<Line>, DomainError> {
         let limit = limit.map(|l| l as i64);
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalLineRepository::get_by_name(line_name, limit, &mut conn).await
     }
 }
@@ -393,6 +392,10 @@ impl InternalLineRepository {
             LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
             WHERE l.line_cd = s.line_cd
             AND l.e_status = 0
+            AND (
+                (sst.line_group_cd IS NOT NULL AND sst.pass <> 1)
+                OR sst.line_group_cd IS NULL
+            )
             GROUP BY s.station_cd",
             params
         );
@@ -610,7 +613,7 @@ impl InternalLineRepository {
             FROM `lines` AS l
             WHERE (
                     l.line_name LIKE ?
-                    OR l.line_name_r LIKE ?
+                    OR l.line_name_rn LIKE ?
                     OR l.line_name_k LIKE ?
                     OR l.line_name_zh LIKE ?
                     OR l.line_name_ko LIKE ?

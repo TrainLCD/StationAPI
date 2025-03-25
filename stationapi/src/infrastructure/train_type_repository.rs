@@ -3,10 +3,9 @@ use crate::domain::{
     repository::train_type_repository::TrainTypeRepository,
 };
 use async_trait::async_trait;
-use sqlx::Pool;
-use sqlx::Sqlite;
 use sqlx::SqliteConnection;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct TrainTypeRow {
@@ -63,12 +62,12 @@ impl From<TrainTypeRow> for TrainType {
 }
 
 pub struct MyTrainTypeRepository {
-    pool: Arc<Pool<Sqlite>>,
+    conn: Arc<Mutex<SqliteConnection>>,
 }
 
 impl MyTrainTypeRepository {
-    pub fn new(pool: Arc<Pool<Sqlite>>) -> Self {
-        Self { pool }
+    pub fn new(conn: Arc<Mutex<SqliteConnection>>) -> Self {
+        Self { conn }
     }
 }
 
@@ -78,12 +77,12 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         &self,
         line_group_id: u32,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalTrainTypeRepository::get_by_line_group_id(line_group_id, &mut conn).await
     }
 
     async fn get_by_station_id(&self, station_id: u32) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalTrainTypeRepository::get_by_station_id(station_id, &mut conn).await
     }
 
@@ -92,7 +91,7 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         line_group_id: u32,
         line_id: u32,
     ) -> Result<Option<TrainType>, DomainError> {
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalTrainTypeRepository::get_by_line_group_id_and_line_id(
             line_group_id,
             line_id,
@@ -106,7 +105,7 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         station_id_vec: &[u32],
         line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalTrainTypeRepository::get_by_station_id_vec(station_id_vec, line_group_id, &mut conn)
             .await
     }
@@ -116,7 +115,7 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         station_id_vec: &[u32],
         line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalTrainTypeRepository::get_types_by_station_id_vec(
             station_id_vec,
             line_group_id,
@@ -129,7 +128,7 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         &self,
         line_group_id_vec: &[u32],
     ) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalTrainTypeRepository::get_by_line_group_id_vec(line_group_id_vec, &mut conn).await
     }
 }

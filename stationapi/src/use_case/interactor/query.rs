@@ -9,6 +9,7 @@ use crate::{
             company::Company, line::Line, line_symbol::LineSymbol, misc::StationIdWithDistance,
             station::Station, station_number::StationNumber, train_type::TrainType,
         },
+        normalize::normalize_for_search,
         repository::{
             company_repository::CompanyRepository, connection_repository::ConnectionRepository,
             line_repository::LineRepository, station_repository::StationRepository,
@@ -20,10 +21,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use petgraph::visit::EdgeRef;
-use petgraph::{
-    graph::{NodeIndex, UnGraph},
-    Graph, Undirected,
-};
+use petgraph::{graph::NodeIndex, Graph, Undirected};
 
 #[derive(Clone)]
 pub struct QueryInteractor<SR, LR, TR, CR, CNR> {
@@ -188,7 +186,11 @@ where
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
-            .get_by_name(station_name, limit, from_station_group_id)
+            .get_by_name(
+                normalize_for_search(&station_name),
+                limit,
+                from_station_group_id,
+            )
             .await?;
 
         let stations = self
@@ -263,7 +265,7 @@ where
                 station.line = Some(Box::new(line.clone()));
                 if let Some(tt) = train_types
                     .iter()
-                    .find(|tt| tt.station_cd.unwrap_or(0) == station.station_cd)
+                    .find(|tt| tt.station_cd == Some(station.station_cd))
                     .cloned()
                     .map(Box::new)
                 {
@@ -291,7 +293,7 @@ where
                         station.station_numbers = station_numbers;
                         if let Some(tt) = train_types
                             .iter()
-                            .find(|tt| tt.station_cd.unwrap_or(0) == station.station_cd)
+                            .find(|tt| tt.station_cd == Some(station.station_cd))
                             .cloned()
                             .map(Box::new)
                         {
@@ -863,7 +865,10 @@ where
         line_name: String,
         limit: Option<u32>,
     ) -> Result<Vec<Line>, UseCaseError> {
-        let lines = self.line_repository.get_by_name(line_name, limit).await?;
+        let lines = self
+            .line_repository
+            .get_by_name(normalize_for_search(&line_name), limit)
+            .await?;
         Ok(lines)
     }
 
@@ -933,33 +938,34 @@ where
         None
     }
 
+    // TODO: SQLite版ではいったん未実装のままにしておく
     async fn get_connected_stations(
         &self,
-        from_station_id: u32,
-        to_station_id: u32,
+        _from_station_id: u32,
+        _to_station_id: u32,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let conns = self.connection_repository.get_all().await?;
+        // let conns = self.connection_repository.get_all().await?;
 
-        let edges = conns.into_iter().map(|conn| {
-            let start = conn.station_cd1;
-            let goal = conn.station_cd2;
-            let weight = conn.distance;
-            (start, goal, weight)
-        });
+        // let edges = conns.into_iter().map(|conn| {
+        //     let start = conn.station_cd1;
+        //     let goal = conn.station_cd2;
+        //     let weight = conn.distance;
+        //     (start, goal, weight)
+        // });
 
-        let graph = UnGraph::<i32, f64>::from_edges(edges);
-        let (_dist_map, prev_map) = self.dijkstra_with_path(&graph, from_station_id.into());
+        // let graph = UnGraph::<i32, f64>::from_edges(edges);
+        // let (_dist_map, prev_map) = self.dijkstra_with_path(&graph, from_station_id.into());
 
-        if let Some(path) =
-            self.reconstruct_path(&prev_map, from_station_id.into(), to_station_id.into())
-        {
-            let node_ids: Vec<u32> = path.to_vec().iter().map(|x| x.index() as u32).collect();
-            let stations = self.station_repository.get_by_id_vec(&node_ids).await?;
-            let stations = self
-                .update_station_vec_with_attributes(stations, None)
-                .await?;
-            return Ok(stations);
-        }
+        // if let Some(path) =
+        //     self.reconstruct_path(&prev_map, from_station_id.into(), to_station_id.into())
+        // {
+        //     let node_ids: Vec<u32> = path.to_vec().iter().map(|x| x.index() as u32).collect();
+        //     let stations = self.station_repository.get_by_id_vec(&node_ids).await?;
+        //     let stations = self
+        //         .update_station_vec_with_attributes(stations, None)
+        //         .await?;
+        //     return Ok(stations);
+        // }
 
         Ok(vec![])
     }

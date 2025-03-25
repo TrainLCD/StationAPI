@@ -1,6 +1,7 @@
 use async_trait::async_trait;
-use sqlx::{Pool, Sqlite, SqliteConnection};
+use sqlx::SqliteConnection;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use crate::domain::{
     entity::connection::Connection, error::DomainError,
@@ -27,19 +28,19 @@ impl From<ConnectionRow> for Connection {
 }
 
 pub struct MyConnectionRepository {
-    pool: Arc<Pool<Sqlite>>,
+    conn: Arc<Mutex<SqliteConnection>>,
 }
 
 impl MyConnectionRepository {
-    pub fn new(pool: Arc<Pool<Sqlite>>) -> Self {
-        Self { pool }
+    pub fn new(conn: Arc<Mutex<SqliteConnection>>) -> Self {
+        Self { conn }
     }
 }
 
 #[async_trait]
 impl ConnectionRepository for MyConnectionRepository {
     async fn get_all(&self) -> Result<Vec<Connection>, DomainError> {
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalConnectionRepository::get_all(&mut conn).await
     }
 }

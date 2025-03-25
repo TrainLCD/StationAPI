@@ -1,6 +1,7 @@
 use async_trait::async_trait;
-use sqlx::{Pool, Sqlite, SqliteConnection};
+use sqlx::SqliteConnection;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use crate::domain::{
     entity::company::Company, error::DomainError, repository::company_repository::CompanyRepository,
@@ -42,12 +43,12 @@ impl From<CompanyRow> for Company {
 }
 
 pub struct MyCompanyRepository {
-    pool: Arc<Pool<Sqlite>>,
+    conn: Arc<Mutex<SqliteConnection>>,
 }
 
 impl MyCompanyRepository {
-    pub fn new(pool: Arc<Pool<Sqlite>>) -> Self {
-        Self { pool }
+    pub fn new(conn: Arc<Mutex<SqliteConnection>>) -> Self {
+        Self { conn }
     }
 }
 
@@ -55,7 +56,7 @@ impl MyCompanyRepository {
 impl CompanyRepository for MyCompanyRepository {
     async fn find_by_id_vec(&self, id_vec: &[u32]) -> Result<Vec<Company>, DomainError> {
         let id_vec: Vec<i64> = id_vec.iter().map(|x| *x as i64).collect();
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.conn.lock().await;
         InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await
     }
 }

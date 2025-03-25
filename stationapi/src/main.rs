@@ -1,8 +1,5 @@
 use csv::{ReaderBuilder, StringRecord};
-use sqlx::{
-    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
-    ConnectOptions, Sqlite,
-};
+use sqlx::{Connection, SqliteConnection};
 use stationapi::{
     infrastructure::{
         company_repository::MyCompanyRepository, connection_repository::MyConnectionRepository,
@@ -17,22 +14,21 @@ use std::{
     env::{self, VarError},
     fs,
     net::{AddrParseError, SocketAddr},
-    str::FromStr,
 };
 use std::{path::Path, sync::Arc};
-use tonic::codec::CompressionEncoding;
+use tokio::sync::Mutex;
 use tonic::transport::Server;
 use tonic_health::server::HealthReporter;
 use tracing::{info, warn};
 
-async fn import_csv(db_url: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let data_path = Path::new("data");
+async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut conn = conn.lock().await;
 
-    let mut conn = SqliteConnectOptions::from_str(db_url)?.connect().await?;
+    let data_path = Path::new("data");
 
     let create_sql: String =
         String::from_utf8_lossy(&fs::read(data_path.join("create_table.sql"))?).parse()?;
-    sqlx::query(&create_sql).execute(&mut conn).await.unwrap();
+    sqlx::query(&create_sql).execute(&mut *conn).await.unwrap();
 
     let entries = fs::read_dir(data_path).expect("The `data` directory could not be found.");
     let mut file_list: Vec<_> = entries
@@ -112,7 +108,7 @@ async fn import_csv(db_url: &str) -> Result<(), Box<dyn std::error::Error>> {
         }
 
         sqlx::query(&sql_lines_inner.concat())
-            .execute(&mut conn)
+            .execute(&mut *conn)
             .await?;
     }
 
@@ -121,10 +117,10 @@ async fn import_csv(db_url: &str) -> Result<(), Box<dyn std::error::Error>> {
 
 async fn station_api_service_status(mut reporter: HealthReporter) {
     let db_url = fetch_database_url();
-    let pool: sqlx::Pool<Sqlite> = SqlitePoolOptions::new().connect(&db_url).await.unwrap();
+    let mut conn = SqliteConnection::connect(&db_url).await.unwrap();
     // NOTE: 今までの障害でDBのデータが一部だけ消えたという現象はなかったので駅数だけ見ればいい
     let row = sqlx::query!("SELECT COUNT(`stations`.station_cd) <> 0 AS alive FROM `stations`")
-        .fetch_one(&pool)
+        .fetch_one(&mut conn)
         .await
         .unwrap();
 
@@ -148,9 +144,11 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     };
 
     let db_url = &fetch_database_url();
-    let pool = Arc::new(SqlitePoolOptions::new().connect(db_url).await.unwrap());
+    let conn = Arc::new(Mutex::new(SqliteConnection::connect(db_url).await.unwrap()));
 
-    import_csv(db_url).await.expect("Failed to import CSV");
+    import_csv(Arc::clone(&conn))
+        .await
+        .expect("Failed to import CSV");
 
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter
@@ -162,11 +160,11 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     let disable_grpc_web = fetch_disable_grpc_web_flag();
     let addr = fetch_addr()?;
 
-    let station_repository = MyStationRepository::new(Arc::clone(&pool));
-    let line_repository = MyLineRepository::new(Arc::clone(&pool));
-    let train_type_repository = MyTrainTypeRepository::new(Arc::clone(&pool));
-    let company_repository = MyCompanyRepository::new(Arc::clone(&pool));
-    let connection_repository = MyConnectionRepository::new(Arc::clone(&pool));
+    let station_repository = MyStationRepository::new(Arc::clone(&conn));
+    let line_repository = MyLineRepository::new(Arc::clone(&conn));
+    let train_type_repository = MyTrainTypeRepository::new(Arc::clone(&conn));
+    let company_repository = MyCompanyRepository::new(Arc::clone(&conn));
+    let connection_repository = MyConnectionRepository::new(Arc::clone(&conn));
 
     let query_use_case = QueryInteractor {
         station_repository,
@@ -178,9 +176,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     let my_api = MyApi { query_use_case };
 
-    let svc = StationApiServer::new(my_api)
-        .accept_compressed(CompressionEncoding::Zstd)
-        .send_compressed(CompressionEncoding::Zstd);
+    let svc = StationApiServer::new(my_api);
 
     let reflection_svc = tonic_reflection::server::Builder::configure()
         .register_encoded_file_descriptor_set(proto::FILE_DESCRIPTOR_SET)
