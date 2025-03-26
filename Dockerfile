@@ -12,7 +12,7 @@ FROM debian:bookworm-slim
 COPY --from=builder /app/target/release/stationapi /usr/local/bin/stationapi
 COPY ./data ./data
 
-ENV DATABASE_URL=file:memdb?mode=memory&cache=shared
+ENV DATABASE_URL=file:memdb?mode=memory
 ENV HOST=0.0.0.0
 ENV PORT=50051
 EXPOSE $PORT
