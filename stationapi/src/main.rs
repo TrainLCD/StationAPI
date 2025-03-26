@@ -143,7 +143,7 @@ async fn station_api_service_status(mut reporter: HealthReporter) {
     }
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> std::result::Result<(), anyhow::Error> {
     run().await
 }
