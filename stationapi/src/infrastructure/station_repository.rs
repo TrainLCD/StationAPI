@@ -705,10 +705,10 @@ impl InternalStationRepository {
         limit: Option<u32>,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let lat_min = latitude - 0.01;
-        let lat_max = latitude + 0.01;
-        let lon_min = longitude - 0.01;
-        let lon_max = longitude + 0.01;
+        let lat_min = latitude - 0.1;
+        let lat_max = latitude + 0.1;
+        let lon_min = longitude - 0.1;
+        let lon_max = longitude + 0.1;
 
         let rows = sqlx::query_as::<_, StationRow>(
             r#"SELECT
