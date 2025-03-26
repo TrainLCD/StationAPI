@@ -706,8 +706,8 @@ impl InternalStationRepository {
         conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let rows = sqlx::query_as::<_, StationRow>(
-            r#"SELECT 
-                s.*, 
+            r#"SELECT
+                s.*,
                 l.company_cd,
                 l.line_type,
                 l.line_symbol_primary,
@@ -720,34 +720,40 @@ impl InternalStationRepository {
                 l.line_symbol_secondary_shape,
                 l.line_symbol_extra_shape,
                 l.average_distance,
-                COALESCE(CAST(a.line_name AS TEXT), l.line_name) AS "line_name: String",
-                COALESCE(CAST(a.line_name_k AS TEXT), l.line_name_k) AS "line_name_k: String",
-                COALESCE(CAST(a.line_name_h AS TEXT), l.line_name_h) AS "line_name_h: String",
-                COALESCE(CAST(a.line_name_r AS TEXT), l.line_name_r) AS "line_name_r: String",
-                COALESCE(CAST(a.line_name_zh AS TEXT), l.line_name_zh) AS "line_name_zh: String",
-                COALESCE(CAST(a.line_name_ko AS TEXT), l.line_name_ko) AS "line_name_ko: String",
-                COALESCE(CAST(a.line_color_c AS TEXT), l.line_color_c) AS "line_color_c: String",
-                sqrt(
-                    pow((6378137.0 * (1 - 0.00669438002301188 )) / pow(1 - 0.00669438002301188  * pow(sin(radians((s.lat + ?) / 2)), 2), 1.5) * radians(s.lat - ?), 2) +
-                    pow(6378137.0 / sqrt(1 - 0.00669438002301188  * pow(sin(radians((s.lat + ?) / 2)), 2)) * cos(radians((s.lat + ?) / 2)) * radians(s.lon - ?), 2)
+                COALESCE(a.line_name, l.line_name)         AS line_name,
+                COALESCE(a.line_name_k, l.line_name_k)     AS line_name_k,
+                COALESCE(a.line_name_h, l.line_name_h)     AS line_name_h,
+                COALESCE(a.line_name_r, l.line_name_r)     AS line_name_r,
+                COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
+                COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
+                COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c,
+                (
+                    6371 * acos(
+                    cos((s.lat * pi()) / 180.0)
+                    * cos((?      * pi()) / 180.0)
+                    * cos(((?     * pi()) / 180.0) - ((s.lon * pi()) / 180.0))
+                    + sin((s.lat * pi()) / 180.0)
+                    * sin((?      * pi()) / 180.0)
+                    )
                 ) AS distance
-              FROM `stations` AS s
-              JOIN `lines` AS l ON s.line_cd = l.line_cd
-              LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-              LEFT JOIN `aliases` AS a ON a.id = la.alias_cd
-              WHERE
+                FROM stations AS s
+                JOIN lines AS l
+                ON s.line_cd = l.line_cd
+                LEFT JOIN line_aliases AS la
+                ON la.station_cd = s.station_cd
+                LEFT JOIN aliases AS a
+                ON a.id = la.alias_cd
+                WHERE
                 s.station_cd = s.station_g_cd
                 AND s.e_status = 0
-              ORDER BY 
+                ORDER BY
                 distance
-              LIMIT
+                LIMIT
                 ?"#,
         )
         .bind(latitude)
-        .bind(latitude)
-        .bind(latitude)
-        .bind(latitude)
         .bind(longitude)
+        .bind(latitude)
         .bind(limit.unwrap_or(1))
         .fetch_all(conn)
         .await?;

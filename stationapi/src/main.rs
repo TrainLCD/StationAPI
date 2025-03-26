@@ -112,7 +112,7 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
             .await?;
     }
 
-    // NOTE: パフォチュー
+    // NOTE: SQLiteパフォーマンスチューニング
     sqlx::query("PRAGMA journal_mode = MEMORY;")
         .execute(&mut *conn)
         .await?;
