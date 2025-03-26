@@ -57,6 +57,7 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
         }
 
         let mut rdr = ReaderBuilder::new().from_path(data_path.join(file_name))?;
+
         let headers_record = rdr.headers()?;
         let headers: Vec<String> = headers_record
             .into_iter()
@@ -64,7 +65,6 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
             .collect();
 
         let mut csv_data: Vec<StringRecord> = Vec::new();
-        let mut rdr = ReaderBuilder::new().from_path(data_path.join(file_name))?;
         let records: Vec<StringRecord> = rdr.records().filter_map(|row| row.ok()).collect();
         csv_data.extend(records);
 
