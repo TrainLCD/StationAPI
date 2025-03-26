@@ -28,7 +28,10 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
 
     let create_sql: String =
         String::from_utf8_lossy(&fs::read(data_path.join("create_table.sql"))?).parse()?;
-    sqlx::query(&create_sql).execute(&mut *conn).await.unwrap();
+    sqlx::query(&create_sql)
+        .execute(&mut *conn)
+        .await
+        .expect("Failed to create tables");
 
     let entries = fs::read_dir(data_path).expect("The `data` directory could not be found.");
     let mut file_list: Vec<_> = entries
@@ -137,12 +140,14 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
 
 async fn station_api_service_status(mut reporter: HealthReporter) {
     let db_url = fetch_database_url();
-    let mut conn = SqliteConnection::connect(&db_url).await.unwrap();
+    let mut conn = SqliteConnection::connect(&db_url)
+        .await
+        .expect("Failed to connect to database");
     // NOTE: 今までの障害でDBのデータが一部だけ消えたという現象はなかったので駅数だけ見ればいい
     let row = sqlx::query!("SELECT COUNT(`stations`.station_cd) <> 0 AS alive FROM `stations`")
         .fetch_one(&mut conn)
         .await
-        .unwrap();
+        .expect("Failed to fetch station count");
 
     if row.alive == 1 {
         reporter.set_serving::<StationApiServer<MyApi>>().await;
@@ -164,7 +169,11 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     };
 
     let db_url = &fetch_database_url();
-    let conn = Arc::new(Mutex::new(SqliteConnection::connect(db_url).await.unwrap()));
+    let conn = Arc::new(Mutex::new(
+        SqliteConnection::connect(db_url)
+            .await
+            .expect("Failed to connect to database"),
+    ));
 
     import_csv(Arc::clone(&conn))
         .await
@@ -201,7 +210,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     let reflection_svc = tonic_reflection::server::Builder::configure()
         .register_encoded_file_descriptor_set(proto::FILE_DESCRIPTOR_SET)
         .build_v1()
-        .unwrap();
+        .expect("Failed to build reflection service");
 
     info!("StationAPI Server listening on {}", addr);
 
