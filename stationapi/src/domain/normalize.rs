@@ -19,5 +19,11 @@ mod tests {
     #[test]
     fn test_normalize_for_search() {
         assert_eq!(normalize_for_search("とうきょう"), "トウキョウ");
+        // 混合文字列のテスト
+        assert_eq!(normalize_for_search("東京TOKYO"), "東京TOKYO");
+        // 空文字列のテスト
+        assert_eq!(normalize_for_search(""), "");
+        // ひらがな・カタカナ混合のテスト
+        assert_eq!(normalize_for_search("とうキョウ"), "トウキョウ");
     }
 }
