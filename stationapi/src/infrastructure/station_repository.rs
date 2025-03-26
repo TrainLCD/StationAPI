@@ -762,7 +762,7 @@ impl InternalStationRepository {
 
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
-        if stations.len() != 0 {
+        if !stations.is_empty() {
             return Ok(stations);
         }
 
