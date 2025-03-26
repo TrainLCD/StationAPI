@@ -31,13 +31,20 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
     sqlx::query(&create_sql)
         .execute(&mut *conn)
         .await
-        .expect("Failed to create tables");
+        .map_err(|e| {
+            tracing::error!("Failed to create tables: {}", e);
+            Box::new(e) as Box<dyn std::error::Error>
+        })?;
+    let entries = fs::read_dir(data_path).map_err(|e| {
+        tracing::error!("Failed to read data directory: {}", e);
+        Box::new(e) as Box<dyn std::error::Error>
+    })?;
 
-    let entries = fs::read_dir(data_path).expect("The `data` directory could not be found.");
     let mut file_list: Vec<_> = entries
         .filter_map(|entry| {
             let path = entry.ok()?.path();
-            if path.is_file() && path.extension()? == "csv" {
+            if path.is_file() && path.extension()? == "csv" && path.to_string_lossy().contains('!')
+            {
                 Some(path.file_name()?.to_string_lossy().into_owned())
             } else {
                 None
@@ -47,18 +54,6 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
     file_list.sort();
 
     for file_name in &file_list {
-        if file_name
-            .split('!')
-            .nth(1)
-            .unwrap_or_default()
-            .split('.')
-            .nth(1)
-            .unwrap_or_default()
-            != "csv"
-        {
-            continue;
-        }
-
         let mut rdr = ReaderBuilder::new().from_path(data_path.join(file_name))?;
 
         let headers_record = rdr.headers()?;
@@ -175,9 +170,10 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
             .expect("Failed to connect to database"),
     ));
 
-    import_csv(Arc::clone(&conn))
-        .await
-        .expect("Failed to import CSV");
+    if let Err(e) = import_csv(Arc::clone(&conn)).await {
+        tracing::error!("Failed to import CSV: {}", e);
+        return Err(anyhow::anyhow!("Failed to import CSV: {}", e));
+    }
 
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter
