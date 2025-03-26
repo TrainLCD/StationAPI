@@ -869,13 +869,15 @@ impl InternalStationRepository {
         let rows = sqlx::query_as!(
             StationRow,
             r#"WITH from_stations AS (
-                SELECT s.station_cd,
+                SELECT
+                    s.station_cd,
                     s.line_cd
                 FROM stations AS s
                 WHERE s.station_g_cd = ?
                 AND s.e_status = 0
             )
-            SELECT s.*,
+            SELECT
+                s.*,
                 l.company_cd,
                 l.line_type,
                 l.line_symbol_primary,
@@ -908,27 +910,46 @@ impl InternalStationRepository {
                 t.color,
                 t.direction,
                 t.kind
-            FROM `stations` AS s
-            LEFT JOIN `from_stations` AS fs ON fs.station_cd IS NOT NULL
-            LEFT JOIN `station_station_types` AS from_sst ON from_sst.station_cd = fs.station_cd
-            LEFT JOIN `station_station_types` AS dst_sst ON dst_sst.station_cd = s.station_cd
-            LEFT JOIN `types` AS t ON t.type_cd = dst_sst.type_cd
-            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
-            JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
-            WHERE (
-                    s.station_name LIKE ?
-                OR s.station_name_rn LIKE ?
-                OR s.station_name_k LIKE ?
-                OR s.station_name_zh LIKE ?
-                OR s.station_name_ko LIKE ?
+            FROM stations AS s
+                LEFT JOIN from_stations AS fs
+                    ON fs.station_cd IS NOT NULL
+                LEFT JOIN station_station_types AS from_sst
+                    ON from_sst.station_cd = fs.station_cd
+                LEFT JOIN station_station_types AS dst_sst
+                    ON dst_sst.station_cd = s.station_cd
+                LEFT JOIN types AS t
+                    ON t.type_cd = dst_sst.type_cd
+                LEFT JOIN line_aliases AS la
+                    ON la.station_cd = s.station_cd
+                LEFT JOIN aliases AS a
+                    ON la.alias_cd = a.id
+                JOIN lines AS l
+                    ON l.line_cd = s.line_cd
+                AND l.e_status = 0
+            WHERE
+                (
+                    s.station_name   LIKE ?
+                    OR s.station_name_rn LIKE ?
+                    OR s.station_name_k LIKE ?
+                    OR s.station_name_zh LIKE ?
+                    OR s.station_name_ko LIKE ?
                 )
-            AND s.e_status = 0
-            AND (
-                (from_sst.id IS NOT NULL AND dst_sst.id IS NOT NULL AND from_sst.line_group_cd = dst_sst.line_group_cd AND dst_sst.pass <> 1)
-                OR (from_sst.id IS NULL OR dst_sst.id IS NULL AND s.line_cd = COALESCE(fs.line_cd, s.line_cd))
-            )
-            GROUP BY s.station_g_cd
+                AND s.e_status = 0
+                AND (
+                    (
+                        from_sst.id IS NOT NULL
+                        AND dst_sst.id IS NOT NULL
+                        AND from_sst.line_group_cd = dst_sst.line_group_cd
+                        AND dst_sst.pass <> 1
+                    )
+                    OR
+                    (
+                        (from_sst.id IS NULL OR dst_sst.id IS NULL)
+                        AND s.line_cd = IFNULL(fs.line_cd, s.line_cd)
+                    )
+                )
+            GROUP BY
+                s.station_g_cd
             LIMIT ?"#,
             from_station_group_id,
             station_name,
