@@ -137,7 +137,13 @@ CREATE TABLE `types` (
 `kind` INTEGER NOT NULL DEFAULT 0,
 `top_priority` INTEGER NOT NULL DEFAULT 0
 );
+DROP TABLE IF EXISTS `station_rtree`;
 
+CREATE VIRTUAL TABLE station_rtree USING rtree(
+  station_cd,
+  min_lat, max_lat,
+  min_lon, max_lon
+);
 
 
 CREATE INDEX `line_aliases_station_cd` ON `line_aliases` (`station_cd`);

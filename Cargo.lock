@@ -1801,7 +1801,6 @@ dependencies = [
  "async-trait",
  "csv",
  "dotenv",
- "libsqlite3-sys",
  "petgraph 0.7.1",
  "prost",
  "serde",

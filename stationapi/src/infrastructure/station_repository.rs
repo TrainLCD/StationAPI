@@ -705,6 +705,11 @@ impl InternalStationRepository {
         limit: Option<u32>,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
+        let lat_min = latitude - 0.01;
+        let lat_max = latitude + 0.01;
+        let lon_min = longitude - 0.01;
+        let lon_max = longitude + 0.01;
+
         let rows = sqlx::query_as::<_, StationRow>(
             r#"SELECT
                 s.*,
@@ -727,15 +732,63 @@ impl InternalStationRepository {
                 COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
                 COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
                 COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c,
-                (
-                    6371 * acos(
-                    cos((s.lat * pi()) / 180.0)
-                    * cos((?      * pi()) / 180.0)
-                    * cos(((?     * pi()) / 180.0) - ((s.lon * pi()) / 180.0))
-                    + sin((s.lat * pi()) / 180.0)
-                    * sin((?      * pi()) / 180.0)
-                    )
-                ) AS distance
+                ((s.lat - ?) * (s.lat - ?) + (s.lon - ?) * (s.lon - ?)) AS distance_sq
+                FROM stations AS s
+                JOIN station_rtree r ON s.station_cd = r.station_cd
+                JOIN lines AS l
+                ON s.line_cd = l.line_cd
+                LEFT JOIN line_aliases AS la
+                ON la.station_cd = s.station_cd
+                LEFT JOIN aliases AS a
+                ON a.id = la.alias_cd
+                WHERE r.min_lat <= ? AND r.max_lat >= ?
+                AND r.min_lon <= ? AND r.max_lon >= ?
+                AND s.e_status = 0
+                ORDER BY distance_sq
+                LIMIT
+                ?"#,
+        )
+        .bind(latitude)
+        .bind(latitude)
+        .bind(longitude)
+        .bind(longitude)
+        .bind(lat_max)
+        .bind(lat_min)
+        .bind(lon_max)
+        .bind(lon_min)
+        .bind(limit.unwrap_or(1))
+        .fetch_all(&mut *conn)
+        .await?;
+
+        let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
+
+        if stations.len() != 0 {
+            return Ok(stations);
+        }
+
+        let rows = sqlx::query_as::<_, StationRow>(
+            r#"SELECT
+                s.*,
+                l.company_cd,
+                l.line_type,
+                l.line_symbol_primary,
+                l.line_symbol_secondary,
+                l.line_symbol_extra,
+                l.line_symbol_primary_color,
+                l.line_symbol_secondary_color,
+                l.line_symbol_extra_color,
+                l.line_symbol_primary_shape,
+                l.line_symbol_secondary_shape,
+                l.line_symbol_extra_shape,
+                l.average_distance,
+                COALESCE(a.line_name, l.line_name)         AS line_name,
+                COALESCE(a.line_name_k, l.line_name_k)     AS line_name_k,
+                COALESCE(a.line_name_h, l.line_name_h)     AS line_name_h,
+                COALESCE(a.line_name_r, l.line_name_r)     AS line_name_r,
+                COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
+                COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
+                COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c,
+                ((s.lat - ?) * (s.lat - ?) + (s.lon - ?) * (s.lon - ?)) AS distance_sq
                 FROM stations AS s
                 JOIN lines AS l
                 ON s.line_cd = l.line_cd
@@ -743,19 +796,17 @@ impl InternalStationRepository {
                 ON la.station_cd = s.station_cd
                 LEFT JOIN aliases AS a
                 ON a.id = la.alias_cd
-                WHERE
-                s.station_cd = s.station_g_cd
-                AND s.e_status = 0
-                ORDER BY
-                distance
+                WHERE s.e_status = 0
+                ORDER BY distance_sq
                 LIMIT
                 ?"#,
         )
         .bind(latitude)
-        .bind(longitude)
         .bind(latitude)
+        .bind(longitude)
+        .bind(longitude)
         .bind(limit.unwrap_or(1))
-        .fetch_all(conn)
+        .fetch_all(&mut *conn)
         .await?;
 
         let stations = rows.into_iter().map(|row| row.into()).collect();
