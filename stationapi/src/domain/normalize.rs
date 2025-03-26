@@ -11,3 +11,13 @@ pub fn normalize_for_search(input: &str) -> String {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_for_search() {
+        assert_eq!(normalize_for_search("とうきょう"), "トウキョウ");
+    }
+}
