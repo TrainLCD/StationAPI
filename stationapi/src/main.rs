@@ -112,6 +112,26 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
             .await?;
     }
 
+    // NOTE: パフォチュー
+    sqlx::query("PRAGMA journal_mode = MEMORY;")
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("PRAGMA synchronous = OFF;")
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("PRAGMA temp_store = MEMORY;")
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("PRAGMA locking_mode = EXCLUSIVE;")
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("PRAGMA cache_size = -262144;")
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("PRAGMA query_only = ON;")
+        .execute(&mut *conn)
+        .await?;
+
     Ok(())
 }
 
