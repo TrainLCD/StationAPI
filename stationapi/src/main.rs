@@ -26,8 +26,12 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
 
     let data_path = Path::new("data");
 
-    let create_sql: String =
-        String::from_utf8_lossy(&fs::read(data_path.join("create_table.sql"))?).parse()?;
+    let create_sql_path = data_path.join("create_table.sql");
+    let create_sql_content = fs::read(&create_sql_path).map_err(|e| {
+        tracing::error!("Failed to read create_table.sql: {}", e);
+        Box::new(e) as Box<dyn std::error::Error>
+    })?;
+    let create_sql: String = String::from_utf8_lossy(&create_sql_content).parse()?;
     sqlx::query(&create_sql)
         .execute(&mut *conn)
         .await
@@ -66,13 +70,19 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
         let records: Vec<StringRecord> = rdr.records().filter_map(|row| row.ok()).collect();
         csv_data.extend(records);
 
-        let table_name = file_name
-            .split('!')
-            .nth(1)
-            .unwrap_or_default()
-            .split('.')
-            .next()
-            .unwrap_or_default();
+        let table_name = match file_name.split('!').nth(1) {
+            Some(part) => match part.split('.').next() {
+                Some(name) if !name.is_empty() => name,
+                _ => {
+                    tracing::warn!("Invalid file name format: {}", file_name);
+                    continue;
+                }
+            },
+            None => {
+                tracing::warn!("Invalid file name format: {}", file_name);
+                continue;
+            }
+        };
 
         let mut sql_lines_inner = Vec::new();
         sql_lines_inner.push(format!("INSERT INTO `{}` VALUES ", table_name));
