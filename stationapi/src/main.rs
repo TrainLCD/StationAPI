@@ -23,7 +23,6 @@ use tracing::{info, warn};
 
 async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut conn = conn.lock().await;
-
     let data_path = Path::new("data");
 
     let create_sql_path = data_path.join("create_table.sql");
@@ -111,11 +110,13 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
                 })
                 .collect();
 
-            sql_lines_inner.push(if idx == csv_data.len() - 1 {
-                format!("({});", cols.join(","))
+            let values_part = cols.join(",");
+            let separator = if idx == csv_data.len() - 1 {
+                ");"
             } else {
-                format!("({}),", cols.join(","))
-            });
+                "),"
+            };
+            sql_lines_inner.push(format!("({}{}", values_part, separator));
         }
 
         sqlx::query(&sql_lines_inner.concat())
@@ -140,9 +141,13 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
 
 async fn station_api_service_status(mut reporter: HealthReporter) {
     let db_url = fetch_database_url();
-    let mut conn = SqliteConnection::connect(&db_url)
-        .await
-        .expect("Failed to connect to database");
+    let mut conn = match SqliteConnection::connect(&db_url).await {
+        Ok(conn) => conn,
+        Err(e) => {
+            tracing::error!("Failed to connect to database: {}", e);
+            panic!("Failed to connect to database: {}", e); // または適切な回復戦略
+        }
+    };
     // NOTE: 今までの障害でDBのデータが一部だけ消えたという現象はなかったので駅数だけ見ればいい
     let row = sqlx::query!("SELECT COUNT(`stations`.station_cd) <> 0 AS alive FROM `stations`")
         .fetch_one(&mut conn)
@@ -169,11 +174,13 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     };
 
     let db_url = &fetch_database_url();
-    let conn = Arc::new(Mutex::new(
-        SqliteConnection::connect(db_url)
-            .await
-            .expect("Failed to connect to database"),
-    ));
+    let conn = Arc::new(Mutex::new(match SqliteConnection::connect(&db_url).await {
+        Ok(conn) => conn,
+        Err(e) => {
+            tracing::error!("Failed to connect to database: {}", e);
+            panic!("Failed to connect to database: {}", e); // または適切な回復戦略
+        }
+    }));
 
     if let Err(e) = import_csv(Arc::clone(&conn)).await {
         tracing::error!("Failed to import CSV: {}", e);
