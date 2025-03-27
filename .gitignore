@@ -1,8 +1,8 @@
 /target
 .env.local
-tmp.sql
 server.crt
 server.key
 api_descriptor.pb
-out.sql
+tmp.sql
 .vscode/
+db.db*

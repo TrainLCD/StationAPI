@@ -20,9 +20,9 @@ impl From<TrainType> for GrpcTrainType {
             kind,
         } = train_type;
         Self {
-            id,
-            type_id: type_cd,
-            group_id: line_group_cd,
+            id: id.map(|id| id as u32).unwrap_or(0),
+            type_id: type_cd.map(|id| id as u32).unwrap_or(0),
+            group_id: line_group_cd.map(|id| id as u32).unwrap_or(0),
             name: type_name,
             name_katakana: type_name_k,
             name_roman: type_name_r,
@@ -31,8 +31,8 @@ impl From<TrainType> for GrpcTrainType {
             color,
             line: line.map(|line| Box::new((*line).into())),
             lines: lines.into_iter().map(|line| line.into()).collect(),
-            direction: direction as i32,
-            kind: kind as i32,
+            direction: direction.map(|direction| direction as i32).unwrap_or(0),
+            kind: kind.map(|kind| kind as i32).unwrap_or(0),
         }
     }
 }

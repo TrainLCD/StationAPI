@@ -4,8 +4,8 @@ use super::{company::Company, line_symbol::LineSymbol, station::Station, train_t
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Line {
-    pub line_cd: u32,
-    pub company_cd: u32,
+    pub line_cd: i64,
+    pub company_cd: i64,
     pub company: Option<Company>,
     pub line_name: String,
     pub line_name_k: String,
@@ -14,7 +14,7 @@ pub struct Line {
     pub line_name_zh: Option<String>,
     pub line_name_ko: Option<String>,
     pub line_color_c: Option<String>,
-    pub line_type: Option<u32>,
+    pub line_type: Option<i64>,
     pub line_symbols: Vec<LineSymbol>,
     pub line_symbol_primary: Option<String>,
     pub line_symbol_secondary: Option<String>,
@@ -25,21 +25,21 @@ pub struct Line {
     pub line_symbol_primary_shape: Option<String>,
     pub line_symbol_secondary_shape: Option<String>,
     pub line_symbol_extra_shape: Option<String>,
-    pub e_status: u32,
-    pub e_sort: u32,
+    pub e_status: i64,
+    pub e_sort: i64,
     pub average_distance: f64,
     pub station: Option<Station>,
     pub train_type: Option<TrainType>,
-    pub line_group_cd: Option<u32>,
-    pub station_cd: Option<u32>,
-    pub station_g_cd: Option<u32>,
+    pub line_group_cd: Option<i64>,
+    pub station_cd: Option<i64>,
+    pub station_g_cd: Option<i64>,
 }
 
 impl Line {
     #![allow(clippy::too_many_arguments)]
     pub fn new(
-        line_cd: u32,
-        company_cd: u32,
+        line_cd: i64,
+        company_cd: i64,
         company: Option<Company>,
         line_name: String,
         line_name_k: String,
@@ -48,7 +48,7 @@ impl Line {
         line_name_zh: Option<String>,
         line_name_ko: Option<String>,
         line_color_c: Option<String>,
-        line_type: Option<u32>,
+        line_type: Option<i64>,
         line_symbols: Vec<LineSymbol>,
         line_symbol_primary: Option<String>,
         line_symbol_secondary: Option<String>,
@@ -59,13 +59,13 @@ impl Line {
         line_symbol_primary_shape: Option<String>,
         line_symbol_secondary_shape: Option<String>,
         line_symbol_extra_shape: Option<String>,
-        e_status: u32,
-        e_sort: u32,
+        e_status: i64,
+        e_sort: i64,
         station: Option<Station>,
         train_type: Option<TrainType>,
-        line_group_cd: Option<u32>,
-        station_cd: Option<u32>,
-        station_g_cd: Option<u32>,
+        line_group_cd: Option<i64>,
+        station_cd: Option<i64>,
+        station_g_cd: Option<i64>,
         average_distance: f64,
     ) -> Self {
         Self {

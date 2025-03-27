@@ -9,6 +9,7 @@ use crate::{
             company::Company, line::Line, line_symbol::LineSymbol, misc::StationIdWithDistance,
             station::Station, station_number::StationNumber, train_type::TrainType,
         },
+        normalize::normalize_for_search,
         repository::{
             company_repository::CompanyRepository, connection_repository::ConnectionRepository,
             line_repository::LineRepository, station_repository::StationRepository,
@@ -20,10 +21,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use petgraph::visit::EdgeRef;
-use petgraph::{
-    graph::{NodeIndex, UnGraph},
-    Graph, Undirected,
-};
+use petgraph::{graph::NodeIndex, Graph, Undirected};
 
 #[derive(Clone)]
 pub struct QueryInteractor<SR, LR, TR, CR, CNR> {
@@ -167,7 +165,7 @@ where
 
         let line_group_id = if let Some(sta) = stations
             .iter()
-            .find(|sta| sta.station_cd == station_id.unwrap_or(0))
+            .find(|sta| sta.station_cd == station_id.unwrap_or(0) as i64)
         {
             sta.line_group_cd
         } else {
@@ -175,7 +173,7 @@ where
         };
 
         let stations = self
-            .update_station_vec_with_attributes(stations, line_group_id)
+            .update_station_vec_with_attributes(stations, line_group_id.map(|id| id as u32))
             .await?;
 
         Ok(stations)
@@ -188,7 +186,11 @@ where
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
-            .get_by_name(station_name, limit, from_station_group_id)
+            .get_by_name(
+                normalize_for_search(&station_name),
+                limit,
+                from_station_group_id,
+            )
             .await?;
 
         let stations = self
@@ -219,7 +221,7 @@ where
             .lock()
             .unwrap()
             .iter()
-            .map(|station| station.station_g_cd)
+            .map(|station| station.station_g_cd as u32)
             .collect::<Vec<u32>>();
 
         let stations_by_group_ids = self
@@ -228,7 +230,7 @@ where
 
         let station_ids = stations_by_group_ids
             .iter()
-            .map(|station| station.station_cd)
+            .map(|station| station.station_cd as u32)
             .collect::<Vec<u32>>();
 
         let lines = &self
@@ -237,7 +239,7 @@ where
 
         let company_ids = &lines
             .iter()
-            .map(|station| station.company_cd)
+            .map(|station| station.company_cd as u32)
             .collect::<Vec<u32>>();
         let companies = self.find_company_by_id_vec(company_ids).await?;
 
@@ -263,7 +265,7 @@ where
                 station.line = Some(Box::new(line.clone()));
                 if let Some(tt) = train_types
                     .iter()
-                    .find(|tt| tt.station_cd == station.station_cd)
+                    .find(|tt| tt.station_cd == Some(station.station_cd))
                     .cloned()
                     .map(Box::new)
                 {
@@ -291,7 +293,7 @@ where
                         station.station_numbers = station_numbers;
                         if let Some(tt) = train_types
                             .iter()
-                            .find(|tt| tt.station_cd == station.station_cd)
+                            .find(|tt| tt.station_cd == Some(station.station_cd))
                             .cloned()
                             .map(Box::new)
                         {
@@ -511,7 +513,7 @@ where
 
         let train_type_ids = train_types
             .iter()
-            .map(|tt| tt.line_group_cd)
+            .filter_map(|tt| tt.line_group_cd.map(|id| id as u32))
             .collect::<Vec<u32>>();
 
         let mut lines = self
@@ -519,7 +521,10 @@ where
             .get_by_line_group_id_vec(&train_type_ids)
             .await?;
 
-        let company_ids = lines.iter().map(|l| l.company_cd).collect::<Vec<u32>>();
+        let company_ids = lines
+            .iter()
+            .map(|l| l.company_cd as u32)
+            .collect::<Vec<u32>>();
 
         let companies = self.company_repository.find_by_id_vec(&company_ids).await?;
 
@@ -529,34 +534,40 @@ where
         };
 
         for tt in train_types.iter_mut() {
-            let mut lines: Vec<Line> = lines
-                .iter_mut()
-                .map(|l| l.clone())
-                .filter(|l| l.line_group_cd.is_some())
-                .filter(|l| l.line_group_cd.unwrap() == tt.line_group_cd)
-                .collect::<Vec<Line>>();
+            if let Some(line_group_cd) = tt.line_group_cd {
+                let mut lines: Vec<Line> = lines
+                    .iter_mut()
+                    .map(|l| l.clone())
+                    .filter(|l| l.line_group_cd.is_some())
+                    .filter(|l| l.line_group_cd.unwrap() == line_group_cd)
+                    .collect::<Vec<Line>>();
 
-            for line in lines.iter_mut() {
+                for line in lines.iter_mut() {
+                    line.company = companies
+                        .iter()
+                        .find(|c| c.company_cd == line.company_cd)
+                        .cloned();
+                    line.line_symbols = self.get_line_symbols(line);
+
+                    let train_type: Option<TrainType> = self
+                        .train_type_repository
+                        .find_by_line_group_id_and_line_id(
+                            line_group_cd as u32,
+                            line.line_cd as u32,
+                        )
+                        .await?;
+                    line.train_type = train_type;
+                }
+
                 line.company = companies
                     .iter()
                     .find(|c| c.company_cd == line.company_cd)
                     .cloned();
-                line.line_symbols = self.get_line_symbols(line);
-                let train_type: Option<TrainType> = self
-                    .train_type_repository
-                    .find_by_line_group_id_and_line_id(tt.line_group_cd, line.line_cd)
-                    .await?;
-                line.train_type = train_type;
+                line.line_symbols = self.get_line_symbols(&line);
+
+                tt.lines = lines;
+                tt.line = Some(Box::new(line.clone()));
             }
-
-            line.company = companies
-                .iter()
-                .find(|c| c.company_cd == line.company_cd)
-                .cloned();
-            line.line_symbols = self.get_line_symbols(&line);
-
-            tt.lines = lines;
-            tt.line = Some(Box::new(line.clone()));
         }
 
         Ok(train_types)
@@ -588,7 +599,7 @@ where
 
         let line_group_id_vec = Arc::clone(&stops)
             .iter()
-            .filter_map(|row| row.line_group_cd)
+            .filter_map(|row| row.line_group_cd.map(|id| id as u32))
             .collect::<Vec<u32>>();
 
         let tt_lines = self
@@ -598,9 +609,9 @@ where
 
         let tt_lines = Arc::new(tt_lines);
 
-        let route_row_tree_map: BTreeMap<u32, Vec<Station>> = Arc::clone(&stops).iter().fold(
+        let route_row_tree_map: BTreeMap<i64, Vec<Station>> = Arc::clone(&stops).iter().fold(
             BTreeMap::new(),
-            |mut acc: BTreeMap<u32, Vec<Station>>, value| {
+            |mut acc: BTreeMap<i64, Vec<Station>>, value| {
                 if let Some(line_group_cd) = value.line_group_cd {
                     acc.entry(line_group_cd).or_default().push(value.clone());
                 } else {
@@ -665,13 +676,11 @@ where
 
                             let train_type = match row.type_id.is_some() {
                                 true => Some(Box::new(TrainType {
-                                    id: Arc::clone(&row).type_id.unwrap_or_default(),
-                                    station_cd: Arc::clone(&row).station_cd,
-                                    type_cd: Arc::clone(&row).type_cd.unwrap_or_default(),
-                                    line_group_cd: Arc::clone(&row)
-                                        .line_group_cd
-                                        .unwrap_or_default(),
-                                    pass: Arc::clone(&row).pass.unwrap_or_default(),
+                                    id: Arc::clone(&row).type_id,
+                                    station_cd: Some(Arc::clone(&row).station_cd),
+                                    type_cd: Arc::clone(&row).type_cd,
+                                    line_group_cd: Arc::clone(&row).line_group_cd,
+                                    pass: Arc::clone(&row).pass,
                                     type_name: Arc::clone(&row)
                                         .type_name
                                         .clone()
@@ -684,8 +693,8 @@ where
                                     type_name_zh: Arc::clone(&row).type_name_zh.clone(),
                                     type_name_ko: Arc::clone(&row).type_name_ko.clone(),
                                     color: Arc::clone(&row).color.clone().unwrap_or_default(),
-                                    direction: Arc::clone(&row).direction.unwrap_or_default(),
-                                    kind: Arc::clone(&row).kind.unwrap_or_default(),
+                                    direction: Arc::clone(&row).direction,
+                                    kind: Arc::clone(&row).kind,
                                     line: Some(Box::new(tt_line.clone())),
                                     lines: tt_lines,
                                 })),
@@ -837,7 +846,10 @@ where
                     return None;
                 }
 
-                Some(Route { id: *id, stops })
+                Some(Route {
+                    id: *id as u32,
+                    stops,
+                })
             })
             .collect();
         Ok(routes)
@@ -853,7 +865,10 @@ where
         line_name: String,
         limit: Option<u32>,
     ) -> Result<Vec<Line>, UseCaseError> {
-        let lines = self.line_repository.get_by_name(line_name, limit).await?;
+        let lines = self
+            .line_repository
+            .get_by_name(normalize_for_search(&line_name), limit)
+            .await?;
         Ok(lines)
     }
 
@@ -923,33 +938,34 @@ where
         None
     }
 
+    // TODO: SQLite版ではいったん未実装のままにしておく
     async fn get_connected_stations(
         &self,
-        from_station_id: u32,
-        to_station_id: u32,
+        _from_station_id: u32,
+        _to_station_id: u32,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let conns = self.connection_repository.get_all().await?;
+        // let conns = self.connection_repository.get_all().await?;
 
-        let edges = conns.into_iter().map(|conn| {
-            let start = conn.station_cd1;
-            let goal = conn.station_cd2;
-            let weight = conn.distance;
-            (start, goal, weight)
-        });
+        // let edges = conns.into_iter().map(|conn| {
+        //     let start = conn.station_cd1;
+        //     let goal = conn.station_cd2;
+        //     let weight = conn.distance;
+        //     (start, goal, weight)
+        // });
 
-        let graph = UnGraph::<i32, f64>::from_edges(edges);
-        let (_dist_map, prev_map) = self.dijkstra_with_path(&graph, from_station_id.into());
+        // let graph = UnGraph::<i32, f64>::from_edges(edges);
+        // let (_dist_map, prev_map) = self.dijkstra_with_path(&graph, from_station_id.into());
 
-        if let Some(path) =
-            self.reconstruct_path(&prev_map, from_station_id.into(), to_station_id.into())
-        {
-            let node_ids: Vec<u32> = path.to_vec().iter().map(|x| x.index() as u32).collect();
-            let stations = self.station_repository.get_by_id_vec(&node_ids).await?;
-            let stations = self
-                .update_station_vec_with_attributes(stations, None)
-                .await?;
-            return Ok(stations);
-        }
+        // if let Some(path) =
+        //     self.reconstruct_path(&prev_map, from_station_id.into(), to_station_id.into())
+        // {
+        //     let node_ids: Vec<u32> = path.to_vec().iter().map(|x| x.index() as u32).collect();
+        //     let stations = self.station_repository.get_by_id_vec(&node_ids).await?;
+        //     let stations = self
+        //         .update_station_vec_with_attributes(stations, None)
+        //         .await?;
+        //     return Ok(stations);
+        // }
 
         Ok(vec![])
     }
