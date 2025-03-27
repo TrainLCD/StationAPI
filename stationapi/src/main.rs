@@ -93,7 +93,10 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
                     if col.is_empty() {
                         Some("NULL".to_string())
                     } else {
-                        Some(format!("'{}'", col.replace('\'', "''")))
+                        Some(format!(
+                            "'{}'",
+                            col.replace('\'', "''").replace('\\', "\\\\")
+                        ))
                     }
                 })
                 .collect();
