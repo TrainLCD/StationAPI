@@ -174,7 +174,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     };
 
     let db_url = &fetch_database_url();
-    let conn = Arc::new(Mutex::new(match SqliteConnection::connect(&db_url).await {
+    let conn = Arc::new(Mutex::new(match SqliteConnection::connect(db_url).await {
         Ok(conn) => conn,
         Err(e) => {
             tracing::error!("Failed to connect to database: {}", e);
