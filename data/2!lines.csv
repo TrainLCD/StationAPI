@@ -114,7 +114,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 11409,2,北アルプス線,キタアルプスセン,大糸線,Kita Alps Line,Kita Alps Line,大糸线,오이토선,#9370DB,2,,,,,,,,,,0,11409,2399.907155
 11410,2,弥彦線,ヤヒコセン,弥彦線,Yahiko Line,Yahiko Line,弥彦线,야히코선,#922790,2,,,,,,,,,,0,11410,2233.574576
 11411,3,中央本線,チュウオウホンセン,中央本線(名古屋～塩尻),Chuo Line,Chuo Line,中央线,주오선,#307097,2,CF,,,#307097,,,HALF_SQUARE_WITHOUT_ROUND,,,0,11411,4145.097415
-11412,2,篠ノ井線,シノノイセン,篠ノ井線,Shinonoi Line,Shinonoi Line,篠之井线,시노노이선,#F15A22,2,,,,,,,,,,0,11412,4365.418165
+11412,2,篠ノ井線,シノノイセン,篠ノ井線,Shinonoi Line,Shinonoi Line,篠之井线,시노노이선,#F15A22,2,SN,,,#F15A22,,,SQUARE,,,0,11412,4365.418165
 11413,3,飯田線,イイダセン,飯田線(豊橋～天竜峡),Iida Line,Iida Line,饭田线,이다선,#6CA2D6,2,CD,,,#6CA2D6,,,HALF_SQUARE_WITHOUT_ROUND,,,0,11413,2128.48505
 11414,3,飯田線,イイダセン,飯田線(天竜峡～辰野),Iida Line,Iida Line,饭田线,이다선,#6CA2D6,2,CD,,,#6CA2D6,,,HALF_SQUARE_WITHOUT_ROUND,,,0,11414,1670.469656
 11415,4,北陸本線,ホクリクホンセン,北陸本線(米原～敦賀),Hokuriku Main Line,Hokuriku Main Line,北陆本线,호쿠리쿠 본선,#D60000,2,A,B,,#0072BC,#00ACD1,,REVERSED_SQUARE_WEST,REVERSED_SQUARE_WEST,,0,11415,4000.327385
