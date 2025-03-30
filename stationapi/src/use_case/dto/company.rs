@@ -3,8 +3,8 @@ use crate::{domain::entity::company::Company, proto::Company as GrpcCompany};
 impl From<Company> for GrpcCompany {
     fn from(company: Company) -> Self {
         Self {
-            id: company.company_cd,
-            railroad_id: company.rr_cd,
+            id: company.company_cd as u32,
+            railroad_id: company.rr_cd as u32,
             name: company.company_name,
             name_short: company.company_name_r,
             name_katakana: company.company_name_k,

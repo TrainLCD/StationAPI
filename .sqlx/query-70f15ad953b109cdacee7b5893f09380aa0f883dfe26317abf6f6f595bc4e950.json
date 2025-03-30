@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.direction,\n            t.kind,\n            sst.*\n            FROM types as t\n            JOIN `station_station_types` AS sst ON sst.line_group_cd = ?\n            WHERE \n                t.type_cd = sst.type_cd\n            ORDER BY t.kind, sst.id",
+  "query": "SELECT\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.direction,\n            t.kind,\n            sst.*\n            FROM  `types` AS t\n            JOIN `stations` AS s ON s.station_cd = ? AND s.e_status = 0\n            JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd AND sst.type_cd = t.type_cd AND sst.pass <> 1\n            ORDER BY sst.id",
   "describe": {
     "columns": [
       {
@@ -88,5 +88,5 @@
       false
     ]
   },
-  "hash": "2f60f11d39d9d94cceff0b26cfb746d60d3e8a3c1b9d9bf5cb498b842875a57a"
+  "hash": "70f15ad953b109cdacee7b5893f09380aa0f883dfe26317abf6f6f595bc4e950"
 }

@@ -2,7 +2,6 @@ on:
   pull_request:
     paths:
       - "stationapi/**"
-      - "migration/**"
       - "data_validator/**"
       - "Cargo.lock"
       - "Cargo.toml"
@@ -10,7 +9,6 @@ on:
   push:
     paths:
       - "stationapi/**"
-      - "migration/**"
       - "data_validator/**"
       - "Cargo.lock"
       - "Cargo.toml"
