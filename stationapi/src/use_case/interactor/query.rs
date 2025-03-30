@@ -729,7 +729,7 @@ where
                                 line_symbol1: row.line_symbol1.clone(),
                                 line_symbol2: row.line_symbol2.clone(),
                                 line_symbol3: row.line_symbol3.clone(),
-                                line_symbol4: row.line_symbol3.clone(),
+                                line_symbol4: row.line_symbol4.clone(),
                                 line_symbol1_color: row.line_symbol1_color.clone(),
                                 line_symbol2_color: row.line_symbol2_color.clone(),
                                 line_symbol3_color: row.line_symbol3_color.clone(),
