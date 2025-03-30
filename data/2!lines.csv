@@ -488,7 +488,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99509,175,あおなみ線,アオナミセン,西名古屋港線,Aonami Line,Aonami Line,,,#464285,2,AN,,,,#464285,,,,ROUND,,,,0,99509,1449.553017
 99510,176,東海交通事業城北線,トウカイコウツウジギョウジョウホクセン,東海交通事業城北線,Tokai Transport Service Johoku Line,Tokai Transport Service Johoku Line,,,#FF6600,2,,,,,,,,,,,,,0,99510,2189.856846
 99511,177,愛知環状鉄道線,アイチカンジョウテツドウセン,愛知環状鉄道線,Aichi Loop Line,Aichi Loop Line,,,#2A359D,2,,,,,#2A359D,,,,MONOCHROME_ROUND,,,,0,99511,1985.929308
-99512,178,リニモ,リニモ,東部丘陵線,Linimo,Linimo,,,#0D1F70,5,L,,,,,,,,,,,,0,99512,1054.088575
+99512,178,リニモ,リニモ,東部丘陵線,Linimo,Linimo,,,#0D1F70,5,L,,,,#000000,,,,ROUND,,,,0,99512,1054.088575
 99513,179,名古屋市営地下鉄東山線,ナゴヤシエイチカテツヒガシヤマセン,名古屋市営地下鉄東山線,Nagoya Municipal Subway Higashiyama Line,Nagoya Municipal Subway Higashiyama Line,,,#FFCC00,3,H,,,,#FFCC00,,,,ROUND,,,,0,99513,953.2051519
 99514,179,名古屋市営地下鉄名城線,ナゴヤシエイチカテツメイジョウセン,名古屋市営地下鉄名城線,Nagoya Municipal Subway Meijo Line,Nagoya Municipal Subway Meijo Line,,,#9B74C1,3,M,,,,#9B74C1,,,,ROUND,,,,0,99514,906.8937929
 99515,179,名古屋市営地下鉄名港線,ナゴヤシエイチカテツメイコウセン,名古屋市営地下鉄名港線,Nagoya Municipal Subway Meiko Line,Nagoya Municipal Subway Meiko Line,,,#9B74C1,3,E,,,,#9B74C1,,,,ROUND,,,,0,99515,988.1579375
