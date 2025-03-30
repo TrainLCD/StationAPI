@@ -5,8 +5,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     domain::{
-        entity::{misc::StationIdWithDistance, station::Station},
-        error::DomainError,
+        entity::station::Station, error::DomainError,
         repository::station_repository::StationRepository,
     },
     proto::StopCondition,
@@ -181,13 +180,6 @@ impl From<StationRow> for Station {
     }
 }
 
-#[derive(sqlx::FromRow, Clone)]
-struct DistanceWithIdRow {
-    station_cd: i64,
-    distance: f64,
-    average_distance: f64,
-}
-
 pub struct MyStationRepository {
     conn: Arc<Mutex<SqliteConnection>>,
 }
@@ -273,28 +265,6 @@ impl StationRepository for MyStationRepository {
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.conn.lock().await;
         InternalStationRepository::get_by_line_group_id(line_group_id, &mut conn).await
-    }
-    async fn get_station_id_and_distance_by_coordinates(
-        &self,
-        latitude: f64,
-        longitude: f64,
-        line_id: Option<u32>,
-    ) -> Result<StationIdWithDistance, DomainError> {
-        let mut conn = self.conn.lock().await;
-        match line_id {
-            Some(line_id) => {
-                InternalStationRepository::get_station_id_and_distance_by_coordinates_and_line_id(
-                    latitude, longitude, line_id, &mut conn,
-                )
-                .await
-            }
-            None => {
-                InternalStationRepository::get_station_id_and_distance_by_coordinates(
-                    latitude, longitude, &mut conn,
-                )
-                .await
-            }
-        }
     }
 
     async fn get_route_stops(
@@ -844,106 +814,6 @@ impl InternalStationRepository {
         let stations = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(stations)
-    }
-
-    async fn get_station_id_and_distance_by_coordinates_and_line_id(
-        latitude: f64,
-        longitude: f64,
-        line_id: u32,
-        conn: &mut SqliteConnection,
-    ) -> Result<StationIdWithDistance, DomainError> {
-        let row = sqlx::query_as::<_, DistanceWithIdRow>(
-            "SELECT
-            s.station_cd,
-            s.station_g_cd, 
-            l.average_distance,
-            (
-              6371 * acos(
-                cos(
-                  radians(s.lat)
-                ) * cos(
-                  radians(?)
-                ) * cos(
-                  radians(?) - radians(s.lon)
-                ) + sin(
-                  radians(s.lat)
-                ) * sin(
-                  radians(?)
-                )
-              )
-            ) AS distance
-          FROM `stations` AS s
-          JOIN `lines` AS l ON l.line_cd = ?
-          WHERE
-            s.line_cd = ?
-            AND s.e_status = 0
-          ORDER BY 
-            distance
-          LIMIT 
-            1",
-        )
-        .bind(latitude)
-        .bind(longitude)
-        .bind(latitude)
-        .bind(line_id)
-        .bind(line_id)
-        .fetch_one(conn)
-        .await?;
-        let id_with_distance = StationIdWithDistance {
-            station_id: row.station_cd as u32,
-            distance: row.distance,
-            average_distance: row.average_distance,
-        };
-
-        Ok(id_with_distance)
-    }
-
-    async fn get_station_id_and_distance_by_coordinates(
-        latitude: f64,
-        longitude: f64,
-        conn: &mut SqliteConnection,
-    ) -> Result<StationIdWithDistance, DomainError> {
-        let row = sqlx::query_as::<_, DistanceWithIdRow>(
-            "SELECT
-          s.station_cd,
-          s.station_g_cd,
-          l.average_distance,
-          (
-            6371 * acos(
-              cos(
-                radians(s.lat)
-              ) * cos(
-                radians(?)
-              ) * cos(
-                radians(?) - radians(s.lon)
-              ) + sin(
-                radians(s.lat)
-              ) * sin(
-                radians(?)
-              )
-            )
-          ) AS distance
-        FROM `stations` AS s
-        JOIN `lines` AS l ON l.line_cd = s.line_cd
-        WHERE
-          s.e_status = 0
-        ORDER BY 
-          distance
-        LIMIT 
-          1",
-        )
-        .bind(latitude)
-        .bind(longitude)
-        .bind(latitude)
-        .fetch_one(conn)
-        .await?;
-        let id_with_distance = StationIdWithDistance {
-            station_id: row.station_cd as u32,
-            distance: row.distance,
-            average_distance: row.average_distance,
-        };
-
-        Ok(id_with_distance)
     }
 
     async fn get_by_name(
