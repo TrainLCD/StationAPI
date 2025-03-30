@@ -3,8 +3,8 @@ use crate::{domain::entity::station::Station, proto::Station as GrpcStation};
 impl From<Station> for GrpcStation {
     fn from(station: Station) -> Self {
         Self {
-            id: station.station_cd,
-            group_id: station.station_g_cd,
+            id: station.station_cd as u32,
+            group_id: station.station_g_cd as u32,
             name: station.station_name,
             name_katakana: station.station_name_k,
             name_roman: station.station_name_r,
@@ -13,7 +13,7 @@ impl From<Station> for GrpcStation {
             three_letter_code: station.three_letter_code,
             lines: station.lines.into_iter().map(|line| line.into()).collect(),
             line: station.line.map(|line| Box::new((*line).into())),
-            prefecture_id: station.pref_cd,
+            prefecture_id: station.pref_cd as u32,
             postal_code: station.post,
             address: station.address,
             latitude: station.lat,

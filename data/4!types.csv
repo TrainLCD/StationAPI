@@ -1,311 +1,311 @@
 id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,direction,kind,top_priority,#メモ,#着手済
-0,1,のぞみ,ノゾミ,Nozomi,希望,노조미,#FFD400,0,4,0,,COMPLETE
-0,2,ひかり,ヒカリ,Hikari,光,히카리,#FF0000,0,4,0,,COMPLETE
-0,3,こだま,コダマ,Kodama,回声,고다마,#3050FF,0,4,0,,COMPLETE
-0,4,みずほ,ミズホ,Mizuho,瑞穗,미즈호,#FFA500,0,4,0,,COMPLETE
-0,5,さくら,サクラ,Sakura,樱,사쿠라,#FF69B4,0,4,0,,COMPLETE
-0,6,つばめ,ツバメ,Tsubame,燕,쓰바메,#40E0D0,0,4,0,,COMPLETE
-0,7,はやぶさ,ハヤブサ,Hayabusa,隼,하야부사,#008000,0,4,0,,COMPLETE
-0,8,はやて,ハヤテ,Hayate,疾风,하야테,#008000,0,4,0,,COMPLETE
-0,9,やまびこ,ヤマビコ,Yamabiko,山彦,야마비코,#008001,0,4,0,,COMPLETE
-0,10,なすの,ナスノ,Nasuno,那须野,나스노,#008002,0,4,0,,COMPLETE
-0,11,こまち,コマチ,Komachi,小町,고마치,#FF0080,0,4,0,,COMPLETE
-0,12,つばさ,ツバサ,Tsubasa,翼,쓰바사,#FF8000,0,4,0,,COMPLETE
-0,13,とき,トキ,Toki,朱鹭,도키,#008000,0,4,0,,COMPLETE
-0,14,たにがわ,タニガワ,Tanigawa,谷川,다니가와,#0000FF,0,4,0,,COMPLETE
-0,15,かがやき,カガヤキ,Kagayaki,光辉,가가야키,#FFD400,0,4,0,,COMPLETE
-0,16,はくたか,ハクタカ,Hakutaka,白鹰,하쿠타카,#FF0000,0,4,0,,COMPLETE
-0,17,あさま,アサマ,Asama,浅间,아사마,#0000FF,0,4,0,,COMPLETE
-0,18,つるぎ,ツルギ,Tsurugi,剑,쓰루기,#3050FF,0,4,0,,COMPLETE
-0,19,かもめ,カモメ,KAMOME,海鸥,카모메,#E10017,0,4,0,,COMPLETE
-0,100,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,,PARTIAL
-0,101,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,,PARTIAL
-0,102,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,,PARTIAL
-0,103,特別快速,トクベツカイソク,Special Rapid,特别快车,특별쾌속,#DC143C,0,2,0,,COMPLETE
-0,104,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#DC143C,0,2,0,,COMPLETE
-0,105,快速(赤),カイソク(アカ),Rapid(Red),快车,쾌속,#FF0000,0,2,0,,NOT
-0,106,快速(緑),カイソク(ミドリ),Rapid(Green),快车,쾌속,#00FF00,0,2,0,,NOT
-0,107,ホームライナー,ホームライナー,Home Liner,家用班轮,홈 라이너,#DC143C,0,2,0,,NOT
-0,108,区間快速,クカンカイソク,Regional Rapid,区域快车,구간쾌속,#DC143C,0,2,0,,PARTIAL
-0,109,快速みえ,カイソクミエ,Rapid Mie,快速三重,쾌속미에,#DC143C,0,2,0,,COMPLETE
-0,110,新快速,シンカイソク,Special Rapid,新快速,새쾌속,#0071BE,0,2,0,JR西日本用,COMPLETE
-0,111,直通快速,チョクツウカイソク,Direct Rapid,直接快速,직통쾌속,#F5A200,0,2,0,,COMPLETE
-0,112,B快速,Bカイソク,B Rapid,B快速,B쾌속,#0071BE,0,2,0,,COMPLETE
-0,113,おくたま号,オクタマゴウ,Okutama,奧多摩号,오쿠타마호,#F15A22,0,2,0,,COMPLETE
-0,114,大和路快速,ヤマトジカイソク,Yamatoji Rapid,大和路快速,야마토지 쾌속,#02AD73,0,2,0,,COMPLETE
-0,115,丹波路快速,タンバジカイソク,Tambaji Rapid,坦巴路快速,단바로 쾌속,#FEC210,0,2,0,,COMPLETE
-0,116,みやこ路快速,ミヤコジカイソク,Miyakoji Rapid,都路快速,미야코지 쾌속,#FEC210,0,2,0,,COMPLETE
-0,117,関空快速,カンクウカイソク,Kansai Airport Rapid,关空快速,간쿠 쾌속,#007AC2,0,2,0,,COMPLETE
-0,118,紀州路快速,キシュウジカイソク,Kishūji Rapid,紀州路快速,기슈로 쾌속,#FD7E00,0,2,0,,COMPLETE
-0,119,青梅特快,オウメトッカイ,Ōme Special Rapid,青梅特快,오메특쾌,#F15A22,0,2,0,,COMPLETE
-0,120,中央特快,チュウオウトッカイ,Chūō Special Rapid,中央特快,중앙특쾌,#F15A23,0,2,0,,COMPLETE
-0,121,通勤特快,ツウキントッカイ,Commuter Special Rapid,通勤特快,통근특쾌,#F15A24,0,2,0,,COMPLETE
-0,122,サンライナー,サンライナー,Sun Liner,Sun Liner,산 라이너,#DC143C,0,2,0,,COMPLETE
-0,123,マリンライナー,マリンライナー,Marine Liner,Marine Liner,마린라이나,#DC143C,0,2,0,,COMPLETE
-0,124,快速ことぶき,カイソクコトブキ,Rapid Kotobuki,快速寿,쾌속 축수,#DC143C,0,2,0,,NOT
-0,125,シティライナー,シティライナー,City Liner,City Liner,시티 라이너,#DC143C,0,2,0,,NOT
-0,126,通勤ライナー,ツウキンライナー,Commuter Liner,通勤Liner,통근 라이너,#DC143C,0,2,0,,NOT
-0,127,安芸路ライナー,アキジライナー,Akiji Liner,安藝路Liner,아키로 라이너,#DC143C,0,2,0,,NOT
-0,128,みよしライナー,ミヨシライナー,Miyoshi Liner,三吉Liner,미요시 라이너,#DC143C,0,2,0,,NOT
-0,129,とっとりライナー,トットリライナー,Tottori Liner,鳥取Liner,돗토리 라이너,#DC143C,0,2,0,,NOT
-0,130,アクアライナー,アクアライナー,Aqua Liner,Aqua Liner,아쿠아 라이너,#DC143C,0,2,0,,NOT
-0,131,快速(青),カイソク（アオ）,Rapid(Blue),快车,쾌속,#0000FF,0,2,0,,NOT
-0,132,各駅停車(南武支線),カクエキテイシャ,Local(Nambu Branch Line),每站停车(南埠支线),각역정차(난부 지선),#FFD400,0,1,0,,COMPLETE
-0,133,普通(成田空港方面),フツウ,Local(for Narita Airport),慢车(成田机场),보통(나리타 공항),#00B261,0,1,0,,COMPLETE
-0,134,区間快速(加茂方面),クカンカイソク,Regional Rapid(for Kamo),区域快速,구간쾌속,#02AD73,0,2,0,,COMPLETE
-0,135,区間快速(和歌山方面),クカンカイソク,Regional Rapid(for Wakayama),区域快速,구간쾌속,#F89C1C,0,2,0,,COMPLETE
-0,136,直通快速(和歌山方面),チョクツウカイソク,Direct Rapid(for Wakayama),直接快速,직통쾌속,#F89C1C,0,2,0,,COMPLETE
-0,137,直通快速(関西空港方面),チョクツウカイソク,Direct Rapid(for Kansai Airport),直接快速,직통쾌속,#007AC2,0,2,0,,COMPLETE
-0,138,新快速,シンカイソク,New Rapid,新快速,신쾌속,#FF4500,0,2,0,JR東海用,COMPLETE
-0,139,普通(辰野支線),フツウ,Local(Tatsuno Branch Line),慢车(辰野支线),보통(다쓰노 지선),#0074BE,0,1,0,,COMPLETE
-0,140,普通(我孫子支線),フツウ,Local(Abiko Branch Line),慢车(我孫子支线),보통(아비코 지선),#00B261,0,1,0,,COMPLETE
-0,141,普通(利府支線),フツウ,Local(Rifu Branch Line),慢车(利府线),보통(리후선),#3CB371,0,1,0,,COMPLETE
-0,142,普通(長与経由),フツウ,Local(Nagayo Branch Line),慢车(长与支线),보통(나가요 경로),#FAAF18,0,1,0,,COMPLETE
-0,143,普通(新千歳空港方面),フツウ,Local(for New Chitose Airport),慢车,보통,#00B2EB,0,1,0,,COMPLETE
-0,144,普通(砂原線経由),フツウ,Local(Sawara Branch Line),慢车(砂原支线),보통(사와라 지선),#0072BC,0,1,0,,COMPLETE
-0,145,普通(室蘭方面),フツウ,Local(for Muroran),慢车,보통,#2CB431,0,1,0,,COMPLETE
-0,146,シーサイドライナー,シーサイドライナー,Sea Side Liner,滨海快线,바다 사이드 라이너,#0095D9,0,2,0,,COMPLETE
-0,147,エアポート,エアポート,Airport,机场号,에어포트,#FF0080,0,2,0,,COMPLETE
-0,148,ニセコライナー,ニセコライナー,Niseko Liner,二世谷快车,니세코라이너,#0098E1,0,2,0,,COMPLETE
-0,149,普通(美濃赤坂線),フツウ,Local(Mino-Akasaka Line),慢车(美浓赤坂线),보통(미노아카사카 지선),#F68B1E,0,1,0,,COMPLETE
-0,150,普通(本山支線),フツウ,Local(Motoyama Branch Line),慢车(本山支线),보통(모토야마 지선),#695FAA,0,1,0,小野田線,COMPLETE
-0,151,あきがわ号,アキガワゴウ,Akigawa,秋川号,아키가와호,#F15A22,0,2,0,,COMPLETE
-0,152,普通,フツウ,Local,慢车,보통,#1F63C6,1,0,0,上り系統,PARTIAL
-0,153,普通,フツウ,Local,慢车,보통,#1F63C6,2,0,0,下り系統,PARTIAL
-0,154,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,1,自動選択用,COMPLETE
-0,155,区間快速エアポート,クカンカイソクエアポート,Semi Rapid Airport,区域快车机场号,구간쾌속에어포트,#33ff33,0,2,0,,COMPLETE
-0,156,快速エアポート,カイソクエアポート,Rapid Airport,快车机场号,쾌속에어포트,#FF6600,0,2,0,,COMPLETE
-0,157,特別快速エアポート,トクベツカイソクエアポート,Special Rapid Airport,特别快车机场号,특별쾌속에어포트,#FF3300,0,2,0,,COMPLETE
-0,158,快速サンポート,カイソクサンポート,Rapid Sunport,快车太陽港号,쾌속선포트,#F39800,0,2,0,,PARTIAL
-0,159,普通(桜島方面),フツウ,Local(For Sakurajima),慢车,보통,#1F63C6,0,1,0,,COMPLETE
-0,160,快速きたみ,カイソクキタミ,Rapid Kitami,快车北见,쾌속니시기타미,#FF6600,0,2,0,,COMPLETE
-0,161,特別快速大雪,トクベツカイソクタイセツ,Special Rapid Taisetsu,特别快车大雪,특별쾌속타이세츠,#FF3300,0,2,0,,COMPLETE
-0,162,エキスポライナー,エキスポライナー,Expo Liner,世博会Liner,박람회 라이너,#0000ff,0,2,0,,COMPLETE
-0,200,踊り子(池袋〜伊豆急下田),オドリコ,Odoriko(Ikebukuro to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
-0,201,踊り子(東京〜伊豆急下田),オドリコ,Odoriko(Tokyo to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
-0,202,踊り子(池袋〜修善寺),オドリコ,Odoriko(Ikebukuro to Shuzenji),踊子,무희,#035D67,0,4,0,,COMPLETE
-0,203,踊り子(東京〜修善寺),オドリコ,Odoriko(Tokyo to Shuzenji),踊子,무희,#035D67,0,4,0,,COMPLETE
-0,204,ひたち,ヒタチ,Hitachi,常陆,히타치,#035D67,0,4,0,,COMPLETE
-0,205,ときわ,トキワ,Tokiwa,常轮,토키와,#035D67,0,4,0,,COMPLETE
-0,206,北斗,ホクト,Hokuto,北斗,북두,#0072BC,0,4,0,,COMPLETE
-0,207,すずらん,スズラン,Suzuran,铃兰,은방울꽃,#0072BC,0,4,0,,COMPLETE
-0,208,ソニック,ソニック,Sonic,索尼克,소닉,#0095D9,0,4,0,,COMPLETE
-0,209,かいじ,カイジ,Kaiji,甲斐路,가이지,#0074BE,0,4,0,,COMPLETE
-0,210,あずさ,アズサ,Azusa,梓,아즈사,#0074BE,0,4,0,,COMPLETE
-0,211,サンライズ瀬戸,サンライズセト,Sunrise Seto,日出濑户,선라이즈 세토,#AA8D01,0,4,0,,COMPLETE
-0,212,サンライズ出雲,サンライズイズモ,Sunrise Izumo,日出出云,선라이즈 이즈모,#AA8D01,0,4,0,,COMPLETE
-0,213,サロベツ,サロベツ,Sarobetsu,佐呂別,살로베츠,#2CB431,0,4,0,,COMPLETE
-0,214,ライラック,ライラック,Lilac,丁香,라일락,#2CB431,0,4,0,,COMPLETE
-0,215,カムイ,カムイ,Kamui,神威,카무이,#2CB431,0,4,0,,COMPLETE
-0,216,宗谷,ソウヤ,Sōya,宗谷,소야,#2CB432,1,4,0,上り,COMPLETE
-0,217,宗谷,ソウヤ,Sōya,宗谷,소야,#2CB432,2,4,0,下り,COMPLETE
-0,218,オホーツク,オホーツク,Okhotsk,鄂霍次克,오호츠크,#2CB431,0,4,0,,COMPLETE
-0,219,大雪,タイセツ,Taisetsu,大雪,타이세츠,#2CB431,0,4,0,,COMPLETE
-0,220,南風,ナンプウ,Nanpū,南风,남풍,#E25885,0,4,0,,COMPLETE
-0,221,うずしお,ウズシオ,Uzushio,涡潮,우즈시오,#1CADCA,0,4,0,,COMPLETE
-0,222,こうのとり,コウノトリ,Kounotori,东方白鹳,고노토리,#FFCC00,0,4,0,,COMPLETE
-0,223,サンダーバード,サンダーバード,Thunderbird,雷鸟,선더버드,#0072BA,0,4,0,,COMPLETE
-0,224,ひだ(大阪〜富山),ヒダ,Hida(Osaka to Toyama),飞驒,히다,#F77321,0,4,0,,COMPLETE
-0,225,ひだ(名古屋発着),ヒダ,Hida(Nagoya to Toyama),飞驒,히다,#F77321,0,4,0,,COMPLETE
-0,226,富士回遊,フジカイユウ,FUJI EXCURSION,富士回游,후지카이유,#7B68EE,0,4,0,中央線-富士急行直通用,COMPLETE
-0,227,はちおうじ,ハチオウジ,Hachioji,八王子,하치오지,#F15A22,0,4,0,,COMPLETE
-0,228,おうめ,オウメ,Ome,青梅,오메,#F15A22,0,4,0,,COMPLETE
-0,229,しなの,シナノ,Shinano,信浓,시나노,#D56A29,0,4,0,,COMPLETE
-0,230,成田エクスプレス,ナリタエクスプレス,Narita Express,成田特快,나리타 익스프레스,#FF3333,0,4,0,,COMPLETE
-0,231,リレーかもめ,リレーカモメ,Relay KAMOME,接力海鸥,릴레이 카모메,#E10018,0,4,0,,COMPLETE
-0,232,あかぎ,アカギ,Akagi,赤城,아카기,#008000,0,4,0,,COMPLETE
-0,233,草津・四万,クサツ・シマ,Kusatsu/Shima,草津・四万,구사쓰・시마,#008000,0,4,0,,COMPLETE
-0,234,湘南(新宿発着),ショウナン,Shōnan(for Shinjuku or Odawara),湘南,쇼난,#F68B1E,0,4,0,,COMPLETE
-0,235,湘南(東京発着),ショウナン,Shōnan(for Tokyo or Odawara),湘南,쇼난,#F68B1E,0,4,0,,COMPLETE
-0,236,"SLぐんま
+,1,のぞみ,ノゾミ,Nozomi,希望,노조미,#FFD400,0,4,0,,COMPLETE
+,2,ひかり,ヒカリ,Hikari,光,히카리,#FF0000,0,4,0,,COMPLETE
+,3,こだま,コダマ,Kodama,回声,고다마,#3050FF,0,4,0,,COMPLETE
+,4,みずほ,ミズホ,Mizuho,瑞穗,미즈호,#FFA500,0,4,0,,COMPLETE
+,5,さくら,サクラ,Sakura,樱,사쿠라,#FF69B4,0,4,0,,COMPLETE
+,6,つばめ,ツバメ,Tsubame,燕,쓰바메,#40E0D0,0,4,0,,COMPLETE
+,7,はやぶさ,ハヤブサ,Hayabusa,隼,하야부사,#008000,0,4,0,,COMPLETE
+,8,はやて,ハヤテ,Hayate,疾风,하야테,#008000,0,4,0,,COMPLETE
+,9,やまびこ,ヤマビコ,Yamabiko,山彦,야마비코,#008001,0,4,0,,COMPLETE
+,10,なすの,ナスノ,Nasuno,那须野,나스노,#008002,0,4,0,,COMPLETE
+,11,こまち,コマチ,Komachi,小町,고마치,#FF0080,0,4,0,,COMPLETE
+,12,つばさ,ツバサ,Tsubasa,翼,쓰바사,#FF8000,0,4,0,,COMPLETE
+,13,とき,トキ,Toki,朱鹭,도키,#008000,0,4,0,,COMPLETE
+,14,たにがわ,タニガワ,Tanigawa,谷川,다니가와,#0000FF,0,4,0,,COMPLETE
+,15,かがやき,カガヤキ,Kagayaki,光辉,가가야키,#FFD400,0,4,0,,COMPLETE
+,16,はくたか,ハクタカ,Hakutaka,白鹰,하쿠타카,#FF0000,0,4,0,,COMPLETE
+,17,あさま,アサマ,Asama,浅间,아사마,#0000FF,0,4,0,,COMPLETE
+,18,つるぎ,ツルギ,Tsurugi,剑,쓰루기,#3050FF,0,4,0,,COMPLETE
+,19,かもめ,カモメ,KAMOME,海鸥,카모메,#E10017,0,4,0,,COMPLETE
+,100,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,,PARTIAL
+,101,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,,PARTIAL
+,102,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,,PARTIAL
+,103,特別快速,トクベツカイソク,Special Rapid,特别快车,특별쾌속,#DC143C,0,2,0,,COMPLETE
+,104,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#DC143C,0,2,0,,COMPLETE
+,105,快速(赤),カイソク(アカ),Rapid(Red),快车,쾌속,#FF0000,0,2,0,,NOT
+,106,快速(緑),カイソク(ミドリ),Rapid(Green),快车,쾌속,#00FF00,0,2,0,,NOT
+,107,ホームライナー,ホームライナー,Home Liner,家用班轮,홈 라이너,#DC143C,0,2,0,,NOT
+,108,区間快速,クカンカイソク,Regional Rapid,区域快车,구간쾌속,#DC143C,0,2,0,,PARTIAL
+,109,快速みえ,カイソクミエ,Rapid Mie,快速三重,쾌속미에,#DC143C,0,2,0,,COMPLETE
+,110,新快速,シンカイソク,Special Rapid,新快速,새쾌속,#0071BE,0,2,0,JR西日本用,COMPLETE
+,111,直通快速,チョクツウカイソク,Direct Rapid,直接快速,직통쾌속,#F5A200,0,2,0,,COMPLETE
+,112,B快速,Bカイソク,B Rapid,B快速,B쾌속,#0071BE,0,2,0,,COMPLETE
+,113,おくたま号,オクタマゴウ,Okutama,奧多摩号,오쿠타마호,#F15A22,0,2,0,,COMPLETE
+,114,大和路快速,ヤマトジカイソク,Yamatoji Rapid,大和路快速,야마토지 쾌속,#02AD73,0,2,0,,COMPLETE
+,115,丹波路快速,タンバジカイソク,Tambaji Rapid,坦巴路快速,단바로 쾌속,#FEC210,0,2,0,,COMPLETE
+,116,みやこ路快速,ミヤコジカイソク,Miyakoji Rapid,都路快速,미야코지 쾌속,#FEC210,0,2,0,,COMPLETE
+,117,関空快速,カンクウカイソク,Kansai Airport Rapid,关空快速,간쿠 쾌속,#007AC2,0,2,0,,COMPLETE
+,118,紀州路快速,キシュウジカイソク,Kishūji Rapid,紀州路快速,기슈로 쾌속,#FD7E00,0,2,0,,COMPLETE
+,119,青梅特快,オウメトッカイ,Ōme Special Rapid,青梅特快,오메특쾌,#F15A22,0,2,0,,COMPLETE
+,120,中央特快,チュウオウトッカイ,Chūō Special Rapid,中央特快,중앙특쾌,#F15A23,0,2,0,,COMPLETE
+,121,通勤特快,ツウキントッカイ,Commuter Special Rapid,通勤特快,통근특쾌,#F15A24,0,2,0,,COMPLETE
+,122,サンライナー,サンライナー,Sun Liner,Sun Liner,산 라이너,#DC143C,0,2,0,,COMPLETE
+,123,マリンライナー,マリンライナー,Marine Liner,Marine Liner,마린라이나,#DC143C,0,2,0,,COMPLETE
+,124,快速ことぶき,カイソクコトブキ,Rapid Kotobuki,快速寿,쾌속 축수,#DC143C,0,2,0,,NOT
+,125,シティライナー,シティライナー,City Liner,City Liner,시티 라이너,#DC143C,0,2,0,,NOT
+,126,通勤ライナー,ツウキンライナー,Commuter Liner,通勤Liner,통근 라이너,#DC143C,0,2,0,,NOT
+,127,安芸路ライナー,アキジライナー,Akiji Liner,安藝路Liner,아키로 라이너,#DC143C,0,2,0,,NOT
+,128,みよしライナー,ミヨシライナー,Miyoshi Liner,三吉Liner,미요시 라이너,#DC143C,0,2,0,,NOT
+,129,とっとりライナー,トットリライナー,Tottori Liner,鳥取Liner,돗토리 라이너,#DC143C,0,2,0,,NOT
+,130,アクアライナー,アクアライナー,Aqua Liner,Aqua Liner,아쿠아 라이너,#DC143C,0,2,0,,NOT
+,131,快速(青),カイソク（アオ）,Rapid(Blue),快车,쾌속,#0000FF,0,2,0,,NOT
+,132,各駅停車(南武支線),カクエキテイシャ,Local(Nambu Branch Line),每站停车(南埠支线),각역정차(난부 지선),#FFD400,0,1,0,,COMPLETE
+,133,普通(成田空港方面),フツウ,Local(for Narita Airport),慢车(成田机场),보통(나리타 공항),#00B261,0,1,0,,COMPLETE
+,134,区間快速(加茂方面),クカンカイソク,Regional Rapid(for Kamo),区域快速,구간쾌속,#02AD73,0,2,0,,COMPLETE
+,135,区間快速(和歌山方面),クカンカイソク,Regional Rapid(for Wakayama),区域快速,구간쾌속,#F89C1C,0,2,0,,COMPLETE
+,136,直通快速(和歌山方面),チョクツウカイソク,Direct Rapid(for Wakayama),直接快速,직통쾌속,#F89C1C,0,2,0,,COMPLETE
+,137,直通快速(関西空港方面),チョクツウカイソク,Direct Rapid(for Kansai Airport),直接快速,직통쾌속,#007AC2,0,2,0,,COMPLETE
+,138,新快速,シンカイソク,New Rapid,新快速,신쾌속,#FF4500,0,2,0,JR東海用,COMPLETE
+,139,普通(辰野支線),フツウ,Local(Tatsuno Branch Line),慢车(辰野支线),보통(다쓰노 지선),#0074BE,0,1,0,,COMPLETE
+,140,普通(我孫子支線),フツウ,Local(Abiko Branch Line),慢车(我孫子支线),보통(아비코 지선),#00B261,0,1,0,,COMPLETE
+,141,普通(利府支線),フツウ,Local(Rifu Branch Line),慢车(利府线),보통(리후선),#3CB371,0,1,0,,COMPLETE
+,142,普通(長与経由),フツウ,Local(Nagayo Branch Line),慢车(长与支线),보통(나가요 경로),#FAAF18,0,1,0,,COMPLETE
+,143,普通(新千歳空港方面),フツウ,Local(for New Chitose Airport),慢车,보통,#00B2EB,0,1,0,,COMPLETE
+,144,普通(砂原線経由),フツウ,Local(Sawara Branch Line),慢车(砂原支线),보통(사와라 지선),#0072BC,0,1,0,,COMPLETE
+,145,普通(室蘭方面),フツウ,Local(for Muroran),慢车,보통,#2CB431,0,1,0,,COMPLETE
+,146,シーサイドライナー,シーサイドライナー,Sea Side Liner,滨海快线,바다 사이드 라이너,#0095D9,0,2,0,,COMPLETE
+,147,エアポート,エアポート,Airport,机场号,에어포트,#FF0080,0,2,0,,COMPLETE
+,148,ニセコライナー,ニセコライナー,Niseko Liner,二世谷快车,니세코라이너,#0098E1,0,2,0,,COMPLETE
+,149,普通(美濃赤坂線),フツウ,Local(Mino-Akasaka Line),慢车(美浓赤坂线),보통(미노아카사카 지선),#F68B1E,0,1,0,,COMPLETE
+,150,普通(本山支線),フツウ,Local(Motoyama Branch Line),慢车(本山支线),보통(모토야마 지선),#695FAA,0,1,0,小野田線,COMPLETE
+,151,あきがわ号,アキガワゴウ,Akigawa,秋川号,아키가와호,#F15A22,0,2,0,,COMPLETE
+,152,普通,フツウ,Local,慢车,보통,#1F63C6,1,0,0,上り系統,PARTIAL
+,153,普通,フツウ,Local,慢车,보통,#1F63C6,2,0,0,下り系統,PARTIAL
+,154,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,1,自動選択用,COMPLETE
+,155,区間快速エアポート,クカンカイソクエアポート,Semi Rapid Airport,区域快车机场号,구간쾌속에어포트,#33ff33,0,2,0,,COMPLETE
+,156,快速エアポート,カイソクエアポート,Rapid Airport,快车机场号,쾌속에어포트,#FF6600,0,2,0,,COMPLETE
+,157,特別快速エアポート,トクベツカイソクエアポート,Special Rapid Airport,特别快车机场号,특별쾌속에어포트,#FF3300,0,2,0,,COMPLETE
+,158,快速サンポート,カイソクサンポート,Rapid Sunport,快车太陽港号,쾌속선포트,#F39800,0,2,0,,PARTIAL
+,159,普通(桜島方面),フツウ,Local(For Sakurajima),慢车,보통,#1F63C6,0,1,0,,COMPLETE
+,160,快速きたみ,カイソクキタミ,Rapid Kitami,快车北见,쾌속니시기타미,#FF6600,0,2,0,,COMPLETE
+,161,特別快速大雪,トクベツカイソクタイセツ,Special Rapid Taisetsu,特别快车大雪,특별쾌속타이세츠,#FF3300,0,2,0,,COMPLETE
+,162,エキスポライナー,エキスポライナー,Expo Liner,世博会Liner,박람회 라이너,#0000ff,0,2,0,,COMPLETE
+,200,踊り子(池袋〜伊豆急下田),オドリコ,Odoriko(Ikebukuro to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
+,201,踊り子(東京〜伊豆急下田),オドリコ,Odoriko(Tokyo to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
+,202,踊り子(池袋〜修善寺),オドリコ,Odoriko(Ikebukuro to Shuzenji),踊子,무희,#035D67,0,4,0,,COMPLETE
+,203,踊り子(東京〜修善寺),オドリコ,Odoriko(Tokyo to Shuzenji),踊子,무희,#035D67,0,4,0,,COMPLETE
+,204,ひたち,ヒタチ,Hitachi,常陆,히타치,#035D67,0,4,0,,COMPLETE
+,205,ときわ,トキワ,Tokiwa,常轮,토키와,#035D67,0,4,0,,COMPLETE
+,206,北斗,ホクト,Hokuto,北斗,북두,#0072BC,0,4,0,,COMPLETE
+,207,すずらん,スズラン,Suzuran,铃兰,은방울꽃,#0072BC,0,4,0,,COMPLETE
+,208,ソニック,ソニック,Sonic,索尼克,소닉,#0095D9,0,4,0,,COMPLETE
+,209,かいじ,カイジ,Kaiji,甲斐路,가이지,#0074BE,0,4,0,,COMPLETE
+,210,あずさ,アズサ,Azusa,梓,아즈사,#0074BE,0,4,0,,COMPLETE
+,211,サンライズ瀬戸,サンライズセト,Sunrise Seto,日出濑户,선라이즈 세토,#AA8D01,0,4,0,,COMPLETE
+,212,サンライズ出雲,サンライズイズモ,Sunrise Izumo,日出出云,선라이즈 이즈모,#AA8D01,0,4,0,,COMPLETE
+,213,サロベツ,サロベツ,Sarobetsu,佐呂別,살로베츠,#2CB431,0,4,0,,COMPLETE
+,214,ライラック,ライラック,Lilac,丁香,라일락,#2CB431,0,4,0,,COMPLETE
+,215,カムイ,カムイ,Kamui,神威,카무이,#2CB431,0,4,0,,COMPLETE
+,216,宗谷,ソウヤ,Sōya,宗谷,소야,#2CB432,1,4,0,上り,COMPLETE
+,217,宗谷,ソウヤ,Sōya,宗谷,소야,#2CB432,2,4,0,下り,COMPLETE
+,218,オホーツク,オホーツク,Okhotsk,鄂霍次克,오호츠크,#2CB431,0,4,0,,COMPLETE
+,219,大雪,タイセツ,Taisetsu,大雪,타이세츠,#2CB431,0,4,0,,COMPLETE
+,220,南風,ナンプウ,Nanpū,南风,남풍,#E25885,0,4,0,,COMPLETE
+,221,うずしお,ウズシオ,Uzushio,涡潮,우즈시오,#1CADCA,0,4,0,,COMPLETE
+,222,こうのとり,コウノトリ,Kounotori,东方白鹳,고노토리,#FFCC00,0,4,0,,COMPLETE
+,223,サンダーバード,サンダーバード,Thunderbird,雷鸟,선더버드,#0072BA,0,4,0,,COMPLETE
+,224,ひだ(大阪〜富山),ヒダ,Hida(Osaka to Toyama),飞驒,히다,#F77321,0,4,0,,COMPLETE
+,225,ひだ(名古屋発着),ヒダ,Hida(Nagoya to Toyama),飞驒,히다,#F77321,0,4,0,,COMPLETE
+,226,富士回遊,フジカイユウ,FUJI EXCURSION,富士回游,후지카이유,#7B68EE,0,4,0,中央線-富士急行直通用,COMPLETE
+,227,はちおうじ,ハチオウジ,Hachioji,八王子,하치오지,#F15A22,0,4,0,,COMPLETE
+,228,おうめ,オウメ,Ome,青梅,오메,#F15A22,0,4,0,,COMPLETE
+,229,しなの,シナノ,Shinano,信浓,시나노,#D56A29,0,4,0,,COMPLETE
+,230,成田エクスプレス,ナリタエクスプレス,Narita Express,成田特快,나리타 익스프레스,#FF3333,0,4,0,,COMPLETE
+,231,リレーかもめ,リレーカモメ,Relay KAMOME,接力海鸥,릴레이 카모메,#E10018,0,4,0,,COMPLETE
+,232,あかぎ,アカギ,Akagi,赤城,아카기,#008000,0,4,0,,COMPLETE
+,233,草津・四万,クサツ・シマ,Kusatsu/Shima,草津・四万,구사쓰・시마,#008000,0,4,0,,COMPLETE
+,234,湘南(新宿発着),ショウナン,Shōnan(for Shinjuku or Odawara),湘南,쇼난,#F68B1E,0,4,0,,COMPLETE
+,235,湘南(東京発着),ショウナン,Shōnan(for Tokyo or Odawara),湘南,쇼난,#F68B1E,0,4,0,,COMPLETE
+,236,"SLぐんま
 みなかみ",SLグンマ ミナカミ,"SL Gunma
 Minakami","SL群马
 水上","SL군마
 미나카미",#0D0C09,0,2,0,,COMPLETE
-0,237,"SLぐんま
+,237,"SLぐんま
 よこかわ",SLグンマ ヨコカワ,"SL Gunma
 Yokokawa","SL群马
 横川","SL군마
 요코카와",#0D0C09,0,2,0,,COMPLETE
-0,238,やくも,ヤクモ,Yakumo,八雲,야쿠모,#bb5535,0,4,0,,COMPLETE
-0,239,スーパーまつかぜ,スーパーマツカゼ,Super Matsukaze,超松風,슈퍼마츠카제,#f8b500,0,4,0,,COMPLETE
-0,240,スーパーおき,スーパーオキ,Super Oki,超隱岐,슈퍼오키,#f8b500,0,4,0,,COMPLETE
-0,241,しまんと,シマント,Shimanto,四萬十,시만토,#E25885,0,4,0,,COMPLETE
-0,242,あしずり,アシズリ,Ashizuri,足折,아시즈리,#E25885,0,4,0,,COMPLETE
-0,243,しおかぜ,シオカゼ,Shiokaze,海風,바닷바람,#1CADCA,0,4,0,,COMPLETE
-0,244,いしづち,イシヅチ,Ishizuchi,石鎚,석진,#1CADCA,0,4,0,,COMPLETE
-0,245,おおぞら,オオゾラ,Ōzora,大空,큰 하늘,#2CB431,0,4,0,,COMPLETE
-0,246,とかち,トカチ,Tokachi,十勝,도카치,#2CB431,0,4,0,,COMPLETE
-0,247,きのさき,キノサキ,Kinosaki,城崎,시로사키,#800080,0,4,0,,COMPLETE
-0,248,はしだて,ハシダテ,Hashidate,橋立,하시다테,#ff0000,0,4,0,,COMPLETE
-0,249,まいづる,マイヅル,Maizuru,舞鶴,마이즈루,#ff8c00,0,4,0,,COMPLETE
-0,250,しらさぎ,シラサギ,Shirasagi,白鷺,백로,#f0e68c,0,4,0,,COMPLETE
-0,251,くろしお,クロシオ,Kuroshio,黑潮,구로시오,#40e0d0,0,4,0,,COMPLETE
-0,252,はるか,ハルカ,Haruka,遙,하루카,#00008b,0,4,0,,COMPLETE
-0,253,スーパーはくと,スーパーハクト,Super Hakuto,超級白兔,슈퍼 하쿠토,#0000ff,0,4,0,,COMPLETE
-0,254,スーパーいなば,スーパーイナバ,Super Inaba,超級因幡,슈퍼 요시만,#7cfc00,0,4,0,,COMPLETE
-0,255,宇和海,ウワカイ,Uwakai,宇和海,우와해,#00bfff,0,4,0,,COMPLETE
-0,256,剣山,ツルギサン,Tsurugisan,劍山,검산,#00008b,0,4,0,,COMPLETE
-0,257,むろと,ムロト,Muroto,室戶,무로토,#00bfff,0,4,0,,COMPLETE
-0,258,みどり,ミドリ,Midori,綠,미도리의,#008000,0,4,0,,COMPLETE
-0,259,ハウステンボス,ハウステンボス,Huis Ten Bosch,豪斯登堡,하우스텐보스,#ff8c00,0,4,0,,COMPLETE
-0,260,かささぎ,カササギ,Kasasagi,喜鵲,가사기,#dc143c,0,4,0,,COMPLETE
-0,261,きらめき,キラメキ,Kirameki,閃耀,반짝임,#ff0000,0,4,0,,COMPLETE
-0,262,にちりん,ニチリン,Nichirin,日輪,일륜,#ffa500,0,4,0,,COMPLETE
-0,263,にちりんシーガイア,ニチリンシーガイア,Nichirin Sea Gaia,日輪喜凱亞,일륜 시가이아,#ffa500,0,4,0,,COMPLETE
-0,264,ひゅうが,ヒュウガ,Hyuga,日向,휴가,#ff0000,0,4,0,,COMPLETE
-0,265,きりしま,キリシマ,Kirishima,霧島,기리시마,#006400,0,4,0,,COMPLETE
-0,266,かいおう,カイオウ,Kaiō,魁皇,카이오,#8b0000,0,4,0,,COMPLETE
-0,267,ゆふ,ユフ,Yufu,由布,유후,#ffff00,0,4,0,,COMPLETE
-0,268,ゆふいんの森,ユフインノモリ,Yufuin no Mori,由布院之森,유후인노모리,#228b22,0,4,0,,COMPLETE
-0,269,有明,アリアケ,Ariake,有明,아리아케,#daa520,0,4,0,,COMPLETE
-0,270,九州横断特急,キュウシュウオウダントッキュウ,Trans-Kyushu Limited Express,九州橫斷特急,규슈 횡단 특급,#dc143c,0,4,0,,COMPLETE
-0,271,南紀,ナンキ,Nanki,南紀,난키,#00bfff,0,4,0,,COMPLETE
-0,272,伊那路,イナジ,Inaji,伊那路,이나로,#228b22,0,4,0,,COMPLETE
-0,273,東海,トウカイ,Tōkai,東海,도카이,#ff8c00,0,4,0,,COMPLETE
-0,274,ふじかわ,フジカワ,Fujikawa,富士川,후지카와,#90ee90,0,4,0,,COMPLETE
-0,275,わかしお,ワカシオ,Wakashio,若潮,와카시오,#ff0000,0,4,0,,COMPLETE
-0,276,新宿わかしお,シンジュクワカシオ,Shinjuku Wakashio,新宿若潮,신주쿠와카시오의,#ff0000,0,4,0,,COMPLETE
-0,277,さざなみ,サザナミ,Sazanami,细波,사자나미,#00bfff,0,4,0,,COMPLETE
-0,278,新宿さざなみ,シンジュクサザナミ,Shinjuku Sazanami,新宿细波,신주쿠사자나미,#00bfff,0,4,0,,COMPLETE
-0,279,しおさい,シオサイ,Shiosai,潮骚,시오사이,#ffff00,0,4,0,,COMPLETE
-0,280,あやめ,アヤメ,Ayame,菖蒲,아야메,#ffd700,0,4,0,,COMPLETE
-0,281,つがる,ツガル,Tsugaru,津輕,쓰가루,#ff0000,0,4,0,,COMPLETE
-0,282,いなほ,イナホ,Inaho,稻穗,이나호,#ffa500,0,4,0,,COMPLETE
-0,283,北越,ホクエツ,Hokuetsu,北越,호쿠코시,#00ffff,0,4,0,,COMPLETE
-0,284,しらゆき,シラユキ,Shirayuki,白雪,백설,#800080,0,4,0,,COMPLETE
-0,285,ダイナスター,ダイナスター,Dinostar,恐龍星,다이노스타,#191970,0,4,0,,COMPLETE
-0,286,能登かがり火,ノトカガリビ,Noto Kagaribi,能登篝火,노토 카오리 불,#dc143c,0,4,0,,COMPLETE
-0,287,サフィール踊り子,サフィールオドリコ,Saphir Odoriko,蓝宝石踊子,사필 무희,#035D67,0,4,0,,COMPLETE
-0,288,はまかぜ,ハマカゼ,Hamakaze,濱風,하마카제,#b22222,0,4,0,,COMPLETE
-0,289,らくラクはりま,ラクラクハリマ,Rakuraku Harima,简单播磨,라쿠 라쿠 하리마,#00bfff,0,4,0,,COMPLETE
-0,290,らくラクびわこ,ラクラクビワコ,Rakuraku Biwako,简单琵琶湖,라쿠 라쿠 비와코,#0000ff,0,4,0,,COMPLETE
-0,291,らくラクやまと,ラクラクヤマト,Rakuraku Yamato,简单大和,라쿠 라쿠 야마토,#90ee90,0,4,0,,COMPLETE
-0,292,まほろば,マホロバ,Mahoroba,真秀场,마호로바,#008000,0,4,0,,COMPLETE
-0,293,信州,シンシュウ,Shinshu,信州,신슈,#800080,0,4,0,,COMPLETE
-0,294,ニセコ,ニセコ,Niseko,二世谷,니세코,#0098E1,0,4,0,,COMPLETE
-0,295,フラノラベンダーエクスプレス,フラノラベンダーエクスプレス,Furano Lavender Express,富良野薰衣草特快,푸라노 라벤더 익스프레스,#da70d6,0,4,0,,COMPLETE
-0,296,鎌倉,カマクラ,Kamakura,镰仓,가마쿠라,#00008b,0,4,0,,COMPLETE
-0,297,いにしへ,イニシヘ,Inishihe,在过去,어서,#8b0000,0,4,0,,COMPLETE
-0,300,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,廃止済み 100に移行,NOT
-0,301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,廃止済み 101に移行,NOT
-0,302,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,廃止済み 102に移行,NOT
-0,303,区間急行,クカンキュウコウ,Semi Express,区域特快,구간급행,#D8CA00,0,3,0,,PARTIAL
-0,304,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,,PARTIAL
-0,306,特急,トッキュウ,Limited Express,特快,특급,#DC143C,0,4,0,,COMPLETE
-0,307,エアポート快特,エアポートカイトク,Airport Limited Express,机场特快,공항쾌특,#FA9715,0,3,0,,COMPLETE
-0,308,快特(泉岳寺〜三崎口),カイトク,Limited Express(Sengakuji to Misakiguchi),特快,쾌특,#379412,0,3,0,,COMPLETE
-0,309,快特(泉岳寺〜羽田空港),カイトク,Limited Express(Sengakuji to Haneda Airport),特快,쾌특,#379412,0,3,0,,COMPLETE
-0,310,急行(泉岳寺〜羽田空港),キュウコウ,Express(Haneda Airport to Sengakuji),特快,급행,#0D83C3,0,3,0,,COMPLETE
-0,311,急行(逗子・葉山〜羽田空港),キュウコウ,Express(Haneda Airport to Zushi･Hayama),特快,급행,#0D83C3,0,3,0,,COMPLETE
-0,312,特急(泉岳寺〜三崎口),トッキュウ,Limited Express(Sengakuji to Misakiguchi),特快,특급,#EA0104,0,3,0,,COMPLETE
-0,313,特急(泉岳寺〜浦賀),トッキュウ,Limited Express(Sengakuji to Uraga),特快,특급,#EA0104,0,3,0,,PARTIAL
-0,314,通勤急行,ツウキンキュウコウ,Commuter Express,通勤快车,통근급행,#EEAA66,0,3,0,,PARTIAL
-0,315,準急,ジュンキュウ,Semi Express,准急,준급,#2EAB8D,0,3,0,,PARTIAL
-0,316,S-TRAIN(平日運行),エストレイン,S-TRAIN(Weekday),S-TRAIN,S-TRAIN,#8EC21F,0,2,0,,COMPLETE
-0,317,通勤特急,ツウキントッキュウ,Commuter Express,通勤特快,통근특급,#DC143C,0,4,0,,PARTIAL
-0,318,区間準急,クカンジュンキュウ,Section Semi Express,区间准急,구간준급,#00FF00,0,3,0,,PARTIAL
-0,319,区間急行,クカンキュウコウ,Section Express,区间快速,구간급행,#FF99FF,0,3,0,,PARTIAL
-0,320,空港快速,クウコウカイソク,Haneda Express,机场快速,공항쾌속,#DC143C,0,2,0,,COMPLETE
-0,321,区間快速,クカンカイソク,Rapid,区间快速,구간쾌속,#FFAE00,0,2,0,,COMPLETE
-0,322,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,(小田原〜新宿),COMPLETE
-0,323,通勤準急,ツウキンジュンキュウ,Commuter Semi Express,通勤准急,통근준급,#00B66B,0,3,0,,COMPLETE
-0,324,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,(唐木田〜新宿),COMPLETE
-0,325,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,(片瀬江ノ島〜新宿),COMPLETE
-0,326,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,(小田原〜新宿),COMPLETE
-0,327,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,(唐木田〜新宿),COMPLETE
-0,328,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,(片瀬江ノ島〜新宿),COMPLETE
-0,330,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,小田急用,COMPLETE
-0,331,快速特急,カイソクトッキュウ,Limited Express,快速特快,쾌속특쾌,#049C5E,0,4,0,,COMPLETE
-0,332,アクセス特急,アクセストッキュウ,Access Express,访问特快,액세스 특급,#ED7D00,0,4,1,,PARTIAL
-0,333,準急,ジュンキュウ,Semi-Express,准急,준급,#2A9B50,0,3,0,堺筋準急,PARTIAL
-0,334,直通特急,チョクツウトッキュウ,Limited Express,直通特急,직통특급,#DD2E1E,0,4,0,山陽電車,COMPLETE
-0,335,区間快速,クカンカイソク,Semi Rapid,区间快速,구간쾌속,#000084,0,2,0,TX用,COMPLETE
-0,336,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#FFA500,0,2,0,廃止済み 104に移行,NOT
-0,337,準特急,ジュントッキュウ,Semi-Limited Express,准特急,준특급,#FF6E00,0,4,0,,COMPLETE
-0,338,区間急行,クカンキュウコウ,Sub Express,区间快速,구간급행,#009A41,0,3,0,南海電車用,COMPLETE
-0,339,S-TRAIN(土休日運行),エストレイン,S-TRAIN(Holiday),S-TRAIN,S-TRAIN,#8EC21F,0,2,0,,COMPLETE
-0,340,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#C05EC4,0,3,0,西武用,COMPLETE
-0,341,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#004098,0,3,0,東武用,COMPLETE
-0,342,快速特急,カイソクトッキュウ,Rapid Limited Express,快速特快,쾌속특급,#C51C40,0,4,0,名鉄用,COMPLETE
-0,343,特急,トッキュウ,Limited Express,特快,특급,#E03837,0,4,0,名鉄用,COMPLETE
-0,344,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#034F98,0,3,0,名鉄用,COMPLETE
-0,345,急行,キュウコウ,Express,特快,급행,#00BEFE,0,3,0,名鉄用,COMPLETE
-0,346,準急,ジュンキュウ,Semi Express,准急,준급,#009945,0,3,0,名鉄用,COMPLETE
-0,347,普通,フツウ,Local,慢车,보통,#333333,0,0,0,名鉄用,COMPLETE
-0,348,空港急行,クウコウキュウコウ,Airport Express,机场快速,공항급행,#FF7F27,0,3,0,南海電車用,COMPLETE
-0,349,区間特急,クカントッキュウ,Limited Express,直通特急,구간특급,#A349A4,0,4,0,阪神電車,COMPLETE
-0,350,S特急,エストッキュウ,Limited Express,S特急,S특급,#22B14C,0,4,0,山陽電車,COMPLETE
-0,351,快速急行(新松田より急行),カイソクキュウコウ,Rapid Express(Express from Shin-Matsuda),快速急行,쾌속급행,#F7931D,0,3,0,,COMPLETE
-0,352,急行(新松田より各駅停車),キュウコウ,Express(Local from Shin-Matsuda),特快,급행,#DC143C,0,3,0,,COMPLETE
-0,353,各駅停車(新松田より急行),カクエキテイシャ,Local(Express from Shin-Matsuda),每站停车,각역정차,#1F63C6,0,0,0,,COMPLETE
-0,354,特急,トッキュウ,Special Express,特快,특급,#DC143C,0,4,0,京王線用,COMPLETE
-0,355,普通,フツウ,Local,慢车,보통,#000000,0,0,0,京急京成用,COMPLETE
-0,356,普通(西馬込方面),フツウ,Local(For Nishi-magome),慢车,보통,#000000,0,0,0,都営浅草線用,COMPLETE
-0,357,普通(押上方面),フツウ,Local(For Oshiage),慢车,보통,#000000,0,0,0,都営浅草線用,COMPLETE
-0,358,急行,キュウコウ,Express,特快,급행,#0D83C3,0,3,0,都営浅草線用,COMPLETE
-0,359,快速,カイソク,Rapid,快车,쾌속,#ff69b4,0,2,0,都営浅草線用,COMPLETE
-0,360,通勤特急,ツウキントッキュウ,Commuter Express,通勤特快,통근특급,#00bfff,0,4,0,都営浅草線用,COMPLETE
-0,361,特急(泉岳寺方面),トッキュウ,Limited Express(For Sengakuji),特快,특급,#DC143C,0,4,0,都営浅草線用,COMPLETE
-0,362,特急(押上方面),トッキュウ,Limited Express(For Oshiage),特快,특급,#DC143C,0,4,0,都営浅草線用,COMPLETE
-0,363,快特(泉岳寺方面),カイトク,Limited Express(For Sengakuji),特快,쾌특,#379412,0,3,0,都営浅草線用,COMPLETE
-0,364,快速特急(押上方面),カイソクトッキュウ,Limited Express(For Oshiage),快速特快,쾌속특쾌,#049C5E,0,4,0,都営浅草線用,COMPLETE
-0,365,通勤快急,ツウキンカイキュウ,Commuter Rapid Express,通勤快急,통근쾌급,#C05EC4,0,3,0,,COMPLETE
-0,366,特快速,トッカイソク,Special Rapid Express,特快车,특쾌속,#DC143C,0,3,0,,COMPLETE
-0,367,快速(芝山千代田方面),カイソク,Rapid(For Shibayama-Chiyoda),快车,쾌속,#ff69b4,0,2,0,都営浅草線用,COMPLETE
-0,368,ノンストップ,ノンストップ,Nonstop,马不停蹄,논스톱,#4169e1,0,2,0,,COMPLETE
-0,369,普通(名古屋港方面),フツウ,Local(For Nagoyako),慢车,보통,#1F63C6,0,1,0,,COMPLETE
-0,400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,2,0,,COMPLETE
-0,401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,2,0,,COMPLETE
-0,402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,2,0,,COMPLETE
-0,403,イブニングウィング号,イブニングウィングゴウ,Evening Wing(Shinagawa to Misakiguchi),Evening Wing,이브닝윙호,#379412,2,2,0,,COMPLETE
-0,404,普通(方南町支線),フツウ,Local(Honancho Branch Line),慢车(方南町支线),보통(호난초 지선),#E60012,0,1,0,,COMPLETE
-0,405,拝島ライナー,ハイジマライナー,Haijima Liner,拜岛Liner,하이지마 라이너,#B4C300,0,2,0,,COMPLETE
-0,406,TJライナー(下り),TJライナー,TJ Liner(Ikebukuro to Ogawamachi),TJ Liner,TJ Liner,#FF710A,2,2,0,,COMPLETE
-0,407,TJライナー(上り),TJライナー,TJ Liner(Ogawamachi to Ikebukuro),TJ Liner,TJ Liner,#008CD6,1,2,0,,COMPLETE
-0,408,各駅停車(北埠頭方面),カクエキテイシャ,Local,每站停车,각역정차,#9686BD,0,1,0,ポートアイランド線用,COMPLETE
-0,409,各駅停車(田園都市線経由),カクエキテイシャ,Local,每站停车,각역정차,#1F63C7,0,0,0,大井町線用,COMPLETE
-0,410,泉北ライナー,センボクライナー,Semboku Liner,泉北Liner,센보쿠라이너,#E6B422,0,2,0,,COMPLETE
-0,411,各駅停車(北綾瀬支線),カクエキテイシャ,Local,每站停车,각역정차,#009944,0,1,0,北綾瀬支線,COMPLETE
-0,412,ライナー,ライナー,Liner,Liner,정기선,#DC143C,0,2,0,,COMPLETE
-0,500,りょうもう(浅草〜伊勢崎),リョウモウ,Ryomo(Asakusa to Isesaki),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
-0,501,りょうもう(浅草〜葛生),リョウモウ,Ryomo(Asakusa to Kuzū),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
-0,502,りょうもう(浅草〜赤城),リョウモウ,Ryomo(Asakusa to Akagi),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
-0,503,スカイライナー,スカイライナー,Skyliner,Skyliner,스카이라이너,#0A3788,0,4,0,,COMPLETE
-0,504,小江戸号,コエドゴウ,Koedo,小江户,고에도,#E73042,0,4,0,,COMPLETE
-0,505,川越特急,カワゴエトッキュウ,Kawagoe Limited Express,川越特快,가와고에 특급,#E73799,0,4,0,,COMPLETE
-0,506,サザン,サザン,Southern,南方,남부,#3366CC,0,4,0,,COMPLETE
-0,507,ラピートα,ラピートアルファ,rapi:tα,rapi:tα,라피트α,#0065AF,0,4,0,,COMPLETE
-0,508,ラピートβ,ラピートベータ,rapi:tβ,rapi:tβ,라피트β,#0065AF,0,4,0,,COMPLETE
-0,509,ちちぶ,チチブ,Chichibu,秩父,지치부,#FF6600,0,4,0,,COMPLETE
-0,510,Mt.TAKAO,マウントタカオ,Mt.TAKAO,Mt.TAKAO,Mt.TAKAO,#57A100,0,4,0,,COMPLETE
-0,511,ミュースカイ,ミュースカイ,μ-SKY,μ-SKY,μ-SKY,#FAA902,0,4,0,,COMPLETE
-0,512,ひのとり,ヒノトリ,HINOTORI,HINOTORI,HINOTORI,#AD2320,0,4,0,,COMPLETE
-0,513,こうや,コウヤ,KŌYA,高野,코야,#009A41,0,4,0,,COMPLETE
-0,514,りんかん,リンカン,RINKAN,林间,린칸,#009A42,0,4,0,,COMPLETE
-0,515,はしだて,ハシダテ,Hashidate,桥立,하시다테,#E80000,0,4,0,,COMPLETE
-0,516,スーパーはこね,スーパーハコネ,Super Hakone,超级箱根,슈퍼 하코네,#2288CC,0,4,0,,COMPLETE
-0,517,はこね,ハコネ,Hakone,箱根,하코네,#2288CC,0,4,0,,COMPLETE
-0,518,メトロはこね,メトロハコネ,Metro Hakone,地下铁箱根,메트로 하코네,#2288CC,0,4,0,,COMPLETE
-0,519,THライナー,THライナー,TH Liner,TH Liner,TH Liner,#B50033,0,2,0,,COMPLETE
-0,520,けごん・きぬ,ケゴン・キヌ,Kegon/Kinu,华严・绢,케곤・키누,#00458F,0,4,0,,COMPLETE
-0,521,きぬがわ,キヌガワ,Kinugawa,鬼怒川,기누가와,#378640,0,4,0,,COMPLETE
-0,522,会津,アイヅ,Aizu,会津,아이즈,#009F49,0,4,0,,COMPLETE
-0,523,スペーシアX(7号・8号),スペーシアX(7ゴウ・8ゴウ),SPACIA X(No.7/No.8),SPACIA X(7号/8号),SPACIA X(7호/8호),#221614,0,4,0,,COMPLETE
-0,524,スペーシアX(1号〜6号),スペーシアX(1ゴウ〜6ゴウ),SPACIA X(No.1 through No.6),SPACIA X(1号~6号),SPACIA X(7호~8호),#221614,0,4,0,,COMPLETE
-0,525,日光,ニッコウ,Nikkō,日光,햇빛,#378640,0,4,0,,COMPLETE
-0,526,さがみ,サガミ,Sagami,相模,사가미,#2288CC,0,4,0,,COMPLETE
-0,527,モーニングウェイ,モーニングウェイ,Morning Way,早晨的方式,모닝웨이,#2288CC,0,4,0,,COMPLETE
-0,528,ホームウェイ,ホームウェイ,Home way,回家的路,홈웨이,#2288CC,0,4,0,,COMPLETE
-0,529,メトロモーニングウェイ,メトロモーニングウェイ,Metro Morning Way,地下铁早晨的方式,메트로 모닝웨이,#2288CC,0,4,0,,COMPLETE
-0,530,メトロホームウェイ,メトロホームウェイ,Metro Home way,地下铁回家的路,메트로 홈웨이,#2288CC,0,4,0,,COMPLETE
-0,531,えのしま,エノシマ,Enoshima,江之岛,에노시마,#2288CC,0,4,0,,COMPLETE
-0,532,メトロえのしま,メトロエノシマ,Metro Enoshima,地下铁江之岛,메트로 에노시마,#2288CC,0,4,0,,COMPLETE
-0,533,ふじさん,フジサン,Mt. Fuji,富士山,후지 씨,#2288CC,0,4,0,,COMPLETE
-0,534,スカイツリーライナー,スカイツリーライナー,Skytree Liner,天空树衬里,스카이 트리 라이너,#87ceeb,0,4,0,,COMPLETE
-0,535,むさし,ムサシ,Musashi,武藏,무사시,#FF6600,0,4,0,,COMPLETE
-0,536,ドーム,ドーム,dome,圆顶,돔,#696969,0,4,0,,COMPLETE
-0,537,シティライナー,シティライナー,City Liner,City Liner,시티 라이너,#1e90ff,0,4,0,,COMPLETE
-0,538,モーニングライナー,モーニングライナー,Morning Liner,Morning Liner,모닝 라이너,#9400d3,0,4,0,,COMPLETE
-0,539,イブニングライナー,イブニングライナー,Evening Liner,Evening Liner,이브닝 라이너,#9400d3,0,4,0,,COMPLETE
-0,540,臨時ライナー,リンジライナー,Special Liner,临时Liner,임시 라이너,#add8e6,0,4,0,,COMPLETE
+,238,やくも,ヤクモ,Yakumo,八雲,야쿠모,#bb5535,0,4,0,,COMPLETE
+,239,スーパーまつかぜ,スーパーマツカゼ,Super Matsukaze,超松風,슈퍼마츠카제,#f8b500,0,4,0,,COMPLETE
+,240,スーパーおき,スーパーオキ,Super Oki,超隱岐,슈퍼오키,#f8b500,0,4,0,,COMPLETE
+,241,しまんと,シマント,Shimanto,四萬十,시만토,#E25885,0,4,0,,COMPLETE
+,242,あしずり,アシズリ,Ashizuri,足折,아시즈리,#E25885,0,4,0,,COMPLETE
+,243,しおかぜ,シオカゼ,Shiokaze,海風,바닷바람,#1CADCA,0,4,0,,COMPLETE
+,244,いしづち,イシヅチ,Ishizuchi,石鎚,석진,#1CADCA,0,4,0,,COMPLETE
+,245,おおぞら,オオゾラ,Ōzora,大空,큰 하늘,#2CB431,0,4,0,,COMPLETE
+,246,とかち,トカチ,Tokachi,十勝,도카치,#2CB431,0,4,0,,COMPLETE
+,247,きのさき,キノサキ,Kinosaki,城崎,시로사키,#800080,0,4,0,,COMPLETE
+,248,はしだて,ハシダテ,Hashidate,橋立,하시다테,#ff0000,0,4,0,,COMPLETE
+,249,まいづる,マイヅル,Maizuru,舞鶴,마이즈루,#ff8c00,0,4,0,,COMPLETE
+,250,しらさぎ,シラサギ,Shirasagi,白鷺,백로,#f0e68c,0,4,0,,COMPLETE
+,251,くろしお,クロシオ,Kuroshio,黑潮,구로시오,#40e0d0,0,4,0,,COMPLETE
+,252,はるか,ハルカ,Haruka,遙,하루카,#00008b,0,4,0,,COMPLETE
+,253,スーパーはくと,スーパーハクト,Super Hakuto,超級白兔,슈퍼 하쿠토,#0000ff,0,4,0,,COMPLETE
+,254,スーパーいなば,スーパーイナバ,Super Inaba,超級因幡,슈퍼 요시만,#7cfc00,0,4,0,,COMPLETE
+,255,宇和海,ウワカイ,Uwakai,宇和海,우와해,#00bfff,0,4,0,,COMPLETE
+,256,剣山,ツルギサン,Tsurugisan,劍山,검산,#00008b,0,4,0,,COMPLETE
+,257,むろと,ムロト,Muroto,室戶,무로토,#00bfff,0,4,0,,COMPLETE
+,258,みどり,ミドリ,Midori,綠,미도리의,#008000,0,4,0,,COMPLETE
+,259,ハウステンボス,ハウステンボス,Huis Ten Bosch,豪斯登堡,하우스텐보스,#ff8c00,0,4,0,,COMPLETE
+,260,かささぎ,カササギ,Kasasagi,喜鵲,가사기,#dc143c,0,4,0,,COMPLETE
+,261,きらめき,キラメキ,Kirameki,閃耀,반짝임,#ff0000,0,4,0,,COMPLETE
+,262,にちりん,ニチリン,Nichirin,日輪,일륜,#ffa500,0,4,0,,COMPLETE
+,263,にちりんシーガイア,ニチリンシーガイア,Nichirin Sea Gaia,日輪喜凱亞,일륜 시가이아,#ffa500,0,4,0,,COMPLETE
+,264,ひゅうが,ヒュウガ,Hyuga,日向,휴가,#ff0000,0,4,0,,COMPLETE
+,265,きりしま,キリシマ,Kirishima,霧島,기리시마,#006400,0,4,0,,COMPLETE
+,266,かいおう,カイオウ,Kaiō,魁皇,카이오,#8b0000,0,4,0,,COMPLETE
+,267,ゆふ,ユフ,Yufu,由布,유후,#ffff00,0,4,0,,COMPLETE
+,268,ゆふいんの森,ユフインノモリ,Yufuin no Mori,由布院之森,유후인노모리,#228b22,0,4,0,,COMPLETE
+,269,有明,アリアケ,Ariake,有明,아리아케,#daa520,0,4,0,,COMPLETE
+,270,九州横断特急,キュウシュウオウダントッキュウ,Trans-Kyushu Limited Express,九州橫斷特急,규슈 횡단 특급,#dc143c,0,4,0,,COMPLETE
+,271,南紀,ナンキ,Nanki,南紀,난키,#00bfff,0,4,0,,COMPLETE
+,272,伊那路,イナジ,Inaji,伊那路,이나로,#228b22,0,4,0,,COMPLETE
+,273,東海,トウカイ,Tōkai,東海,도카이,#ff8c00,0,4,0,,COMPLETE
+,274,ふじかわ,フジカワ,Fujikawa,富士川,후지카와,#90ee90,0,4,0,,COMPLETE
+,275,わかしお,ワカシオ,Wakashio,若潮,와카시오,#ff0000,0,4,0,,COMPLETE
+,276,新宿わかしお,シンジュクワカシオ,Shinjuku Wakashio,新宿若潮,신주쿠와카시오의,#ff0000,0,4,0,,COMPLETE
+,277,さざなみ,サザナミ,Sazanami,细波,사자나미,#00bfff,0,4,0,,COMPLETE
+,278,新宿さざなみ,シンジュクサザナミ,Shinjuku Sazanami,新宿细波,신주쿠사자나미,#00bfff,0,4,0,,COMPLETE
+,279,しおさい,シオサイ,Shiosai,潮骚,시오사이,#ffff00,0,4,0,,COMPLETE
+,280,あやめ,アヤメ,Ayame,菖蒲,아야메,#ffd700,0,4,0,,COMPLETE
+,281,つがる,ツガル,Tsugaru,津輕,쓰가루,#ff0000,0,4,0,,COMPLETE
+,282,いなほ,イナホ,Inaho,稻穗,이나호,#ffa500,0,4,0,,COMPLETE
+,283,北越,ホクエツ,Hokuetsu,北越,호쿠코시,#00ffff,0,4,0,,COMPLETE
+,284,しらゆき,シラユキ,Shirayuki,白雪,백설,#800080,0,4,0,,COMPLETE
+,285,ダイナスター,ダイナスター,Dinostar,恐龍星,다이노스타,#191970,0,4,0,,COMPLETE
+,286,能登かがり火,ノトカガリビ,Noto Kagaribi,能登篝火,노토 카오리 불,#dc143c,0,4,0,,COMPLETE
+,287,サフィール踊り子,サフィールオドリコ,Saphir Odoriko,蓝宝石踊子,사필 무희,#035D67,0,4,0,,COMPLETE
+,288,はまかぜ,ハマカゼ,Hamakaze,濱風,하마카제,#b22222,0,4,0,,COMPLETE
+,289,らくラクはりま,ラクラクハリマ,Rakuraku Harima,简单播磨,라쿠 라쿠 하리마,#00bfff,0,4,0,,COMPLETE
+,290,らくラクびわこ,ラクラクビワコ,Rakuraku Biwako,简单琵琶湖,라쿠 라쿠 비와코,#0000ff,0,4,0,,COMPLETE
+,291,らくラクやまと,ラクラクヤマト,Rakuraku Yamato,简单大和,라쿠 라쿠 야마토,#90ee90,0,4,0,,COMPLETE
+,292,まほろば,マホロバ,Mahoroba,真秀场,마호로바,#008000,0,4,0,,COMPLETE
+,293,信州,シンシュウ,Shinshu,信州,신슈,#800080,0,4,0,,COMPLETE
+,294,ニセコ,ニセコ,Niseko,二世谷,니세코,#0098E1,0,4,0,,COMPLETE
+,295,フラノラベンダーエクスプレス,フラノラベンダーエクスプレス,Furano Lavender Express,富良野薰衣草特快,푸라노 라벤더 익스프레스,#da70d6,0,4,0,,COMPLETE
+,296,鎌倉,カマクラ,Kamakura,镰仓,가마쿠라,#00008b,0,4,0,,COMPLETE
+,297,いにしへ,イニシヘ,Inishihe,在过去,어서,#8b0000,0,4,0,,COMPLETE
+,300,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,廃止済み 100に移行,NOT
+,301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,廃止済み 101に移行,NOT
+,302,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,廃止済み 102に移行,NOT
+,303,区間急行,クカンキュウコウ,Semi Express,区域特快,구간급행,#D8CA00,0,3,0,,PARTIAL
+,304,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,,PARTIAL
+,306,特急,トッキュウ,Limited Express,特快,특급,#DC143C,0,4,0,,COMPLETE
+,307,エアポート快特,エアポートカイトク,Airport Limited Express,机场特快,공항쾌특,#FA9715,0,3,0,,COMPLETE
+,308,快特(泉岳寺〜三崎口),カイトク,Limited Express(Sengakuji to Misakiguchi),特快,쾌특,#379412,0,3,0,,COMPLETE
+,309,快特(泉岳寺〜羽田空港),カイトク,Limited Express(Sengakuji to Haneda Airport),特快,쾌특,#379412,0,3,0,,COMPLETE
+,310,急行(泉岳寺〜羽田空港),キュウコウ,Express(Haneda Airport to Sengakuji),特快,급행,#0D83C3,0,3,0,,COMPLETE
+,311,急行(逗子・葉山〜羽田空港),キュウコウ,Express(Haneda Airport to Zushi･Hayama),特快,급행,#0D83C3,0,3,0,,COMPLETE
+,312,特急(泉岳寺〜三崎口),トッキュウ,Limited Express(Sengakuji to Misakiguchi),特快,특급,#EA0104,0,3,0,,COMPLETE
+,313,特急(泉岳寺〜浦賀),トッキュウ,Limited Express(Sengakuji to Uraga),特快,특급,#EA0104,0,3,0,,PARTIAL
+,314,通勤急行,ツウキンキュウコウ,Commuter Express,通勤快车,통근급행,#EEAA66,0,3,0,,PARTIAL
+,315,準急,ジュンキュウ,Semi Express,准急,준급,#2EAB8D,0,3,0,,PARTIAL
+,316,S-TRAIN(平日運行),エストレイン,S-TRAIN(Weekday),S-TRAIN,S-TRAIN,#8EC21F,0,2,0,,COMPLETE
+,317,通勤特急,ツウキントッキュウ,Commuter Express,通勤特快,통근특급,#DC143C,0,4,0,,PARTIAL
+,318,区間準急,クカンジュンキュウ,Section Semi Express,区间准急,구간준급,#00FF00,0,3,0,,PARTIAL
+,319,区間急行,クカンキュウコウ,Section Express,区间快速,구간급행,#FF99FF,0,3,0,,PARTIAL
+,320,空港快速,クウコウカイソク,Haneda Express,机场快速,공항쾌속,#DC143C,0,2,0,,COMPLETE
+,321,区間快速,クカンカイソク,Rapid,区间快速,구간쾌속,#FFAE00,0,2,0,,COMPLETE
+,322,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,(小田原〜新宿),COMPLETE
+,323,通勤準急,ツウキンジュンキュウ,Commuter Semi Express,通勤准急,통근준급,#00B66B,0,3,0,,COMPLETE
+,324,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,(唐木田〜新宿),COMPLETE
+,325,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,(片瀬江ノ島〜新宿),COMPLETE
+,326,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,(小田原〜新宿),COMPLETE
+,327,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,(唐木田〜新宿),COMPLETE
+,328,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,(片瀬江ノ島〜新宿),COMPLETE
+,330,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#F7931D,0,3,0,小田急用,COMPLETE
+,331,快速特急,カイソクトッキュウ,Limited Express,快速特快,쾌속특쾌,#049C5E,0,4,0,,COMPLETE
+,332,アクセス特急,アクセストッキュウ,Access Express,访问特快,액세스 특급,#ED7D00,0,4,1,,PARTIAL
+,333,準急,ジュンキュウ,Semi-Express,准急,준급,#2A9B50,0,3,0,堺筋準急,PARTIAL
+,334,直通特急,チョクツウトッキュウ,Limited Express,直通特急,직통특급,#DD2E1E,0,4,0,山陽電車,COMPLETE
+,335,区間快速,クカンカイソク,Semi Rapid,区间快速,구간쾌속,#000084,0,2,0,TX用,COMPLETE
+,336,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#FFA500,0,2,0,廃止済み 104に移行,NOT
+,337,準特急,ジュントッキュウ,Semi-Limited Express,准特急,준특급,#FF6E00,0,4,0,,COMPLETE
+,338,区間急行,クカンキュウコウ,Sub Express,区间快速,구간급행,#009A41,0,3,0,南海電車用,COMPLETE
+,339,S-TRAIN(土休日運行),エストレイン,S-TRAIN(Holiday),S-TRAIN,S-TRAIN,#8EC21F,0,2,0,,COMPLETE
+,340,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#C05EC4,0,3,0,西武用,COMPLETE
+,341,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#004098,0,3,0,東武用,COMPLETE
+,342,快速特急,カイソクトッキュウ,Rapid Limited Express,快速特快,쾌속특급,#C51C40,0,4,0,名鉄用,COMPLETE
+,343,特急,トッキュウ,Limited Express,特快,특급,#E03837,0,4,0,名鉄用,COMPLETE
+,344,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#034F98,0,3,0,名鉄用,COMPLETE
+,345,急行,キュウコウ,Express,特快,급행,#00BEFE,0,3,0,名鉄用,COMPLETE
+,346,準急,ジュンキュウ,Semi Express,准急,준급,#009945,0,3,0,名鉄用,COMPLETE
+,347,普通,フツウ,Local,慢车,보통,#333333,0,0,0,名鉄用,COMPLETE
+,348,空港急行,クウコウキュウコウ,Airport Express,机场快速,공항급행,#FF7F27,0,3,0,南海電車用,COMPLETE
+,349,区間特急,クカントッキュウ,Limited Express,直通特急,구간특급,#A349A4,0,4,0,阪神電車,COMPLETE
+,350,S特急,エストッキュウ,Limited Express,S特急,S특급,#22B14C,0,4,0,山陽電車,COMPLETE
+,351,快速急行(新松田より急行),カイソクキュウコウ,Rapid Express(Express from Shin-Matsuda),快速急行,쾌속급행,#F7931D,0,3,0,,COMPLETE
+,352,急行(新松田より各駅停車),キュウコウ,Express(Local from Shin-Matsuda),特快,급행,#DC143C,0,3,0,,COMPLETE
+,353,各駅停車(新松田より急行),カクエキテイシャ,Local(Express from Shin-Matsuda),每站停车,각역정차,#1F63C6,0,0,0,,COMPLETE
+,354,特急,トッキュウ,Special Express,特快,특급,#DC143C,0,4,0,京王線用,COMPLETE
+,355,普通,フツウ,Local,慢车,보통,#000000,0,0,0,京急京成用,COMPLETE
+,356,普通(西馬込方面),フツウ,Local(For Nishi-magome),慢车,보통,#000000,0,0,0,都営浅草線用,COMPLETE
+,357,普通(押上方面),フツウ,Local(For Oshiage),慢车,보통,#000000,0,0,0,都営浅草線用,COMPLETE
+,358,急行,キュウコウ,Express,特快,급행,#0D83C3,0,3,0,都営浅草線用,COMPLETE
+,359,快速,カイソク,Rapid,快车,쾌속,#ff69b4,0,2,0,都営浅草線用,COMPLETE
+,360,通勤特急,ツウキントッキュウ,Commuter Express,通勤特快,통근특급,#00bfff,0,4,0,都営浅草線用,COMPLETE
+,361,特急(泉岳寺方面),トッキュウ,Limited Express(For Sengakuji),特快,특급,#DC143C,0,4,0,都営浅草線用,COMPLETE
+,362,特急(押上方面),トッキュウ,Limited Express(For Oshiage),特快,특급,#DC143C,0,4,0,都営浅草線用,COMPLETE
+,363,快特(泉岳寺方面),カイトク,Limited Express(For Sengakuji),特快,쾌특,#379412,0,3,0,都営浅草線用,COMPLETE
+,364,快速特急(押上方面),カイソクトッキュウ,Limited Express(For Oshiage),快速特快,쾌속특쾌,#049C5E,0,4,0,都営浅草線用,COMPLETE
+,365,通勤快急,ツウキンカイキュウ,Commuter Rapid Express,通勤快急,통근쾌급,#C05EC4,0,3,0,,COMPLETE
+,366,特快速,トッカイソク,Special Rapid Express,特快车,특쾌속,#DC143C,0,3,0,,COMPLETE
+,367,快速(芝山千代田方面),カイソク,Rapid(For Shibayama-Chiyoda),快车,쾌속,#ff69b4,0,2,0,都営浅草線用,COMPLETE
+,368,ノンストップ,ノンストップ,Nonstop,马不停蹄,논스톱,#4169e1,0,2,0,,COMPLETE
+,369,普通(名古屋港方面),フツウ,Local(For Nagoyako),慢车,보통,#1F63C6,0,1,0,,COMPLETE
+,400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,2,0,,COMPLETE
+,401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,2,0,,COMPLETE
+,402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,2,0,,COMPLETE
+,403,イブニングウィング号,イブニングウィングゴウ,Evening Wing(Shinagawa to Misakiguchi),Evening Wing,이브닝윙호,#379412,2,2,0,,COMPLETE
+,404,普通(方南町支線),フツウ,Local(Honancho Branch Line),慢车(方南町支线),보통(호난초 지선),#E60012,0,1,0,,COMPLETE
+,405,拝島ライナー,ハイジマライナー,Haijima Liner,拜岛Liner,하이지마 라이너,#B4C300,0,2,0,,COMPLETE
+,406,TJライナー(下り),TJライナー,TJ Liner(Ikebukuro to Ogawamachi),TJ Liner,TJ Liner,#FF710A,2,2,0,,COMPLETE
+,407,TJライナー(上り),TJライナー,TJ Liner(Ogawamachi to Ikebukuro),TJ Liner,TJ Liner,#008CD6,1,2,0,,COMPLETE
+,408,各駅停車(北埠頭方面),カクエキテイシャ,Local,每站停车,각역정차,#9686BD,0,1,0,ポートアイランド線用,COMPLETE
+,409,各駅停車(田園都市線経由),カクエキテイシャ,Local,每站停车,각역정차,#1F63C7,0,0,0,大井町線用,COMPLETE
+,410,泉北ライナー,センボクライナー,Semboku Liner,泉北Liner,센보쿠라이너,#E6B422,0,2,0,,COMPLETE
+,411,各駅停車(北綾瀬支線),カクエキテイシャ,Local,每站停车,각역정차,#009944,0,1,0,北綾瀬支線,COMPLETE
+,412,ライナー,ライナー,Liner,Liner,정기선,#DC143C,0,2,0,,COMPLETE
+,500,りょうもう(浅草〜伊勢崎),リョウモウ,Ryomo(Asakusa to Isesaki),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
+,501,りょうもう(浅草〜葛生),リョウモウ,Ryomo(Asakusa to Kuzū),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
+,502,りょうもう(浅草〜赤城),リョウモウ,Ryomo(Asakusa to Akagi),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
+,503,スカイライナー,スカイライナー,Skyliner,Skyliner,스카이라이너,#0A3788,0,4,0,,COMPLETE
+,504,小江戸号,コエドゴウ,Koedo,小江户,고에도,#E73042,0,4,0,,COMPLETE
+,505,川越特急,カワゴエトッキュウ,Kawagoe Limited Express,川越特快,가와고에 특급,#E73799,0,4,0,,COMPLETE
+,506,サザン,サザン,Southern,南方,남부,#3366CC,0,4,0,,COMPLETE
+,507,ラピートα,ラピートアルファ,rapi:tα,rapi:tα,라피트α,#0065AF,0,4,0,,COMPLETE
+,508,ラピートβ,ラピートベータ,rapi:tβ,rapi:tβ,라피트β,#0065AF,0,4,0,,COMPLETE
+,509,ちちぶ,チチブ,Chichibu,秩父,지치부,#FF6600,0,4,0,,COMPLETE
+,510,Mt.TAKAO,マウントタカオ,Mt.TAKAO,Mt.TAKAO,Mt.TAKAO,#57A100,0,4,0,,COMPLETE
+,511,ミュースカイ,ミュースカイ,μ-SKY,μ-SKY,μ-SKY,#FAA902,0,4,0,,COMPLETE
+,512,ひのとり,ヒノトリ,HINOTORI,HINOTORI,HINOTORI,#AD2320,0,4,0,,COMPLETE
+,513,こうや,コウヤ,KŌYA,高野,코야,#009A41,0,4,0,,COMPLETE
+,514,りんかん,リンカン,RINKAN,林间,린칸,#009A42,0,4,0,,COMPLETE
+,515,はしだて,ハシダテ,Hashidate,桥立,하시다테,#E80000,0,4,0,,COMPLETE
+,516,スーパーはこね,スーパーハコネ,Super Hakone,超级箱根,슈퍼 하코네,#2288CC,0,4,0,,COMPLETE
+,517,はこね,ハコネ,Hakone,箱根,하코네,#2288CC,0,4,0,,COMPLETE
+,518,メトロはこね,メトロハコネ,Metro Hakone,地下铁箱根,메트로 하코네,#2288CC,0,4,0,,COMPLETE
+,519,THライナー,THライナー,TH Liner,TH Liner,TH Liner,#B50033,0,2,0,,COMPLETE
+,520,けごん・きぬ,ケゴン・キヌ,Kegon/Kinu,华严・绢,케곤・키누,#00458F,0,4,0,,COMPLETE
+,521,きぬがわ,キヌガワ,Kinugawa,鬼怒川,기누가와,#378640,0,4,0,,COMPLETE
+,522,会津,アイヅ,Aizu,会津,아이즈,#009F49,0,4,0,,COMPLETE
+,523,スペーシアX(7号・8号),スペーシアX(7ゴウ・8ゴウ),SPACIA X(No.7/No.8),SPACIA X(7号/8号),SPACIA X(7호/8호),#221614,0,4,0,,COMPLETE
+,524,スペーシアX(1号〜6号),スペーシアX(1ゴウ〜6ゴウ),SPACIA X(No.1 through No.6),SPACIA X(1号~6号),SPACIA X(7호~8호),#221614,0,4,0,,COMPLETE
+,525,日光,ニッコウ,Nikkō,日光,햇빛,#378640,0,4,0,,COMPLETE
+,526,さがみ,サガミ,Sagami,相模,사가미,#2288CC,0,4,0,,COMPLETE
+,527,モーニングウェイ,モーニングウェイ,Morning Way,早晨的方式,모닝웨이,#2288CC,0,4,0,,COMPLETE
+,528,ホームウェイ,ホームウェイ,Home way,回家的路,홈웨이,#2288CC,0,4,0,,COMPLETE
+,529,メトロモーニングウェイ,メトロモーニングウェイ,Metro Morning Way,地下铁早晨的方式,메트로 모닝웨이,#2288CC,0,4,0,,COMPLETE
+,530,メトロホームウェイ,メトロホームウェイ,Metro Home way,地下铁回家的路,메트로 홈웨이,#2288CC,0,4,0,,COMPLETE
+,531,えのしま,エノシマ,Enoshima,江之岛,에노시마,#2288CC,0,4,0,,COMPLETE
+,532,メトロえのしま,メトロエノシマ,Metro Enoshima,地下铁江之岛,메트로 에노시마,#2288CC,0,4,0,,COMPLETE
+,533,ふじさん,フジサン,Mt. Fuji,富士山,후지 씨,#2288CC,0,4,0,,COMPLETE
+,534,スカイツリーライナー,スカイツリーライナー,Skytree Liner,天空树衬里,스카이 트리 라이너,#87ceeb,0,4,0,,COMPLETE
+,535,むさし,ムサシ,Musashi,武藏,무사시,#FF6600,0,4,0,,COMPLETE
+,536,ドーム,ドーム,dome,圆顶,돔,#696969,0,4,0,,COMPLETE
+,537,シティライナー,シティライナー,City Liner,City Liner,시티 라이너,#1e90ff,0,4,0,,COMPLETE
+,538,モーニングライナー,モーニングライナー,Morning Liner,Morning Liner,모닝 라이너,#9400d3,0,4,0,,COMPLETE
+,539,イブニングライナー,イブニングライナー,Evening Liner,Evening Liner,이브닝 라이너,#9400d3,0,4,0,,COMPLETE
+,540,臨時ライナー,リンジライナー,Special Liner,临时Liner,임시 라이너,#add8e6,0,4,0,,COMPLETE
