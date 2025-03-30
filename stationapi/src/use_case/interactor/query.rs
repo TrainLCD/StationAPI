@@ -341,35 +341,31 @@ where
     fn get_station_numbers(&self, station: &Station) -> Vec<StationNumber> {
         let station = station.clone();
 
-        let line_symbol_primary = &station.line_symbol_primary;
-        let line_symbol_secondary = &station.line_symbol_secondary;
-        let line_symbol_extra = &station.line_symbol_extra;
-        let line_symbols_raw = [
-            line_symbol_primary,
-            line_symbol_secondary,
-            line_symbol_extra,
-        ];
+        let line_symbol1 = &station.line_symbol1;
+        let line_symbol2 = &station.line_symbol2;
+        let line_symbol3 = &station.line_symbol3;
+        let line_symbol4 = &station.line_symbol4;
+        let line_symbols_raw = [line_symbol1, line_symbol2, line_symbol3, line_symbol4];
 
         let line_symbol_colors_raw: Vec<String> = vec![
-            station.line_symbol_primary_color.unwrap_or("".to_string()),
-            station
-                .line_symbol_secondary_color
-                .unwrap_or("".to_string()),
-            station.line_symbol_extra_color.unwrap_or("".to_string()),
+            station.line_symbol1_color.unwrap_or("".to_string()),
+            station.line_symbol2_color.unwrap_or("".to_string()),
+            station.line_symbol3_color.unwrap_or("".to_string()),
+            station.line_symbol4_color.unwrap_or("".to_string()),
         ];
 
         let station_numbers_raw = vec![
-            station.primary_station_number.unwrap_or("".to_string()),
-            station.secondary_station_number.unwrap_or("".to_string()),
-            station.extra_station_number.unwrap_or("".to_string()),
+            station.station_number1.unwrap_or("".to_string()),
+            station.station_number2.unwrap_or("".to_string()),
+            station.station_number3.unwrap_or("".to_string()),
+            station.station_number4.unwrap_or("".to_string()),
         ];
 
         let line_symbols_shape_raw: Vec<String> = vec![
-            station.line_symbol_primary_shape.unwrap_or("".to_string()),
-            station
-                .line_symbol_secondary_shape
-                .unwrap_or("".to_string()),
-            station.line_symbol_extra_shape.unwrap_or("".to_string()),
+            station.line_symbol1_shape.unwrap_or("".to_string()),
+            station.line_symbol2_shape.unwrap_or("".to_string()),
+            station.line_symbol3_shape.unwrap_or("".to_string()),
+            station.line_symbol4_shape.unwrap_or("".to_string()),
         ];
 
         station_numbers_raw
@@ -419,15 +415,18 @@ where
             line_color_c: station.line_color_c,
             line_type: station.line_type,
             line_symbols: vec![],
-            line_symbol_primary: station.line_symbol_primary,
-            line_symbol_secondary: station.line_symbol_secondary,
-            line_symbol_extra: station.line_symbol_extra,
-            line_symbol_primary_color: station.line_symbol_primary_color,
-            line_symbol_secondary_color: station.line_symbol_secondary_color,
-            line_symbol_extra_color: station.line_symbol_extra_color,
-            line_symbol_primary_shape: station.line_symbol_primary_shape,
-            line_symbol_secondary_shape: station.line_symbol_secondary_shape,
-            line_symbol_extra_shape: station.line_symbol_extra_shape,
+            line_symbol1: station.line_symbol1,
+            line_symbol2: station.line_symbol2,
+            line_symbol3: station.line_symbol3,
+            line_symbol4: station.line_symbol4,
+            line_symbol1_color: station.line_symbol1_color,
+            line_symbol2_color: station.line_symbol2_color,
+            line_symbol3_color: station.line_symbol3_color,
+            line_symbol4_color: station.line_symbol4_color,
+            line_symbol1_shape: station.line_symbol1_shape,
+            line_symbol2_shape: station.line_symbol2_shape,
+            line_symbol3_shape: station.line_symbol3_shape,
+            line_symbol4_shape: station.line_symbol4_shape,
             e_status: 0,
             e_sort: 0,
             station: None,
@@ -441,41 +440,29 @@ where
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol> {
         let line = Arc::new(line);
 
-        let line_symbol_primary = &Arc::clone(&line).line_symbol_primary;
-        let line_symbol_secondary = &Arc::clone(&line).line_symbol_secondary;
-        let line_symbol_extra = &Arc::clone(&line).line_symbol_extra;
-        let line_symbols_raw = [
-            line_symbol_primary,
-            line_symbol_secondary,
-            line_symbol_extra,
-        ];
+        let line_symbol1 = &Arc::clone(&line).line_symbol1;
+        let line_symbol2 = &Arc::clone(&line).line_symbol2;
+        let line_symbol3 = &Arc::clone(&line).line_symbol3;
+        let line_symbols_raw = [line_symbol1, line_symbol2, line_symbol3];
 
         let line_color = &Arc::clone(&line).line_color_c;
 
-        let line_symbol_primary_color = &Arc::clone(&line).line_symbol_primary_color;
-        let line_symbol_primary_color = match line_symbol_primary_color.is_some() {
-            true => line_symbol_primary_color,
+        let line_symbol1_color = &Arc::clone(&line).line_symbol1_color;
+        let line_symbol1_color = match line_symbol1_color.is_some() {
+            true => line_symbol1_color,
             false => line_color,
         };
 
-        let line_symbol_secondary_color = &Arc::clone(&line).line_symbol_secondary_color;
-        let line_symbol_extra_color = &Arc::clone(&line).line_symbol_extra_color;
+        let line_symbol2_color = &Arc::clone(&line).line_symbol2_color;
+        let line_symbol3_color = &Arc::clone(&line).line_symbol3_color;
 
-        let line_symbol_colors_raw = [
-            line_symbol_primary_color,
-            line_symbol_secondary_color,
-            line_symbol_extra_color,
-        ];
+        let line_symbol_colors_raw = [line_symbol1_color, line_symbol2_color, line_symbol3_color];
 
-        let line_symbol_primary_shape = &Arc::clone(&line).line_symbol_primary_shape;
-        let line_symbol_secondary_shape = &Arc::clone(&line).line_symbol_secondary_shape;
-        let line_symbol_extra_shape = &Arc::clone(&line).line_symbol_extra_shape;
+        let line_symbol1_shape = &Arc::clone(&line).line_symbol1_shape;
+        let line_symbol2_shape = &Arc::clone(&line).line_symbol2_shape;
+        let line_symbol3_shape = &Arc::clone(&line).line_symbol3_shape;
 
-        let line_symbols_shape_raw = [
-            line_symbol_primary_shape,
-            line_symbol_secondary_shape,
-            line_symbol_extra_shape,
-        ];
+        let line_symbols_shape_raw = [line_symbol1_shape, line_symbol2_shape, line_symbol3_shape];
 
         if line_symbols_raw.is_empty() {
             return vec![];
@@ -650,19 +637,18 @@ where
                                     line_color_c: l.line_color_c.clone(),
                                     line_type: l.line_type,
                                     line_symbols: l.line_symbols.clone(),
-                                    line_symbol_primary: l.line_symbol_primary.clone(),
-                                    line_symbol_secondary: l.line_symbol_secondary.clone(),
-                                    line_symbol_extra: l.line_symbol_extra.clone(),
-                                    line_symbol_primary_color: l.line_symbol_primary_color.clone(),
-                                    line_symbol_secondary_color: l
-                                        .line_symbol_secondary_color
-                                        .clone(),
-                                    line_symbol_extra_color: l.line_symbol_extra_color.clone(),
-                                    line_symbol_primary_shape: l.line_symbol_primary_shape.clone(),
-                                    line_symbol_secondary_shape: l
-                                        .line_symbol_secondary_shape
-                                        .clone(),
-                                    line_symbol_extra_shape: l.line_symbol_extra_shape.clone(),
+                                    line_symbol1: l.line_symbol1.clone(),
+                                    line_symbol2: l.line_symbol2.clone(),
+                                    line_symbol3: l.line_symbol3.clone(),
+                                    line_symbol4: l.line_symbol4.clone(),
+                                    line_symbol1_color: l.line_symbol1_color.clone(),
+                                    line_symbol2_color: l.line_symbol2_color.clone(),
+                                    line_symbol3_color: l.line_symbol3_color.clone(),
+                                    line_symbol4_color: l.line_symbol4_color.clone(),
+                                    line_symbol1_shape: l.line_symbol1_shape.clone(),
+                                    line_symbol2_shape: l.line_symbol2_shape.clone(),
+                                    line_symbol3_shape: l.line_symbol3_shape.clone(),
+                                    line_symbol4_shape: l.line_symbol4_shape.clone(),
                                     e_status: l.e_status,
                                     e_sort: l.e_sort,
                                     station: None,
@@ -710,9 +696,10 @@ where
                                 station_name_zh: row.station_name_zh.clone(),
                                 station_name_ko: row.station_name_ko.clone(),
                                 station_numbers: self.get_station_numbers(&Arc::clone(&row)),
-                                primary_station_number: row.primary_station_number.clone(),
-                                secondary_station_number: row.secondary_station_number.clone(),
-                                extra_station_number: row.extra_station_number.clone(),
+                                station_number1: row.station_number1.clone(),
+                                station_number2: row.station_number2.clone(),
+                                station_number3: row.station_number3.clone(),
+                                station_number4: row.station_number4.clone(),
                                 three_letter_code: row.three_letter_code.clone(),
                                 line_cd: row.line_cd,
                                 line: Some(Box::new(Arc::clone(&extracted_line).as_ref().clone())),
@@ -739,19 +726,18 @@ where
                                 line_name_ko: row.line_name_ko.clone(),
                                 line_color_c: row.line_color_c.clone(),
                                 line_type: row.line_type,
-                                line_symbol_primary: row.line_symbol_primary.clone(),
-                                line_symbol_secondary: row.line_symbol_secondary.clone(),
-                                line_symbol_extra: row.line_symbol_extra.clone(),
-                                line_symbol_primary_color: row.line_symbol_primary_color.clone(),
-                                line_symbol_secondary_color: row
-                                    .line_symbol_secondary_color
-                                    .clone(),
-                                line_symbol_extra_color: row.line_symbol_extra_color.clone(),
-                                line_symbol_primary_shape: row.line_symbol_primary_shape.clone(),
-                                line_symbol_secondary_shape: row
-                                    .line_symbol_secondary_shape
-                                    .clone(),
-                                line_symbol_extra_shape: row.line_symbol_extra_shape.clone(),
+                                line_symbol1: row.line_symbol1.clone(),
+                                line_symbol2: row.line_symbol2.clone(),
+                                line_symbol3: row.line_symbol3.clone(),
+                                line_symbol4: row.line_symbol3.clone(),
+                                line_symbol1_color: row.line_symbol1_color.clone(),
+                                line_symbol2_color: row.line_symbol2_color.clone(),
+                                line_symbol3_color: row.line_symbol3_color.clone(),
+                                line_symbol4_color: row.line_symbol4_color.clone(),
+                                line_symbol1_shape: row.line_symbol1_shape.clone(),
+                                line_symbol2_shape: row.line_symbol2_shape.clone(),
+                                line_symbol3_shape: row.line_symbol3_shape.clone(),
+                                line_symbol4_shape: row.line_symbol4_shape.clone(),
                                 average_distance: row.average_distance,
                                 type_id: row.type_id,
                                 sst_id: row.sst_id,
@@ -780,9 +766,10 @@ where
                             station_name_zh: row.station_name_zh.clone(),
                             station_name_ko: row.station_name_ko.clone(),
                             station_numbers: self.get_station_numbers(&Arc::clone(&row)),
-                            primary_station_number: row.primary_station_number.clone(),
-                            secondary_station_number: row.secondary_station_number.clone(),
-                            extra_station_number: row.extra_station_number.clone(),
+                            station_number1: row.station_number1.clone(),
+                            station_number2: row.station_number2.clone(),
+                            station_number3: row.station_number3.clone(),
+                            station_number4: row.station_number4.clone(),
                             three_letter_code: row.three_letter_code.clone(),
                             line_cd: row.line_cd,
                             line: Some(Box::new(Arc::clone(&extracted_line).as_ref().clone())),
@@ -809,15 +796,18 @@ where
                             line_name_ko: row.line_name_ko.clone(),
                             line_color_c: row.line_color_c.clone(),
                             line_type: row.line_type,
-                            line_symbol_primary: row.line_symbol_primary.clone(),
-                            line_symbol_secondary: row.line_symbol_secondary.clone(),
-                            line_symbol_extra: row.line_symbol_extra.clone(),
-                            line_symbol_primary_color: row.line_symbol_primary_color.clone(),
-                            line_symbol_secondary_color: row.line_symbol_secondary_color.clone(),
-                            line_symbol_extra_color: row.line_symbol_extra_color.clone(),
-                            line_symbol_primary_shape: row.line_symbol_primary_shape.clone(),
-                            line_symbol_secondary_shape: row.line_symbol_secondary_shape.clone(),
-                            line_symbol_extra_shape: row.line_symbol_extra_shape.clone(),
+                            line_symbol1: row.line_symbol1.clone(),
+                            line_symbol2: row.line_symbol2.clone(),
+                            line_symbol3: row.line_symbol3.clone(),
+                            line_symbol4: row.line_symbol4.clone(),
+                            line_symbol1_color: row.line_symbol1_color.clone(),
+                            line_symbol2_color: row.line_symbol2_color.clone(),
+                            line_symbol3_color: row.line_symbol3_color.clone(),
+                            line_symbol4_color: row.line_symbol4_color.clone(),
+                            line_symbol1_shape: row.line_symbol1_shape.clone(),
+                            line_symbol2_shape: row.line_symbol2_shape.clone(),
+                            line_symbol3_shape: row.line_symbol3_shape.clone(),
+                            line_symbol4_shape: row.line_symbol4_shape.clone(),
                             average_distance: row.average_distance,
                             type_id: row.type_id,
                             sst_id: row.sst_id,

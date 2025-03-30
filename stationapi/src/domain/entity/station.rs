@@ -14,9 +14,10 @@ pub struct Station {
     pub station_name_zh: Option<String>,
     pub station_name_ko: Option<String>,
     pub station_numbers: Vec<StationNumber>,
-    pub primary_station_number: Option<String>,
-    pub secondary_station_number: Option<String>,
-    pub extra_station_number: Option<String>,
+    pub station_number1: Option<String>,
+    pub station_number2: Option<String>,
+    pub station_number3: Option<String>,
+    pub station_number4: Option<String>,
     pub three_letter_code: Option<String>,
     pub line_cd: i64,
     pub line: Option<Box<Line>>,
@@ -44,15 +45,18 @@ pub struct Station {
     pub line_name_ko: Option<String>,
     pub line_color_c: Option<String>,
     pub line_type: Option<i64>,
-    pub line_symbol_primary: Option<String>,
-    pub line_symbol_secondary: Option<String>,
-    pub line_symbol_extra: Option<String>,
-    pub line_symbol_primary_color: Option<String>,
-    pub line_symbol_secondary_color: Option<String>,
-    pub line_symbol_extra_color: Option<String>,
-    pub line_symbol_primary_shape: Option<String>,
-    pub line_symbol_secondary_shape: Option<String>,
-    pub line_symbol_extra_shape: Option<String>,
+    pub line_symbol1: Option<String>,
+    pub line_symbol2: Option<String>,
+    pub line_symbol3: Option<String>,
+    pub line_symbol4: Option<String>,
+    pub line_symbol1_color: Option<String>,
+    pub line_symbol2_color: Option<String>,
+    pub line_symbol3_color: Option<String>,
+    pub line_symbol4_color: Option<String>,
+    pub line_symbol1_shape: Option<String>,
+    pub line_symbol2_shape: Option<String>,
+    pub line_symbol3_shape: Option<String>,
+    pub line_symbol4_shape: Option<String>,
     pub average_distance: f64,
     // station_station_typesからJOIN
     pub type_id: Option<i64>,
@@ -82,9 +86,10 @@ impl Station {
         station_name_zh: Option<String>,
         station_name_ko: Option<String>,
         station_numbers: Vec<StationNumber>,
-        primary_station_number: Option<String>,
-        secondary_station_number: Option<String>,
-        extra_station_number: Option<String>,
+        station_number1: Option<String>,
+        station_number2: Option<String>,
+        station_number3: Option<String>,
+        station_number4: Option<String>,
         three_letter_code: Option<String>,
         line_cd: i64,
         line: Option<Box<Line>>,
@@ -111,15 +116,18 @@ impl Station {
         line_name_ko: Option<String>,
         line_color_c: Option<String>,
         line_type: Option<i64>,
-        line_symbol_primary: Option<String>,
-        line_symbol_secondary: Option<String>,
-        line_symbol_extra: Option<String>,
-        line_symbol_primary_color: Option<String>,
-        line_symbol_secondary_color: Option<String>,
-        line_symbol_extra_color: Option<String>,
-        line_symbol_primary_shape: Option<String>,
-        line_symbol_secondary_shape: Option<String>,
-        line_symbol_extra_shape: Option<String>,
+        line_symbol1: Option<String>,
+        line_symbol2: Option<String>,
+        line_symbol3: Option<String>,
+        line_symbol4: Option<String>,
+        line_symbol1_color: Option<String>,
+        line_symbol2_color: Option<String>,
+        line_symbol3_color: Option<String>,
+        line_symbol4_color: Option<String>,
+        line_symbol1_shape: Option<String>,
+        line_symbol2_shape: Option<String>,
+        line_symbol3_shape: Option<String>,
+        line_symbol4_shape: Option<String>,
         line_group_cd: Option<i64>,
         average_distance: f64,
         pass: Option<i64>,
@@ -144,9 +152,10 @@ impl Station {
             station_name_zh,
             station_name_ko,
             station_numbers,
-            primary_station_number,
-            secondary_station_number,
-            extra_station_number,
+            station_number1,
+            station_number2,
+            station_number3,
+            station_number4,
             three_letter_code,
             line_cd,
             line,
@@ -173,15 +182,18 @@ impl Station {
             line_name_ko,
             line_color_c,
             line_type,
-            line_symbol_primary,
-            line_symbol_secondary,
-            line_symbol_extra,
-            line_symbol_primary_color,
-            line_symbol_secondary_color,
-            line_symbol_extra_color,
-            line_symbol_primary_shape,
-            line_symbol_secondary_shape,
-            line_symbol_extra_shape,
+            line_symbol1,
+            line_symbol2,
+            line_symbol3,
+            line_symbol4,
+            line_symbol1_color,
+            line_symbol2_color,
+            line_symbol3_color,
+            line_symbol4_color,
+            line_symbol1_shape,
+            line_symbol2_shape,
+            line_symbol3_shape,
+            line_symbol4_shape,
             line_group_cd,
             pass,
             average_distance,
@@ -231,10 +243,13 @@ mod tests {
             Some("JY".to_string()),
             None,
             None,
+            None,
             Some("#80C241".to_string()),
             None,
             None,
+            None,
             Some("SQUARE".to_string()),
+            None,
             None,
             None,
             0,
@@ -257,6 +272,7 @@ mod tests {
             Some("시부야".to_string()),
             station_numbers,
             Some("20".to_string()),
+            None,
             None,
             None,
             Some("SBY".to_string()),
@@ -288,10 +304,13 @@ mod tests {
             Some("JY".to_string()),
             None,
             None,
+            None,
             Some("#80C241".to_string()),
             None,
             None,
+            None,
             Some("SQUARE".to_string()),
+            None,
             None,
             None,
             Some(11302),
@@ -317,7 +336,7 @@ mod tests {
         assert_eq!(station.station_name_r, Some("渋谷".to_string()));
         assert_eq!(station.station_name_zh, Some("涩谷".to_string()));
         assert_eq!(station.station_name_ko, Some("시부야".to_string()));
-        assert_eq!(station.primary_station_number, Some("20".to_string()));
+        assert_eq!(station.station_number1, Some("20".to_string()));
         assert_eq!(station.three_letter_code, Some("SBY".to_string()));
         assert_eq!(station.line_cd, 11302);
         assert_eq!(station.pref_cd, 13);
@@ -341,21 +360,17 @@ mod tests {
         assert_eq!(station.line_name_ko, Some("야마노테선".to_string()));
         assert_eq!(station.line_color_c, Some("#80C241".to_string()));
         assert_eq!(station.line_type, Some(2));
-        assert_eq!(station.line_symbol_primary, Some("JY".to_string()));
-        assert_eq!(station.line_symbol_secondary, None);
-        assert_eq!(station.line_symbol_extra, None);
-        assert_eq!(
-            station.line_symbol_primary_color,
-            Some("#80C241".to_string())
-        );
-        assert_eq!(station.line_symbol_secondary_color, None);
-        assert_eq!(station.line_symbol_extra_color, None);
-        assert_eq!(
-            station.line_symbol_primary_shape,
-            Some("SQUARE".to_string())
-        );
-        assert_eq!(station.line_symbol_secondary_shape, None);
-        assert_eq!(station.line_symbol_extra_shape, None);
+        assert_eq!(station.line_symbol1, Some("JY".to_string()));
+        assert_eq!(station.line_symbol2, None);
+        assert_eq!(station.line_symbol3, None);
+        assert_eq!(station.line_symbol1_color, Some("#80C241".to_string()));
+        assert_eq!(station.line_symbol2_color, None);
+        assert_eq!(station.line_symbol3_color, None);
+        assert_eq!(station.line_symbol4_color, None);
+        assert_eq!(station.line_symbol1_shape, Some("SQUARE".to_string()));
+        assert_eq!(station.line_symbol2_shape, None);
+        assert_eq!(station.line_symbol3_shape, None);
+        assert_eq!(station.line_symbol4_shape, None);
         assert_eq!(station.average_distance, 1075.968412);
         assert_eq!(station.type_id, Some(20));
     }
