@@ -523,7 +523,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99612,196,京福電鉄嵐山本線,ケイフクデンテツアラシヤマホンセン,京福電鉄嵐山本線,Keifuku Electric Railway Arashiyama Main Line,Keifuku Electric Railway Arashiyama Main Line,,,#CC0033,4,A,,,,#CC0033,,,,REVERSED_ROUND_HORIZONTAL,,,,0,99612,587.8530191
 99613,196,京福電鉄北野線,ケイフクデンテツキタノセン,京福電鉄北野線,Keifuku Electric Railway Kitano Line,Keifuku Electric Railway Kitano Line,,,#6666CC,4,B,A,,,#6666CC,#CC0033,,,REVERSED_ROUND_HORIZONTAL,,,,0,99613,407.7236824
 99614,197,北大阪急行電鉄,キタオオサカキュウコウデンテツ,北大阪急行電鉄,Kita Osaka Express Electric Railway,Kita Osaka Express Electric Railway,,,#DD5B5C,2,M,,,,#E5171F,,,,REVERSED_ROUND,,,,0,99614,1637.299415
-99616,198,泉北高速鉄道線,センボクコウソクテツドウセン,泉北高速鉄道線,Semboku Rapid Railway,Semboku Rapid Railway,,,#0099FF,2,SB,,,,#0099FF,,,,REVERSED_ROUND,,,,0,99616,2665.75274
+99616,22,南海泉北線,ナンカイセンボクセン,南海泉北線,Nankai Semboku Line,Nankai Semboku Line,南海泉北线,난카이 센보쿠선,#0099FF,2,NK,,,,#000000,,,,NANKAI,,,,0,99616,2665.75274
 99617,199,水間鉄道水間線,ミズマテツドウミズマセン,水間鉄道水間線,Mizuma Railway Mizuma Line,Mizuma Railway Mizuma Line,,,#005CB1,2,,,,,,,,,,,,,0,99617,597.0363676
 99618,249,Osaka Metro御堂筋線,オオサカメトロミドウスジセン,高速電気軌道第1号線,Midosuji Line,Midosuji Line,御堂筋线,미도스지선,#E5171F,3,M,,,,#E5171F,,,,REVERSED_ROUND,,,,0,99618,1250.699705
 99619,249,Osaka Metro谷町線,オオサカメトロタニマチセン,高速電気軌道第2号線,Tanimachi Line,Tanimachi Line,谷町线,다니마치선,#522886,3,T,,,,#522886,,,,REVERSED_ROUND,,,,0,99619,1058.128596
