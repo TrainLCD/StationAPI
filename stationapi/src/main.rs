@@ -2,9 +2,8 @@ use csv::{ReaderBuilder, StringRecord};
 use sqlx::{Connection, SqliteConnection};
 use stationapi::{
     infrastructure::{
-        company_repository::MyCompanyRepository, connection_repository::MyConnectionRepository,
-        line_repository::MyLineRepository, station_repository::MyStationRepository,
-        train_type_repository::MyTrainTypeRepository,
+        company_repository::MyCompanyRepository, line_repository::MyLineRepository,
+        station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
     },
     presentation::controller::grpc::MyApi,
     proto::{self, station_api_server::StationApiServer},
@@ -201,14 +200,12 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     let line_repository = MyLineRepository::new(Arc::clone(&conn));
     let train_type_repository = MyTrainTypeRepository::new(Arc::clone(&conn));
     let company_repository = MyCompanyRepository::new(Arc::clone(&conn));
-    let connection_repository = MyConnectionRepository::new(Arc::clone(&conn));
 
     let query_use_case = QueryInteractor {
         station_repository,
         line_repository,
         train_type_repository,
         company_repository,
-        connection_repository,
     };
 
     let my_api = MyApi { query_use_case };

@@ -1,13 +1,11 @@
 use crate::{
     infrastructure::{
-        company_repository::MyCompanyRepository, connection_repository::MyConnectionRepository,
-        line_repository::MyLineRepository, station_repository::MyStationRepository,
-        train_type_repository::MyTrainTypeRepository,
+        company_repository::MyCompanyRepository, line_repository::MyLineRepository,
+        station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
     },
     presentation::error::PresentationalError,
     proto::{
-        station_api_server::StationApi, CoordinatesRequest, DistanceResponse,
-        DistanceResponseState, GetConnectedStationsRequest, GetLineByIdRequest,
+        station_api_server::StationApi, GetConnectedStationsRequest, GetLineByIdRequest,
         GetLinesByNameRequest, GetRouteRequest, GetStationByCoordinatesRequest,
         GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
         GetStationByLineIdRequest, GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
@@ -24,7 +22,6 @@ pub struct MyApi {
         MyLineRepository,
         MyTrainTypeRepository,
         MyCompanyRepository,
-        MyConnectionRepository,
     >,
 }
 
@@ -195,52 +192,6 @@ impl StationApi for MyApi {
         }
     }
 
-    async fn get_distance_for_closest_station_from_coordinates(
-        &self,
-        request: tonic::Request<CoordinatesRequest>,
-    ) -> Result<tonic::Response<DistanceResponse>, tonic::Status> {
-        let request_ref = request.get_ref();
-        let latitude = request_ref.latitude;
-        let longitude = request_ref.longitude;
-        let line_id = request_ref.line_id;
-
-        match self
-            .query_use_case
-            .get_station_id_and_distance_by_coordinates(latitude, longitude, line_id)
-            .await
-        {
-            Ok(station) => {
-                let avg_distance_in_km = station.average_distance / 1000.0;
-                let arrived_threshold = if (avg_distance_in_km / 4.5) > 0.5 {
-                    0.5
-                } else {
-                    avg_distance_in_km / 4.5
-                };
-                let approaching_threshold = if (avg_distance_in_km / 2.0) > 1.0 {
-                    1.0
-                } else {
-                    avg_distance_in_km / 2.0
-                };
-
-                let mut state = DistanceResponseState::Away;
-                if station.distance < arrived_threshold {
-                    state = DistanceResponseState::Arrived;
-                }
-                if station.distance < approaching_threshold && station.distance > arrived_threshold
-                {
-                    state = DistanceResponseState::Approaching
-                }
-
-                Ok(Response::new(DistanceResponse {
-                    station_id: station.station_id,
-                    distance: station.distance,
-                    state: state.into(),
-                }))
-            }
-            Err(err) => return Err(PresentationalError::from(err).into()),
-        }
-    }
-
     async fn get_routes(
         &self,
         request: tonic::Request<GetRouteRequest>,
@@ -250,7 +201,10 @@ impl StationApi for MyApi {
 
         match self.query_use_case.get_routes(from_id, to_id).await {
             Ok(routes) => {
-                return Ok(Response::new(RouteResponse { routes }));
+                return Ok(Response::new(RouteResponse {
+                    routes,
+                    next_page_token: "".to_string(),
+                }));
             }
             Err(err) => Err(PresentationalError::from(err).into()),
         }
@@ -319,6 +273,7 @@ impl StationApi for MyApi {
                     id: 0,
                     stops: stations.into_iter().map(|station| station.into()).collect(),
                 }],
+                next_page_token: "".to_string(),
             })),
             Err(err) => {
                 return Err(PresentationalError::OtherError(anyhow::anyhow!(err).into()).into())

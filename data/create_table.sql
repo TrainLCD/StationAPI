@@ -159,6 +159,7 @@ CREATE INDEX `station_station_types_station_cd` ON `station_station_types` (`sta
 CREATE INDEX `station_station_types_line_group_cd` ON `station_station_types` (`line_group_cd`);
 CREATE INDEX `stations_line_cd` ON `stations` (`line_cd`);
 CREATE INDEX `stations_station_g_cd` ON `stations` (`station_g_cd`);
+CREATE INDEX `stations_e_sort_station_cd` ON `stations` (`e_sort`, `station_cd`);
 CREATE INDEX `stations_lat_lon` ON `stations` (`lat`, `lon`);
 CREATE UNIQUE INDEX `types_type_cd` ON `types` (`type_cd`);
 
