@@ -1,8 +1,7 @@
 use crate::{
     infrastructure::{
-        company_repository::MyCompanyRepository, connection_repository::MyConnectionRepository,
-        line_repository::MyLineRepository, station_repository::MyStationRepository,
-        train_type_repository::MyTrainTypeRepository,
+        company_repository::MyCompanyRepository, line_repository::MyLineRepository,
+        station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
     },
     presentation::error::PresentationalError,
     proto::{
@@ -23,7 +22,6 @@ pub struct MyApi {
         MyLineRepository,
         MyTrainTypeRepository,
         MyCompanyRepository,
-        MyConnectionRepository,
     >,
 }
 

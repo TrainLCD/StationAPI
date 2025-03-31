@@ -11,9 +11,8 @@ use crate::{
         },
         normalize::normalize_for_search,
         repository::{
-            company_repository::CompanyRepository, connection_repository::ConnectionRepository,
-            line_repository::LineRepository, station_repository::StationRepository,
-            train_type_repository::TrainTypeRepository,
+            company_repository::CompanyRepository, line_repository::LineRepository,
+            station_repository::StationRepository, train_type_repository::TrainTypeRepository,
         },
     },
     proto::{self, Route},
@@ -24,12 +23,11 @@ use petgraph::visit::EdgeRef;
 use petgraph::{graph::NodeIndex, Graph, Undirected};
 
 #[derive(Clone)]
-pub struct QueryInteractor<SR, LR, TR, CR, CNR> {
+pub struct QueryInteractor<SR, LR, TR, CR> {
     pub station_repository: SR,
     pub line_repository: LR,
     pub train_type_repository: TR,
     pub company_repository: CR,
-    pub connection_repository: CNR,
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -56,13 +54,12 @@ impl PartialOrd for DijkstraState {
 }
 
 #[async_trait]
-impl<SR, LR, TR, CR, CNR> QueryUseCase for QueryInteractor<SR, LR, TR, CR, CNR>
+impl<SR, LR, TR, CR> QueryUseCase for QueryInteractor<SR, LR, TR, CR>
 where
     SR: StationRepository,
     LR: LineRepository,
     TR: TrainTypeRepository,
     CR: CompanyRepository,
-    CNR: ConnectionRepository,
 {
     async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
         let Some(station) = self.station_repository.find_by_id(station_id).await? else {
