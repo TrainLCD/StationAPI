@@ -1,6 +1,7 @@
 name: Deploy StationAPI to Production Environment on Amazon ECS
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
