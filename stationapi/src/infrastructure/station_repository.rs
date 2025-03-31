@@ -5,8 +5,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     domain::{
-        entity::{misc::StationIdWithDistance, station::Station},
-        error::DomainError,
+        entity::station::Station, error::DomainError,
         repository::station_repository::StationRepository,
     },
     proto::StopCondition,
@@ -181,13 +180,6 @@ impl From<StationRow> for Station {
     }
 }
 
-#[derive(sqlx::FromRow, Clone)]
-struct DistanceWithIdRow {
-    station_cd: i64,
-    distance: f64,
-    average_distance: f64,
-}
-
 pub struct MyStationRepository {
     conn: Arc<Mutex<SqliteConnection>>,
 }
@@ -274,28 +266,6 @@ impl StationRepository for MyStationRepository {
         let mut conn = self.conn.lock().await;
         InternalStationRepository::get_by_line_group_id(line_group_id, &mut conn).await
     }
-    async fn get_station_id_and_distance_by_coordinates(
-        &self,
-        latitude: f64,
-        longitude: f64,
-        line_id: Option<u32>,
-    ) -> Result<StationIdWithDistance, DomainError> {
-        let mut conn = self.conn.lock().await;
-        match line_id {
-            Some(line_id) => {
-                InternalStationRepository::get_station_id_and_distance_by_coordinates_and_line_id(
-                    latitude, longitude, line_id, &mut conn,
-                )
-                .await
-            }
-            None => {
-                InternalStationRepository::get_station_id_and_distance_by_coordinates(
-                    latitude, longitude, &mut conn,
-                )
-                .await
-            }
-        }
-    }
 
     async fn get_route_stops(
         &self,
@@ -354,13 +324,13 @@ impl InternalStationRepository {
             l.line_symbol3_shape,
             l.line_symbol4_shape,
             l.average_distance,
-            COALESCE(CAST(a.line_name AS TEXT), l.line_name) AS "line_name: String",
-            COALESCE(CAST(a.line_name_k AS TEXT), l.line_name_k) AS "line_name_k: String",
-            COALESCE(CAST(a.line_name_h AS TEXT), l.line_name_h) AS "line_name_h: String",
-            COALESCE(CAST(a.line_name_r AS TEXT), l.line_name_r) AS "line_name_r: String",
-            COALESCE(CAST(a.line_name_zh AS TEXT), l.line_name_zh) AS "line_name_zh: String",
-            COALESCE(CAST(a.line_name_ko AS TEXT), l.line_name_ko) AS "line_name_ko: String",
-            COALESCE(CAST(a.line_color_c AS TEXT), l.line_color_c) AS "line_color_c: String",
+            COALESCE(a.line_name, l.line_name)         AS line_name,
+            COALESCE(a.line_name_k, l.line_name_k)     AS line_name_k,
+            COALESCE(a.line_name_h, l.line_name_h)     AS line_name_h,
+            COALESCE(a.line_name_r, l.line_name_r)     AS line_name_r,
+            COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
+            COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
+            COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c,
             sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
@@ -424,14 +394,13 @@ impl InternalStationRepository {
                 l.line_symbol3_shape,
                 l.line_symbol4_shape,
                 l.average_distance,
-                COALESCE(CAST(a.line_name AS TEXT), l.line_name) AS "line_name: String",
-                COALESCE(CAST(a.line_name_k AS TEXT), l.line_name_k) AS "line_name_k: String",
-                COALESCE(CAST(a.line_name_h AS TEXT), l.line_name_h) AS "line_name_h: String",
-                COALESCE(CAST(a.line_name_r AS TEXT), l.line_name_r) AS "line_name_r: String",
-                COALESCE(CAST(a.line_name_zh AS TEXT), l.line_name_zh) AS "line_name_zh: String",
-                COALESCE(CAST(a.line_name_ko AS TEXT), l.line_name_ko) AS "line_name_ko: String",
-                COALESCE(CAST(a.line_color_c AS TEXT), l.line_color_c) AS "line_color_c: String",
-                IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types
+                COALESCE(a.line_name, l.line_name)         AS line_name,
+                COALESCE(a.line_name_k, l.line_name_k)     AS line_name_k,
+                COALESCE(a.line_name_h, l.line_name_h)     AS line_name_h,
+                COALESCE(a.line_name_r, l.line_name_r)     AS line_name_r,
+                COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
+                COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
+                COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c,                IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types
             FROM `stations` AS s
             JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
             LEFT JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
@@ -482,13 +451,13 @@ impl InternalStationRepository {
               l.line_symbol3_shape,
               l.line_symbol4_shape,
               l.average_distance,
-              COALESCE(CAST(a.line_name AS TEXT), l.line_name) AS "line_name: String",
-              COALESCE(CAST(a.line_name_k AS TEXT), l.line_name_k) AS "line_name_k: String",
-              COALESCE(CAST(a.line_name_h AS TEXT), l.line_name_h) AS "line_name_h: String",
-              COALESCE(CAST(a.line_name_r AS TEXT), l.line_name_r) AS "line_name_r: String",
-              COALESCE(CAST(a.line_name_zh AS TEXT), l.line_name_zh) AS "line_name_zh: String",
-              COALESCE(CAST(a.line_name_ko AS TEXT), l.line_name_ko) AS "line_name_ko: String",
-              COALESCE(CAST(a.line_color_c AS TEXT), l.line_color_c) AS "line_color_c: String",
+              COALESCE(a.line_name, l.line_name)         AS line_name,
+              COALESCE(a.line_name_k, l.line_name_k)     AS line_name_k,
+              COALESCE(a.line_name_h, l.line_name_h)     AS line_name_h,
+              COALESCE(a.line_name_r, l.line_name_r)     AS line_name_r,
+              COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
+              COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
+              COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c,
               t.id AS type_id,
               t.type_cd,
               t.color,
@@ -551,13 +520,13 @@ impl InternalStationRepository {
                           l.line_symbol3_shape,
                           l.line_symbol4_shape,
                           l.average_distance,
-                          COALESCE(CAST(a.line_name AS TEXT), l.line_name) AS "line_name: String",
-                          COALESCE(CAST(a.line_name_k AS TEXT), l.line_name_k) AS "line_name_k: String",
-                          COALESCE(CAST(a.line_name_h AS TEXT), l.line_name_h) AS "line_name_h: String",
-                          COALESCE(CAST(a.line_name_r AS TEXT), l.line_name_r) AS "line_name_r: String",
-                          COALESCE(CAST(a.line_name_zh AS TEXT), l.line_name_zh) AS "line_name_zh: String",
-                          COALESCE(CAST(a.line_name_ko AS TEXT), l.line_name_ko) AS "line_name_ko: String",
-                          COALESCE(CAST(a.line_color_c AS TEXT), l.line_color_c) AS "line_color_c: String",
+                          COALESCE(a.line_name, l.line_name) AS "line_name: String",
+                          COALESCE(a.line_name_k, l.line_name_k) AS "line_name_k: String",
+                          COALESCE(a.line_name_h, l.line_name_h) AS "line_name_h: String",
+                          COALESCE(a.line_name_r, l.line_name_r) AS "line_name_r: String",
+                          COALESCE(a.line_name_zh, l.line_name_zh) AS "line_name_zh: String",
+                          COALESCE(a.line_name_ko, l.line_name_ko) AS "line_name_ko: String",
+                          COALESCE(a.line_color_c, l.line_color_c) AS "line_color_c: String",
                           t.id AS type_id,
                           t.type_cd,
                           t.color,
@@ -625,13 +594,13 @@ impl InternalStationRepository {
             l.line_symbol3_shape,
             l.line_symbol4_shape,
             l.average_distance,
-            COALESCE(CAST(a.line_name AS TEXT), l.line_name) AS "line_name: String",
-            COALESCE(CAST(a.line_name_k AS TEXT), l.line_name_k) AS "line_name_k: String",
-            COALESCE(CAST(a.line_name_h AS TEXT), l.line_name_h) AS "line_name_h: String",
-            COALESCE(CAST(a.line_name_r AS TEXT), l.line_name_r) AS "line_name_r: String",
-            COALESCE(CAST(a.line_name_zh AS TEXT), l.line_name_zh) AS "line_name_zh: String",
-            COALESCE(CAST(a.line_name_ko AS TEXT), l.line_name_ko) AS "line_name_ko: String",
-            COALESCE(CAST(a.line_color_c AS TEXT), l.line_color_c) AS "line_color_c: String",
+            COALESCE(a.line_name, l.line_name) AS "line_name: String",
+            COALESCE(a.line_name_k, l.line_name_k) AS "line_name_k: String",
+            COALESCE(a.line_name_h, l.line_name_h) AS "line_name_h: String",
+            COALESCE(a.line_name_r, l.line_name_r) AS "line_name_r: String",
+            COALESCE(a.line_name_zh, l.line_name_zh) AS "line_name_zh: String",
+            COALESCE(a.line_name_ko, l.line_name_ko) AS "line_name_ko: String",
+            COALESCE(a.line_color_c, l.line_color_c) AS "line_color_c: String",
             sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
@@ -693,13 +662,13 @@ impl InternalStationRepository {
             l.line_symbol3_shape,
             l.line_symbol4_shape,
             l.average_distance,
-            COALESCE(CAST(a.line_name AS TEXT), l.line_name) AS "line_name: String",
-            COALESCE(CAST(a.line_name_k AS TEXT), l.line_name_k) AS "line_name_k: String",
-            COALESCE(CAST(a.line_name_h AS TEXT), l.line_name_h) AS "line_name_h: String",
-            COALESCE(CAST(a.line_name_r AS TEXT), l.line_name_r) AS "line_name_r: String",
-            COALESCE(CAST(a.line_name_zh AS TEXT), l.line_name_zh) AS "line_name_zh: String",
-            COALESCE(CAST(a.line_name_ko AS TEXT), l.line_name_ko) AS "line_name_ko: String",
-            COALESCE(CAST(a.line_color_c AS TEXT), l.line_color_c) AS "line_color_c: String"
+            COALESCE(a.line_name, l.line_name)         AS line_name,
+            COALESCE(a.line_name_k, l.line_name_k)     AS line_name_k,
+            COALESCE(a.line_name_h, l.line_name_h)     AS line_name_h,
+            COALESCE(a.line_name_r, l.line_name_r)     AS line_name_r,
+            COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
+            COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
+            COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c
           FROM
             `stations` AS s
             JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
@@ -846,106 +815,6 @@ impl InternalStationRepository {
         Ok(stations)
     }
 
-    async fn get_station_id_and_distance_by_coordinates_and_line_id(
-        latitude: f64,
-        longitude: f64,
-        line_id: u32,
-        conn: &mut SqliteConnection,
-    ) -> Result<StationIdWithDistance, DomainError> {
-        let row = sqlx::query_as::<_, DistanceWithIdRow>(
-            "SELECT
-            s.station_cd,
-            s.station_g_cd, 
-            l.average_distance,
-            (
-              6371 * acos(
-                cos(
-                  radians(s.lat)
-                ) * cos(
-                  radians(?)
-                ) * cos(
-                  radians(?) - radians(s.lon)
-                ) + sin(
-                  radians(s.lat)
-                ) * sin(
-                  radians(?)
-                )
-              )
-            ) AS distance
-          FROM `stations` AS s
-          JOIN `lines` AS l ON l.line_cd = ?
-          WHERE
-            s.line_cd = ?
-            AND s.e_status = 0
-          ORDER BY 
-            distance
-          LIMIT 
-            1",
-        )
-        .bind(latitude)
-        .bind(longitude)
-        .bind(latitude)
-        .bind(line_id)
-        .bind(line_id)
-        .fetch_one(conn)
-        .await?;
-        let id_with_distance = StationIdWithDistance {
-            station_id: row.station_cd as u32,
-            distance: row.distance,
-            average_distance: row.average_distance,
-        };
-
-        Ok(id_with_distance)
-    }
-
-    async fn get_station_id_and_distance_by_coordinates(
-        latitude: f64,
-        longitude: f64,
-        conn: &mut SqliteConnection,
-    ) -> Result<StationIdWithDistance, DomainError> {
-        let row = sqlx::query_as::<_, DistanceWithIdRow>(
-            "SELECT
-          s.station_cd,
-          s.station_g_cd,
-          l.average_distance,
-          (
-            6371 * acos(
-              cos(
-                radians(s.lat)
-              ) * cos(
-                radians(?)
-              ) * cos(
-                radians(?) - radians(s.lon)
-              ) + sin(
-                radians(s.lat)
-              ) * sin(
-                radians(?)
-              )
-            )
-          ) AS distance
-        FROM `stations` AS s
-        JOIN `lines` AS l ON l.line_cd = s.line_cd
-        WHERE
-          s.e_status = 0
-        ORDER BY 
-          distance
-        LIMIT 
-          1",
-        )
-        .bind(latitude)
-        .bind(longitude)
-        .bind(latitude)
-        .fetch_one(conn)
-        .await?;
-        let id_with_distance = StationIdWithDistance {
-            station_id: row.station_cd as u32,
-            distance: row.distance,
-            average_distance: row.average_distance,
-        };
-
-        Ok(id_with_distance)
-    }
-
     async fn get_by_name(
         station_name: String,
         limit: Option<u32>,
@@ -986,13 +855,13 @@ impl InternalStationRepository {
                 dst_sst.type_cd,
                 dst_sst.line_group_cd,
                 dst_sst.pass,
-                COALESCE(CAST(a.line_name AS TEXT), l.line_name) AS "line_name: String",
-                COALESCE(CAST(a.line_name_k AS TEXT), l.line_name_k) AS "line_name_k: String",
-                COALESCE(CAST(a.line_name_h AS TEXT), l.line_name_h) AS "line_name_h: String",
-                COALESCE(CAST(a.line_name_r AS TEXT), l.line_name_r) AS "line_name_r: String",
-                COALESCE(CAST(a.line_name_zh AS TEXT), l.line_name_zh) AS "line_name_zh: String",
-                COALESCE(CAST(a.line_name_ko AS TEXT), l.line_name_ko) AS "line_name_ko: String",
-                COALESCE(CAST(a.line_color_c AS TEXT), l.line_color_c) AS "line_color_c: String",
+                COALESCE(a.line_name, l.line_name) AS "line_name: String",
+                COALESCE(a.line_name_k, l.line_name_k) AS "line_name_k: String",
+                COALESCE(a.line_name_h, l.line_name_h) AS "line_name_h: String",
+                COALESCE(a.line_name_r, l.line_name_r) AS "line_name_r: String",
+                COALESCE(a.line_name_zh, l.line_name_zh) AS "line_name_zh: String",
+                COALESCE(a.line_name_ko, l.line_name_ko) AS "line_name_ko: String",
+                COALESCE(a.line_color_c, l.line_color_c) AS "line_color_c: String",
                 t.id AS type_id,
                 t.type_name,
                 t.type_name_k,
@@ -1066,13 +935,13 @@ impl InternalStationRepository {
         let rows = sqlx::query_as!(
             StationRow,
             r#"SELECT DISTINCT s.*,
-            COALESCE(CAST(a.line_name AS TEXT), l.line_name) AS "line_name: String",
-            COALESCE(CAST(a.line_name_k AS TEXT), l.line_name_k) AS "line_name_k: String",
-            COALESCE(CAST(a.line_name_h AS TEXT), l.line_name_h) AS "line_name_h: String",
-            COALESCE(CAST(a.line_name_r AS TEXT), l.line_name_r) AS "line_name_r: String",
-            COALESCE(CAST(a.line_name_zh AS TEXT), l.line_name_zh) AS "line_name_zh: String",
-            COALESCE(CAST(a.line_name_ko AS TEXT), l.line_name_ko) AS "line_name_ko: String",
-            COALESCE(CAST(a.line_color_c AS TEXT), l.line_color_c) AS "line_color_c: String",
+            COALESCE(a.line_name, l.line_name) AS "line_name: String",
+            COALESCE(a.line_name_k, l.line_name_k) AS "line_name_k: String",
+            COALESCE(a.line_name_h, l.line_name_h) AS "line_name_h: String",
+            COALESCE(a.line_name_r, l.line_name_r) AS "line_name_r: String",
+            COALESCE(a.line_name_zh, l.line_name_zh) AS "line_name_zh: String",
+            COALESCE(a.line_name_ko, l.line_name_ko) AS "line_name_ko: String",
+            COALESCE(a.line_color_c, l.line_color_c) AS "line_color_c: String",
             l.company_cd,
             l.line_type,
             l.line_symbol1,
@@ -1147,36 +1016,18 @@ impl InternalStationRepository {
                     WHERE
                         s.station_g_cd = ?
                 ),
-                local_cte AS (
-                    SELECT
-                        s.*
-                    FROM
-                        `stations` AS s
-                        JOIN `lines` AS l ON l.line_cd IN (
-                            SELECT
-                                line_cd
-                            FROM
-                                `stations`
-                            WHERE
-                                station_g_cd = ?
-                                AND e_status = 0
+                common_lines AS (
+                    SELECT DISTINCT s1.line_cd
+                    FROM stations s1
+                    WHERE s1.station_g_cd = ?
+                        AND s1.e_status = 0
+                        AND EXISTS (
+                        SELECT 1
+                        FROM stations s2
+                        WHERE s2.station_g_cd = ?
+                            AND s2.e_status = 0
+                            AND s2.line_cd = s1.line_cd
                         )
-                        AND l.line_cd IN (
-                            (
-                                SELECT
-                                    line_cd
-                                FROM
-                                    `stations`
-                                WHERE
-                                    station_g_cd = ?
-                                    AND e_status = 0
-                            )
-                        )
-                    WHERE
-                        s.line_cd = l.line_cd
-                    ORDER BY
-                        s.e_sort,
-                        s.station_cd
                 ),
                 sst_cte_c1 AS (
                     SELECT
@@ -1202,7 +1053,7 @@ impl InternalStationRepository {
                     SELECT
                         sst.*
                     FROM
-                        `station_station_types` AS sst
+                        station_station_types AS sst
                         JOIN sst_cte_c1
                         JOIN sst_cte_c2
                     WHERE
@@ -1211,13 +1062,13 @@ impl InternalStationRepository {
                 )
             SELECT
             sta.*,
-            COALESCE(CAST(a.line_name AS TEXT), lin.line_name) AS "line_name: String",
-            COALESCE(CAST(a.line_name_k AS TEXT), lin.line_name_k) AS "line_name_k: String",
-            COALESCE(CAST(a.line_name_h AS TEXT), lin.line_name_h) AS "line_name_h: String",
-            COALESCE(CAST(a.line_name_r AS TEXT), lin.line_name_r) AS "line_name_r: String",
-            COALESCE(CAST(a.line_name_zh AS TEXT), lin.line_name_zh) AS "line_name_zh: String",
-            COALESCE(CAST(a.line_name_ko AS TEXT), lin.line_name_ko) AS "line_name_ko: String",
-            COALESCE(CAST(a.line_color_c AS TEXT), lin.line_color_c) AS "line_color_c: String",
+            COALESCE(a.line_name, lin.line_name) AS "line_name: String",
+            COALESCE(a.line_name_k, lin.line_name_k) AS "line_name_k: String",
+            COALESCE(a.line_name_h, lin.line_name_h) AS "line_name_h: String",
+            COALESCE(a.line_name_r, lin.line_name_r) AS "line_name_r: String",
+            COALESCE(a.line_name_zh, lin.line_name_zh) AS "line_name_zh: String",
+            COALESCE(a.line_name_ko, lin.line_name_ko) AS "line_name_ko: String",
+            COALESCE(a.line_color_c, lin.line_color_c) AS "line_color_c: String",
             lin.company_cd,
             lin.line_type,
             lin.line_symbol1,
@@ -1247,12 +1098,13 @@ impl InternalStationRepository {
             tt.direction,
             tt.kind
             FROM
-                local_cte AS sta
-                LEFT JOIN `sst_cte` AS sst ON sst.station_cd = sta.station_cd
-                LEFT JOIN `types` AS tt ON tt.type_cd = sst.type_cd
-                JOIN `lines` AS lin ON lin.line_cd = sta.line_cd
-                LEFT JOIN `line_aliases` AS la ON la.station_cd = sta.station_cd
-                LEFT JOIN `aliases` AS a ON a.id = la.alias_cd
+                stations AS sta
+				JOIN common_lines AS cl ON sta.line_cd = cl.line_cd
+				JOIN lines AS lin ON lin.line_cd = cl.line_cd
+                LEFT JOIN sst_cte AS sst ON sst.station_cd = sta.station_cd
+                LEFT JOIN types AS tt ON tt.type_cd = sst.type_cd
+                LEFT JOIN line_aliases AS la ON la.station_cd = sta.station_cd
+                LEFT JOIN aliases AS a ON a.id = la.alias_cd
             WHERE
                 sst.line_group_cd IS NULL
                 AND lin.e_status = 0
@@ -1341,13 +1193,13 @@ impl InternalStationRepository {
                 sst.type_cd,
                 sst.line_group_cd,
                 sst.pass,
-                COALESCE(CAST(a.line_name AS TEXT), lin.line_name) AS "line_name: String",
-                COALESCE(CAST(a.line_name_k AS TEXT), lin.line_name_k) AS "line_name_k: String",
-                COALESCE(CAST(a.line_name_h AS TEXT), lin.line_name_h) AS "line_name_h: String",
-                COALESCE(CAST(a.line_name_r AS TEXT), lin.line_name_r) AS "line_name_r: String",
-                COALESCE(CAST(a.line_name_zh AS TEXT), lin.line_name_zh) AS "line_name_zh: String",
-                COALESCE(CAST(a.line_name_ko AS TEXT), lin.line_name_ko) AS "line_name_ko: String",
-                COALESCE(CAST(a.line_color_c AS TEXT), lin.line_color_c) AS "line_color_c: String",
+                COALESCE(a.line_name, lin.line_name) AS "line_name: String",
+                COALESCE(a.line_name_k, lin.line_name_k) AS "line_name_k: String",
+                COALESCE(a.line_name_h, lin.line_name_h) AS "line_name_h: String",
+                COALESCE(a.line_name_r, lin.line_name_r) AS "line_name_r: String",
+                COALESCE(a.line_name_zh, lin.line_name_zh) AS "line_name_zh: String",
+                COALESCE(a.line_name_ko, lin.line_name_ko) AS "line_name_ko: String",
+                COALESCE(a.line_color_c, lin.line_color_c) AS "line_color_c: String",
                 tt.id AS type_id,
                 tt.type_name,
                 tt.type_name_k,
@@ -1367,9 +1219,7 @@ impl InternalStationRepository {
             WHERE
                 sta.station_cd = sst.station_cd
                 AND lin.e_status = 0
-                AND sta.e_status = 0
-            ORDER BY
-                sst.id"#,
+                AND sta.e_status = 0"#,
             from_station_id,
             to_station_id,
         )
