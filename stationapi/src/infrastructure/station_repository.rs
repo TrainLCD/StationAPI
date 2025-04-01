@@ -1219,7 +1219,8 @@ impl InternalStationRepository {
             WHERE
                 sta.station_cd = sst.station_cd
                 AND lin.e_status = 0
-                AND sta.e_status = 0"#,
+                AND sta.e_status = 0
+            ORDER BY sst.id"#,
             from_station_id,
             to_station_id,
         )
