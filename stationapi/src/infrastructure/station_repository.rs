@@ -910,7 +910,7 @@ impl InternalStationRepository {
                     )
                 )
             GROUP BY
-                s.station_g_cd
+                s.station_name
             LIMIT ?"#,
             from_station_group_id,
             station_name,
