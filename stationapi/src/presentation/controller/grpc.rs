@@ -33,7 +33,11 @@ impl StationApi for MyApi {
     ) -> Result<tonic::Response<SingleStationResponse>, tonic::Status> {
         let station_id = request.get_ref().id;
 
-        let station = match self.query_use_case.find_station_by_id(station_id).await {
+        let station = match self
+            .query_use_case
+            .find_station_by_id(station_id as i64)
+            .await
+        {
             Ok(Some(station)) => station,
             Ok(None) => {
                 return Err(PresentationalError::NotFound(format!(
@@ -60,7 +64,7 @@ impl StationApi for MyApi {
 
         let stations = match self
             .query_use_case
-            .get_stations_by_id_vec(station_ids)
+            .get_stations_by_id_vec(station_ids.iter().map(|x| *x as i64).collect())
             .await
         {
             Ok(stations) => stations,
@@ -80,7 +84,11 @@ impl StationApi for MyApi {
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let group_id = request.get_ref().group_id;
 
-        match self.query_use_case.get_stations_by_group_id(group_id).await {
+        match self
+            .query_use_case
+            .get_stations_by_group_id(group_id as i64)
+            .await
+        {
             Ok(stations) => {
                 return Ok(Response::new(MultipleStationResponse {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
@@ -99,7 +107,7 @@ impl StationApi for MyApi {
         let limit = request_ref.limit;
         let stations = match self
             .query_use_case
-            .get_stations_by_coordinates(latitude, longitude, limit)
+            .get_stations_by_coordinates(latitude, longitude, limit.map(|l| l as i64))
             .await
         {
             Ok(stations) => stations,
@@ -119,7 +127,7 @@ impl StationApi for MyApi {
 
         match self
             .query_use_case
-            .get_stations_by_line_id(line_id, station_id)
+            .get_stations_by_line_id(line_id as i64, station_id.map(|s| s as i64))
             .await
         {
             Ok(stations) => {
@@ -140,7 +148,11 @@ impl StationApi for MyApi {
         let from_station_group_id = request_ref.from_station_group_id;
         match self
             .query_use_case
-            .get_stations_by_name(query_station_name, query_limit, from_station_group_id)
+            .get_stations_by_name(
+                query_station_name,
+                query_limit.map(|l| l as i64),
+                from_station_group_id.map(|g| g as i64),
+            )
             .await
         {
             Ok(stations) => {
@@ -161,7 +173,7 @@ impl StationApi for MyApi {
 
         match self
             .query_use_case
-            .get_stations_by_line_group_id(query_line_group_id)
+            .get_stations_by_line_group_id(query_line_group_id as i64)
             .await
         {
             Ok(stations) => {
@@ -182,7 +194,7 @@ impl StationApi for MyApi {
 
         match self
             .query_use_case
-            .get_train_types_by_station_id(query_station_id)
+            .get_train_types_by_station_id(query_station_id as i64)
             .await
         {
             Ok(train_types) => Ok(Response::new(MultipleTrainTypeResponse {
@@ -199,7 +211,11 @@ impl StationApi for MyApi {
         let from_id = request.get_ref().from_station_group_id;
         let to_id = request.get_ref().to_station_group_id;
 
-        match self.query_use_case.get_routes(from_id, to_id).await {
+        match self
+            .query_use_case
+            .get_routes(from_id as i64, to_id as i64)
+            .await
+        {
             Ok(routes) => {
                 return Ok(Response::new(RouteResponse {
                     routes,
@@ -216,7 +232,7 @@ impl StationApi for MyApi {
     ) -> Result<tonic::Response<SingleLineResponse>, tonic::Status> {
         let line_id = request.get_ref().line_id;
 
-        let line = match self.query_use_case.find_line_by_id(line_id).await {
+        let line = match self.query_use_case.find_line_by_id(line_id as i64).await {
             Ok(Some(line)) => line,
             Ok(None) => {
                 return Err(PresentationalError::NotFound(format!(
@@ -244,7 +260,7 @@ impl StationApi for MyApi {
 
         match self
             .query_use_case
-            .get_lines_by_name(line_name, limit)
+            .get_lines_by_name(line_name, limit.map(|x| x as i64))
             .await
         {
             Ok(lines) => {
@@ -265,7 +281,7 @@ impl StationApi for MyApi {
 
         match self
             .query_use_case
-            .get_connected_stations(from_station_group_id, to_station_group_id)
+            .get_connected_stations(from_station_group_id as i64, to_station_group_id as i64)
             .await
         {
             Ok(stations) => Ok(Response::new(RouteResponse {

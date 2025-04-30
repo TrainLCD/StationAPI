@@ -3,9 +3,8 @@ use crate::domain::{
     repository::train_type_repository::TrainTypeRepository,
 };
 use async_trait::async_trait;
-use sqlx::SqliteConnection;
+use sqlx::{PgConnection, Pool, Postgres};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct TrainTypeRow {
@@ -62,12 +61,12 @@ impl From<TrainTypeRow> for TrainType {
 }
 
 pub struct MyTrainTypeRepository {
-    conn: Arc<Mutex<SqliteConnection>>,
+    pool: Arc<Pool<Postgres>>,
 }
 
 impl MyTrainTypeRepository {
-    pub fn new(conn: Arc<Mutex<SqliteConnection>>) -> Self {
-        Self { conn }
+    pub fn new(pool: Arc<Pool<Postgres>>) -> Self {
+        Self { pool }
     }
 }
 
@@ -75,23 +74,23 @@ impl MyTrainTypeRepository {
 impl TrainTypeRepository for MyTrainTypeRepository {
     async fn get_by_line_group_id(
         &self,
-        line_group_id: u32,
+        line_group_id: i64,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.conn.lock().await;
+        let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_by_line_group_id(line_group_id, &mut conn).await
     }
 
-    async fn get_by_station_id(&self, station_id: u32) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.conn.lock().await;
+    async fn get_by_station_id(&self, station_id: i64) -> Result<Vec<TrainType>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_by_station_id(station_id, &mut conn).await
     }
 
     async fn find_by_line_group_id_and_line_id(
         &self,
-        line_group_id: u32,
-        line_id: u32,
+        line_group_id: i64,
+        line_id: i64,
     ) -> Result<Option<TrainType>, DomainError> {
-        let mut conn = self.conn.lock().await;
+        let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_by_line_group_id_and_line_id(
             line_group_id,
             line_id,
@@ -102,20 +101,20 @@ impl TrainTypeRepository for MyTrainTypeRepository {
 
     async fn get_by_station_id_vec(
         &self,
-        station_id_vec: &[u32],
-        line_group_id: Option<u32>,
+        station_id_vec: Vec<i64>,
+        line_group_id: Option<i64>,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.conn.lock().await;
+        let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_by_station_id_vec(station_id_vec, line_group_id, &mut conn)
             .await
     }
 
     async fn get_types_by_station_id_vec(
         &self,
-        station_id_vec: &[u32],
-        line_group_id: Option<u32>,
+        station_id_vec: Vec<i64>,
+        line_group_id: Option<i64>,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.conn.lock().await;
+        let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_types_by_station_id_vec(
             station_id_vec,
             line_group_id,
@@ -126,9 +125,9 @@ impl TrainTypeRepository for MyTrainTypeRepository {
 
     async fn get_by_line_group_id_vec(
         &self,
-        line_group_id_vec: &[u32],
+        line_group_id_vec: Vec<i64>,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.conn.lock().await;
+        let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_by_line_group_id_vec(line_group_id_vec, &mut conn).await
     }
 }
@@ -137,12 +136,14 @@ pub struct InternalTrainTypeRepository {}
 
 impl InternalTrainTypeRepository {
     async fn get_by_line_group_id(
-        line_group_id: u32,
-        conn: &mut SqliteConnection,
+        line_group_id: i64,
+        conn: &mut PgConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         let rows = sqlx::query_as!(
             TrainTypeRow,
             "SELECT
+            t.id,
+            t.type_cd,
             t.type_name,
             t.type_name_k,
             t.type_name_r,
@@ -151,9 +152,11 @@ impl InternalTrainTypeRepository {
             t.color,
             t.direction,
             t.kind,
-            sst.*
+            sst.station_cd,
+            sst.line_group_cd,
+            sst.pass
             FROM types as t
-            JOIN `station_station_types` AS sst ON sst.line_group_cd = ?
+            JOIN station_station_types AS sst ON sst.line_group_cd = $1
             WHERE 
                 t.type_cd = sst.type_cd
             ORDER BY t.kind, sst.id",
@@ -166,11 +169,13 @@ impl InternalTrainTypeRepository {
         Ok(train_types)
     }
     async fn get_by_station_id(
-        station_id: u32,
-        conn: &mut SqliteConnection,
+        station_id: i64,
+        conn: &mut PgConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         let rows = sqlx::query_as!(TrainTypeRow,
             "SELECT
+            t.id,
+            t.type_cd,
             t.type_name,
             t.type_name_k,
             t.type_name_r,
@@ -179,10 +184,12 @@ impl InternalTrainTypeRepository {
             t.color,
             t.direction,
             t.kind,
-            sst.*
-            FROM  `types` AS t
-            JOIN `stations` AS s ON s.station_cd = ? AND s.e_status = 0
-            JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd AND sst.type_cd = t.type_cd AND sst.pass <> 1
+            s.station_cd,
+            sst.line_group_cd,
+            sst.pass
+            FROM  types AS t
+            JOIN stations AS s ON s.station_cd = $1 AND s.e_status = 0
+            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.type_cd = t.type_cd AND sst.pass <> 1
             ORDER BY sst.id",
             station_id
         )
@@ -193,31 +200,43 @@ impl InternalTrainTypeRepository {
         Ok(train_types)
     }
     async fn get_by_line_group_id_and_line_id(
-        line_group_id: u32,
-        line_id: u32,
-        conn: &mut SqliteConnection,
+        line_group_id: i64,
+        line_id: i64,
+        conn: &mut PgConnection,
     ) -> Result<Option<TrainType>, DomainError> {
-        let rows: Option<TrainTypeRow> = sqlx::query_as(
+        let rows = sqlx::query_as!(
+            TrainTypeRow,
             "SELECT 
-            t.*, 
-            sst.*
-            FROM `types` as t
-            JOIN `station_station_types` AS sst ON sst.line_group_cd = ? 
+            t.id,
+            t.type_cd,
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
+            sst.station_cd,
+            sst.line_group_cd,
+            sst.pass
+            FROM types as t
+            JOIN station_station_types AS sst ON sst.line_group_cd = $1
             WHERE 
-            sst.station_cd IN (
+            sst.station_cd = ANY(
                 SELECT 
                 station_cd 
                 FROM 
-                stations as s 
+                stations
                 WHERE 
-                line_cd = ?
-                AND s.e_status = 0
+                line_cd = $2
+                AND e_status = 0
             )
             AND t.type_cd = sst.type_cd
             ORDER BY sst.id",
+            line_group_id,
+            line_id,
         )
-        .bind(line_group_id)
-        .bind(line_id)
         .fetch_optional(conn)
         .await?;
 
@@ -231,59 +250,74 @@ impl InternalTrainTypeRepository {
     }
 
     async fn get_by_station_id_vec(
-        station_id_vec: &[u32],
-        line_group_id: Option<u32>,
-        conn: &mut SqliteConnection,
+        station_id_vec: Vec<i64>,
+        line_group_id: Option<i64>,
+        conn: &mut PgConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         if station_id_vec.is_empty() {
             return Ok(vec![]);
         }
 
-        let params = format!("?{}", ", ?".repeat(station_id_vec.len() - 1));
-        let query_str = format!(
+        let rows = sqlx::query_as!(TrainTypeRow,
             "SELECT 
-            t.*, 
-            sst.*
+            t.id,
+            t.type_cd,
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
+            s.station_cd,
+            sst.line_group_cd,
+            sst.pass
             FROM 
             types as t
-            JOIN `stations` AS s ON s.station_cd IN ( {} ) AND s.e_status = 0
-            JOIN `station_station_types` AS sst ON sst.line_group_cd = ? AND sst.pass <> 1 AND sst.type_cd = t.type_cd
+            JOIN stations AS s ON s.station_cd IN (SELECT unnest($1::bigint[])) AND s.e_status = 0
+            JOIN station_station_types AS sst ON sst.line_group_cd = $2 AND sst.pass <> 1 AND sst.type_cd = t.type_cd
             WHERE sst.pass <> 1 AND sst.type_cd = t.type_cd
             ORDER BY sst.id",
-            params
-        );
-
-        let mut query = sqlx::query_as::<_, TrainTypeRow>(&query_str);
-        for id in station_id_vec {
-            query = query.bind(id);
-        }
-
-        let rows = query.bind(line_group_id).fetch_all(conn).await?;
+            &station_id_vec,
+            line_group_id
+        ).fetch_all(conn).await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(train_types)
     }
 
     async fn get_types_by_station_id_vec(
-        station_id_vec: &[u32],
-        line_group_id: Option<u32>,
-        conn: &mut SqliteConnection,
+        station_id_vec: Vec<i64>,
+        line_group_id: Option<i64>,
+        conn: &mut PgConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         if station_id_vec.is_empty() {
             return Ok(vec![]);
         }
 
-        let params = format!("?{}", ", ?".repeat(station_id_vec.len() - 1));
-        let query_str = format!(
+        let rows = sqlx::query_as!(
+            TrainTypeRow,
             "SELECT 
-            t.*, 
-            sst.*
+            t.id,
+            t.type_cd,
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
+            s.station_cd,
+            sst.line_group_cd,
+            sst.pass
             FROM 
             station_station_types as sst, 
             stations as s, 
             types as t 
             WHERE 
-            s.station_cd IN ( {} ) 
+            s.station_cd IN (SELECT unnest($1::bigint[]))
             AND CASE WHEN t.top_priority = 1
             THEN
                 sst.type_cd = t.type_cd
@@ -294,52 +328,51 @@ impl InternalTrainTypeRepository {
             AND s.station_cd = sst.station_cd
             AND sst.type_cd = t.type_cd 
             AND s.e_status = 0
-            AND sst.line_group_cd = ?
+            AND sst.line_group_cd = $2
             AND sst.pass <> 1
             ORDER BY t.kind, sst.id",
-            params
-        );
-
-        let mut query = sqlx::query_as::<_, TrainTypeRow>(&query_str);
-        for id in station_id_vec {
-            query = query.bind(id);
-        }
-
-        let rows = query.bind(line_group_id).fetch_all(conn).await?;
+            &station_id_vec,
+            line_group_id
+        )
+        .fetch_all(conn)
+        .await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(train_types)
     }
 
     async fn get_by_line_group_id_vec(
-        line_group_id_vec: &[u32],
-        conn: &mut SqliteConnection,
+        line_group_id_vec: Vec<i64>,
+        conn: &mut PgConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         if line_group_id_vec.is_empty() {
             return Ok(vec![]);
         }
 
-        let params = format!("?{}", ", ?".repeat(line_group_id_vec.len() - 1));
-        let query_str = format!(
+        let rows = sqlx::query_as!(
+            TrainTypeRow,
             "SELECT 
-            t.*, 
-            s.*,
-            sst.*
+            t.id,
+            t.type_cd,
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
+            s.station_cd,
+            sst.line_group_cd,
+            sst.pass
             FROM 
             types as t
-            JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} ) AND sst.pass <> 1 AND sst.type_cd = t.type_cd
-            JOIN `stations` AS s ON s.station_cd = sst.station_cd
+            JOIN station_station_types AS sst ON sst.line_group_cd IN (SELECT unnest($1::bigint[])) AND sst.pass <> 1 AND sst.type_cd = t.type_cd
+            JOIN stations AS s ON s.station_cd = sst.station_cd
             WHERE sst.pass <> 1 AND sst.type_cd = t.type_cd
             ORDER BY sst.id",
-            params
-        );
-
-        let mut query = sqlx::query_as::<_, TrainTypeRow>(&query_str);
-        for id in line_group_id_vec {
-            query = query.bind(id);
-        }
-
-        let rows = query.fetch_all(conn).await?;
+            &line_group_id_vec)
+            .fetch_all(conn).await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(train_types)

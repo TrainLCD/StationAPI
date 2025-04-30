@@ -1,7 +1,6 @@
 use async_trait::async_trait;
-use sqlx::SqliteConnection;
+use sqlx::{PgConnection, Pool, Postgres};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 use crate::domain::{
     entity::line::Line, error::DomainError, repository::line_repository::LineRepository,
@@ -33,7 +32,7 @@ pub struct LineRow {
     pub line_symbol4_shape: Option<String>,
     pub e_status: i64,
     pub e_sort: i64,
-    pub average_distance: Option<f64>,
+    pub average_distance: Option<f32>,
     pub line_group_cd: Option<i64>,
     pub station_cd: Option<i64>,
     pub station_g_cd: Option<i64>,
@@ -45,9 +44,9 @@ impl From<LineRow> for Line {
             line_cd: row.line_cd,
             company_cd: row.company_cd,
             company: None,
-            line_name: row.line_name.unwrap_or_default(),
-            line_name_k: row.line_name_k.unwrap_or_default(),
-            line_name_h: row.line_name_h.unwrap_or_default(),
+            line_name: row.line_name,
+            line_name_k: row.line_name_k,
+            line_name_h: row.line_name_h,
             line_name_r: row.line_name_r,
             line_name_zh: row.line_name_zh,
             line_name_ko: row.line_name_ko,
@@ -73,81 +72,78 @@ impl From<LineRow> for Line {
             line_group_cd: row.line_group_cd,
             station_cd: row.station_cd,
             station_g_cd: row.station_g_cd,
-            average_distance: row.average_distance.unwrap_or(0.0),
+            average_distance: row.average_distance,
         }
     }
 }
 
 pub struct MyLineRepository {
-    conn: Arc<Mutex<SqliteConnection>>,
+    pool: Arc<Pool<Postgres>>,
 }
 
 impl MyLineRepository {
-    pub fn new(conn: Arc<Mutex<SqliteConnection>>) -> Self {
-        Self { conn }
+    pub fn new(pool: Arc<Pool<Postgres>>) -> Self {
+        Self { pool }
     }
 }
 
 #[async_trait]
 impl LineRepository for MyLineRepository {
-    async fn find_by_id(&self, id: u32) -> Result<Option<Line>, DomainError> {
-        let id: i64 = id as i64;
-        let mut conn = self.conn.lock().await;
+    async fn find_by_id(&self, id: i64) -> Result<Option<Line>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
         InternalLineRepository::find_by_id(id, &mut conn).await
     }
-    async fn find_by_station_id(&self, station_id: u32) -> Result<Option<Line>, DomainError> {
-        let station_id: i64 = station_id as i64;
-        let mut conn = self.conn.lock().await;
+    async fn find_by_station_id(&self, station_id: i64) -> Result<Option<Line>, DomainError> {
+        let station_id: i64 = station_id;
+        let mut conn = self.pool.acquire().await?;
         InternalLineRepository::find_by_station_id(station_id, &mut conn).await
     }
-    async fn get_by_ids(&self, ids: &[u32]) -> Result<Vec<Line>, DomainError> {
-        let ids: Vec<i64> = ids.iter().map(|x| *x as i64).collect();
-        let mut conn = self.conn.lock().await;
-        InternalLineRepository::get_by_ids(&ids, &mut conn).await
+    async fn get_by_ids(&self, ids: Vec<i64>) -> Result<Vec<Line>, DomainError> {
+        let ids: Vec<i64> = ids.to_vec();
+        let mut conn = self.pool.acquire().await?;
+        InternalLineRepository::get_by_ids(ids, &mut conn).await
     }
-    async fn get_by_station_group_id(&self, id: u32) -> Result<Vec<Line>, DomainError> {
-        let id: i64 = id as i64;
-        let mut conn = self.conn.lock().await;
+    async fn get_by_station_group_id(&self, id: i64) -> Result<Vec<Line>, DomainError> {
+        let id: i64 = id;
+        let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_station_group_id(id, &mut conn).await
     }
     async fn get_by_station_group_id_vec(
         &self,
-        station_group_id_vec: &[u32],
+        station_group_id_vec: Vec<i64>,
     ) -> Result<Vec<Line>, DomainError> {
-        let station_group_id_vec: Vec<i64> =
-            station_group_id_vec.iter().map(|x| *x as i64).collect();
-        let mut conn = self.conn.lock().await;
-        InternalLineRepository::get_by_station_group_id_vec(&station_group_id_vec, &mut conn).await
+        let station_group_id_vec: Vec<i64> = station_group_id_vec.to_vec();
+        let mut conn = self.pool.acquire().await?;
+        InternalLineRepository::get_by_station_group_id_vec(station_group_id_vec, &mut conn).await
     }
-    async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Line>, DomainError> {
-        let line_group_id: i64 = line_group_id as i64;
-        let mut conn = self.conn.lock().await;
+    async fn get_by_line_group_id(&self, line_group_id: i64) -> Result<Vec<Line>, DomainError> {
+        let line_group_id: i64 = line_group_id;
+        let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_line_group_id(line_group_id, &mut conn).await
     }
     async fn get_by_line_group_id_vec(
         &self,
-        line_group_id_vec: &[u32],
+        line_group_id_vec: Vec<i64>,
     ) -> Result<Vec<Line>, DomainError> {
-        let line_group_id_vec: Vec<i64> = line_group_id_vec.iter().map(|x| *x as i64).collect();
-        let mut conn = self.conn.lock().await;
-        InternalLineRepository::get_by_line_group_id_vec(&line_group_id_vec, &mut conn).await
+        let line_group_id_vec: Vec<i64> = line_group_id_vec.to_vec();
+        let mut conn = self.pool.acquire().await?;
+        InternalLineRepository::get_by_line_group_id_vec(line_group_id_vec, &mut conn).await
     }
     async fn get_by_line_group_id_vec_for_routes(
         &self,
-        line_group_id_vec: &[u32],
+        line_group_id_vec: Vec<i64>,
     ) -> Result<Vec<Line>, DomainError> {
-        let line_group_id_vec: Vec<i64> = line_group_id_vec.iter().map(|x| *x as i64).collect();
-        let mut conn = self.conn.lock().await;
-        InternalLineRepository::get_by_line_group_id_vec_for_routes(&line_group_id_vec, &mut conn)
+        let line_group_id_vec: Vec<i64> = line_group_id_vec.to_vec();
+        let mut conn = self.pool.acquire().await?;
+        InternalLineRepository::get_by_line_group_id_vec_for_routes(line_group_id_vec, &mut conn)
             .await
     }
     async fn get_by_name(
         &self,
         line_name: String,
-        limit: Option<u32>,
+        limit: Option<i64>,
     ) -> Result<Vec<Line>, DomainError> {
-        let limit = limit.map(|l| l as i64);
-        let mut conn = self.conn.lock().await;
+        let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_name(line_name, limit, &mut conn).await
     }
 }
@@ -155,10 +151,10 @@ impl LineRepository for MyLineRepository {
 pub struct InternalLineRepository {}
 
 impl InternalLineRepository {
-    async fn find_by_id(id: i64, conn: &mut SqliteConnection) -> Result<Option<Line>, DomainError> {
+    async fn find_by_id(id: i64, conn: &mut PgConnection) -> Result<Option<Line>, DomainError> {
         let rows: Option<LineRow> = sqlx::query_as!(
             LineRow,
-            "SELECT 
+            "SELECT
             l.line_cd,
             l.company_cd,
             l.line_type,
@@ -184,11 +180,11 @@ impl InternalLineRepository {
             l.e_status,
             l.e_sort,
             l.average_distance,
-            CAST(NULL AS INTEGER) AS line_group_cd,
-            CAST(NULL AS INTEGER) AS station_cd,
-            CAST(NULL AS INTEGER) AS station_g_cd
-            FROM `lines` AS l
-            WHERE l.line_cd = ?
+            CAST(NULL AS BIGINT) AS line_group_cd,
+            CAST(NULL AS BIGINT) AS station_cd,
+            CAST(NULL AS BIGINT) AS station_g_cd
+            FROM lines AS l
+            WHERE l.line_cd = $1
             AND l.e_status = 0",
             id
         )
@@ -205,9 +201,9 @@ impl InternalLineRepository {
 
     async fn find_by_station_id(
         station_id: i64,
-        conn: &mut SqliteConnection,
+        conn: &mut PgConnection,
     ) -> Result<Option<Line>, DomainError> {
-        let rows: Option<LineRow> = sqlx::query_as!(
+        let rows = sqlx::query_as!(
             LineRow,
             "SELECT DISTINCT l.line_cd,
             l.company_cd,
@@ -237,11 +233,11 @@ impl InternalLineRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
-        FROM `lines` AS l
-            JOIN `stations` AS s ON s.station_cd = ?
-            JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1
-            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+        FROM lines AS l
+            JOIN stations AS s ON s.station_cd = $1
+            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1
+            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+            LEFT JOIN aliases AS a ON la.alias_cd = a.id
         WHERE l.line_cd = s.line_cd",
             station_id,
         )
@@ -256,16 +252,13 @@ impl InternalLineRepository {
         Ok(Some(line))
     }
 
-    async fn get_by_ids(
-        ids: &[i64],
-        conn: &mut SqliteConnection,
-    ) -> Result<Vec<Line>, DomainError> {
+    async fn get_by_ids(ids: Vec<i64>, conn: &mut PgConnection) -> Result<Vec<Line>, DomainError> {
         if ids.is_empty() {
             return Ok(vec![]);
         }
 
-        let params = format!("?{}", ", ?".repeat(ids.len() - 1));
-        let query_str = format!(
+        let rows = sqlx::query_as!(
+            LineRow,
             "SELECT 
                 line_cd,
                 company_cd,
@@ -292,19 +285,14 @@ impl InternalLineRepository {
                 e_status,
                 e_sort,
                 average_distance,
-                CAST(NULL AS INTEGER) AS line_group_cd,
-                CAST(NULL AS INTEGER) AS station_cd,
-                CAST(NULL AS INTEGER) AS station_g_cd
-            FROM `lines` WHERE line_cd IN ( {} ) AND e_status = 0",
-            params
-        );
-
-        let mut query = sqlx::query_as::<_, LineRow>(&query_str);
-        for id in ids {
-            query = query.bind(id);
-        }
-
-        let rows = query.fetch_all(conn).await?;
+                CAST(NULL AS BIGINT) AS line_group_cd,
+                CAST(NULL AS BIGINT) AS station_cd,
+                CAST(NULL AS BIGINT) AS station_g_cd
+            FROM lines WHERE line_cd IN (SELECT unnest($1::bigint[])) AND e_status = 0",
+            &ids
+        )
+        .fetch_all(conn)
+        .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(lines)
@@ -312,7 +300,7 @@ impl InternalLineRepository {
 
     async fn get_by_station_group_id(
         station_group_id: i64,
-        conn: &mut SqliteConnection,
+        conn: &mut PgConnection,
     ) -> Result<Vec<Line>, DomainError> {
         let rows = sqlx::query_as!(
             LineRow,
@@ -344,13 +332,13 @@ impl InternalLineRepository {
             sst.line_group_cd,
             s.station_cd,
             s.station_g_cd
-        FROM `lines` AS l
-        JOIN `stations` AS s ON s.station_g_cd = ?
+        FROM lines AS l
+        JOIN stations AS s ON s.station_g_cd = $1
             AND s.e_status = 0
-        JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1
+        JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1
         WHERE l.line_cd = s.line_cd
             AND l.e_status = 0",
-            station_group_id
+            &station_group_id
         )
         .fetch_all(conn)
         .await?;
@@ -360,26 +348,19 @@ impl InternalLineRepository {
     }
 
     async fn get_by_station_group_id_vec(
-        station_group_id_vec: &[i64],
-        conn: &mut SqliteConnection,
+        station_group_id_vec: Vec<i64>,
+        conn: &mut PgConnection,
     ) -> Result<Vec<Line>, DomainError> {
         if station_group_id_vec.is_empty() {
             return Ok(vec![]);
         }
 
-        let params = format!("?{}", ", ?".repeat(station_group_id_vec.len() - 1));
-        let query_str = format!(
-            "SELECT 
+        let rows = sqlx::query_as!(
+            LineRow,
+            r#"SELECT DISTINCT ON (s.station_cd)
                 l.line_cd,
                 l.company_cd,
                 l.line_type,
-                l.line_name,
-                l.line_name_k,
-                l.line_name_h,
-                l.line_name_r,
-                l.line_name_zh,
-                l.line_name_ko,
-                l.line_color_c,
                 l.line_symbol1,
                 l.line_symbol2,
                 l.line_symbol3,
@@ -397,7 +378,7 @@ impl InternalLineRepository {
                 l.average_distance,
                 s.station_cd,
                 s.station_g_cd,
-                sst.line_group_cd,
+                sst.line_group_cd AS "line_group_cd?",
                 COALESCE(a.line_name, l.line_name) AS line_name,
                 COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
                 COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -405,28 +386,22 @@ impl InternalLineRepository {
                 COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
                 COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
                 COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
-            FROM `lines` AS l
-            JOIN `stations` AS s ON s.station_g_cd IN ( {} )
+            FROM lines AS l
+            JOIN stations AS s ON s.station_g_cd IN (SELECT unnest($1::bigint[]))
             AND s.e_status = 0
-            LEFT JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
-            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+            LEFT JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
+            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+            LEFT JOIN aliases AS a ON la.alias_cd = a.id
             WHERE l.line_cd = s.line_cd
             AND l.e_status = 0
             AND (
                 (sst.line_group_cd IS NOT NULL AND sst.pass <> 1)
                 OR sst.line_group_cd IS NULL
-            )
-            GROUP BY s.station_cd",
-            params
-        );
-
-        let mut query = sqlx::query_as::<_, LineRow>(&query_str);
-        for id in station_group_id_vec {
-            query = query.bind(id);
-        }
-
-        let rows = query.fetch_all(conn).await?;
+            )"#,
+            &station_group_id_vec
+        )
+        .fetch_all(conn)
+        .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(lines)
@@ -434,11 +409,13 @@ impl InternalLineRepository {
 
     async fn get_by_line_group_id(
         line_group_id: i64,
-        conn: &mut SqliteConnection,
+        conn: &mut PgConnection,
     ) -> Result<Vec<Line>, DomainError> {
         let rows = sqlx::query_as!(
             LineRow,
-            "SELECT DISTINCT l.line_cd,
+            "SELECT DISTINCT
+            ON (l.line_cd)
+            l.line_cd,
             l.company_cd,
             l.line_type,
             l.line_symbol1,
@@ -466,16 +443,15 @@ impl InternalLineRepository {
             l.line_name_zh,
             l.line_name_ko,
             l.line_color_c
-        FROM `lines` AS l
-            JOIN `station_station_types` AS sst ON sst.line_group_cd = ? AND sst.pass <> 1
-            JOIN `stations` AS s ON s.station_cd = sst.station_cd
+        FROM lines AS l
+            JOIN station_station_types AS sst ON sst.line_group_cd = $1 AND sst.pass <> 1
+            JOIN stations AS s ON s.station_cd = sst.station_cd
             AND s.e_status = 0
-            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+            LEFT JOIN aliases AS a ON la.alias_cd = a.id
         WHERE l.line_cd = s.line_cd
-            AND l.e_status = 0
-            GROUP BY l.line_cd",
-            line_group_id
+            AND l.e_status = 0",
+            &line_group_id
         )
         .fetch_all(conn)
         .await?;
@@ -484,16 +460,17 @@ impl InternalLineRepository {
     }
 
     async fn get_by_line_group_id_vec(
-        line_group_id_vec: &[i64],
-        conn: &mut SqliteConnection,
+        line_group_id_vec: Vec<i64>,
+        conn: &mut PgConnection,
     ) -> Result<Vec<Line>, DomainError> {
         if line_group_id_vec.is_empty() {
             return Ok(vec![]);
         }
 
-        let params = format!("?{}", ", ?".repeat(line_group_id_vec.len() - 1));
-        let query_str = format!(
+        let rows = sqlx::query_as!(
+            LineRow,
             "SELECT DISTINCT
+                ON (sst.line_group_cd, l.line_cd)
                 l.line_cd,
                 l.company_cd,
                 l.line_type,
@@ -522,83 +499,69 @@ impl InternalLineRepository {
                 sst.line_group_cd,
                 s.station_cd,
                 s.station_g_cd
-            FROM `lines` AS l
-            JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} ) AND sst.pass <> 1
-            JOIN `stations` AS s ON s.station_cd = sst.station_cd AND s.e_status = 0
-            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
+            FROM lines AS l
+            JOIN station_station_types AS sst ON sst.line_group_cd IN (SELECT unnest($1::bigint[])) AND sst.pass <> 1
+            JOIN stations AS s ON s.station_cd = sst.station_cd AND s.e_status = 0
+            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+            LEFT JOIN aliases AS a ON la.alias_cd = a.id
             WHERE
                 l.line_cd = s.line_cd
-                AND l.e_status = 0
-            GROUP BY sst.line_group_cd, l.line_cd",
-            params
-        );
-
-        let mut query = sqlx::query_as::<_, LineRow>(&query_str);
-        for id in line_group_id_vec {
-            query = query.bind(id);
-        }
-
-        let rows = query.fetch_all(conn).await?;
+                AND l.e_status = 0",
+            &line_group_id_vec
+        )
+        .fetch_all(conn)
+        .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(lines)
     }
     async fn get_by_line_group_id_vec_for_routes(
-        line_group_id_vec: &[i64],
-        conn: &mut SqliteConnection,
+        line_group_id_vec: Vec<i64>,
+        conn: &mut PgConnection,
     ) -> Result<Vec<Line>, DomainError> {
         if line_group_id_vec.is_empty() {
             return Ok(vec![]);
         }
 
-        let params = format!("?{}", ", ?".repeat(line_group_id_vec.len() - 1));
-        let query_str = format!(
-            "SELECT
-                l.line_cd,
-                l.company_cd,
-                l.line_type,
-                l.line_name,
-                l.line_name_k,
-                l.line_name_h,
-                l.line_name_r,
-                l.line_name_zh,
-                l.line_name_ko,
-                l.line_color_c,
-                l.line_symbol1,
-                l.line_symbol2,
-                l.line_symbol3,
-                l.line_symbol4,
-                l.line_symbol1_color,
-                l.line_symbol2_color,
-                l.line_symbol3_color,
-                l.line_symbol4_color,
-                l.line_symbol1_shape,
-                l.line_symbol2_shape,
-                l.line_symbol3_shape,
-                l.line_symbol4_shape,
-                l.e_status,
-                l.e_sort,
-                l.average_distance,
-                sst.line_group_cd,
-                s.station_cd,
-                s.station_g_cd
-            FROM `lines` AS l
-            JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} ) AND sst.pass <> 1
-            JOIN `stations` AS s ON s.station_cd = sst.station_cd AND s.e_status = 0 AND s.line_cd = l.line_cd
-            LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
-            LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
-            WHERE l.e_status = 0
-            GROUP BY l.line_cd",
-            params
-        );
-
-        let mut query = sqlx::query_as::<_, LineRow>(&query_str);
-        for id in line_group_id_vec {
-            query = query.bind(id);
-        }
-
-        let rows = query.fetch_all(conn).await?;
+        let rows = sqlx::query_as!(
+            LineRow,
+            "SELECT DISTINCT ON (l.line_cd)
+            l.line_cd,
+            l.company_cd,
+            l.line_type,
+            l.line_name,
+            l.line_name_k,
+            l.line_name_h,
+            l.line_name_r,
+            l.line_name_zh,
+            l.line_name_ko,
+            l.line_color_c,
+            l.line_symbol1,
+            l.line_symbol2,
+            l.line_symbol3,
+            l.line_symbol4,
+            l.line_symbol1_color,
+            l.line_symbol2_color,
+            l.line_symbol3_color,
+            l.line_symbol4_color,
+            l.line_symbol1_shape,
+            l.line_symbol2_shape,
+            l.line_symbol3_shape,
+            l.line_symbol4_shape,
+            l.e_status,
+            l.e_sort,
+            l.average_distance,
+            sst.line_group_cd,
+            s.station_cd,
+            s.station_g_cd
+            FROM lines AS l
+            JOIN station_station_types AS sst ON sst.line_group_cd IN (SELECT unnest($1::bigint[])) AND sst.pass <> 1
+            JOIN stations AS s ON s.station_cd = sst.station_cd AND s.e_status = 0 AND s.line_cd = l.line_cd
+            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+            LEFT JOIN aliases AS a ON la.alias_cd = a.id
+            WHERE l.e_status = 0",
+            &line_group_id_vec
+        ).fetch_all(conn).await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(lines)
@@ -607,7 +570,7 @@ impl InternalLineRepository {
     async fn get_by_name(
         line_name: String,
         limit: Option<i64>,
-        conn: &mut SqliteConnection,
+        conn: &mut PgConnection,
     ) -> Result<Vec<Line>, DomainError> {
         let limit = limit.unwrap_or(1);
         let line_name = &format!("%{}%", line_name);
@@ -640,19 +603,19 @@ impl InternalLineRepository {
             l.e_status,
             l.e_sort,
             l.average_distance,
-            CAST(NULL AS INTEGER) AS line_group_cd,
-            CAST(NULL AS INTEGER) AS station_cd,
-            CAST(NULL AS INTEGER) AS station_g_cd
-            FROM `lines` AS l
+            CAST(NULL AS BIGINT) AS line_group_cd,
+            CAST(NULL AS BIGINT) AS station_cd,
+            CAST(NULL AS BIGINT) AS station_g_cd
+            FROM lines AS l
             WHERE (
-                    l.line_name LIKE ?
-                    OR l.line_name_rn LIKE ?
-                    OR l.line_name_k LIKE ?
-                    OR l.line_name_zh LIKE ?
-                    OR l.line_name_ko LIKE ?
+                    l.line_name LIKE $1
+                    OR l.line_name_rn LIKE $2
+                    OR l.line_name_k LIKE $3
+                    OR l.line_name_zh LIKE $4
+                    OR l.line_name_ko LIKE $5
                 )
                 AND l.e_status = 0
-            LIMIT ?",
+            LIMIT $6",
             line_name,
             line_name,
             line_name,
