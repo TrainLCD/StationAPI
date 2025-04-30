@@ -25,8 +25,8 @@ pub struct Station {
     pub pref_cd: i64,
     pub post: String,
     pub address: String,
-    pub lon: f64,
-    pub lat: f64,
+    pub lon: f32,
+    pub lat: f32,
     pub open_ymd: String,
     pub close_ymd: String,
     pub e_status: i64,
@@ -57,7 +57,7 @@ pub struct Station {
     pub line_symbol2_shape: Option<String>,
     pub line_symbol3_shape: Option<String>,
     pub line_symbol4_shape: Option<String>,
-    pub average_distance: f64,
+    pub average_distance: Option<f32>,
     // station_station_typesからJOIN
     pub type_id: Option<i64>,
     pub sst_id: Option<i64>,
@@ -97,8 +97,8 @@ impl Station {
         pref_cd: i64,
         post: String,
         address: String,
-        lon: f64,
-        lat: f64,
+        lon: f32,
+        lat: f32,
         open_ymd: String,
         close_ymd: String,
         e_status: i64,
@@ -129,7 +129,7 @@ impl Station {
         line_symbol3_shape: Option<String>,
         line_symbol4_shape: Option<String>,
         line_group_cd: Option<i64>,
-        average_distance: f64,
+        average_distance: Option<f32>,
         pass: Option<i64>,
         type_id: Option<i64>,
         sst_id: Option<i64>,
@@ -231,9 +231,9 @@ mod tests {
             11302,
             1,
             None,
-            "山手線".to_string(),
-            "ヤマノテセン".to_string(),
-            "Yamanote Line".to_string(),
+            Some("山手線".to_string()),
+            Some("ヤマノテセン".to_string()),
+            Some("Yamanote Line".to_string()),
             Some("山手線".to_string()),
             Some("山手线".to_string()),
             Some("야마노테선".to_string()),
@@ -259,7 +259,7 @@ mod tests {
             None,
             None,
             None,
-            29.0,
+            Some(29.0),
         )];
 
         let station = Station::new(
@@ -282,8 +282,8 @@ mod tests {
             13,
             "150-0043".to_string(),
             "東京都渋谷区道玄坂一丁目1-1".to_string(),
-            139.701238,
-            35.658871,
+            139.701_23,
+            35.658_87,
             "1885-03-01".to_string(),
             "0000-00-00".to_string(),
             0,
@@ -314,7 +314,7 @@ mod tests {
             None,
             None,
             Some(11302),
-            1075.968412,
+            Some(1_075.968_4),
             Some(0),
             Some(20),
             Some(99999), // NOTE: あえて存在しない前提の値にしている
@@ -342,8 +342,8 @@ mod tests {
         assert_eq!(station.pref_cd, 13);
         assert_eq!(station.post, "150-0043");
         assert_eq!(station.address, "東京都渋谷区道玄坂一丁目1-1");
-        assert_eq!(station.lon, 139.701238);
-        assert_eq!(station.lat, 35.658871);
+        assert_eq!(station.lon, 139.701_23);
+        assert_eq!(station.lat, 35.658_87);
         assert_eq!(station.open_ymd, "1885-03-01");
         assert_eq!(station.close_ymd, "0000-00-00");
         assert_eq!(station.e_status, 0);
@@ -371,7 +371,7 @@ mod tests {
         assert_eq!(station.line_symbol2_shape, None);
         assert_eq!(station.line_symbol3_shape, None);
         assert_eq!(station.line_symbol4_shape, None);
-        assert_eq!(station.average_distance, 1075.968412);
+        assert_eq!(station.average_distance, Some(1_075.968_4));
         assert_eq!(station.type_id, Some(20));
     }
 }

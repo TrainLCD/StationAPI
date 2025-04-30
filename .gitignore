@@ -5,4 +5,3 @@ server.key
 api_descriptor.pb
 tmp.sql
 .vscode/
-db.db*

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(sst.line_group_cd) AS train_types_count\n            FROM station_station_types AS sst\n                JOIN types AS t ON t.type_cd = sst.type_cd\n                AND (\n                    t.kind IN (0, 1)\n                    OR t.top_priority = 1\n                )\n            WHERE sst.station_cd = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "train_types_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "17234250cbd9e12142d5fddbc5697a4587155f07beb5abc2ddbd06f19aca9829"
+}

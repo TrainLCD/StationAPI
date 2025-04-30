@@ -61,7 +61,7 @@ where
     TR: TrainTypeRepository,
     CR: CompanyRepository,
 {
-    async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
+    async fn find_station_by_id(&self, station_id: i64) -> Result<Option<Station>, UseCaseError> {
         let Some(station) = self.station_repository.find_by_id(station_id).await? else {
             return Ok(None);
         };
@@ -74,7 +74,7 @@ where
     }
     async fn get_stations_by_id_vec(
         &self,
-        station_ids: &[u32],
+        station_ids: Vec<i64>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self.station_repository.get_by_id_vec(station_ids).await?;
         let stations = self
@@ -85,7 +85,7 @@ where
     }
     async fn get_stations_by_group_id(
         &self,
-        station_group_id: u32,
+        station_group_id: i64,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
@@ -100,7 +100,7 @@ where
     }
     async fn get_stations_by_group_id_vec(
         &self,
-        station_group_id_vec: &[u32],
+        station_group_id_vec: Vec<i64>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
@@ -111,7 +111,7 @@ where
     }
     async fn get_lines_by_station_group_id_vec(
         &self,
-        station_group_id_vec: &[u32],
+        station_group_id_vec: Vec<i64>,
     ) -> Result<Vec<Line>, UseCaseError> {
         let lines = self
             .line_repository
@@ -124,7 +124,7 @@ where
         &self,
         latitude: f64,
         longitude: f64,
-        limit: Option<u32>,
+        limit: Option<i64>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
@@ -139,8 +139,8 @@ where
     }
     async fn get_stations_by_line_id(
         &self,
-        line_id: u32,
-        station_id: Option<u32>,
+        line_id: i64,
+        station_id: Option<i64>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
@@ -149,7 +149,7 @@ where
 
         let line_group_id = if let Some(sta) = stations
             .iter()
-            .find(|sta| sta.station_cd == station_id.unwrap_or(0) as i64)
+            .find(|sta| sta.station_cd == station_id.unwrap_or(0))
         {
             sta.line_group_cd
         } else {
@@ -157,7 +157,7 @@ where
         };
 
         let stations = self
-            .update_station_vec_with_attributes(stations, line_group_id.map(|id| id as u32))
+            .update_station_vec_with_attributes(stations, line_group_id)
             .await?;
 
         Ok(stations)
@@ -165,8 +165,8 @@ where
     async fn get_stations_by_name(
         &self,
         station_name: String,
-        limit: Option<u32>,
-        from_station_group_id: Option<u32>,
+        limit: Option<i64>,
+        from_station_group_id: Option<i64>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
@@ -185,7 +185,7 @@ where
     }
     async fn find_company_by_id_vec(
         &self,
-        company_id_vec: &[u32],
+        company_id_vec: Vec<i64>,
     ) -> Result<Vec<Company>, UseCaseError> {
         let companies = self
             .company_repository
@@ -197,38 +197,45 @@ where
     async fn update_station_vec_with_attributes(
         &self,
         stations: Vec<Station>,
-        line_group_id: Option<u32>,
+        line_group_id: Option<i64>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = Arc::new(Mutex::new(stations));
 
-        let station_group_ids = Arc::clone(&stations)
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|station| station.station_g_cd as u32)
-            .collect::<Vec<u32>>();
+        let station_group_ids = Arc::new(
+            Arc::clone(&stations)
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|station| station.station_g_cd)
+                .collect::<Vec<i64>>(),
+        );
 
         let stations_by_group_ids = self
-            .get_stations_by_group_id_vec(&station_group_ids)
+            .get_stations_by_group_id_vec(station_group_ids.to_vec())
             .await?;
 
-        let station_ids = stations_by_group_ids
-            .iter()
-            .map(|station| station.station_cd as u32)
-            .collect::<Vec<u32>>();
+        let station_ids = Arc::new(
+            stations_by_group_ids
+                .iter()
+                .map(|station| station.station_cd)
+                .collect::<Vec<i64>>(),
+        );
 
         let lines = &self
-            .get_lines_by_station_group_id_vec(&station_group_ids)
+            .get_lines_by_station_group_id_vec(station_group_ids.to_vec())
             .await?;
 
-        let company_ids = &lines
-            .iter()
-            .map(|station| station.company_cd as u32)
-            .collect::<Vec<u32>>();
-        let companies = self.find_company_by_id_vec(company_ids).await?;
+        let company_ids = Arc::new(
+            lines
+                .iter()
+                .map(|station| station.company_cd)
+                .collect::<Vec<i64>>(),
+        );
+
+        let companies = self.find_company_by_id_vec(company_ids.to_vec()).await?;
 
         let train_types = self
-            .get_train_types_by_station_id_vec(&station_ids, line_group_id)
+            .get_train_types_by_station_id_vec(station_ids.to_vec(), line_group_id)
             .await?;
 
         let stations = Arc::clone(&stations)
@@ -298,7 +305,7 @@ where
     }
     async fn get_lines_by_station_group_id(
         &self,
-        station_group_id: u32,
+        station_group_id: i64,
     ) -> Result<Vec<Line>, UseCaseError> {
         let lines = self
             .line_repository
@@ -309,7 +316,7 @@ where
     }
     async fn get_stations_by_line_group_id(
         &self,
-        line_group_id: u32,
+        line_group_id: i64,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
@@ -390,9 +397,9 @@ where
             line_cd: station.line_cd,
             company_cd: station.company_cd.unwrap_or_default(),
             company: None,
-            line_name: station.line_name.unwrap_or_default(),
-            line_name_k: station.line_name_k.unwrap_or_default(),
-            line_name_h: station.line_name_h.unwrap_or_default(),
+            line_name: station.line_name,
+            line_name_k: station.line_name_k,
+            line_name_h: station.line_name_h,
             line_name_r: station.line_name_r,
             line_name_zh: station.line_name_zh,
             line_name_ko: station.line_name_ko,
@@ -475,7 +482,7 @@ where
     }
     async fn get_train_types_by_station_id(
         &self,
-        station_id: u32,
+        station_id: i64,
     ) -> Result<Vec<TrainType>, UseCaseError> {
         let mut train_types = self
             .train_type_repository
@@ -484,20 +491,20 @@ where
 
         let train_type_ids = train_types
             .iter()
-            .filter_map(|tt| tt.line_group_cd.map(|id| id as u32))
-            .collect::<Vec<u32>>();
+            .filter_map(|tt| tt.line_group_cd)
+            .collect::<Vec<i64>>();
 
         let mut lines = self
             .line_repository
-            .get_by_line_group_id_vec(&train_type_ids)
+            .get_by_line_group_id_vec(train_type_ids)
             .await?;
 
         let company_ids = lines
             .iter()
-            .map(|l| l.company_cd as u32)
-            .collect::<Vec<u32>>();
+            .map(|l| l.company_cd)
+            .collect::<Vec<i64>>();
 
-        let companies = self.company_repository.find_by_id_vec(&company_ids).await?;
+        let companies = self.company_repository.find_by_id_vec(company_ids).await?;
 
         let line = self.line_repository.find_by_station_id(station_id).await?;
         let Some(mut line) = line else {
@@ -522,10 +529,7 @@ where
 
                     let train_type: Option<TrainType> = self
                         .train_type_repository
-                        .find_by_line_group_id_and_line_id(
-                            line_group_cd as u32,
-                            line.line_cd as u32,
-                        )
+                        .find_by_line_group_id_and_line_id(line_group_cd, line.line_cd)
                         .await?;
                     line.train_type = train_type;
                 }
@@ -546,8 +550,8 @@ where
 
     async fn get_train_types_by_station_id_vec(
         &self,
-        station_id_vec: &[u32],
-        line_group_id: Option<u32>,
+        station_id_vec: Vec<i64>,
+        line_group_id: Option<i64>,
     ) -> Result<Vec<TrainType>, UseCaseError> {
         let train_types = self
             .train_type_repository
@@ -559,8 +563,8 @@ where
 
     async fn get_routes(
         &self,
-        from_station_id: u32,
-        to_station_id: u32,
+        from_station_id: i64,
+        to_station_id: i64,
     ) -> Result<Vec<Route>, UseCaseError> {
         let stops = self
             .station_repository
@@ -570,12 +574,12 @@ where
 
         let line_group_id_vec = Arc::clone(&stops)
             .iter()
-            .filter_map(|row| row.line_group_cd.map(|id| id as u32))
-            .collect::<Vec<u32>>();
+            .filter_map(|row| row.line_group_cd)
+            .collect::<Vec<i64>>();
 
         let tt_lines = self
             .line_repository
-            .get_by_line_group_id_vec_for_routes(&line_group_id_vec)
+            .get_by_line_group_id_vec_for_routes(line_group_id_vec)
             .await?;
 
         let tt_lines = Arc::new(tt_lines);
@@ -813,9 +817,9 @@ where
                     .collect::<Vec<proto::Station>>();
 
                 // TODO: SQLで同等の処理を行う
-                let includes_requested_station = stops
-                    .iter()
-                    .any(|stop| stop.group_id == from_station_id || stop.group_id == to_station_id);
+                let includes_requested_station = stops.iter().any(|stop| {
+                    stop.group_id == from_station_id as u32 || stop.group_id == to_station_id as u32
+                });
                 if !includes_requested_station {
                     return None;
                 }
@@ -829,7 +833,7 @@ where
         Ok(routes)
     }
 
-    async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError> {
+    async fn find_line_by_id(&self, line_id: i64) -> Result<Option<Line>, UseCaseError> {
         let line = self.line_repository.find_by_id(line_id).await?;
         Ok(line)
     }
@@ -837,7 +841,7 @@ where
     async fn get_lines_by_name(
         &self,
         line_name: String,
-        limit: Option<u32>,
+        limit: Option<i64>,
     ) -> Result<Vec<Line>, UseCaseError> {
         let lines = self
             .line_repository
@@ -915,8 +919,8 @@ where
     // TODO: SQLite版ではいったん未実装のままにしておく
     async fn get_connected_stations(
         &self,
-        _from_station_id: u32,
-        _to_station_id: u32,
+        _from_station_id: i64,
+        _to_station_id: i64,
     ) -> Result<Vec<Station>, UseCaseError> {
         // let conns = self.connection_repository.get_all().await?;
 
@@ -933,7 +937,7 @@ where
         // if let Some(path) =
         //     self.reconstruct_path(&prev_map, from_station_id.into(), to_station_id.into())
         // {
-        //     let node_ids: Vec<u32> = path.to_vec().iter().map(|x| x.index() as u32).collect();
+        //     let node_ids: Vec<i64> = path.to_vec().iter().map(|x| x.index() as i64).collect();
         //     let stations = self.station_repository.get_by_id_vec(&node_ids).await?;
         //     let stations = self
         //         .update_station_vec_with_attributes(stations, None)

@@ -5,14 +5,17 @@ RUN apt-get update && apt-get install -y \
     rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY . .
-RUN SQLX_OFFLINE=true cargo build -p stationapi --release
+RUN cargo build -p stationapi --release
 
 FROM debian:bookworm-slim
 
 COPY --from=builder /app/target/release/stationapi /usr/local/bin/stationapi
 COPY ./data ./data
 
-ENV DATABASE_URL=file:memdb?mode=memory
+RUN apt-get update && apt-get install -y \
+    libssl-dev && \
+    rm -rf /var/lib/apt/lists/*
+
 ENV HOST=0.0.0.0
 ENV PORT=50051
 EXPOSE $PORT

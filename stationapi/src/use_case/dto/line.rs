@@ -4,9 +4,9 @@ impl From<Line> for GrpcLine {
     fn from(line: Line) -> Self {
         Self {
             id: line.line_cd as u32,
-            name_short: line.line_name,
-            name_katakana: line.line_name_k,
-            name_full: line.line_name_h,
+            name_short: line.line_name.unwrap_or_default(),
+            name_katakana: line.line_name_k.unwrap_or_default(),
+            name_full: line.line_name_h.unwrap_or_default(),
             name_roman: Some(line.line_name_r.unwrap_or_default()),
             name_chinese: line.line_name_zh,
             name_korean: line.line_name_ko,
@@ -19,7 +19,7 @@ impl From<Line> for GrpcLine {
             train_type: line
                 .train_type
                 .map(|train_type| Box::new(train_type.into())),
-            average_distance: line.average_distance,
+            average_distance: line.average_distance.map(|d| d as f64).unwrap_or(0.0),
         }
     }
 }
