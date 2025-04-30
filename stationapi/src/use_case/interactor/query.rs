@@ -499,10 +499,7 @@ where
             .get_by_line_group_id_vec(train_type_ids)
             .await?;
 
-        let company_ids = lines
-            .iter()
-            .map(|l| l.company_cd)
-            .collect::<Vec<i64>>();
+        let company_ids = lines.iter().map(|l| l.company_cd).collect::<Vec<i64>>();
 
         let companies = self.company_repository.find_by_id_vec(company_ids).await?;
 
