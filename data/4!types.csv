@@ -81,6 +81,10 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 ,160,快速きたみ,カイソクキタミ,Rapid Kitami,快车北见,쾌속니시기타미,#FF6600,0,2,0,,COMPLETE
 ,161,特別快速大雪,トクベツカイソクタイセツ,Special Rapid Taisetsu,特别快车大雪,특별쾌속타이세츠,#FF3300,0,2,0,,COMPLETE
 ,162,エキスポライナー,エキスポライナー,Expo Liner,世博会Liner,박람회 라이너,#0000ff,0,2,0,,COMPLETE
+,163,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,1,常磐線用,COMPLETE
+,164,特別快速,トクベツカイソク,Special Rapid,特别快车,특별쾌속,#DC143C,0,2,0,常磐線用,COMPLETE
+,165,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#DC143C,0,2,0,TX用,COMPLETE
+,166,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,TX用,COMPLETE
 ,200,踊り子(池袋〜伊豆急下田),オドリコ,Odoriko(Ikebukuro to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
 ,201,踊り子(東京〜伊豆急下田),オドリコ,Odoriko(Tokyo to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
 ,202,踊り子(池袋〜修善寺),オドリコ,Odoriko(Ikebukuro to Shuzenji),踊子,무희,#035D67,0,4,0,,COMPLETE
