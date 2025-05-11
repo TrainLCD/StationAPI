@@ -291,7 +291,7 @@ impl InternalStationRepository {
                 JOIN `types` AS t ON t.type_cd = sst.type_cd
                 AND (
                     t.kind IN (0, 1)
-                    OR t.top_priority = 1
+                    OR t.priority = 1
                 )
             WHERE sst.station_cd = ?",
             id,
@@ -496,13 +496,10 @@ impl InternalStationRepository {
         station_id: u32,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let stations: Vec<Station> = match Self::fetch_has_local_train_types_by_station_id(
-            station_id, conn,
-        )
-        .await?
-        {
-            true => {
-                let rows = sqlx::query_as!(
+        let stations: Vec<Station> =
+            match Self::fetch_has_local_train_types_by_station_id(station_id, conn).await? {
+                true => {
+                    let rows = sqlx::query_as!(
                         StationRow,
                         r#"SELECT s.*,
                           l.company_cd,
@@ -547,7 +544,7 @@ impl InternalStationRepository {
                               LEFT JOIN `types` AS t ON sst.type_cd = t.type_cd
                             WHERE sst.station_cd = ?
                               AND CASE
-                                WHEN t.top_priority = 1 AND sst.pass <> 1 THEN sst.type_cd = t.type_cd
+                                WHEN t.priority = 1 AND sst.pass <> 1 THEN sst.type_cd = t.type_cd
                                 ELSE t.kind IN (0, 1)
                               END
                             LIMIT 1
@@ -560,14 +557,14 @@ impl InternalStationRepository {
                           LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
                           LEFT JOIN `aliases` AS a ON a.id = la.alias_cd
                           ORDER BY sst.id"#,
-                          station_id
-                )
+                        station_id
+                    )
                     .fetch_all(conn)
                     .await?;
-                rows.into_iter().map(|row| row.into()).collect()
-            }
-            false => Self::get_by_line_id_without_train_types(line_id, conn).await?,
-        };
+                    rows.into_iter().map(|row| row.into()).collect()
+                }
+                false => Self::get_by_line_id_without_train_types(line_id, conn).await?,
+            };
 
         Ok(stations)
     }

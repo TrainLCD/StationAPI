@@ -284,7 +284,7 @@ impl InternalTrainTypeRepository {
             types as t 
             WHERE 
             s.station_cd IN ( {} ) 
-            AND CASE WHEN t.top_priority = 1
+            AND CASE WHEN t.priority = 1
             THEN
                 sst.type_cd = t.type_cd
             ELSE
