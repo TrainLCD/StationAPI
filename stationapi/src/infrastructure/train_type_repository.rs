@@ -284,7 +284,7 @@ impl InternalTrainTypeRepository {
             types as t 
             WHERE 
             s.station_cd IN ( {} ) 
-            AND CASE WHEN t.priority <> 0
+            AND CASE WHEN t.priority > 0
             THEN
                 sst.type_cd = t.type_cd
             ELSE
@@ -296,7 +296,7 @@ impl InternalTrainTypeRepository {
             AND s.e_status = 0
             AND sst.line_group_cd = ?
             AND sst.pass <> 1
-            ORDER BY t.kind, sst.id",
+            ORDER BY t.priority DESC, sst.id",
             params
         );
 

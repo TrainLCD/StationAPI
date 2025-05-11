@@ -291,9 +291,10 @@ impl InternalStationRepository {
                 JOIN `types` AS t ON t.type_cd = sst.type_cd
                 AND (
                     t.kind IN (0, 1)
-                    OR t.priority <> 0
+                    OR t.priority > 0
                 )
-            WHERE sst.station_cd = ?",
+            WHERE sst.station_cd = ?
+            ORDER BY t.priority DESC",
             id,
         )
         .fetch_one(conn)
@@ -544,9 +545,10 @@ impl InternalStationRepository {
                               LEFT JOIN `types` AS t ON sst.type_cd = t.type_cd
                             WHERE sst.station_cd = ?
                               AND CASE
-                                WHEN t.priority <> 0 AND sst.pass <> 1 THEN sst.type_cd = t.type_cd
+                                WHEN t.priority > 0 AND sst.pass <> 1 THEN sst.type_cd = t.type_cd
                                 ELSE t.kind IN (0, 1)
                               END
+                            ORDER BY t.priority DESC
                             LIMIT 1
                           )
                           AND sst.station_cd = s.station_cd
