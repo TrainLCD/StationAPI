@@ -139,7 +139,7 @@ CREATE TABLE `types` (
 `color` TEXT NOT NULL,
 `direction` INTEGER NOT NULL DEFAULT 0,
 `kind` INTEGER NOT NULL DEFAULT 0,
-`top_priority` INTEGER NOT NULL DEFAULT 0
+`priority` INTEGER NOT NULL DEFAULT 0
 );
 DROP TABLE IF EXISTS `station_rtree`;
 
