@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(sst.line_group_cd) AS train_types_count\n            FROM station_station_types AS sst\n                JOIN `types` AS t ON t.type_cd = sst.type_cd\n                AND (\n                    t.kind IN (0, 1)\n                    OR t.priority = 1\n                )\n            WHERE sst.station_cd = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "train_types_count",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "eacf7d0474f5442f6929f3fc3b13d60c0b2c7d70299f3a830598b1ca0f8335da"
+}
