@@ -544,10 +544,10 @@ impl InternalStationRepository {
                             FROM `station_station_types` AS sst
                               LEFT JOIN `types` AS t ON sst.type_cd = t.type_cd
                             WHERE sst.station_cd = ?
-                              AND CASE
-                                WHEN t.priority > 0 AND sst.pass <> 1 THEN sst.type_cd = t.type_cd
-                                ELSE t.kind IN (0, 1)
-                              END
+                            AND (
+                                (t.priority > 0 AND sst.pass <> 1 AND sst.type_cd = t.type_cd)
+                                OR (NOT (t.priority > 0 AND sst.pass <> 1) AND t.kind IN (0,1))
+                              )
                             ORDER BY t.priority DESC
                             LIMIT 1
                           )
