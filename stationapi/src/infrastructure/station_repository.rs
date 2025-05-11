@@ -291,9 +291,10 @@ impl InternalStationRepository {
                 JOIN `types` AS t ON t.type_cd = sst.type_cd
                 AND (
                     t.kind IN (0, 1)
-                    OR t.top_priority = 1
+                    OR t.priority > 0
                 )
-            WHERE sst.station_cd = ?",
+            WHERE sst.station_cd = ?
+            ORDER BY t.priority DESC",
             id,
         )
         .fetch_one(conn)
@@ -496,13 +497,10 @@ impl InternalStationRepository {
         station_id: u32,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let stations: Vec<Station> = match Self::fetch_has_local_train_types_by_station_id(
-            station_id, conn,
-        )
-        .await?
-        {
-            true => {
-                let rows = sqlx::query_as!(
+        let stations: Vec<Station> =
+            match Self::fetch_has_local_train_types_by_station_id(station_id, conn).await? {
+                true => {
+                    let rows = sqlx::query_as!(
                         StationRow,
                         r#"SELECT s.*,
                           l.company_cd,
@@ -546,10 +544,11 @@ impl InternalStationRepository {
                             FROM `station_station_types` AS sst
                               LEFT JOIN `types` AS t ON sst.type_cd = t.type_cd
                             WHERE sst.station_cd = ?
-                              AND CASE
-                                WHEN t.top_priority = 1 AND sst.pass <> 1 THEN sst.type_cd = t.type_cd
-                                ELSE t.kind IN (0, 1)
-                              END
+                            AND (
+                                (t.priority > 0 AND sst.pass <> 1 AND sst.type_cd = t.type_cd)
+                                OR (NOT (t.priority > 0 AND sst.pass <> 1) AND t.kind IN (0,1))
+                              )
+                            ORDER BY t.priority DESC
                             LIMIT 1
                           )
                           AND sst.station_cd = s.station_cd
@@ -560,14 +559,14 @@ impl InternalStationRepository {
                           LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
                           LEFT JOIN `aliases` AS a ON a.id = la.alias_cd
                           ORDER BY sst.id"#,
-                          station_id
-                )
+                        station_id
+                    )
                     .fetch_all(conn)
                     .await?;
-                rows.into_iter().map(|row| row.into()).collect()
-            }
-            false => Self::get_by_line_id_without_train_types(line_id, conn).await?,
-        };
+                    rows.into_iter().map(|row| row.into()).collect()
+                }
+                false => Self::get_by_line_id_without_train_types(line_id, conn).await?,
+            };
 
         Ok(stations)
     }

@@ -284,19 +284,16 @@ impl InternalTrainTypeRepository {
             types as t 
             WHERE 
             s.station_cd IN ( {} ) 
-            AND CASE WHEN t.top_priority = 1
-            THEN
-                sst.type_cd = t.type_cd
-            ELSE
-                sst.pass <> 1
-                AND sst.type_cd = t.type_cd
-            END
+            AND (
+                ((t.priority > 0) AND sst.type_cd = t.type_cd)
+                OR (NOT (t.priority > 0) AND sst.pass <> 1 AND sst.type_cd = t.type_cd)
+            )
             AND s.station_cd = sst.station_cd
             AND sst.type_cd = t.type_cd 
             AND s.e_status = 0
             AND sst.line_group_cd = ?
             AND sst.pass <> 1
-            ORDER BY t.kind, sst.id",
+            ORDER BY t.priority DESC, sst.id",
             params
         );
 
