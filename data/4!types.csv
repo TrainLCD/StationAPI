@@ -28,7 +28,7 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 ,107,ホームライナー,ホームライナー,Home Liner,家用班轮,홈 라이너,#DC143C,0,2,0,,NOT
 ,108,区間快速,クカンカイソク,Regional Rapid,区域快车,구간쾌속,#DC143C,0,2,0,,PARTIAL
 ,109,快速みえ,カイソクミエ,Rapid Mie,快速三重,쾌속미에,#DC143C,0,2,0,,COMPLETE
-,110,新快速,シンカイソク,Special Rapid,新快速,새쾌속,#0071BE,0,2,0,JR西日本用,COMPLETE
+,110,新快速,シンカイソク,Special Rapid,新快速,새쾌속,#0071BE,0,5,0,JR西日本用,COMPLETE
 ,111,直通快速,チョクツウカイソク,Direct Rapid,直接快速,직통쾌속,#F5A200,0,2,0,,COMPLETE
 ,112,B快速,Bカイソク,B Rapid,B快速,B쾌속,#0071BE,0,2,0,,COMPLETE
 ,113,おくたま号,オクタマゴウ,Okutama,奧多摩号,오쿠타마호,#F15A22,0,2,0,,COMPLETE
@@ -41,7 +41,7 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 ,120,中央特快,チュウオウトッカイ,Chūō Special Rapid,中央特快,중앙특쾌,#F15A23,0,2,0,,COMPLETE
 ,121,通勤特快,ツウキントッカイ,Commuter Special Rapid,通勤特快,통근특쾌,#F15A24,0,2,0,,COMPLETE
 ,122,サンライナー,サンライナー,Sun Liner,Sun Liner,산 라이너,#DC143C,0,2,0,,COMPLETE
-,123,マリンライナー,マリンライナー,Marine Liner,Marine Liner,마린라이나,#DC143C,0,2,0,,COMPLETE
+,123,マリンライナー,マリンライナー,Marine Liner,Marine Liner,마린라이나,#DC143C,0,5,0,,COMPLETE
 ,124,快速ことぶき,カイソクコトブキ,Rapid Kotobuki,快速寿,쾌속 축수,#DC143C,0,2,0,,NOT
 ,125,シティライナー,シティライナー,City Liner,City Liner,시티 라이너,#DC143C,0,2,0,,NOT
 ,126,通勤ライナー,ツウキンライナー,Commuter Liner,通勤Liner,통근 라이너,#DC143C,0,2,0,,NOT
@@ -65,7 +65,7 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 ,144,普通(砂原線経由),フツウ,Local(Sawara Branch Line),慢车(砂原支线),보통(사와라 지선),#0072BC,0,1,0,,COMPLETE
 ,145,普通(室蘭方面),フツウ,Local(for Muroran),慢车,보통,#2CB431,0,1,0,,COMPLETE
 ,146,シーサイドライナー,シーサイドライナー,Sea Side Liner,滨海快线,바다 사이드 라이너,#0095D9,0,2,0,,COMPLETE
-,147,エアポート,エアポート,Airport,机场号,에어포트,#FF0080,0,2,0,,COMPLETE
+,147,エアポート,エアポート,Airport,机场号,에어포트,#FF0080,0,5,0,,COMPLETE
 ,148,ニセコライナー,ニセコライナー,Niseko Liner,二世谷快车,니세코라이너,#0098E1,0,2,0,,COMPLETE
 ,149,普通(美濃赤坂線),フツウ,Local(Mino-Akasaka Line),慢车(美浓赤坂线),보통(미노아카사카 지선),#F68B1E,0,1,0,,COMPLETE
 ,150,普通(本山支線),フツウ,Local(Motoyama Branch Line),慢车(本山支线),보통(모토야마 지선),#695FAA,0,1,0,小野田線,COMPLETE
@@ -73,18 +73,18 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 ,152,普通,フツウ,Local,慢车,보통,#1F63C6,1,0,0,上り系統,PARTIAL
 ,153,普通,フツウ,Local,慢车,보통,#1F63C6,2,0,0,下り系統,PARTIAL
 ,154,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,1,自動選択用,COMPLETE
-,155,区間快速エアポート,クカンカイソクエアポート,Semi Rapid Airport,区域快车机场号,구간쾌속에어포트,#33ff33,0,2,0,,COMPLETE
-,156,快速エアポート,カイソクエアポート,Rapid Airport,快车机场号,쾌속에어포트,#FF6600,0,2,0,,COMPLETE
-,157,特別快速エアポート,トクベツカイソクエアポート,Special Rapid Airport,特别快车机场号,특별쾌속에어포트,#FF3300,0,2,0,,COMPLETE
+,155,区間快速エアポート,クカンカイソクエアポート,Semi Rapid Airport,区域快车机场号,구간쾌속에어포트,#33ff33,0,5,0,,COMPLETE
+,156,快速エアポート,カイソクエアポート,Rapid Airport,快车机场号,쾌속에어포트,#FF6600,0,5,0,,COMPLETE
+,157,特別快速エアポート,トクベツカイソクエアポート,Special Rapid Airport,特别快车机场号,특별쾌속에어포트,#FF3300,0,5,0,,COMPLETE
 ,158,快速サンポート,カイソクサンポート,Rapid Sunport,快车太陽港号,쾌속선포트,#F39800,0,2,0,,PARTIAL
 ,159,普通(桜島方面),フツウ,Local(For Sakurajima),慢车,보통,#1F63C6,0,1,0,,COMPLETE
 ,160,快速きたみ,カイソクキタミ,Rapid Kitami,快车北见,쾌속니시기타미,#FF6600,0,2,0,,COMPLETE
 ,161,特別快速大雪,トクベツカイソクタイセツ,Special Rapid Taisetsu,特别快车大雪,특별쾌속타이세츠,#FF3300,0,2,0,,COMPLETE
 ,162,エキスポライナー,エキスポライナー,Expo Liner,世博会Liner,박람회 라이너,#0000ff,0,2,0,,COMPLETE
-,163,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,1,常磐線用,COMPLETE
-,164,特別快速,トクベツカイソク,Special Rapid,特别快车,특별쾌속,#DC143C,0,2,0,常磐線用,COMPLETE
-,165,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#DC143C,0,2,0,TX用,COMPLETE
-,166,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,TX用,COMPLETE
+,163,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,5,1,常磐線用,COMPLETE
+,164,特別快速,トクベツカイソク,Special Rapid,特别快车,특별쾌속,#DC143C,0,5,0,常磐線用,COMPLETE
+,165,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#DC143C,0,5,0,TX用,COMPLETE
+,166,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,5,0,TX用,COMPLETE
 ,200,踊り子(池袋〜伊豆急下田),オドリコ,Odoriko(Ikebukuro to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
 ,201,踊り子(東京〜伊豆急下田),オドリコ,Odoriko(Tokyo to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
 ,202,踊り子(池袋〜修善寺),オドリコ,Odoriko(Ikebukuro to Shuzenji),踊子,무희,#035D67,0,4,0,,COMPLETE
@@ -224,7 +224,7 @@ Yokokawa","SL群马
 ,332,アクセス特急,アクセストッキュウ,Access Express,访问特快,액세스 특급,#ED7D00,0,4,1,,PARTIAL
 ,333,準急,ジュンキュウ,Semi-Express,准急,준급,#2A9B50,0,3,0,堺筋準急,PARTIAL
 ,334,直通特急,チョクツウトッキュウ,Limited Express,直通特急,직통특급,#DD2E1E,0,4,0,山陽電車,COMPLETE
-,335,区間快速,クカンカイソク,Semi Rapid,区间快速,구간쾌속,#000084,0,2,0,TX用,COMPLETE
+,335,区間快速,クカンカイソク,Semi Rapid,区间快速,구간쾌속,#000084,0,5,0,TX用,COMPLETE
 ,336,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#FFA500,0,2,0,廃止済み 104に移行,NOT
 ,337,準特急,ジュントッキュウ,Semi-Limited Express,准特急,준특급,#FF6E00,0,4,0,,COMPLETE
 ,338,区間急行,クカンキュウコウ,Sub Express,区间快速,구간급행,#009A41,0,3,0,南海電車用,COMPLETE
