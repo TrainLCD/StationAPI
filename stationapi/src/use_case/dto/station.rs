@@ -10,6 +10,8 @@ impl From<Station> for GrpcStation {
             name_roman: station.station_name_r,
             name_chinese: station.station_name_zh,
             name_korean: station.station_name_ko,
+            name_pronounce: station.station_name_ipa,
+            name_roman_pronounce: station.station_name_r_ipa,
             three_letter_code: station.three_letter_code,
             lines: station.lines.into_iter().map(|line| line.into()).collect(),
             line: station.line.map(|line| Box::new((*line).into())),

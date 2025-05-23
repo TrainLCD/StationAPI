@@ -16,6 +16,8 @@ CREATE TABLE `aliases` (
 `line_name_r` TEXT DEFAULT NULL,
 `line_name_zh` TEXT DEFAULT NULL,
 `line_name_ko` TEXT DEFAULT NULL,
+`line_name_ipa` TEXT DEFAULT NULL,
+`line_name_r_ipa` TEXT DEFAULT NULL,
 `line_color_c` TEXT DEFAULT NULL,
 PRIMARY KEY (`id`)
 );
@@ -66,6 +68,8 @@ CREATE TABLE `lines` (
 `line_name_rn` TEXT DEFAULT '',
 `line_name_zh` TEXT DEFAULT '',
 `line_name_ko` TEXT DEFAULT '',
+`line_name_ipa` TEXT DEFAULT '',
+`line_name_r_ipa` TEXT DEFAULT '',
 `line_color_c` TEXT NOT NULL,
 `line_type` INTEGER NOT NULL,
 `line_symbol1` TEXT DEFAULT NULL,
@@ -108,6 +112,8 @@ CREATE TABLE `stations` (
 `station_name_rn` TEXT DEFAULT NULL,
 `station_name_zh` TEXT DEFAULT NULL,
 `station_name_ko` TEXT DEFAULT NULL,
+`station_name_ipa` TEXT DEFAULT NULL,
+`station_name_r_ipa` TEXT DEFAULT NULL,
 `station_number1` TEXT DEFAULT NULL,
 `station_number2` TEXT DEFAULT NULL,
 `station_number3` TEXT DEFAULT NULL,

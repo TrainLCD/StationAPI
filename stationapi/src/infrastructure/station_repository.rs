@@ -27,6 +27,8 @@ struct StationRow {
     pub station_name_rn: Option<String>,
     pub station_name_zh: Option<String>,
     pub station_name_ko: Option<String>,
+    pub station_name_ipa: Option<String>,
+    pub station_name_r_ipa: Option<String>,
     pub station_number1: Option<String>,
     pub station_number2: Option<String>,
     pub station_number3: Option<String>,
@@ -55,6 +57,10 @@ struct StationRow {
     pub line_name_zh: Option<String>,
     #[sqlx(default)]
     pub line_name_ko: Option<String>,
+    #[sqlx(default)]
+    pub line_name_ipa: Option<String>,
+    #[sqlx(default)]
+    pub line_name_r_ipa: Option<String>,
     #[sqlx(default)]
     pub line_color_c: Option<String>,
     pub line_type: Option<i64>,
@@ -119,6 +125,8 @@ impl From<StationRow> for Station {
             station_name_r: row.station_name_r,
             station_name_zh: row.station_name_zh,
             station_name_ko: row.station_name_ko,
+            station_name_ipa: row.station_name_ipa,
+            station_name_r_ipa: row.station_name_r_ipa,
             station_numbers: vec![],
             station_number1: row.station_number1,
             station_number2: row.station_number2,
@@ -148,6 +156,8 @@ impl From<StationRow> for Station {
             line_name_r: row.line_name_r,
             line_name_zh: row.line_name_zh,
             line_name_ko: row.line_name_ko,
+            line_name_ipa: row.line_name_ipa,
+            line_name_r_ipa: row.line_name_r_ipa,
             line_color_c: row.line_color_c,
             line_type: row.line_type,
             line_symbol1: row.line_symbol1,
@@ -332,6 +342,8 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
             COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c,
+            COALESCE(a.line_name_ipa, l.line_name_ipa) AS line_name_ipa,
+            COALESCE(a.line_name_r_ipa, l.line_name_r_ipa) AS line_name_r_ipa,
             sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
@@ -401,6 +413,8 @@ impl InternalStationRepository {
                 COALESCE(a.line_name_r, l.line_name_r)     AS line_name_r,
                 COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
                 COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
+                COALESCE(a.line_name_ipa, l.line_name_ipa) AS line_name_ipa,
+                COALESCE(a.line_name_r_ipa, l.line_name_r_ipa) AS line_name_r_ipa,
                 COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c,                IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types
             FROM `stations` AS s
             JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
@@ -458,6 +472,8 @@ impl InternalStationRepository {
               COALESCE(a.line_name_r, l.line_name_r)     AS line_name_r,
               COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
               COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
+              COALESCE(a.line_name_ipa, l.line_name_ipa) AS line_name_ipa,
+              COALESCE(a.line_name_r_ipa, l.line_name_r_ipa) AS line_name_r_ipa,
               COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c,
               t.id AS type_id,
               t.type_cd,
@@ -497,10 +513,13 @@ impl InternalStationRepository {
         station_id: u32,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let stations: Vec<Station> =
-            match Self::fetch_has_local_train_types_by_station_id(station_id, conn).await? {
-                true => {
-                    let rows = sqlx::query_as!(
+        let stations: Vec<Station> = match Self::fetch_has_local_train_types_by_station_id(
+            station_id, conn,
+        )
+        .await?
+        {
+            true => {
+                let rows = sqlx::query_as!(
                         StationRow,
                         r#"SELECT s.*,
                           l.company_cd,
@@ -524,6 +543,8 @@ impl InternalStationRepository {
                           COALESCE(a.line_name_r, l.line_name_r) AS "line_name_r: String",
                           COALESCE(a.line_name_zh, l.line_name_zh) AS "line_name_zh: String",
                           COALESCE(a.line_name_ko, l.line_name_ko) AS "line_name_ko: String",
+                          COALESCE(a.line_name_ipa, l.line_name_ipa) AS "line_name_ipa: String",
+                          COALESCE(a.line_name_r_ipa, l.line_name_r_ipa) AS "line_name_r_ipa: String",
                           COALESCE(a.line_color_c, l.line_color_c) AS "line_color_c: String",
                           t.id AS type_id,
                           t.type_cd,
@@ -563,10 +584,10 @@ impl InternalStationRepository {
                     )
                     .fetch_all(conn)
                     .await?;
-                    rows.into_iter().map(|row| row.into()).collect()
-                }
-                false => Self::get_by_line_id_without_train_types(line_id, conn).await?,
-            };
+                rows.into_iter().map(|row| row.into()).collect()
+            }
+            false => Self::get_by_line_id_without_train_types(line_id, conn).await?,
+        };
 
         Ok(stations)
     }
@@ -600,6 +621,8 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS "line_name_zh: String",
             COALESCE(a.line_name_ko, l.line_name_ko) AS "line_name_ko: String",
             COALESCE(a.line_color_c, l.line_color_c) AS "line_color_c: String",
+            COALESCE(a.line_name_ipa, l.line_name_ipa) AS "line_name_ipa: String",
+            COALESCE(a.line_name_r_ipa, l.line_name_r_ipa) AS "line_name_r_ipa: String",
             sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
@@ -667,6 +690,8 @@ impl InternalStationRepository {
             COALESCE(a.line_name_r, l.line_name_r)     AS line_name_r,
             COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
+            COALESCE(a.line_name_ipa, l.line_name_ipa) AS line_name_ipa,
+            COALESCE(a.line_name_r_ipa, l.line_name_r_ipa) AS line_name_r_ipa,
             COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c
           FROM
             `stations` AS s
@@ -728,6 +753,8 @@ impl InternalStationRepository {
                 COALESCE(a.line_name_r, l.line_name_r)     AS line_name_r,
                 COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
                 COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
+                COALESCE(a.line_name_ipa, l.line_name_ipa) AS line_name_ipa,
+                COALESCE(a.line_name_r_ipa, l.line_name_r_ipa) AS line_name_r_ipa,
                 COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c,
                 ((s.lat - ?) * (s.lat - ?) + (s.lon - ?) * (s.lon - ?)) AS distance_sq
                 FROM stations AS s
@@ -787,6 +814,8 @@ impl InternalStationRepository {
                 COALESCE(a.line_name_r, l.line_name_r)     AS line_name_r,
                 COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
                 COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
+                COALESCE(a.line_name_ipa, l.line_name_ipa) AS line_name_ipa,
+                COALESCE(a.line_name_r_ipa, l.line_name_r_ipa) AS line_name_r_ipa,
                 COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c,
                 ((s.lat - ?) * (s.lat - ?) + (s.lon - ?) * (s.lon - ?)) AS distance_sq
                 FROM stations AS s
@@ -860,6 +889,8 @@ impl InternalStationRepository {
                 COALESCE(a.line_name_r, l.line_name_r) AS "line_name_r: String",
                 COALESCE(a.line_name_zh, l.line_name_zh) AS "line_name_zh: String",
                 COALESCE(a.line_name_ko, l.line_name_ko) AS "line_name_ko: String",
+                COALESCE(a.line_name_ipa, l.line_name_ipa) AS "line_name_ipa: String",
+                COALESCE(a.line_name_r_ipa, l.line_name_r_ipa) AS "line_name_r_ipa: String",
                 COALESCE(a.line_color_c, l.line_color_c) AS "line_color_c: String",
                 t.id AS type_id,
                 t.type_name,
@@ -941,6 +972,8 @@ impl InternalStationRepository {
             COALESCE(a.line_name_zh, l.line_name_zh) AS "line_name_zh: String",
             COALESCE(a.line_name_ko, l.line_name_ko) AS "line_name_ko: String",
             COALESCE(a.line_color_c, l.line_color_c) AS "line_color_c: String",
+            COALESCE(a.line_name_ipa, l.line_name_ipa) AS "line_name_ipa: String",
+            COALESCE(a.line_name_r_ipa, l.line_name_r_ipa) AS "line_name_r_ipa: String",
             l.company_cd,
             l.line_type,
             l.line_symbol1,
@@ -1067,6 +1100,8 @@ impl InternalStationRepository {
             COALESCE(a.line_name_r, lin.line_name_r) AS "line_name_r: String",
             COALESCE(a.line_name_zh, lin.line_name_zh) AS "line_name_zh: String",
             COALESCE(a.line_name_ko, lin.line_name_ko) AS "line_name_ko: String",
+            COALESCE(a.line_name_ipa, lin.line_name_ipa) AS "line_name_ipa: String",
+            COALESCE(a.line_name_r_ipa, lin.line_name_r_ipa) AS "line_name_r_ipa: String",
             COALESCE(a.line_color_c, lin.line_color_c) AS "line_color_c: String",
             lin.company_cd,
             lin.line_type,
@@ -1198,6 +1233,8 @@ impl InternalStationRepository {
                 COALESCE(a.line_name_r, lin.line_name_r) AS "line_name_r: String",
                 COALESCE(a.line_name_zh, lin.line_name_zh) AS "line_name_zh: String",
                 COALESCE(a.line_name_ko, lin.line_name_ko) AS "line_name_ko: String",
+                COALESCE(a.line_name_ipa, lin.line_name_ipa) AS "line_name_ipa: String",
+                COALESCE(a.line_name_r_ipa, lin.line_name_r_ipa) AS "line_name_r_ipa: String",
                 COALESCE(a.line_color_c, lin.line_color_c) AS "line_color_c: String",
                 tt.id AS type_id,
                 tt.type_name,

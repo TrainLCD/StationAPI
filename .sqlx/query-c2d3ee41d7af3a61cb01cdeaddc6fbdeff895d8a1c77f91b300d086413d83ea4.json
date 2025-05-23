@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT DISTINCT l.line_cd,\n            l.line_name,\n            l.line_name_k,\n            l.line_name_h,\n            l.line_name_r,\n            l.line_name_zh,\n            l.line_name_ko,\n            l.line_color_c,\n            l.company_cd,\n            l.line_type,\n            l.line_symbol1,\n            l.line_symbol2,\n            l.line_symbol3,\n            l.line_symbol4,\n            l.line_symbol1_color,\n            l.line_symbol2_color,\n            l.line_symbol3_color,\n            l.line_symbol4_color,\n            l.line_symbol1_shape,\n            l.line_symbol2_shape,\n            l.line_symbol3_shape,\n            l.line_symbol4_shape,\n            l.e_status,\n            l.e_sort,\n            l.average_distance,\n            sst.line_group_cd,\n            s.station_cd,\n            s.station_g_cd\n        FROM `lines` AS l\n        JOIN `stations` AS s ON s.station_g_cd = ?\n            AND s.e_status = 0\n        JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1\n        WHERE l.line_cd = s.line_cd\n            AND l.e_status = 0",
+  "query": "SELECT DISTINCT l.line_cd,\n            l.line_name,\n            l.line_name_k,\n            l.line_name_h,\n            l.line_name_r,\n            l.line_name_zh,\n            l.line_name_ko,\n            l.line_name_ipa,\n            l.line_name_r_ipa,\n            l.line_color_c,\n            l.company_cd,\n            l.line_type,\n            l.line_symbol1,\n            l.line_symbol2,\n            l.line_symbol3,\n            l.line_symbol4,\n            l.line_symbol1_color,\n            l.line_symbol2_color,\n            l.line_symbol3_color,\n            l.line_symbol4_color,\n            l.line_symbol1_shape,\n            l.line_symbol2_shape,\n            l.line_symbol3_shape,\n            l.line_symbol4_shape,\n            l.e_status,\n            l.e_sort,\n            l.average_distance,\n            sst.line_group_cd,\n            s.station_cd,\n            s.station_g_cd\n        FROM `lines` AS l\n        JOIN `stations` AS s ON s.station_g_cd = ?\n            AND s.e_status = 0\n        JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1\n        WHERE l.line_cd = s.line_cd\n            AND l.e_status = 0",
   "describe": {
     "columns": [
       {
@@ -39,108 +39,118 @@
         "type_info": "Text"
       },
       {
-        "name": "line_color_c",
+        "name": "line_name_ipa",
         "ordinal": 7,
         "type_info": "Text"
       },
       {
-        "name": "company_cd",
+        "name": "line_name_r_ipa",
         "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "line_color_c",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "company_cd",
+        "ordinal": 10,
         "type_info": "Integer"
       },
       {
         "name": "line_type",
-        "ordinal": 9,
+        "ordinal": 11,
         "type_info": "Integer"
       },
       {
         "name": "line_symbol1",
-        "ordinal": 10,
-        "type_info": "Text"
-      },
-      {
-        "name": "line_symbol2",
-        "ordinal": 11,
-        "type_info": "Text"
-      },
-      {
-        "name": "line_symbol3",
         "ordinal": 12,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol4",
+        "name": "line_symbol2",
         "ordinal": 13,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol1_color",
+        "name": "line_symbol3",
         "ordinal": 14,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol2_color",
+        "name": "line_symbol4",
         "ordinal": 15,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol3_color",
+        "name": "line_symbol1_color",
         "ordinal": 16,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol4_color",
+        "name": "line_symbol2_color",
         "ordinal": 17,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol1_shape",
+        "name": "line_symbol3_color",
         "ordinal": 18,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol2_shape",
+        "name": "line_symbol4_color",
         "ordinal": 19,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol3_shape",
+        "name": "line_symbol1_shape",
         "ordinal": 20,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol4_shape",
+        "name": "line_symbol2_shape",
         "ordinal": 21,
         "type_info": "Text"
       },
       {
-        "name": "e_status",
+        "name": "line_symbol3_shape",
         "ordinal": 22,
+        "type_info": "Text"
+      },
+      {
+        "name": "line_symbol4_shape",
+        "ordinal": 23,
+        "type_info": "Text"
+      },
+      {
+        "name": "e_status",
+        "ordinal": 24,
         "type_info": "Integer"
       },
       {
         "name": "e_sort",
-        "ordinal": 23,
-        "type_info": "Integer"
-      },
-      {
-        "name": "average_distance",
-        "ordinal": 24,
-        "type_info": "Float"
-      },
-      {
-        "name": "line_group_cd",
         "ordinal": 25,
         "type_info": "Integer"
       },
       {
-        "name": "station_cd",
+        "name": "average_distance",
         "ordinal": 26,
+        "type_info": "Float"
+      },
+      {
+        "name": "line_group_cd",
+        "ordinal": 27,
+        "type_info": "Integer"
+      },
+      {
+        "name": "station_cd",
+        "ordinal": 28,
         "type_info": "Integer"
       },
       {
         "name": "station_g_cd",
-        "ordinal": 27,
+        "ordinal": 29,
         "type_info": "Integer"
       }
     ],
@@ -149,6 +159,8 @@
     },
     "nullable": [
       false,
+      true,
+      true,
       true,
       true,
       true,
@@ -178,5 +190,5 @@
       false
     ]
   },
-  "hash": "1ad7a9d5dbe0911206b896433fe9503377babfa9d65965516e7589fb9909d905"
+  "hash": "c2d3ee41d7af3a61cb01cdeaddc6fbdeff895d8a1c77f91b300d086413d83ea4"
 }

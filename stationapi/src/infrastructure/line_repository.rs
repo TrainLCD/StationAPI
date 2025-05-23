@@ -18,6 +18,8 @@ pub struct LineRow {
     pub line_name_r: Option<String>,
     pub line_name_zh: Option<String>,
     pub line_name_ko: Option<String>,
+    pub line_name_ipa: Option<String>,
+    pub line_name_r_ipa: Option<String>,
     pub line_color_c: Option<String>,
     pub line_symbol1: Option<String>,
     pub line_symbol2: Option<String>,
@@ -51,6 +53,8 @@ impl From<LineRow> for Line {
             line_name_r: row.line_name_r,
             line_name_zh: row.line_name_zh,
             line_name_ko: row.line_name_ko,
+            line_name_ipa: row.line_name_ipa,
+            line_name_r_ipa: row.line_name_r_ipa,
             line_color_c: row.line_color_c,
             line_type: row.line_type,
             line_symbols: vec![],
@@ -168,6 +172,8 @@ impl InternalLineRepository {
             l.line_name_r,
             l.line_name_zh,
             l.line_name_ko,
+            l.line_name_ipa,
+            l.line_name_r_ipa,
             l.line_color_c,
             l.line_symbol1,
             l.line_symbol2,
@@ -236,6 +242,8 @@ impl InternalLineRepository {
             COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
             COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(a.line_name_ipa, l.line_name_ipa) AS line_name_ipa,
+            COALESCE(a.line_name_r_ipa, l.line_name_r_ipa) AS line_name_r_ipa,
             COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
         FROM `lines` AS l
             JOIN `stations` AS s ON s.station_cd = ?
@@ -276,6 +284,8 @@ impl InternalLineRepository {
                 line_name_r,
                 line_name_zh,
                 line_name_ko,
+                line_name_ipa,
+                line_name_r_ipa,
                 line_color_c,
                 line_symbol1,
                 line_symbol2,
@@ -323,6 +333,8 @@ impl InternalLineRepository {
             l.line_name_r,
             l.line_name_zh,
             l.line_name_ko,
+            l.line_name_ipa,
+            l.line_name_r_ipa,
             l.line_color_c,
             l.company_cd,
             l.line_type,
@@ -373,12 +385,6 @@ impl InternalLineRepository {
                 l.line_cd,
                 l.company_cd,
                 l.line_type,
-                l.line_name,
-                l.line_name_k,
-                l.line_name_h,
-                l.line_name_r,
-                l.line_name_zh,
-                l.line_name_ko,
                 l.line_color_c,
                 l.line_symbol1,
                 l.line_symbol2,
@@ -404,6 +410,8 @@ impl InternalLineRepository {
                 COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
                 COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
                 COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+                COALESCE(a.line_name_ipa, l.line_name_ipa) AS line_name_ipa,
+                COALESCE(a.line_name_r_ipa, l.line_name_r_ipa) AS line_name_r_ipa,
                 COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
             FROM `lines` AS l
             JOIN `stations` AS s ON s.station_g_cd IN ( {} )
@@ -465,6 +473,8 @@ impl InternalLineRepository {
             l.line_name_r,
             l.line_name_zh,
             l.line_name_ko,
+            l.line_name_ipa,
+            l.line_name_r_ipa,
             l.line_color_c
         FROM `lines` AS l
             JOIN `station_station_types` AS sst ON sst.line_group_cd = ? AND sst.pass <> 1
@@ -503,6 +513,8 @@ impl InternalLineRepository {
                 l.line_name_r,
                 l.line_name_zh,
                 l.line_name_ko,
+                l.line_name_ipa,
+                l.line_name_r_ipa,
                 l.line_color_c,
                 l.line_symbol1,
                 l.line_symbol2,
@@ -521,7 +533,9 @@ impl InternalLineRepository {
                 l.average_distance,
                 sst.line_group_cd,
                 s.station_cd,
-                s.station_g_cd
+                s.station_g_cd,
+                l.line_name_ipa,
+                l.line_name_r_ipa
             FROM `lines` AS l
             JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} ) AND sst.pass <> 1
             JOIN `stations` AS s ON s.station_cd = sst.station_cd AND s.e_status = 0
@@ -564,6 +578,8 @@ impl InternalLineRepository {
                 l.line_name_r,
                 l.line_name_zh,
                 l.line_name_ko,
+                l.line_name_ipa,
+                l.line_name_r_ipa,
                 l.line_color_c,
                 l.line_symbol1,
                 l.line_symbol2,
@@ -624,6 +640,8 @@ impl InternalLineRepository {
             l.line_name_r,
             l.line_name_zh,
             l.line_name_ko,
+            l.line_name_ipa,
+            l.line_name_r_ipa,
             l.line_color_c,
             l.line_symbol1,
             l.line_symbol2,
