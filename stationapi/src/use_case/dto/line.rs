@@ -10,6 +10,8 @@ impl From<Line> for GrpcLine {
             name_roman: Some(line.line_name_r.unwrap_or_default()),
             name_chinese: line.line_name_zh,
             name_korean: line.line_name_ko,
+            name_pronounce: line.line_name_ipa,
+            name_roman_pronounce: line.line_name_r_ipa,
             color: line.line_color_c.unwrap_or_default(),
             line_type: line.line_type.unwrap_or_default() as i32,
             line_symbols: line.line_symbols.into_iter().map(|s| s.into()).collect(),

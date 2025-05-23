@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT DISTINCT s.*,\n            COALESCE(a.line_name, l.line_name) AS \"line_name: String\",\n            COALESCE(a.line_name_k, l.line_name_k) AS \"line_name_k: String\",\n            COALESCE(a.line_name_h, l.line_name_h) AS \"line_name_h: String\",\n            COALESCE(a.line_name_r, l.line_name_r) AS \"line_name_r: String\",\n            COALESCE(a.line_name_zh, l.line_name_zh) AS \"line_name_zh: String\",\n            COALESCE(a.line_name_ko, l.line_name_ko) AS \"line_name_ko: String\",\n            COALESCE(a.line_color_c, l.line_color_c) AS \"line_color_c: String\",\n            l.company_cd,\n            l.line_type,\n            l.line_symbol1,\n            l.line_symbol2,\n            l.line_symbol3,\n            l.line_symbol4,\n            l.line_symbol1_color,\n            l.line_symbol2_color,\n            l.line_symbol3_color,\n            l.line_symbol4_color,\n            l.line_symbol1_shape,\n            l.line_symbol2_shape,\n            l.line_symbol3_shape,\n            l.line_symbol4_shape,\n            l.average_distance,\n            sst.id AS sst_id,\n            sst.type_cd,\n            sst.line_group_cd,\n            sst.pass,\n            t.id AS type_id,\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.direction,\n            t.kind\n          FROM `stations` AS s\n          JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0\n          LEFT JOIN `station_station_types` AS sst ON sst.line_group_cd = ?\n          LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd\n          LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd\n          LEFT JOIN `aliases` AS a ON a.id = la.alias_cd\n          WHERE\n            s.line_cd = l.line_cd\n            AND s.station_cd = sst.station_cd\n            AND s.e_status = 0",
+  "query": "SELECT DISTINCT s.*,\n            COALESCE(a.line_name, l.line_name) AS \"line_name: String\",\n            COALESCE(a.line_name_k, l.line_name_k) AS \"line_name_k: String\",\n            COALESCE(a.line_name_h, l.line_name_h) AS \"line_name_h: String\",\n            COALESCE(a.line_name_r, l.line_name_r) AS \"line_name_r: String\",\n            COALESCE(a.line_name_zh, l.line_name_zh) AS \"line_name_zh: String\",\n            COALESCE(a.line_name_ko, l.line_name_ko) AS \"line_name_ko: String\",\n            COALESCE(a.line_color_c, l.line_color_c) AS \"line_color_c: String\",\n            COALESCE(a.line_name_ipa, l.line_name_ipa) AS \"line_name_ipa: String\",\n            COALESCE(a.line_name_r_ipa, l.line_name_r_ipa) AS \"line_name_r_ipa: String\",\n            l.company_cd,\n            l.line_type,\n            l.line_symbol1,\n            l.line_symbol2,\n            l.line_symbol3,\n            l.line_symbol4,\n            l.line_symbol1_color,\n            l.line_symbol2_color,\n            l.line_symbol3_color,\n            l.line_symbol4_color,\n            l.line_symbol1_shape,\n            l.line_symbol2_shape,\n            l.line_symbol3_shape,\n            l.line_symbol4_shape,\n            l.average_distance,\n            sst.id AS sst_id,\n            sst.type_cd,\n            sst.line_group_cd,\n            sst.pass,\n            t.id AS type_id,\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.direction,\n            t.kind\n          FROM `stations` AS s\n          JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0\n          LEFT JOIN `station_station_types` AS sst ON sst.line_group_cd = ?\n          LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd\n          LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd\n          LEFT JOIN `aliases` AS a ON a.id = la.alias_cd\n          WHERE\n            s.line_cd = l.line_cd\n            AND s.station_cd = sst.station_cd\n            AND s.e_status = 0",
   "describe": {
     "columns": [
       {
@@ -44,253 +44,273 @@
         "type_info": "Text"
       },
       {
-        "name": "station_number1",
+        "name": "station_name_ipa",
         "ordinal": 8,
         "type_info": "Text"
       },
       {
-        "name": "station_number2",
+        "name": "station_name_r_ipa",
         "ordinal": 9,
         "type_info": "Text"
       },
       {
-        "name": "station_number3",
+        "name": "station_number1",
         "ordinal": 10,
         "type_info": "Text"
       },
       {
-        "name": "station_number4",
+        "name": "station_number2",
         "ordinal": 11,
         "type_info": "Text"
       },
       {
-        "name": "three_letter_code",
+        "name": "station_number3",
         "ordinal": 12,
         "type_info": "Text"
       },
       {
-        "name": "line_cd",
+        "name": "station_number4",
         "ordinal": 13,
+        "type_info": "Text"
+      },
+      {
+        "name": "three_letter_code",
+        "ordinal": 14,
+        "type_info": "Text"
+      },
+      {
+        "name": "line_cd",
+        "ordinal": 15,
         "type_info": "Integer"
       },
       {
         "name": "pref_cd",
-        "ordinal": 14,
+        "ordinal": 16,
         "type_info": "Integer"
       },
       {
         "name": "post",
-        "ordinal": 15,
+        "ordinal": 17,
         "type_info": "Text"
       },
       {
         "name": "address",
-        "ordinal": 16,
+        "ordinal": 18,
         "type_info": "Text"
       },
       {
         "name": "lon",
-        "ordinal": 17,
+        "ordinal": 19,
         "type_info": "Float"
       },
       {
         "name": "lat",
-        "ordinal": 18,
+        "ordinal": 20,
         "type_info": "Float"
       },
       {
         "name": "open_ymd",
-        "ordinal": 19,
+        "ordinal": 21,
         "type_info": "Text"
       },
       {
         "name": "close_ymd",
-        "ordinal": 20,
+        "ordinal": 22,
         "type_info": "Text"
       },
       {
         "name": "e_status",
-        "ordinal": 21,
+        "ordinal": 23,
         "type_info": "Integer"
       },
       {
         "name": "e_sort",
-        "ordinal": 22,
+        "ordinal": 24,
         "type_info": "Integer"
       },
       {
         "name": "line_name: String",
-        "ordinal": 23,
-        "type_info": "Null"
-      },
-      {
-        "name": "line_name_k: String",
-        "ordinal": 24,
-        "type_info": "Null"
-      },
-      {
-        "name": "line_name_h: String",
         "ordinal": 25,
         "type_info": "Null"
       },
       {
-        "name": "line_name_r: String",
+        "name": "line_name_k: String",
         "ordinal": 26,
         "type_info": "Null"
       },
       {
-        "name": "line_name_zh: String",
+        "name": "line_name_h: String",
         "ordinal": 27,
         "type_info": "Null"
       },
       {
-        "name": "line_name_ko: String",
+        "name": "line_name_r: String",
         "ordinal": 28,
         "type_info": "Null"
       },
       {
-        "name": "line_color_c: String",
+        "name": "line_name_zh: String",
         "ordinal": 29,
         "type_info": "Null"
       },
       {
-        "name": "company_cd",
+        "name": "line_name_ko: String",
         "ordinal": 30,
+        "type_info": "Null"
+      },
+      {
+        "name": "line_color_c: String",
+        "ordinal": 31,
+        "type_info": "Null"
+      },
+      {
+        "name": "line_name_ipa: String",
+        "ordinal": 32,
+        "type_info": "Null"
+      },
+      {
+        "name": "line_name_r_ipa: String",
+        "ordinal": 33,
+        "type_info": "Null"
+      },
+      {
+        "name": "company_cd",
+        "ordinal": 34,
         "type_info": "Integer"
       },
       {
         "name": "line_type",
-        "ordinal": 31,
+        "ordinal": 35,
         "type_info": "Integer"
       },
       {
         "name": "line_symbol1",
-        "ordinal": 32,
-        "type_info": "Text"
-      },
-      {
-        "name": "line_symbol2",
-        "ordinal": 33,
-        "type_info": "Text"
-      },
-      {
-        "name": "line_symbol3",
-        "ordinal": 34,
-        "type_info": "Text"
-      },
-      {
-        "name": "line_symbol4",
-        "ordinal": 35,
-        "type_info": "Text"
-      },
-      {
-        "name": "line_symbol1_color",
         "ordinal": 36,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol2_color",
+        "name": "line_symbol2",
         "ordinal": 37,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol3_color",
+        "name": "line_symbol3",
         "ordinal": 38,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol4_color",
+        "name": "line_symbol4",
         "ordinal": 39,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol1_shape",
+        "name": "line_symbol1_color",
         "ordinal": 40,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol2_shape",
+        "name": "line_symbol2_color",
         "ordinal": 41,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol3_shape",
+        "name": "line_symbol3_color",
         "ordinal": 42,
         "type_info": "Text"
       },
       {
-        "name": "line_symbol4_shape",
+        "name": "line_symbol4_color",
         "ordinal": 43,
         "type_info": "Text"
       },
       {
-        "name": "average_distance",
+        "name": "line_symbol1_shape",
         "ordinal": 44,
+        "type_info": "Text"
+      },
+      {
+        "name": "line_symbol2_shape",
+        "ordinal": 45,
+        "type_info": "Text"
+      },
+      {
+        "name": "line_symbol3_shape",
+        "ordinal": 46,
+        "type_info": "Text"
+      },
+      {
+        "name": "line_symbol4_shape",
+        "ordinal": 47,
+        "type_info": "Text"
+      },
+      {
+        "name": "average_distance",
+        "ordinal": 48,
         "type_info": "Float"
       },
       {
         "name": "sst_id",
-        "ordinal": 45,
-        "type_info": "Integer"
-      },
-      {
-        "name": "type_cd",
-        "ordinal": 46,
-        "type_info": "Integer"
-      },
-      {
-        "name": "line_group_cd",
-        "ordinal": 47,
-        "type_info": "Integer"
-      },
-      {
-        "name": "pass",
-        "ordinal": 48,
-        "type_info": "Integer"
-      },
-      {
-        "name": "type_id",
         "ordinal": 49,
         "type_info": "Integer"
       },
       {
-        "name": "type_name",
+        "name": "type_cd",
         "ordinal": 50,
-        "type_info": "Text"
+        "type_info": "Integer"
       },
       {
-        "name": "type_name_k",
+        "name": "line_group_cd",
         "ordinal": 51,
-        "type_info": "Text"
+        "type_info": "Integer"
       },
       {
-        "name": "type_name_r",
+        "name": "pass",
         "ordinal": 52,
-        "type_info": "Text"
+        "type_info": "Integer"
       },
       {
-        "name": "type_name_zh",
+        "name": "type_id",
         "ordinal": 53,
-        "type_info": "Text"
+        "type_info": "Integer"
       },
       {
-        "name": "type_name_ko",
+        "name": "type_name",
         "ordinal": 54,
         "type_info": "Text"
       },
       {
-        "name": "color",
+        "name": "type_name_k",
         "ordinal": 55,
         "type_info": "Text"
       },
       {
-        "name": "direction",
+        "name": "type_name_r",
         "ordinal": 56,
+        "type_info": "Text"
+      },
+      {
+        "name": "type_name_zh",
+        "ordinal": 57,
+        "type_info": "Text"
+      },
+      {
+        "name": "type_name_ko",
+        "ordinal": 58,
+        "type_info": "Text"
+      },
+      {
+        "name": "color",
+        "ordinal": 59,
+        "type_info": "Text"
+      },
+      {
+        "name": "direction",
+        "ordinal": 60,
         "type_info": "Integer"
       },
       {
         "name": "kind",
-        "ordinal": 57,
+        "ordinal": 61,
         "type_info": "Integer"
       }
     ],
@@ -311,6 +331,8 @@
       true,
       true,
       true,
+      true,
+      true,
       false,
       false,
       false,
@@ -321,6 +343,8 @@
       false,
       false,
       false,
+      null,
+      null,
       null,
       null,
       null,
@@ -358,5 +382,5 @@
       false
     ]
   },
-  "hash": "b5ee45b9b7ca22b23f957622b413358677d71dd25d87badd1b1defa4ead25d15"
+  "hash": "dacc7cafa94ddc2be0842004b46a8348eee4cd51bc09dbcd589d2baa95a23051"
 }
