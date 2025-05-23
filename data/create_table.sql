@@ -152,15 +152,30 @@ CREATE VIRTUAL TABLE station_rtree USING rtree(
 
 CREATE INDEX `line_aliases_station_cd` ON `line_aliases` (`station_cd`);
 CREATE INDEX `line_aliases_alias_cd` ON `line_aliases` (`alias_cd`);
+CREATE INDEX `connections_station_cd1` ON `connections` (`station_cd1`);
+CREATE INDEX `connections_station_cd2` ON `connections` (`station_cd2`);
+CREATE INDEX `connections_station_cd1_cd2` ON `connections` (`station_cd1`, `station_cd2`);
+CREATE INDEX `companies_e_status` ON `companies` (`e_status`);
+CREATE INDEX `companies_e_sort` ON `companies` (`e_sort`);
+CREATE INDEX `companies_company_type` ON `companies` (`company_type`);
 CREATE INDEX `lines_company_cd` ON `lines` (`company_cd`);
 CREATE INDEX `lines_e_sort` ON `lines` (`e_sort`);
+CREATE INDEX `lines_e_status` ON `lines` (`e_status`);
+CREATE INDEX `lines_line_type` ON `lines` (`line_type`);
 CREATE INDEX `station_station_types_type_cd` ON `station_station_types` (`type_cd`);
 CREATE INDEX `station_station_types_station_cd` ON `station_station_types` (`station_cd`);
 CREATE INDEX `station_station_types_line_group_cd` ON `station_station_types` (`line_group_cd`);
+CREATE INDEX `station_station_types_station_type` ON `station_station_types` (`station_cd`, `type_cd`);
+CREATE INDEX `station_station_types_line_group_type` ON `station_station_types` (`line_group_cd`, `type_cd`);
 CREATE INDEX `stations_line_cd` ON `stations` (`line_cd`);
 CREATE INDEX `stations_station_g_cd` ON `stations` (`station_g_cd`);
 CREATE INDEX `stations_e_sort_station_cd` ON `stations` (`e_sort`, `station_cd`);
 CREATE INDEX `stations_lat_lon` ON `stations` (`lat`, `lon`);
+CREATE INDEX `stations_e_status` ON `stations` (`e_status`);
+CREATE INDEX `stations_pref_cd` ON `stations` (`pref_cd`);
+CREATE INDEX `stations_station_name` ON `stations` (`station_name`);
+CREATE INDEX `stations_station_name_k` ON `stations` (`station_name_k`);
+CREATE INDEX `stations_line_cd_e_status` ON `stations` (`line_cd`, `e_status`);
 CREATE UNIQUE INDEX `types_type_cd` ON `types` (`type_cd`);
 
 COMMIT;
