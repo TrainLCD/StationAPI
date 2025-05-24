@@ -19,7 +19,7 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 ,18,つるぎ,ツルギ,Tsurugi,剑,쓰루기,#3050FF,0,4,0,,COMPLETE
 ,19,かもめ,カモメ,KAMOME,海鸥,카모메,#E10017,0,4,0,,COMPLETE
 ,100,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,2,,PARTIAL
-,101,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,,PARTIAL
+,101,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,2,,PARTIAL
 ,102,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,,PARTIAL
 ,103,特別快速,トクベツカイソク,Special Rapid,特别快车,특별쾌속,#DC143C,0,2,0,,COMPLETE
 ,104,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#DC143C,0,2,0,,COMPLETE
