@@ -10,7 +10,8 @@ use crate::{
         GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
         GetStationByLineIdRequest, GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
         GetTrainTypesByStationIdRequest, MultipleLineResponse, MultipleStationResponse,
-        MultipleTrainTypeResponse, Route, RouteResponse, SingleLineResponse, SingleStationResponse,
+        MultipleTrainTypeResponse, Route, RouteResponse, RouteTypeResponse, SingleLineResponse,
+        SingleStationResponse,
     },
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
@@ -203,6 +204,24 @@ impl StationApi for MyApi {
             Ok(routes) => {
                 return Ok(Response::new(RouteResponse {
                     routes,
+                    next_page_token: "".to_string(),
+                }));
+            }
+            Err(err) => Err(PresentationalError::from(err).into()),
+        }
+    }
+
+    async fn get_route_types(
+        &self,
+        request: tonic::Request<GetRouteRequest>,
+    ) -> Result<tonic::Response<RouteTypeResponse>, tonic::Status> {
+        let from_id = request.get_ref().from_station_group_id;
+        let to_id = request.get_ref().to_station_group_id;
+
+        match self.query_use_case.get_train_types(from_id, to_id).await {
+            Ok(train_types) => {
+                return Ok(Response::new(RouteTypeResponse {
+                    train_types: train_types.into_iter().map(|t| t.into()).collect(),
                     next_page_token: "".to_string(),
                 }));
             }

@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BinaryHeap, HashMap},
+    collections::{BTreeMap, BinaryHeap, HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 
@@ -419,6 +419,7 @@ where
             station_cd: Some(station.station_cd),
             station_g_cd: Some(station.station_g_cd),
             average_distance: station.average_distance,
+            type_cd: station.type_cd,
         }
     }
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol> {
@@ -641,6 +642,7 @@ where
                                     station_cd: l.station_cd,
                                     station_g_cd: l.station_g_cd,
                                     average_distance: l.average_distance,
+                                    type_cd: l.type_cd,
                                 })
                                 .collect();
 
@@ -827,6 +829,91 @@ where
             })
             .collect();
         Ok(routes)
+    }
+
+    async fn get_train_types(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+    ) -> Result<Vec<TrainType>, UseCaseError> {
+        let stops = self
+            .station_repository
+            .get_route_stops(from_station_id, to_station_id)
+            .await?;
+        let stops = Arc::new(stops);
+
+        let line_group_id_vec: Vec<u32> = Arc::clone(&stops)
+            .iter()
+            .filter_map(|stop| stop.line_group_cd.map(|id| id as u32))
+            .collect::<HashSet<u32>>()
+            .into_iter()
+            .collect();
+
+        let mut result: Vec<TrainType> = Vec::with_capacity(line_group_id_vec.len());
+
+        let train_types = self
+            .train_type_repository
+            .get_by_line_group_id_vec(&line_group_id_vec)
+            .await?;
+
+        let tt_lines = self
+            .line_repository
+            .get_by_line_group_id_vec(&line_group_id_vec)
+            .await?;
+
+        for mut train_type in train_types.clone() {
+            if result
+                .iter()
+                .any(|t| t.line_group_cd == train_type.line_group_cd)
+            {
+                continue;
+            }
+
+            train_type.lines = tt_lines
+                .iter()
+                .filter(|line| line.line_group_cd == train_type.line_group_cd)
+                .map(|line| Line {
+                    line_cd: line.line_cd,
+                    company_cd: line.company_cd,
+                    company: None,
+                    line_name: line.line_name.clone(),
+                    line_name_k: line.line_name_k.clone(),
+                    line_name_h: line.line_name_h.clone(),
+                    line_name_r: line.line_name_r.clone(),
+                    line_name_zh: line.line_name_zh.clone(),
+                    line_name_ko: line.line_name_ko.clone(),
+                    line_color_c: line.line_color_c.clone(),
+                    line_type: line.line_type,
+                    line_symbols: line.line_symbols.clone(),
+                    line_symbol1: line.line_symbol1.clone(),
+                    line_symbol2: line.line_symbol2.clone(),
+                    line_symbol3: line.line_symbol3.clone(),
+                    line_symbol4: line.line_symbol4.clone(),
+                    line_symbol1_color: line.line_symbol1_color.clone(),
+                    line_symbol2_color: line.line_symbol2_color.clone(),
+                    line_symbol3_color: line.line_symbol3_color.clone(),
+                    line_symbol4_color: line.line_symbol4_color.clone(),
+                    line_symbol1_shape: line.line_symbol1_shape.clone(),
+                    line_symbol2_shape: line.line_symbol2_shape.clone(),
+                    line_symbol3_shape: line.line_symbol3_shape.clone(),
+                    line_symbol4_shape: line.line_symbol4_shape.clone(),
+                    e_status: line.e_status,
+                    e_sort: line.e_sort,
+                    average_distance: line.average_distance,
+                    station: None,
+                    train_type: train_types
+                        .iter()
+                        .find(|tt| tt.type_cd == line.type_cd)
+                        .cloned(),
+                    line_group_cd: line.line_group_cd,
+                    station_cd: line.station_cd,
+                    station_g_cd: line.station_g_cd,
+                    type_cd: line.type_cd,
+                })
+                .collect::<Vec<Line>>();
+            result.push(train_type.clone());
+        }
+        Ok(result.to_vec())
     }
 
     async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError> {

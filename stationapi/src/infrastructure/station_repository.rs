@@ -1587,7 +1587,7 @@ mod tests {
         assert!(result.is_ok());
 
         let stations = result.unwrap();
-        assert!(stations.len() > 0);
+        assert!(!stations.is_empty());
 
         // 山手線の駅のみが返されることを確認
         for station in &stations {
@@ -1605,7 +1605,7 @@ mod tests {
 
         let stations = result.unwrap();
         // train typesを持つ駅の場合、特定のtype情報が含まれる
-        assert!(stations.len() > 0);
+        assert!(!stations.is_empty());
     }
 
     #[tokio::test]
@@ -1667,7 +1667,7 @@ mod tests {
         assert!(result.is_ok());
 
         let stations = result.unwrap();
-        assert!(stations.len() > 0);
+        assert!(!stations.is_empty());
         assert!(stations.len() <= 3);
 
         // 最初の駅は東京駅であるはず（距離が最も近い）
@@ -1697,7 +1697,7 @@ mod tests {
         assert!(result.is_ok());
 
         let stations = result.unwrap();
-        assert!(stations.len() > 0);
+        assert!(!stations.is_empty());
 
         // 「東京」を含む駅名が返されることを確認
         let found_tokyo = stations.iter().any(|s| s.station_name.contains("東京"));
@@ -1741,7 +1741,7 @@ mod tests {
         assert!(result.is_ok());
 
         let stations = result.unwrap();
-        assert!(stations.len() > 0);
+        assert!(!stations.is_empty());
 
         // 指定したline_group_cdを持つ駅のみが返されることを確認
         for station in &stations {
@@ -1785,20 +1785,20 @@ mod tests {
         // 新宿駅（ID: 2）は複数の train types を持つ
         let result = InternalStationRepository::fetch_has_local_train_types_by_station_id(
             2,
-            &mut *conn_guard,
+            &mut conn_guard,
         )
         .await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true);
+        assert!(result.unwrap());
 
         // 存在しない駅
         let result = InternalStationRepository::fetch_has_local_train_types_by_station_id(
             999,
-            &mut *conn_guard,
+            &mut conn_guard,
         )
         .await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), false);
+        assert!(!result.unwrap());
     }
 
     #[tokio::test]
@@ -1871,7 +1871,7 @@ mod tests {
         assert_eq!(station.station_name, "テスト駅");
         assert_eq!(station.station_name_k, "てすとえき");
         assert_eq!(station.stop_condition, StopCondition::All);
-        assert_eq!(station.has_train_types, true);
+        assert!(station.has_train_types);
         assert_eq!(station.average_distance, 2.0);
     }
 

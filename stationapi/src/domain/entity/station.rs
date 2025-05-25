@@ -260,6 +260,7 @@ mod tests {
             Some(11302),                       // station_cd
             Some(1130201),                     // station_g_cd
             0.97,                              // average_distance
+            None,                              // type_cd
         )
     }
 
@@ -568,7 +569,7 @@ mod tests {
 
         for condition in stop_conditions {
             let mut station = create_test_station_minimal();
-            station.stop_condition = condition.clone();
+            station.stop_condition = condition;
             assert_eq!(station.stop_condition, condition);
         }
     }
