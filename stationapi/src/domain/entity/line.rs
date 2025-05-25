@@ -36,6 +36,7 @@ pub struct Line {
     pub line_group_cd: Option<i64>,
     pub station_cd: Option<i64>,
     pub station_g_cd: Option<i64>,
+    pub type_cd: Option<i64>,
 }
 
 impl Line {
@@ -73,6 +74,7 @@ impl Line {
         station_cd: Option<i64>,
         station_g_cd: Option<i64>,
         average_distance: f64,
+        type_cd: Option<i64>,
     ) -> Self {
         Self {
             line_cd,
@@ -107,6 +109,7 @@ impl Line {
             station_cd,
             station_g_cd,
             average_distance,
+            type_cd,
         }
     }
 }
@@ -174,6 +177,7 @@ mod tests {
             Some(11302),                       // station_cd
             Some(1130201),                     // station_g_cd
             0.97,                              // average_distance
+            Some(1),                           // type_cd
         )
     }
 
@@ -211,6 +215,7 @@ mod tests {
             None,                       // station_cd
             None,                       // station_g_cd
             0.0,                        // average_distance
+            None,                       // type_cd
         )
     }
 
@@ -239,6 +244,7 @@ mod tests {
         assert_eq!(line.line_group_cd, Some(1001));
         assert_eq!(line.station_cd, Some(11302));
         assert_eq!(line.station_g_cd, Some(1130201));
+        assert_eq!(line.type_cd, Some(1));
     }
 
     #[test]
@@ -273,6 +279,7 @@ mod tests {
         assert_eq!(line.line_group_cd, None);
         assert_eq!(line.station_cd, None);
         assert_eq!(line.station_g_cd, None);
+        assert_eq!(line.type_cd, None);
     }
 
     #[test]
@@ -285,6 +292,7 @@ mod tests {
         assert_eq!(original.line_name, cloned.line_name);
         assert_eq!(original.company_cd, cloned.company_cd);
         assert_eq!(original.average_distance, cloned.average_distance);
+        assert_eq!(original.type_cd, cloned.type_cd);
     }
 
     #[test]
@@ -309,6 +317,7 @@ mod tests {
         assert!(json.contains("\"line_cd\":11302"));
         assert!(json.contains("\"line_name\":\"山手線\""));
         assert!(json.contains("\"line_color_c\":\"#00B261\""));
+        assert!(json.contains("\"type_cd\":1"));
 
         // JSONからデシリアライズ
         let deserialized: Line =
@@ -325,6 +334,7 @@ mod tests {
         assert!(json.contains("\"company\":null"));
         assert!(json.contains("\"line_name_r\":null"));
         assert!(json.contains("\"line_color_c\":null"));
+        assert!(json.contains("\"type_cd\":null"));
 
         // JSONからデシリアライズ
         let deserialized: Line =
@@ -341,6 +351,7 @@ mod tests {
         assert!(debug_string.contains("line_cd: 11302"));
         assert!(debug_string.contains("山手線"));
         assert!(debug_string.contains("#00B261"));
+        assert!(debug_string.contains("type_cd: Some(1)"));
     }
 
     #[test]
@@ -391,6 +402,7 @@ mod tests {
             None,
             None,
             0.97,
+            Some(2),
         );
 
         assert_eq!(line.line_symbols.len(), 2);
@@ -400,6 +412,7 @@ mod tests {
         assert_eq!(line.line_symbol2_color, Some("#FF0000".to_string()));
         assert_eq!(line.line_symbol1_shape, Some("square".to_string()));
         assert_eq!(line.line_symbol2_shape, Some("circle".to_string()));
+        assert_eq!(line.type_cd, Some(2));
     }
 
     #[test]
@@ -439,6 +452,7 @@ mod tests {
         let _: Option<i64> = line.line_group_cd;
         let _: Option<i64> = line.station_cd;
         let _: Option<i64> = line.station_g_cd;
+        let _: Option<i64> = line.type_cd;
     }
 
     #[test]
@@ -476,6 +490,7 @@ mod tests {
             None,
             None,
             515.4,
+            Some(7),
         );
 
         assert_eq!(line.line_name, "東海道新幹線");
@@ -484,6 +499,7 @@ mod tests {
         assert_eq!(line.line_name_r, Some("Tōkaidō Shinkansen".to_string()));
         assert_eq!(line.line_name_zh, Some("东海道新干线".to_string()));
         assert_eq!(line.line_name_ko, Some("도카이도 신칸센".to_string()));
+        assert_eq!(line.type_cd, Some(7));
     }
 
     #[test]
@@ -521,6 +537,7 @@ mod tests {
             Some(0),
             Some(0),
             0.0,
+            Some(0),
         );
 
         assert_eq!(line.line_name, "");
@@ -529,6 +546,7 @@ mod tests {
         assert_eq!(line.line_name_r, Some("".to_string()));
         assert_eq!(line.line_symbol1, Some("".to_string()));
         assert_eq!(line.line_color_c, Some("".to_string()));
+        assert_eq!(line.type_cd, Some(0));
     }
 
     #[test]
@@ -567,6 +585,7 @@ mod tests {
             Some(-1),
             Some(-1),
             -1.0,
+            Some(-1),
         );
 
         assert_eq!(line.line_cd, -1);
@@ -578,5 +597,175 @@ mod tests {
         assert_eq!(line.line_group_cd, Some(-1));
         assert_eq!(line.station_cd, Some(-1));
         assert_eq!(line.station_g_cd, Some(-1));
+        assert_eq!(line.type_cd, Some(-1));
+    }
+
+    #[test]
+    fn test_line_type_cd_specific_values() {
+        // type_cdフィールドの特定の値をテスト
+        let test_cases = vec![
+            (Some(0), "普通列車"),
+            (Some(1), "快速列車"),
+            (Some(2), "急行列車"),
+            (Some(3), "特急列車"),
+            (Some(7), "新幹線"),
+            (None, "未指定"),
+        ];
+
+        for (type_cd, description) in test_cases {
+            let line = Line::new(
+                1,
+                1,
+                None,
+                format!("テスト線 ({})", description),
+                "テストセン".to_string(),
+                "てすとせん".to_string(),
+                None,
+                None,
+                None,
+                None,
+                None,
+                vec![],
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                1,
+                1,
+                None,
+                None,
+                None,
+                None,
+                None,
+                1.0,
+                type_cd,
+            );
+
+            assert_eq!(line.type_cd, type_cd);
+        }
+    }
+
+    #[test]
+    fn test_line_with_all_optional_fields_some() {
+        // すべてのOptionalフィールドがSomeの場合のテスト
+        let line = Line::new(
+            12345,
+            5678,
+            Some(create_test_company()),
+            "全項目設定線".to_string(),
+            "ゼンコウモクセッテイセン".to_string(),
+            "ぜんこうもくせっていせん".to_string(),
+            Some("All Fields Set Line".to_string()),
+            Some("全项目设定线".to_string()),
+            Some("전 항목 설정선".to_string()),
+            Some("#FF5733".to_string()),
+            Some(5),
+            vec![create_test_line_symbol()],
+            Some("AF".to_string()),
+            Some("FS".to_string()),
+            Some("SL".to_string()),
+            Some("XX".to_string()),
+            Some("#FF5733".to_string()),
+            Some("#33FF57".to_string()),
+            Some("#3357FF".to_string()),
+            Some("#F333FF".to_string()),
+            Some("circle".to_string()),
+            Some("square".to_string()),
+            Some("triangle".to_string()),
+            Some("diamond".to_string()),
+            1,
+            999999,
+            None,
+            None,
+            Some(9999),
+            Some(8888),
+            Some(7777),
+            123.45,
+            Some(99),
+        );
+
+        // すべてのOptionalフィールドがSomeであることを確認
+        assert!(line.company.is_some());
+        assert!(line.line_name_r.is_some());
+        assert!(line.line_name_zh.is_some());
+        assert!(line.line_name_ko.is_some());
+        assert!(line.line_color_c.is_some());
+        assert!(line.line_type.is_some());
+        assert!(line.line_symbol1.is_some());
+        assert!(line.line_symbol2.is_some());
+        assert!(line.line_symbol3.is_some());
+        assert!(line.line_symbol4.is_some());
+        assert!(line.line_symbol1_color.is_some());
+        assert!(line.line_symbol2_color.is_some());
+        assert!(line.line_symbol3_color.is_some());
+        assert!(line.line_symbol4_color.is_some());
+        assert!(line.line_symbol1_shape.is_some());
+        assert!(line.line_symbol2_shape.is_some());
+        assert!(line.line_symbol3_shape.is_some());
+        assert!(line.line_symbol4_shape.is_some());
+        assert!(line.line_group_cd.is_some());
+        assert!(line.station_cd.is_some());
+        assert!(line.station_g_cd.is_some());
+        assert!(line.type_cd.is_some());
+
+        // 具体的な値の確認
+        assert_eq!(line.type_cd, Some(99));
+        assert_eq!(line.line_group_cd, Some(9999));
+        assert_eq!(line.station_cd, Some(8888));
+        assert_eq!(line.station_g_cd, Some(7777));
+    }
+
+    #[test]
+    fn test_line_serialization_with_type_cd() {
+        // type_cdが設定されている場合のシリアライゼーションテスト
+        let line_with_type = Line::new(
+            1,
+            1,
+            None,
+            "テスト".to_string(),
+            "テスト".to_string(),
+            "てすと".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            vec![],
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            1,
+            1,
+            None,
+            None,
+            None,
+            None,
+            None,
+            1.0,
+            Some(42),
+        );
+
+        let json = serde_json::to_string(&line_with_type).expect("シリアライゼーションに失敗");
+        assert!(json.contains("\"type_cd\":42"));
+
+        let deserialized: Line = serde_json::from_str(&json).expect("デシリアライゼーションに失敗");
+        assert_eq!(deserialized.type_cd, Some(42));
     }
 }

@@ -37,6 +37,7 @@ pub struct LineRow {
     pub line_group_cd: Option<i64>,
     pub station_cd: Option<i64>,
     pub station_g_cd: Option<i64>,
+    pub type_cd: Option<i64>,
 }
 
 impl From<LineRow> for Line {
@@ -74,6 +75,7 @@ impl From<LineRow> for Line {
             station_cd: row.station_cd,
             station_g_cd: row.station_g_cd,
             average_distance: row.average_distance.unwrap_or(0.0),
+            type_cd: row.type_cd,
         }
     }
 }
@@ -186,7 +188,8 @@ impl InternalLineRepository {
             l.average_distance,
             CAST(NULL AS INTEGER) AS line_group_cd,
             CAST(NULL AS INTEGER) AS station_cd,
-            CAST(NULL AS INTEGER) AS station_g_cd
+            CAST(NULL AS INTEGER) AS station_g_cd,
+            CAST(NULL AS INTEGER) AS type_cd
             FROM `lines` AS l
             WHERE l.line_cd = ?
             AND l.e_status = 0",
@@ -230,6 +233,7 @@ impl InternalLineRepository {
             s.station_cd,
             s.station_g_cd,
             sst.line_group_cd,
+            sst.type_cd,
             COALESCE(a.line_name, l.line_name) AS line_name,
             COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -294,7 +298,8 @@ impl InternalLineRepository {
                 average_distance,
                 CAST(NULL AS INTEGER) AS line_group_cd,
                 CAST(NULL AS INTEGER) AS station_cd,
-                CAST(NULL AS INTEGER) AS station_g_cd
+                CAST(NULL AS INTEGER) AS station_g_cd,
+                CAST(NULL AS INTEGER) AS type_cd
             FROM `lines` WHERE line_cd IN ( {} ) AND e_status = 0",
             params
         );
@@ -342,6 +347,7 @@ impl InternalLineRepository {
             l.e_sort,
             l.average_distance,
             sst.line_group_cd,
+            sst.type_cd,
             s.station_cd,
             s.station_g_cd
         FROM `lines` AS l
@@ -398,6 +404,7 @@ impl InternalLineRepository {
                 s.station_cd,
                 s.station_g_cd,
                 sst.line_group_cd,
+                sst.type_cd,
                 COALESCE(a.line_name, l.line_name) AS line_name,
                 COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
                 COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
@@ -459,6 +466,7 @@ impl InternalLineRepository {
             s.station_cd,
             s.station_g_cd,
             sst.line_group_cd,
+            sst.type_cd,
             l.line_name,
             l.line_name_k,
             l.line_name_h,
@@ -520,6 +528,7 @@ impl InternalLineRepository {
                 l.e_sort,
                 l.average_distance,
                 sst.line_group_cd,
+                sst.type_cd,
                 s.station_cd,
                 s.station_g_cd
             FROM `lines` AS l
@@ -581,6 +590,7 @@ impl InternalLineRepository {
                 l.e_sort,
                 l.average_distance,
                 sst.line_group_cd,
+                sst.type_cd,
                 s.station_cd,
                 s.station_g_cd
             FROM `lines` AS l
@@ -642,7 +652,8 @@ impl InternalLineRepository {
             l.average_distance,
             CAST(NULL AS INTEGER) AS line_group_cd,
             CAST(NULL AS INTEGER) AS station_cd,
-            CAST(NULL AS INTEGER) AS station_g_cd
+            CAST(NULL AS INTEGER) AS station_g_cd,
+            CAST(NULL AS INTEGER) AS type_cd
             FROM `lines` AS l
             WHERE (
                     l.line_name LIKE ?
@@ -755,6 +766,7 @@ mod tests {
                 station_cd INTEGER NOT NULL,
                 line_group_cd INTEGER,
                 station_type_cd INTEGER NOT NULL,
+                type_cd INTEGER,
                 pass INTEGER DEFAULT 0
             );
 
@@ -827,11 +839,11 @@ mod tests {
                  '19271230', '', 0, 1110101);
 
             INSERT INTO station_station_types (
-                station_cd, line_group_cd, station_type_cd, pass
+                station_cd, line_group_cd, station_type_cd, type_cd, pass
             ) VALUES 
-                (1130201, 100, 1, 0),
-                (1130301, 200, 1, 0),
-                (1110101, 300, 1, 0);
+                (1130201, 100, 1, 0, 0),
+                (1130301, 200, 1, 0, 0),
+                (1110101, 300, 1, 0, 0);
 
             INSERT INTO aliases (
                 id, line_name, line_name_k, line_name_h, line_name_r,
@@ -885,6 +897,7 @@ mod tests {
             line_group_cd: None,
             station_cd: None,
             station_g_cd: None,
+            type_cd: Some(0),
         };
 
         let line: Line = line_row.into();
@@ -908,6 +921,7 @@ mod tests {
         assert_eq!(line.line_group_cd, None);
         assert_eq!(line.station_cd, None);
         assert_eq!(line.station_g_cd, None);
+        assert_eq!(line.type_cd, Some(0));
     }
 
     /// line_nameがNoneの場合の変換をテスト
@@ -942,6 +956,7 @@ mod tests {
             line_group_cd: None,
             station_cd: None,
             station_g_cd: None,
+            type_cd: None,
         };
 
         let line: Line = line_row.into();
@@ -1215,7 +1230,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() >= 1);
+        assert!(!lines.is_empty());
     }
 
     /// InternalLineRepository::get_by_line_group_id_vec - 空のベクター
@@ -1252,7 +1267,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() >= 1);
+        assert!(!lines.is_empty());
     }
 
     /// InternalLineRepository::get_by_line_group_id_vec_for_routes - 空のベクター
@@ -1360,9 +1375,6 @@ mod tests {
         let lines = result.unwrap();
         assert_eq!(lines.len(), 1); // デフォルトlimit=1
     }
-
-    /// MyLineRepository統合テストは型の問題で難しいため、
-    /// より詳細なInternalLineRepositoryのテストを追加
 
     /// InternalLineRepository::get_by_ids - 複数の結果を検証
     #[tokio::test]
@@ -1492,7 +1504,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() >= 1); // 存在する路線グループに対応する路線
+        assert!(!lines.is_empty()); // 存在する路線グループに対応する路線
     }
 
     /// エラーハンドリングのテスト - 無効なSQL（実際にはこのケースは発生しにくい）

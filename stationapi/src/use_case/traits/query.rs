@@ -82,6 +82,11 @@ pub trait QueryUseCase: Send + Sync + 'static {
         from_station_id: u32,
         to_station_id: u32,
     ) -> Result<Vec<Route>, UseCaseError>;
+    async fn get_train_types(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+    ) -> Result<Vec<TrainType>, UseCaseError>;
     async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError>;
     async fn get_lines_by_name(
         &self,
