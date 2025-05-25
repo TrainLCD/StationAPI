@@ -19,7 +19,7 @@ id,type_cd,type_name,type_name_k,type_name_r,type_name_zh,type_name_ko,color,dir
 ,18,つるぎ,ツルギ,Tsurugi,剑,쓰루기,#3050FF,0,4,0,,COMPLETE
 ,19,かもめ,カモメ,KAMOME,海鸥,카모메,#E10017,0,4,0,,COMPLETE
 ,100,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,2,,PARTIAL
-,101,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,,PARTIAL
+,101,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,2,,PARTIAL
 ,102,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,,PARTIAL
 ,103,特別快速,トクベツカイソク,Special Rapid,特别快车,특별쾌속,#DC143C,0,2,0,,COMPLETE
 ,104,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#DC143C,0,2,0,,COMPLETE
@@ -191,8 +191,8 @@ Yokokawa","SL群马
 ,295,フラノラベンダーエクスプレス,フラノラベンダーエクスプレス,Furano Lavender Express,富良野薰衣草特快,푸라노 라벤더 익스프레스,#da70d6,0,4,0,,COMPLETE
 ,296,鎌倉,カマクラ,Kamakura,镰仓,가마쿠라,#00008b,0,4,0,,COMPLETE
 ,297,いにしへ,イニシヘ,Inishihe,在过去,어서,#8b0000,0,4,0,,COMPLETE
-,300,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,廃止済み 100に移行,NOT
-,301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,廃止済み 101に移行,NOT
+,300,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,優先度0,PARTIAL
+,301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,優先度0,PARTIAL
 ,302,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,廃止済み 102に移行,NOT
 ,303,区間急行,クカンキュウコウ,Semi Express,区域特快,구간급행,#D8CA00,0,3,0,,PARTIAL
 ,304,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,,PARTIAL

@@ -978,7 +978,8 @@ impl InternalStationRepository {
           WHERE
             s.line_cd = l.line_cd
             AND s.station_cd = sst.station_cd
-            AND s.e_status = 0"#,
+            AND s.e_status = 0
+          ORDER BY sst.id"#,
             line_group_id
         )
         .fetch_all(conn)
