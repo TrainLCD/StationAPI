@@ -121,37 +121,37 @@
       {
         "name": "line_name: String",
         "ordinal": 23,
-        "type_info": "Null"
+        "type_info": "Text"
       },
       {
         "name": "line_name_k: String",
         "ordinal": 24,
-        "type_info": "Null"
+        "type_info": "Text"
       },
       {
         "name": "line_name_h: String",
         "ordinal": 25,
-        "type_info": "Null"
+        "type_info": "Text"
       },
       {
         "name": "line_name_r: String",
         "ordinal": 26,
-        "type_info": "Null"
+        "type_info": "Text"
       },
       {
         "name": "line_name_zh: String",
         "ordinal": 27,
-        "type_info": "Null"
+        "type_info": "Text"
       },
       {
         "name": "line_name_ko: String",
         "ordinal": 28,
-        "type_info": "Null"
+        "type_info": "Text"
       },
       {
         "name": "line_color_c: String",
         "ordinal": 29,
-        "type_info": "Null"
+        "type_info": "Text"
       },
       {
         "name": "company_cd",
@@ -321,13 +321,13 @@
       false,
       false,
       false,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
       false,
       false,
       true,
@@ -344,18 +344,18 @@
       true,
       false,
       true,
-      false,
-      false,
-      false,
       true,
-      false,
-      false,
-      false,
-      false,
-      false,
-      false,
-      false,
-      false
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
     ]
   },
   "hash": "5a6566d955230fba8dffad2b7813cfebe7566825d81fe16f928f5d9dec4733c0"
