@@ -377,14 +377,6 @@ impl InternalStationRepository {
 
         let params = format!("?{}", ", ?".repeat(ids.len() - 1));
 
-        // SQLiteにはFIELD関数がないため、CASE文を使用して順序を保持
-        let order_case = ids
-            .iter()
-            .enumerate()
-            .map(|(i, _)| format!("WHEN ? THEN {}", i))
-            .collect::<Vec<_>>()
-            .join(" ");
-
         let query_str = format!(
             r#"SELECT DISTINCT
                 s.*,
@@ -409,29 +401,19 @@ impl InternalStationRepository {
                 COALESCE(a.line_name_r, l.line_name_r)     AS line_name_r,
                 COALESCE(a.line_name_zh, l.line_name_zh)   AS line_name_zh,
                 COALESCE(a.line_name_ko, l.line_name_ko)   AS line_name_ko,
-                COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c,
-                NULL AS sst_id,
-                NULL AS type_cd,
-                NULL AS line_group_cd,
-                NULL AS pass,
-                NULL AS type_id,
-                NULL AS type_name,
-                NULL AS type_name_k,
-                NULL AS type_name_r,
-                NULL AS type_name_zh,
-                NULL AS type_name_ko,
-                NULL AS color,
-                NULL AS direction,
-                NULL AS kind
+                COALESCE(a.line_color_c, l.line_color_c)   AS line_color_c,                IFNULL(s.station_cd = sst.station_cd, 0) AS has_train_types
             FROM `stations` AS s
             JOIN `lines` AS l ON l.line_cd = s.line_cd AND l.e_status = 0
+            LEFT JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd
+            LEFT JOIN `types` AS t ON t.type_cd = sst.type_cd
             LEFT JOIN `line_aliases` AS la ON la.station_cd = s.station_cd
             LEFT JOIN `aliases` AS a ON la.alias_cd = a.id
             WHERE
                 s.station_cd IN ( {} )
+                AND s.line_cd = l.line_cd
                 AND s.e_status = 0
-            ORDER BY CASE s.station_cd {} END"#,
-            params, order_case
+            ORDER BY FIELD(s.station_cd, {})"#,
+            params, params
         );
 
         let mut query = sqlx::query_as::<_, StationRow>(&query_str);
