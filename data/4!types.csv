@@ -244,7 +244,7 @@ Yokokawa","SL群马
 ,352,急行(新松田より各駅停車),キュウコウ,Express(Local from Shin-Matsuda),特快,급행,#DC143C,0,3,0,,COMPLETE
 ,353,各駅停車(新松田より急行),カクエキテイシャ,Local(Express from Shin-Matsuda),每站停车,각역정차,#1F63C6,0,0,0,,COMPLETE
 ,354,特急,トッキュウ,Special Express,特快,특급,#DC143C,0,4,0,京王線用,COMPLETE
-,355,普通,フツウ,Local,慢车,보통,#000000,0,0,0,京急京成用,COMPLETE
+,355,普通,フツウ,Local,慢车,보통,#000000,0,0,2,京急京成用,COMPLETE
 ,356,普通(西馬込方面),フツウ,Local(For Nishi-magome),慢车,보통,#000000,0,0,0,都営浅草線用,COMPLETE
 ,357,普通(押上方面),フツウ,Local(For Oshiage),慢车,보통,#000000,0,0,0,都営浅草線用,COMPLETE
 ,358,急行,キュウコウ,Express,特快,급행,#0D83C3,0,3,0,都営浅草線用,COMPLETE
