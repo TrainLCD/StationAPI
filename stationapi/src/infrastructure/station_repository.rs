@@ -1013,131 +1013,130 @@ impl InternalStationRepository {
         to_station_id: u32,
         conn: &mut SqliteConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        // TODO: モバイルアプリv8.12.2がリリースされたら復活させる
-        // let mut rows = sqlx::query_as!(
-        //     StationRow,
-        //     r#"WITH
-        //         from_cte AS (
-        //             SELECT
-        //                 s.station_cd,
-        //                 s.line_cd
-        //             FROM
-        //                 stations AS s
-        //             WHERE
-        //                 s.station_g_cd = ?
-        //         ),
-        //         to_cte AS (
-        //             SELECT
-        //                 s.station_cd,
-        //                 s.line_cd
-        //             FROM
-        //                 stations AS s
-        //             WHERE
-        //                 s.station_g_cd = ?
-        //         ),
-        //         common_lines AS (
-        //             SELECT DISTINCT s1.line_cd
-        //             FROM stations s1
-        //             WHERE s1.station_g_cd = ?
-        //                 AND s1.e_status = 0
-        //                 AND EXISTS (
-        //                 SELECT 1
-        //                 FROM stations s2
-        //                 WHERE s2.station_g_cd = ?
-        //                     AND s2.e_status = 0
-        //                     AND s2.line_cd = s1.line_cd
-        //                 )
-        //         ),
-        //         sst_cte_c1 AS (
-        //             SELECT
-        //                 sst.line_group_cd
-        //             FROM
-        //                 station_station_types AS sst
-        //                 JOIN from_cte
-        //             WHERE
-        //                 sst.station_cd = from_cte.station_cd
-        //                 AND sst.pass <> 1
-        //         ),
-        //         sst_cte_c2 AS (
-        //             SELECT
-        //                 sst.line_group_cd
-        //             FROM
-        //                 station_station_types AS sst
-        //                 JOIN to_cte
-        //             WHERE
-        //                 sst.station_cd = to_cte.station_cd
-        //                 AND sst.pass <> 1
-        //         ),
-        //         sst_cte AS (
-        //             SELECT
-        //                 sst.*
-        //             FROM
-        //                 station_station_types AS sst
-        //                 JOIN sst_cte_c1
-        //                 JOIN sst_cte_c2
-        //             WHERE
-        //                 sst.line_group_cd = sst_cte_c1.line_group_cd
-        //                 AND sst.line_group_cd = sst_cte_c2.line_group_cd
-        //         )
-        //     SELECT
-        //     sta.*,
-        //     COALESCE(a.line_name, lin.line_name) AS "line_name: String",
-        //     COALESCE(a.line_name_k, lin.line_name_k) AS "line_name_k: String",
-        //     COALESCE(a.line_name_h, lin.line_name_h) AS "line_name_h: String",
-        //     COALESCE(a.line_name_r, lin.line_name_r) AS "line_name_r: String",
-        //     COALESCE(a.line_name_zh, lin.line_name_zh) AS "line_name_zh: String",
-        //     COALESCE(a.line_name_ko, lin.line_name_ko) AS "line_name_ko: String",
-        //     COALESCE(a.line_color_c, lin.line_color_c) AS "line_color_c: String",
-        //     lin.company_cd,
-        //     lin.line_type,
-        //     lin.line_symbol1,
-        //     lin.line_symbol2,
-        //     lin.line_symbol3,
-        //     lin.line_symbol4,
-        //     lin.line_symbol1_color,
-        //     lin.line_symbol2_color,
-        //     lin.line_symbol3_color,
-        //     lin.line_symbol4_color,
-        //     lin.line_symbol1_shape,
-        //     lin.line_symbol2_shape,
-        //     lin.line_symbol3_shape,
-        //     lin.line_symbol4_shape,
-        //     lin.average_distance,
-        //     sst.id AS sst_id,
-        //     sst.type_cd,
-        //     sst.line_group_cd,
-        //     sst.pass,
-        //     tt.id AS type_id,
-        //     tt.type_name,
-        //     tt.type_name_k,
-        //     tt.type_name_r,
-        //     tt.type_name_zh,
-        //     tt.type_name_ko,
-        //     tt.color,
-        //     tt.direction,
-        //     tt.kind
-        //     FROM
-        //         stations AS sta
-        // 		JOIN common_lines AS cl ON sta.line_cd = cl.line_cd
-        // 		JOIN lines AS lin ON lin.line_cd = cl.line_cd
-        //         LEFT JOIN sst_cte AS sst ON sst.station_cd = sta.station_cd
-        //         LEFT JOIN types AS tt ON tt.type_cd = sst.type_cd
-        //         LEFT JOIN line_aliases AS la ON la.station_cd = sta.station_cd
-        //         LEFT JOIN aliases AS a ON a.id = la.alias_cd
-        //     WHERE
-        //         sst.line_group_cd IS NULL
-        //         AND lin.e_status = 0
-        //         AND sta.e_status = 0
-        //         ORDER BY sta.e_sort, sta.station_cd"#,
-        //     from_station_id,
-        //     to_station_id,
-        //     from_station_id,
-        //     to_station_id,
-        // )
-        // .fetch_all(&mut *conn)
-        // .await?;
+        let mut rows = sqlx::query_as!(
+            StationRow,
+            r#"WITH
+                from_cte AS (
+                    SELECT
+                        s.station_cd,
+                        s.line_cd
+                    FROM
+                        stations AS s
+                    WHERE
+                        s.station_g_cd = ?
+                ),
+                to_cte AS (
+                    SELECT
+                        s.station_cd,
+                        s.line_cd
+                    FROM
+                        stations AS s
+                    WHERE
+                        s.station_g_cd = ?
+                ),
+                common_lines AS (
+                    SELECT DISTINCT s1.line_cd
+                    FROM stations s1
+                    WHERE s1.station_g_cd = ?
+                        AND s1.e_status = 0
+                        AND EXISTS (
+                        SELECT 1
+                        FROM stations s2
+                        WHERE s2.station_g_cd = ?
+                            AND s2.e_status = 0
+                            AND s2.line_cd = s1.line_cd
+                        )
+                ),
+                sst_cte_c1 AS (
+                    SELECT
+                        sst.line_group_cd
+                    FROM
+                        station_station_types AS sst
+                        JOIN from_cte
+                    WHERE
+                        sst.station_cd = from_cte.station_cd
+                        AND sst.pass <> 1
+                ),
+                sst_cte_c2 AS (
+                    SELECT
+                        sst.line_group_cd
+                    FROM
+                        station_station_types AS sst
+                        JOIN to_cte
+                    WHERE
+                        sst.station_cd = to_cte.station_cd
+                        AND sst.pass <> 1
+                ),
+                sst_cte AS (
+                    SELECT
+                        sst.*
+                    FROM
+                        station_station_types AS sst
+                        JOIN sst_cte_c1
+                        JOIN sst_cte_c2
+                    WHERE
+                        sst.line_group_cd = sst_cte_c1.line_group_cd
+                        AND sst.line_group_cd = sst_cte_c2.line_group_cd
+                )
+            SELECT
+            sta.*,
+            COALESCE(a.line_name, lin.line_name) AS "line_name: String",
+            COALESCE(a.line_name_k, lin.line_name_k) AS "line_name_k: String",
+            COALESCE(a.line_name_h, lin.line_name_h) AS "line_name_h: String",
+            COALESCE(a.line_name_r, lin.line_name_r) AS "line_name_r: String",
+            COALESCE(a.line_name_zh, lin.line_name_zh) AS "line_name_zh: String",
+            COALESCE(a.line_name_ko, lin.line_name_ko) AS "line_name_ko: String",
+            COALESCE(a.line_color_c, lin.line_color_c) AS "line_color_c: String",
+            lin.company_cd,
+            lin.line_type,
+            lin.line_symbol1,
+            lin.line_symbol2,
+            lin.line_symbol3,
+            lin.line_symbol4,
+            lin.line_symbol1_color,
+            lin.line_symbol2_color,
+            lin.line_symbol3_color,
+            lin.line_symbol4_color,
+            lin.line_symbol1_shape,
+            lin.line_symbol2_shape,
+            lin.line_symbol3_shape,
+            lin.line_symbol4_shape,
+            lin.average_distance,
+            sst.id AS sst_id,
+            sst.type_cd,
+            sst.line_group_cd,
+            sst.pass,
+            tt.id AS type_id,
+            tt.type_name,
+            tt.type_name_k,
+            tt.type_name_r,
+            tt.type_name_zh,
+            tt.type_name_ko,
+            tt.color,
+            tt.direction,
+            tt.kind
+            FROM
+                stations AS sta
+				JOIN common_lines AS cl ON sta.line_cd = cl.line_cd
+				JOIN lines AS lin ON lin.line_cd = cl.line_cd
+                LEFT JOIN sst_cte AS sst ON sst.station_cd = sta.station_cd
+                LEFT JOIN types AS tt ON tt.type_cd = sst.type_cd
+                LEFT JOIN line_aliases AS la ON la.station_cd = sta.station_cd
+                LEFT JOIN aliases AS a ON a.id = la.alias_cd
+            WHERE
+                sst.line_group_cd IS NULL
+                AND lin.e_status = 0
+                AND sta.e_status = 0
+                ORDER BY sta.e_sort, sta.station_cd"#,
+            from_station_id,
+            to_station_id,
+            from_station_id,
+            to_station_id,
+        )
+        .fetch_all(&mut *conn)
+        .await?;
 
-        let rows = sqlx::query_as!(
+        let mut typed_rows = sqlx::query_as!(
             StationRow,
             r#"WITH
                 from_cte AS (
@@ -1246,6 +1245,7 @@ impl InternalStationRepository {
         .fetch_all(conn)
         .await?;
 
+        rows.append(&mut typed_rows);
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(stations)
