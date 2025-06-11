@@ -136,12 +136,16 @@ impl StationApi for MyApi {
         request: tonic::Request<GetStationsByNameRequest>,
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let request_ref = request.get_ref();
-        let query_station_name = request_ref.station_name.clone();
+        let query_station_name = &request_ref.station_name;
         let query_limit = request_ref.limit;
         let from_station_group_id = request_ref.from_station_group_id;
         match self
             .query_use_case
-            .get_stations_by_name(query_station_name, query_limit, from_station_group_id)
+            .get_stations_by_name(
+                query_station_name.clone(),
+                query_limit,
+                from_station_group_id,
+            )
             .await
         {
             Ok(stations) => {
@@ -258,12 +262,13 @@ impl StationApi for MyApi {
         &self,
         request: tonic::Request<GetLinesByNameRequest>,
     ) -> Result<tonic::Response<MultipleLineResponse>, tonic::Status> {
-        let line_name = request.get_ref().line_name.clone();
-        let limit = request.get_ref().limit;
+        let request_ref = request.get_ref();
+        let line_name = &request_ref.line_name;
+        let limit = request_ref.limit;
 
         match self
             .query_use_case
-            .get_lines_by_name(line_name, limit)
+            .get_lines_by_name(line_name.clone(), limit)
             .await
         {
             Ok(lines) => {
