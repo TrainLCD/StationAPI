@@ -141,7 +141,11 @@ impl StationApi for MyApi {
         let from_station_group_id = request_ref.from_station_group_id;
         match self
             .query_use_case
-            .get_stations_by_name(query_station_name.clone(), query_limit, from_station_group_id)
+            .get_stations_by_name(
+                query_station_name.clone(),
+                query_limit,
+                from_station_group_id,
+            )
             .await
         {
             Ok(stations) => {

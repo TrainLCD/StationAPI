@@ -203,7 +203,8 @@ where
 
         let station_group_ids = {
             let stations_guard = stations.lock().unwrap();
-            stations_guard.iter()
+            stations_guard
+                .iter()
                 .map(|station| station.station_g_cd as u32)
                 .collect::<Vec<u32>>()
         };
@@ -233,64 +234,67 @@ where
 
         let stations = {
             let mut stations_guard = stations.lock().unwrap();
-            stations_guard.iter_mut().map(|station| {
-                let mut line = self.extract_line_from_station(station);
-                line.line_symbols = self.get_line_symbols(&line);
-                line.company = companies
-                    .iter()
-                    .find(|c| c.company_cd == line.company_cd)
-                    .cloned();
-                line.station = Some(station.clone());
-
-                let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
-                station.station_numbers = station_numbers;
-                station.line = Some(Box::new(line));
-                if let Some(tt) = train_types
-                    .iter()
-                    .find(|tt| tt.station_cd == Some(station.station_cd))
-                    .cloned()
-                    .map(Box::new)
-                {
-                    station.train_type = Some(tt);
-                };
-
-                let mut lines: Vec<Line> = lines
-                    .iter()
-                    .filter(|&l| l.station_g_cd.unwrap_or(0) == station.station_g_cd)
-                    .cloned()
-                    .collect();
-                for line in lines.iter_mut() {
+            stations_guard
+                .iter_mut()
+                .map(|station| {
+                    let mut line = self.extract_line_from_station(station);
+                    line.line_symbols = self.get_line_symbols(&line);
                     line.company = companies
                         .iter()
                         .find(|c| c.company_cd == line.company_cd)
                         .cloned();
-                    line.line_symbols = self.get_line_symbols(line);
-                    if let Some(station_ref) = stations_by_group_ids
-                        .iter()
-                        .filter(|s| s.line_cd == line.line_cd)
-                        .find(|s| s.station_g_cd == station.station_g_cd)
-                    {
-                        let mut station_copy = station_ref.clone();
-                        let station_numbers: Vec<StationNumber> = self.get_station_numbers(&station_copy);
-                        station_copy.station_numbers = station_numbers;
-                        if let Some(tt) = train_types
-                            .iter()
-                            .find(|tt| tt.station_cd == Some(station_copy.station_cd))
-                            .cloned()
-                            .map(Box::new)
-                        {
-                            station_copy.train_type = Some(tt);
-                        };
-                        line.station = Some(station_copy);
-                    }
-                }
-                let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
-                station.station_numbers = station_numbers;
-                station.lines = lines;
+                    line.station = Some(station.clone());
 
-                station.clone()
-            })
-            .collect()
+                    let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
+                    station.station_numbers = station_numbers;
+                    station.line = Some(Box::new(line));
+                    if let Some(tt) = train_types
+                        .iter()
+                        .find(|tt| tt.station_cd == Some(station.station_cd))
+                        .cloned()
+                        .map(Box::new)
+                    {
+                        station.train_type = Some(tt);
+                    };
+
+                    let mut lines: Vec<Line> = lines
+                        .iter()
+                        .filter(|&l| l.station_g_cd.unwrap_or(0) == station.station_g_cd)
+                        .cloned()
+                        .collect();
+                    for line in lines.iter_mut() {
+                        line.company = companies
+                            .iter()
+                            .find(|c| c.company_cd == line.company_cd)
+                            .cloned();
+                        line.line_symbols = self.get_line_symbols(line);
+                        if let Some(station_ref) = stations_by_group_ids
+                            .iter()
+                            .filter(|s| s.line_cd == line.line_cd)
+                            .find(|s| s.station_g_cd == station.station_g_cd)
+                        {
+                            let mut station_copy = station_ref.clone();
+                            let station_numbers: Vec<StationNumber> =
+                                self.get_station_numbers(&station_copy);
+                            station_copy.station_numbers = station_numbers;
+                            if let Some(tt) = train_types
+                                .iter()
+                                .find(|tt| tt.station_cd == Some(station_copy.station_cd))
+                                .cloned()
+                                .map(Box::new)
+                            {
+                                station_copy.train_type = Some(tt);
+                            };
+                            line.station = Some(station_copy);
+                        }
+                    }
+                    let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
+                    station.station_numbers = station_numbers;
+                    station.lines = lines;
+
+                    station.clone()
+                })
+                .collect()
         };
 
         Ok(stations)
@@ -322,7 +326,12 @@ where
         Ok(stations)
     }
     fn get_station_numbers(&self, station: &Station) -> Vec<StationNumber> {
-        let line_symbols_raw = [&station.line_symbol1, &station.line_symbol2, &station.line_symbol3, &station.line_symbol4];
+        let line_symbols_raw = [
+            &station.line_symbol1,
+            &station.line_symbol2,
+            &station.line_symbol3,
+            &station.line_symbol4,
+        ];
 
         let line_symbol_colors_raw: Vec<String> = vec![
             station.line_symbol1_color.clone().unwrap_or_default(),
@@ -417,10 +426,21 @@ where
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol> {
         let line_symbols_raw = [&line.line_symbol1, &line.line_symbol2, &line.line_symbol3];
 
-        let line_symbol1_color = line.line_symbol1_color.as_ref().or(line.line_color_c.as_ref());
-        let line_symbol_colors_raw = [line_symbol1_color, line.line_symbol2_color.as_ref(), line.line_symbol3_color.as_ref()];
+        let line_symbol1_color = line
+            .line_symbol1_color
+            .as_ref()
+            .or(line.line_color_c.as_ref());
+        let line_symbol_colors_raw = [
+            line_symbol1_color,
+            line.line_symbol2_color.as_ref(),
+            line.line_symbol3_color.as_ref(),
+        ];
 
-        let line_symbols_shape_raw = [&line.line_symbol1_shape, &line.line_symbol2_shape, &line.line_symbol3_shape];
+        let line_symbols_shape_raw = [
+            &line.line_symbol1_shape,
+            &line.line_symbol2_shape,
+            &line.line_symbol3_shape,
+        ];
 
         if line_symbols_raw.is_empty() {
             return vec![];
@@ -430,8 +450,7 @@ where
             .filter_map(|index| {
                 let symbol = line_symbols_raw[index].as_ref()?;
                 let shape = line_symbols_shape_raw[index].as_ref()?;
-                let color = line_symbol_colors_raw[index]
-                    .map(|s| s.clone())
+                let color = line_symbol_colors_raw[index].cloned()
                     .unwrap_or_default();
 
                 Some(LineSymbol {
@@ -569,14 +588,10 @@ where
                     .map(|row| {
                         let extracted_line = self.extract_line_from_station(row);
 
-                        if let Some(tt_line) = tt_lines
-                            .iter()
-                            .find(|line| line.line_cd == row.line_cd)
+                        if let Some(tt_line) =
+                            tt_lines.iter().find(|line| line.line_cd == row.line_cd)
                         {
-                            let tt_lines_cloned: Vec<Line> = tt_lines
-                                .iter()
-                                .cloned()
-                                .collect();
+                            let tt_lines_cloned: Vec<Line> = tt_lines.iter().cloned().collect();
 
                             let train_type = match row.type_id.is_some() {
                                 true => Some(Box::new(TrainType {
