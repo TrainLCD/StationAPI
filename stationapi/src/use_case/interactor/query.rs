@@ -450,8 +450,7 @@ where
             .filter_map(|index| {
                 let symbol = line_symbols_raw[index].as_ref()?;
                 let shape = line_symbols_shape_raw[index].as_ref()?;
-                let color = line_symbol_colors_raw[index].cloned()
-                    .unwrap_or_default();
+                let color = line_symbol_colors_raw[index].cloned().unwrap_or_default();
 
                 Some(LineSymbol {
                     symbol: symbol.clone(),
