@@ -380,7 +380,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 36003,26,西鉄甘木線,ニシテツアマギセン,西鉄甘木線,Nishitetsu Amagi Line,Nishitetsu Amagi Line,,,#1065AB,2,A,T,,,#1065AB,,,,NISHITETSU,,,,0,36003,1569.023252
 36004,26,西鉄貝塚線,ニシテツカイヅカセン,西鉄貝塚線,Nishitetsu Kaizuka Line,Nishitetsu Kaizuka Line,,,#1065AB,2,NK,,,,#1065AB,,,,NISHITETSU,,,,0,36004,1348.007544
 99101,101,札幌市営地下鉄東西線,サッポロシエイチカテツトウザイセン,札幌市営地下鉄東西線,Sapporo Municipal Subway Tozai Line,Sapporo Municipal Subway Tozai Line,,,#FFA500,3,T,,,,#FFA500,,,,ROUND,,,,0,99101,1083.121978
-99102,101,札幌市営地下鉄南北線,サッポロシエイチカテツトナンボクセン,札幌市営地下鉄南北線,Sapporo Municipal Subway Namboku Line,Sapporo Municipal Subway Namboku Line,,,#008000,3,N,,,,#008000,,,,ROUND,,,,0,99102,939.1835256
+99102,101,札幌市営地下鉄南北線,サッポロシエイチカテツナンボクセン,札幌市営地下鉄南北線,Sapporo Municipal Subway Namboku Line,Sapporo Municipal Subway Namboku Line,,,#008000,3,N,,,,#008000,,,,ROUND,,,,0,99102,939.1835256
 99103,101,札幌市営地下鉄東豊線,サッポロシエイチカテツトウホウセン,札幌市営地下鉄東豊線,Sapporo Municipal Subway Toho Line,Sapporo Municipal Subway Toho Line,,,#0080FF,3,H,,,,#0080FF,,,,ROUND,,,,0,99103,1013.017689
 99104,252,札幌市電,サッポロシデン,札幌市電 一条・山鼻軌道線,Yamahana Streetcar Line,Yamahana Streetcar Line,,,#2A74BC,4,SC,,,,#2A74BC,,,,ROUND,,,,0,99104,366.9403175
 99105,102,函館市電２系統,ハコダテシデンニケイトウ,函館市電２系統,Hakodate Streetcar Route 2,Hakodate Streetcar Route 2,,,#004896,4,DY,Y,,,#004896,,,,ROUND,,,,0,99105,407.2177481
