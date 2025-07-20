@@ -561,7 +561,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99650,213,紀州鉄道線,キシュウテツドウセン,紀州鉄道線,Kishu Railway Line,Kishu Railway Line,,,#081042,2,,,,,,,,,,,,,0,99650,606.4684007
 99651,214,貴志川線,キシガワセン,和歌山電鐵貴志川線,Kishigawa Line,Kishigawa Line,,,#DA381B,2,,,,,,,,,,,,,0,99651,1052.763552
 99701,215,若桜線,ワカサセン,若桜鉄道若桜線,Wakasa Line,Wakasa Line,,,#FF2F1A,2,,,,,,,,,,,,,0,99701,2131.160042
-99702,216,北松江線,キタマツエセン,一畑電車北松江線,Kita-Matsue Line,Kita-Matsue Line,,,#EB5C02,2,,,,,,,,,,,,,0,99702,1552.688356
+99702,216,北松江線,キタマツエセン,一畑電車北松江線,Kita-Matsue Line,Kita-Matsue Line,,,#EB5C02,2,,,,,#EB5C02,,,,REVERSED_ROUND,,,,0,99702,1552.688356
 99703,216,大社線,タイシャセン,一畑電車大社線,Taisha Line,Taisha Line,,,#EB5C02,2,,,,,,,,,,,,,0,99703,2044.195461
 99704,217,水島本線,ミズシマホンセン,水島臨海鉄道水島本線,Mizushima Main Line,Mizushima Main Line,,,#3B82C5,2,MR,,,,#3B82C5,,,,REVERSED_ROUND,,,,0,99704,1126.374424
 99705,218,井原線,イバラセン,井原鉄道井原線,Ibara Line,Ibara Line,,,#00AD66,2,,,,,,,,,,,,,0,99705,2869.876875
