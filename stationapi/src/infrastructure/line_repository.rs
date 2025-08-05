@@ -374,7 +374,7 @@ impl InternalLineRepository {
         if station_group_id_vec.is_empty() {
             return Ok(vec![]);
         }
-/*  */
+        /*  */
         let params = (1..=station_group_id_vec.len())
             .map(|i| format!("${i}"))
             .collect::<Vec<_>>()
