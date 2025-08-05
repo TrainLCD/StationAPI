@@ -442,7 +442,8 @@ impl InternalLineRepository {
         let line_group_id = line_group_id as i32;
         let rows = sqlx::query_as!(
             LineRow,
-            "SELECT DISTINCT ON (l.line_cd) l.line_cd,
+            "SELECT 
+            l.line_cd,
             l.company_cd,
             l.line_type,
             l.line_symbol1,
@@ -500,7 +501,7 @@ impl InternalLineRepository {
             .collect::<Vec<_>>()
             .join(", ");
         let query_str = format!(
-            "SELECT DISTINCT ON (l.line_cd)
+            "SELECT
                 l.line_cd,
                 l.company_cd,
                 l.line_type,
