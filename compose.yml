@@ -17,6 +17,7 @@ services:
       - 50051:50051
     networks:
       - sapi-link
+    restart: always
 
   psql:
     image: postgres:17.5
@@ -28,6 +29,7 @@ services:
       - 5432:5432
     networks:
       - sapi-link
+    restart: always
 
 networks:
   sapi-link:
