@@ -201,7 +201,7 @@ impl InternalTrainTypeRepository {
             t.*, 
             sst.*
             FROM types as t
-            JOIN station_station_types AS sst ON sst.line_group_cd = ? 
+            JOIN station_station_types AS sst ON sst.line_group_cd = $1 AND t.type_cd = sst.type_cd
             WHERE 
             sst.station_cd IN (
                 SELECT 
@@ -209,10 +209,9 @@ impl InternalTrainTypeRepository {
                 FROM 
                 stations as s 
                 WHERE 
-                line_cd = ?
+                line_cd = $2
                 AND s.e_status = 0
             )
-            AND t.type_cd = sst.type_cd
             ORDER BY sst.id",
         )
         .bind(line_group_id as i32)
