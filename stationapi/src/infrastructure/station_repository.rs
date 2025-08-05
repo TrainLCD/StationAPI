@@ -501,7 +501,29 @@ impl InternalStationRepository {
     async fn find_by_id(id: u32, conn: &mut PgConnection) -> Result<Option<Station>, DomainError> {
         let rows: Option<StationRow> = sqlx::query_as!(
             StationRow,
-            r#"SELECT DISTINCT s.*,
+            r#"SELECT s.station_cd,
+            s.station_g_cd,
+            s.station_name,
+            s.station_name_k,
+            s.station_name_r,
+            s.station_name_rn,
+            s.station_name_zh,
+            s.station_name_ko,
+            s.station_number1,
+            s.station_number2,
+            s.station_number3,
+            s.station_number4,
+            s.three_letter_code,
+            s.line_cd,
+            s.pref_cd,
+            s.post,
+            s.address,
+            s.lon,
+            s.lat,
+            s.open_ymd,
+            s.close_ymd,
+            s.e_status,
+            s.e_sort,
             l.company_cd,
             l.line_type,
             l.line_symbol1,
@@ -545,7 +567,8 @@ impl InternalStationRepository {
           LEFT JOIN aliases AS a ON a.id = la.alias_cd
           WHERE s.station_cd = $1
             AND s.e_status = 0
-            AND l.e_status = 0"#,
+            AND l.e_status = 0
+          LIMIT 1"#,
             id as i32,
         )
         .fetch_optional(conn)
@@ -1141,7 +1164,29 @@ impl InternalStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let rows = sqlx::query_as!(
             StationRow,
-            r#"SELECT DISTINCT s.*,
+            r#"SELECT DISTINCT ON (s.station_cd) s.station_cd,
+            s.station_g_cd,
+            s.station_name,
+            s.station_name_k,
+            s.station_name_r,
+            s.station_name_rn,
+            s.station_name_zh,
+            s.station_name_ko,
+            s.station_number1,
+            s.station_number2,
+            s.station_number3,
+            s.station_number4,
+            s.three_letter_code,
+            s.line_cd,
+            s.pref_cd,
+            s.post,
+            s.address,
+            s.lon,
+            s.lat,
+            s.open_ymd,
+            s.close_ymd,
+            s.e_status,
+            s.e_sort,
             COALESCE(a.line_name, l.line_name, '') AS "line_name: String",
             COALESCE(a.line_name_k, l.line_name_k, '') AS "line_name_k: String",
             COALESCE(a.line_name_h, l.line_name_h, '') AS "line_name_h: String",
@@ -1187,7 +1232,7 @@ impl InternalStationRepository {
             s.line_cd = l.line_cd
             AND s.station_cd = sst.station_cd
             AND s.e_status = 0
-          ORDER BY sst.id"#,
+          ORDER BY s.station_cd, sst.id"#,
             line_group_id as i32
         )
         .fetch_all(conn)
