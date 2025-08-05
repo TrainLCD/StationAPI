@@ -1,27 +1,29 @@
 use csv::{ReaderBuilder, StringRecord};
-use sqlx::{Connection, SqliteConnection};
-use stationapi::{
-    infrastructure::{
-        company_repository::MyCompanyRepository, line_repository::MyLineRepository,
-        station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
-    },
-    presentation::controller::grpc::MyApi,
-    proto::{self, station_api_server::StationApiServer},
-    use_case::interactor::query::QueryInteractor,
-};
+use sqlx::postgres::PgPoolOptions;
+use sqlx::{Connection, PgConnection};
+use stationapi::infrastructure::company_repository::MyCompanyRepository;
+use stationapi::infrastructure::line_repository::MyLineRepository;
+use stationapi::infrastructure::station_repository::MyStationRepository;
+use stationapi::infrastructure::train_type_repository::MyTrainTypeRepository;
+use stationapi::presentation::controller::grpc::MyApi;
+use stationapi::proto;
+use stationapi::proto::station_api_server::StationApiServer;
+use stationapi::use_case::interactor::query::QueryInteractor;
+use tonic::transport::Server;
+use tonic_health::server::HealthReporter;
+
+use std::path::Path;
+use std::sync::Arc;
 use std::{
     env::{self, VarError},
     fs,
     net::{AddrParseError, SocketAddr},
 };
-use std::{path::Path, sync::Arc};
-use tokio::sync::Mutex;
-use tonic::transport::Server;
-use tonic_health::server::HealthReporter;
 use tracing::{info, warn};
 
-async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut conn = conn.lock().await;
+async fn import_csv() -> Result<(), Box<dyn std::error::Error>> {
+    let db_url = fetch_database_url();
+    let mut conn = PgConnection::connect(&db_url).await?;
     let data_path = Path::new("data");
 
     let create_sql_path = data_path.join("create_table.sql");
@@ -30,13 +32,7 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
         Box::new(e) as Box<dyn std::error::Error>
     })?;
     let create_sql: String = String::from_utf8_lossy(&create_sql_content).parse()?;
-    sqlx::query(&create_sql)
-        .execute(&mut *conn)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to create tables: {}", e);
-            Box::new(e) as Box<dyn std::error::Error>
-        })?;
+    sqlx::raw_sql(&create_sql).execute(&mut conn).await?;
     let entries = fs::read_dir(data_path).map_err(|e| {
         tracing::error!("Failed to read data directory: {}", e);
         Box::new(e) as Box<dyn std::error::Error>
@@ -83,7 +79,7 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
         };
 
         let mut sql_lines_inner = Vec::new();
-        sql_lines_inner.push(format!("INSERT INTO `{}` VALUES ", table_name));
+        sql_lines_inner.push(format!("INSERT INTO public.{table_name} VALUES "));
 
         for (idx, data) in csv_data.iter().enumerate() {
             let cols: Vec<_> = data
@@ -115,52 +111,50 @@ async fn import_csv(conn: Arc<Mutex<SqliteConnection>>) -> Result<(), Box<dyn st
             } else {
                 "),"
             };
-            sql_lines_inner.push(format!("({}{}", values_part, separator));
+            sql_lines_inner.push(format!("({values_part}{separator}"));
         }
 
         sqlx::query(&sql_lines_inner.concat())
-            .execute(&mut *conn)
+            .execute(&mut conn)
             .await?;
     }
 
-    // NOTE: SQLiteパフォーマンスチューニング
-    sqlx::query(
-        r#"PRAGMA journal_mode = MEMORY;
-    PRAGMA synchronous = OFF;
-    PRAGMA temp_store = MEMORY;
-    PRAGMA locking_mode = EXCLUSIVE;
-    PRAGMA cache_size = -262144;
-    PRAGMA query_only = ON;"#,
-    )
-    .execute(&mut *conn)
-    .await?;
+    info!("CSV import completed successfully.");
 
     Ok(())
 }
 
+#[derive(sqlx::FromRow)]
+struct AliveRow {
+    pub alive: Option<bool>,
+}
+
 async fn station_api_service_status(mut reporter: HealthReporter) {
     let db_url = fetch_database_url();
-    let mut conn = match SqliteConnection::connect(&db_url).await {
+    let mut conn = match PgConnection::connect(&db_url).await {
         Ok(conn) => conn,
         Err(e) => {
             tracing::error!("Failed to connect to database: {}", e);
-            panic!("Failed to connect to database: {}", e); // または適切な回復戦略
+            panic!("Failed to connect to database: {e}"); // または適切な回復戦略
         }
     };
     // NOTE: 今までの障害でDBのデータが一部だけ消えたという現象はなかったので駅数だけ見ればいい
-    let row = sqlx::query!("SELECT COUNT(`stations`.station_cd) <> 0 AS alive FROM `stations`")
-        .fetch_one(&mut conn)
-        .await
-        .expect("Failed to fetch station count");
+    let row = sqlx::query_as!(
+        AliveRow,
+        "SELECT COUNT(stations.station_cd) <> 0 AS alive FROM stations"
+    )
+    .fetch_one(&mut conn)
+    .await
+    .expect("Failed to fetch station count");
 
-    if row.alive == 1 {
+    if row.alive.unwrap_or(false) {
         reporter.set_serving::<StationApiServer<MyApi>>().await;
     } else {
         reporter.set_not_serving::<StationApiServer<MyApi>>().await;
     }
 }
 
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main]
 async fn main() -> std::result::Result<(), anyhow::Error> {
     run().await
 }
@@ -172,19 +166,24 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
         warn!("Could not load .env.local");
     };
 
-    let db_url = &fetch_database_url();
-    let conn = Arc::new(Mutex::new(match SqliteConnection::connect(db_url).await {
-        Ok(conn) => conn,
-        Err(e) => {
-            tracing::error!("Failed to connect to database: {}", e);
-            panic!("Failed to connect to database: {}", e); // または適切な回復戦略
-        }
-    }));
-
-    if let Err(e) = import_csv(Arc::clone(&conn)).await {
-        tracing::error!("Failed to import CSV: {}", e);
+    if let Err(e) = import_csv().await {
         return Err(anyhow::anyhow!("Failed to import CSV: {}", e));
     }
+
+    let db_url = &fetch_database_url();
+    let pool = Arc::new(
+        match PgPoolOptions::new()
+            .max_connections(5)
+            .connect(db_url)
+            .await
+        {
+            Ok(conn) => conn,
+            Err(e) => {
+                tracing::error!("Failed to connect to database: {}", e);
+                panic!("Failed to connect to database: {e}"); // または適切な回復戦略
+            }
+        },
+    );
 
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter
@@ -196,10 +195,10 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     let disable_grpc_web = fetch_disable_grpc_web_flag();
     let addr = fetch_addr()?;
 
-    let station_repository = MyStationRepository::new(Arc::clone(&conn));
-    let line_repository = MyLineRepository::new(Arc::clone(&conn));
-    let train_type_repository = MyTrainTypeRepository::new(Arc::clone(&conn));
-    let company_repository = MyCompanyRepository::new(Arc::clone(&conn));
+    let station_repository = MyStationRepository::new(Arc::clone(&pool));
+    let line_repository = MyLineRepository::new(Arc::clone(&pool));
+    let train_type_repository = MyTrainTypeRepository::new(Arc::clone(&pool));
+    let company_repository = MyCompanyRepository::new(Arc::clone(&pool));
 
     let query_use_case = QueryInteractor {
         station_repository,
@@ -253,9 +252,9 @@ fn fetch_port() -> u16 {
 fn fetch_addr() -> Result<SocketAddr, AddrParseError> {
     let port = fetch_port();
     match env::var("HOST") {
-        Ok(s) => format!("{}:{}", s, port).parse(),
+        Ok(s) => format!("{s}:{port}").parse(),
         Err(env::VarError::NotPresent) => {
-            let fallback_host = format!("[::1]:{}", port);
+            let fallback_host = format!("[::1]:{port}");
             warn!("$HOST is not set. Falling back to {}.", fallback_host);
             fallback_host.parse()
         }

@@ -120,7 +120,7 @@ mod tests {
             "square".to_string(),
         );
 
-        let debug_output = format!("{:?}", line_symbol);
+        let debug_output = format!("{line_symbol:?}");
         assert!(debug_output.contains("JY"));
         assert!(debug_output.contains("#00B261"));
         assert!(debug_output.contains("square"));

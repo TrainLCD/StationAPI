@@ -1,0 +1,190 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT l.line_cd,\n            l.company_cd,\n            l.line_type,\n            l.line_symbol1,\n            l.line_symbol2,\n            l.line_symbol3,\n            l.line_symbol4,\n            l.line_symbol1_color,\n            l.line_symbol2_color,\n            l.line_symbol3_color,\n            l.line_symbol4_color,\n            l.line_symbol1_shape,\n            l.line_symbol2_shape,\n            l.line_symbol3_shape,\n            l.line_symbol4_shape,\n            l.e_status,\n            l.e_sort,\n            COALESCE(l.average_distance, 0.0) AS average_distance,\n            s.station_cd,\n            s.station_g_cd,\n            sst.line_group_cd,\n            sst.type_cd,\n            COALESCE(a.line_name, l.line_name) AS line_name,\n            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,\n            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,\n            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,\n            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,\n            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,\n            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c\n        FROM lines AS l\n            JOIN stations AS s ON s.station_cd = $1\n            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1\n            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd\n            LEFT JOIN aliases AS a ON la.alias_cd = a.id\n        WHERE l.line_cd = s.line_cd",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "line_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "company_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "line_type",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "line_symbol1",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "line_symbol2",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "line_symbol3",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "line_symbol4",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "line_symbol1_color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "line_symbol2_color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "line_symbol3_color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "line_symbol4_color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "line_symbol1_shape",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "line_symbol2_shape",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "line_symbol3_shape",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "line_symbol4_shape",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "e_status",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 16,
+        "name": "e_sort",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 17,
+        "name": "average_distance",
+        "type_info": "Float4"
+      },
+      {
+        "ordinal": 18,
+        "name": "station_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 19,
+        "name": "station_g_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 20,
+        "name": "line_group_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 21,
+        "name": "type_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 22,
+        "name": "line_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 23,
+        "name": "line_name_k",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 24,
+        "name": "line_name_h",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 25,
+        "name": "line_name_r",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 26,
+        "name": "line_name_zh",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 27,
+        "name": "line_name_ko",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 28,
+        "name": "line_color_c",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "502a57cf9032e7c7fc10d57ebd0cf22486cd0cb3f47b70f1ae6c533d4253d3e3"
+}

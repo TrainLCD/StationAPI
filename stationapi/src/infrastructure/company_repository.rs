@@ -1,7 +1,6 @@
 use async_trait::async_trait;
-use sqlx::SqliteConnection;
+use sqlx::{PgConnection, Pool, Postgres};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 use crate::domain::{
     entity::company::Company, error::DomainError, repository::company_repository::CompanyRepository,
@@ -9,8 +8,8 @@ use crate::domain::{
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct CompanyRow {
-    pub company_cd: i64,
-    pub rr_cd: i64,
+    pub company_cd: i32,
+    pub rr_cd: i32,
     pub company_name: String,
     pub company_name_k: String,
     pub company_name_h: String,
@@ -18,9 +17,9 @@ pub struct CompanyRow {
     pub company_name_en: String,
     pub company_name_full_en: String,
     pub company_url: Option<String>,
-    pub company_type: i64,
-    pub e_status: i64,
-    pub e_sort: i64,
+    pub company_type: i32,
+    pub e_status: i32,
+    pub e_sort: i32,
 }
 
 impl From<CompanyRow> for Company {
@@ -43,20 +42,20 @@ impl From<CompanyRow> for Company {
 }
 
 pub struct MyCompanyRepository {
-    conn: Arc<Mutex<SqliteConnection>>,
+    pool: Arc<Pool<Postgres>>,
 }
 
 impl MyCompanyRepository {
-    pub fn new(conn: Arc<Mutex<SqliteConnection>>) -> Self {
-        Self { conn }
+    pub fn new(pool: Arc<Pool<Postgres>>) -> Self {
+        Self { pool }
     }
 }
 
 #[async_trait]
 impl CompanyRepository for MyCompanyRepository {
     async fn find_by_id_vec(&self, id_vec: &[u32]) -> Result<Vec<Company>, DomainError> {
-        let id_vec: Vec<i64> = id_vec.iter().map(|x| *x as i64).collect();
-        let mut conn = self.conn.lock().await;
+        let id_vec: Vec<i32> = id_vec.iter().map(|x| *x as i32).collect();
+        let mut conn = self.pool.acquire().await?;
         InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await
     }
 }
@@ -65,18 +64,16 @@ pub struct InternalCompanyRepository {}
 
 impl InternalCompanyRepository {
     async fn find_by_id_vec(
-        id_vec: &[i64],
-        conn: &mut SqliteConnection,
+        id_vec: &[i32],
+        conn: &mut PgConnection,
     ) -> Result<Vec<Company>, DomainError> {
         if id_vec.is_empty() {
             return Ok(vec![]);
         }
 
-        let params = format!("?{}", ", ?".repeat(id_vec.len() - 1));
-        let query_str = format!(
-            "SELECT * FROM `companies` WHERE company_cd IN ( {} )",
-            params
-        );
+        let params: Vec<String> = (1..=id_vec.len()).map(|i| format!("${i}")).collect();
+        let params_str = params.join(", ");
+        let query_str = format!("SELECT * FROM companies WHERE company_cd IN ( {params_str} )");
 
         let mut query = sqlx::query_as::<_, CompanyRow>(&query_str);
         for id in id_vec {
@@ -93,19 +90,23 @@ impl InternalCompanyRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
+    use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 
-    /// テスト用のインメモリSQLiteデータベースをセットアップ
-    async fn setup_test_db() -> Pool<Sqlite> {
-        let pool = SqlitePoolOptions::new()
-            .connect(":memory:")
+    /// テスト用のPostgreSQLデータベースをセットアップ
+    async fn setup_test_db() -> Pool<Postgres> {
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgresql://stationapi:stationapi@localhost/stationapi_test".to_string()
+        });
+
+        let pool = PgPoolOptions::new()
+            .connect(&database_url)
             .await
             .expect("データベース接続に失敗しました");
 
         // テスト用のテーブルを作成
         sqlx::query(
             r#"
-            CREATE TABLE companies (
+            CREATE TABLE IF NOT EXISTS companies (
                 company_cd INTEGER PRIMARY KEY,
                 rr_cd INTEGER NOT NULL,
                 company_name TEXT NOT NULL,
@@ -219,7 +220,7 @@ mod tests {
             .acquire()
             .await
             .expect("コネクション取得に失敗しました");
-        let id_vec = vec![1i64, 2i64];
+        let id_vec = vec![1i32, 2i32];
 
         let result = InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await;
 
@@ -262,7 +263,7 @@ mod tests {
             .acquire()
             .await
             .expect("コネクション取得に失敗しました");
-        let id_vec = vec![3i64];
+        let id_vec = vec![3i32];
 
         let result = InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await;
 
@@ -282,7 +283,7 @@ mod tests {
             .acquire()
             .await
             .expect("コネクション取得に失敗しました");
-        let id_vec = vec![999i64];
+        let id_vec = vec![999i32];
 
         let result = InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await;
 
@@ -299,7 +300,7 @@ mod tests {
             .acquire()
             .await
             .expect("コネクション取得に失敗しました");
-        let id_vec = vec![1i64, 999i64, 2i64];
+        let id_vec = vec![1i32, 999i32, 2i32];
 
         let result = InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await;
 
@@ -347,8 +348,8 @@ mod tests {
             .await
             .expect("コネクション取得に失敗しました");
 
-        // 悪意のあるSQLを含むIDリスト（実際にはi64にキャストされるため無害になる）
-        let id_vec = vec![1i64, 2i64];
+        // 悪意のあるSQLを含むIDリスト（実際にはi32にキャストされるため無害になる）
+        let id_vec = vec![1i32, 2i32];
 
         let result = InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await;
 
@@ -366,7 +367,7 @@ mod tests {
             .acquire()
             .await
             .expect("コネクション取得に失敗しました");
-        let id_vec = vec![1i64];
+        let id_vec = vec![1i32];
 
         let result = InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await;
 
@@ -384,7 +385,7 @@ mod tests {
             .acquire()
             .await
             .expect("コネクション取得に失敗しました");
-        let id_vec = vec![1i64, 1i64, 2i64, 2i64];
+        let id_vec = vec![1i32, 1i32, 2i32, 2i32];
 
         let result = InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await;
 
@@ -402,7 +403,7 @@ mod tests {
             .acquire()
             .await
             .expect("コネクション取得に失敗しました");
-        let id_vec = vec![-1i64, -2i64];
+        let id_vec = vec![-1i32, -2i32];
 
         let result = InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await;
 
@@ -420,7 +421,7 @@ mod tests {
             .acquire()
             .await
             .expect("コネクション取得に失敗しました");
-        let id_vec = vec![0i64];
+        let id_vec = vec![0i32];
 
         let result = InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await;
 
@@ -438,7 +439,7 @@ mod tests {
             .acquire()
             .await
             .expect("コネクション取得に失敗しました");
-        let id_vec = vec![1i64, -1i64, 2i64, -2i64];
+        let id_vec = vec![1i32, -1i32, 2i32, -2i32];
 
         let result = InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await;
 
@@ -454,7 +455,7 @@ mod tests {
         assert_eq!(companies[1].company_cd, 2);
     }
 
-    /// i64の最大値と最小値のテスト
+    /// i32の最大値と最小値のテスト
     #[tokio::test]
     async fn test_internal_company_repository_find_by_id_vec_extreme_values() {
         let pool = setup_test_db().await;
@@ -462,7 +463,7 @@ mod tests {
             .acquire()
             .await
             .expect("コネクション取得に失敗しました");
-        let id_vec = vec![i64::MAX, i64::MIN, 1i64];
+        let id_vec = vec![i32::MAX, i32::MIN, 1i32];
 
         let result = InternalCompanyRepository::find_by_id_vec(&id_vec, &mut conn).await;
 

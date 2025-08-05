@@ -6,8 +6,8 @@ use super::{line::Line, station_number::StationNumber, train_type::TrainType as 
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Station {
-    pub station_cd: i64,
-    pub station_g_cd: i64,
+    pub station_cd: i32,
+    pub station_g_cd: i32,
     pub station_name: String,
     pub station_name_k: String,
     pub station_name_r: Option<String>,
@@ -19,24 +19,24 @@ pub struct Station {
     pub station_number3: Option<String>,
     pub station_number4: Option<String>,
     pub three_letter_code: Option<String>,
-    pub line_cd: i64,
+    pub line_cd: i32,
     pub line: Option<Box<Line>>,
     pub lines: Vec<Line>,
-    pub pref_cd: i64,
+    pub pref_cd: i32,
     pub post: String,
     pub address: String,
     pub lon: f64,
     pub lat: f64,
     pub open_ymd: String,
     pub close_ymd: String,
-    pub e_status: i64,
-    pub e_sort: i64,
+    pub e_status: i32,
+    pub e_sort: i32,
     pub stop_condition: StopCondition,
     pub distance: Option<f64>,
     pub has_train_types: bool,
     pub train_type: Option<Box<TrainTypeEntity>>,
     // linesからJOIN
-    pub company_cd: Option<i64>,
+    pub company_cd: Option<i32>,
     pub line_name: Option<String>,
     pub line_name_k: Option<String>,
     pub line_name_h: Option<String>,
@@ -44,7 +44,7 @@ pub struct Station {
     pub line_name_zh: Option<String>,
     pub line_name_ko: Option<String>,
     pub line_color_c: Option<String>,
-    pub line_type: Option<i64>,
+    pub line_type: Option<i32>,
     pub line_symbol1: Option<String>,
     pub line_symbol2: Option<String>,
     pub line_symbol3: Option<String>,
@@ -59,11 +59,11 @@ pub struct Station {
     pub line_symbol4_shape: Option<String>,
     pub average_distance: f64,
     // station_station_typesからJOIN
-    pub type_id: Option<i64>,
-    pub sst_id: Option<i64>,
-    pub type_cd: Option<i64>,
-    pub line_group_cd: Option<i64>,
-    pub pass: Option<i64>,
+    pub type_id: Option<i32>,
+    pub sst_id: Option<i32>,
+    pub type_cd: Option<i32>,
+    pub line_group_cd: Option<i32>,
+    pub pass: Option<i32>,
     // typesからJOIN
     pub type_name: Option<String>,
     pub type_name_k: Option<String>,
@@ -71,15 +71,15 @@ pub struct Station {
     pub type_name_zh: Option<String>,
     pub type_name_ko: Option<String>,
     pub color: Option<String>,
-    pub direction: Option<i64>,
-    pub kind: Option<i64>,
+    pub direction: Option<i32>,
+    pub kind: Option<i32>,
 }
 
 impl Station {
     #![allow(clippy::too_many_arguments)]
     pub fn new(
-        station_cd: i64,
-        station_g_cd: i64,
+        station_cd: i32,
+        station_g_cd: i32,
         station_name: String,
         station_name_k: String,
         station_name_r: Option<String>,
@@ -91,23 +91,23 @@ impl Station {
         station_number3: Option<String>,
         station_number4: Option<String>,
         three_letter_code: Option<String>,
-        line_cd: i64,
+        line_cd: i32,
         line: Option<Box<Line>>,
         lines: Vec<Line>,
-        pref_cd: i64,
+        pref_cd: i32,
         post: String,
         address: String,
         lon: f64,
         lat: f64,
         open_ymd: String,
         close_ymd: String,
-        e_status: i64,
-        e_sort: i64,
+        e_status: i32,
+        e_sort: i32,
         stop_condition: StopCondition,
         distance: Option<f64>,
         has_train_types: bool,
         train_type: Option<Box<TrainTypeEntity>>,
-        company_cd: Option<i64>,
+        company_cd: Option<i32>,
         line_name: Option<String>,
         line_name_k: Option<String>,
         line_name_h: Option<String>,
@@ -115,7 +115,7 @@ impl Station {
         line_name_zh: Option<String>,
         line_name_ko: Option<String>,
         line_color_c: Option<String>,
-        line_type: Option<i64>,
+        line_type: Option<i32>,
         line_symbol1: Option<String>,
         line_symbol2: Option<String>,
         line_symbol3: Option<String>,
@@ -128,20 +128,20 @@ impl Station {
         line_symbol2_shape: Option<String>,
         line_symbol3_shape: Option<String>,
         line_symbol4_shape: Option<String>,
-        line_group_cd: Option<i64>,
+        line_group_cd: Option<i32>,
         average_distance: f64,
-        pass: Option<i64>,
-        type_id: Option<i64>,
-        sst_id: Option<i64>,
-        type_cd: Option<i64>,
+        pass: Option<i32>,
+        type_id: Option<i32>,
+        sst_id: Option<i32>,
+        type_cd: Option<i32>,
         type_name: Option<String>,
         type_name_k: Option<String>,
         type_name_r: Option<String>,
         type_name_zh: Option<String>,
         type_name_ko: Option<String>,
         color: Option<String>,
-        direction: Option<i64>,
-        kind: Option<i64>,
+        direction: Option<i32>,
+        kind: Option<i32>,
     ) -> Self {
         Self {
             station_cd,
@@ -515,7 +515,7 @@ mod tests {
     #[test]
     fn test_station_debug() {
         let station = create_test_station_minimal();
-        let debug_string = format!("{:?}", station);
+        let debug_string = format!("{station:?}");
 
         assert!(debug_string.contains("Station"));
         assert!(debug_string.contains("テスト駅"));
@@ -606,7 +606,7 @@ mod tests {
         assert!(station.station_name_ko.is_none());
         assert!(station.three_letter_code.is_none());
 
-        // Optional<i64> フィールドのテスト
+        // Optional<i32> フィールドのテスト
         assert!(station.company_cd.is_none());
         assert!(station.line_type.is_none());
         assert!(station.type_id.is_none());
@@ -690,18 +690,18 @@ mod tests {
         assert_eq!(station.address, "");
 
         // 極端に大きな値のテスト
-        station.station_cd = i64::MAX;
-        station.e_sort = i64::MAX;
+        station.station_cd = i32::MAX;
+        station.e_sort = i32::MAX;
 
-        assert_eq!(station.station_cd, i64::MAX);
-        assert_eq!(station.e_sort, i64::MAX);
+        assert_eq!(station.station_cd, i32::MAX);
+        assert_eq!(station.e_sort, i32::MAX);
 
         // 極端に小さな値のテスト
-        station.station_cd = i64::MIN;
-        station.e_sort = i64::MIN;
+        station.station_cd = i32::MIN;
+        station.e_sort = i32::MIN;
 
-        assert_eq!(station.station_cd, i64::MIN);
-        assert_eq!(station.e_sort, i64::MIN);
+        assert_eq!(station.station_cd, i32::MIN);
+        assert_eq!(station.e_sort, i32::MIN);
     }
 
     #[test]

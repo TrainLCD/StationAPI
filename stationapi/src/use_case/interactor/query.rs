@@ -149,7 +149,7 @@ where
 
         let line_group_id = if let Some(sta) = stations
             .iter()
-            .find(|sta| sta.station_cd == station_id.unwrap_or(0) as i64)
+            .find(|sta| sta.station_cd == station_id.unwrap_or(0) as i32)
         {
             sta.line_group_cd
         } else {
@@ -366,7 +366,7 @@ where
                 }
 
                 if let Some(sym) = line_symbols_raw[index] {
-                    let station_number_string = format!("{}-{}", sym, station_number);
+                    let station_number_string = format!("{sym}-{station_number}");
 
                     let station_number = StationNumber {
                         line_symbol: sym.to_string(),
@@ -567,9 +567,9 @@ where
 
         let tt_lines = Arc::new(tt_lines);
 
-        let route_row_tree_map: BTreeMap<i64, Vec<Station>> = Arc::clone(&stops).iter().fold(
+        let route_row_tree_map: BTreeMap<i32, Vec<Station>> = Arc::clone(&stops).iter().fold(
             BTreeMap::new(),
-            |mut acc: BTreeMap<i64, Vec<Station>>, value| {
+            |mut acc: BTreeMap<i32, Vec<Station>>, value| {
                 if let Some(line_group_cd) = value.line_group_cd {
                     acc.entry(line_group_cd).or_default().push(value.clone());
                 } else {

@@ -8,7 +8,12 @@ build = "build.rs"
 async-trait = "0.1.68"
 dotenv = "0.15.0"
 prost = "0.13.3"
-sqlx = { version = "0.8.3", features = ["runtime-tokio-native-tls", "sqlite"] }
+sqlx = { version = "0.8.3", features = [
+    "runtime-tokio-native-tls",
+    "postgres",
+    "macros",
+    "derive",
+] }
 tokio = { version = "1.28.0", features = ["full"] }
 tonic = "0.12.3"
 tonic-web = "0.12.3"
