@@ -374,13 +374,13 @@ impl InternalLineRepository {
         if station_group_id_vec.is_empty() {
             return Ok(vec![]);
         }
-
+/*  */
         let params = (1..=station_group_id_vec.len())
             .map(|i| format!("${i}"))
             .collect::<Vec<_>>()
             .join(", ");
         let query_str = format!(
-            "SELECT DISTINCT
+            "SELECT DISTINCT ON (s.station_cd)
                 l.line_cd,
                 l.company_cd,
                 l.line_type,
@@ -442,7 +442,7 @@ impl InternalLineRepository {
         let line_group_id = line_group_id as i32;
         let rows = sqlx::query_as!(
             LineRow,
-            "SELECT l.line_cd,
+            "SELECT DISTINCT ON (l.line_cd) l.line_cd,
             l.company_cd,
             l.line_type,
             l.line_symbol1,
@@ -478,12 +478,7 @@ impl InternalLineRepository {
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
             LEFT JOIN aliases AS a ON la.alias_cd = a.id
         WHERE l.line_cd = s.line_cd
-            AND l.e_status = 0
-            GROUP BY l.line_cd, l.company_cd, l.line_type, l.line_symbol1, l.line_symbol2, l.line_symbol3, l.line_symbol4,
-                     l.line_symbol1_color, l.line_symbol2_color, l.line_symbol3_color, l.line_symbol4_color,
-                     l.line_symbol1_shape, l.line_symbol2_shape, l.line_symbol3_shape, l.line_symbol4_shape,
-                     l.e_status, l.e_sort, l.average_distance, s.station_cd, s.station_g_cd, sst.line_group_cd, sst.type_cd,
-                     l.line_name, l.line_name_k, l.line_name_h, l.line_name_r, l.line_name_zh, l.line_name_ko, l.line_color_c",
+            AND l.e_status = 0",
             line_group_id
         )
         .fetch_all(conn)
@@ -505,7 +500,7 @@ impl InternalLineRepository {
             .collect::<Vec<_>>()
             .join(", ");
         let query_str = format!(
-            "SELECT
+            "SELECT DISTINCT ON (l.line_cd)
                 l.line_cd,
                 l.company_cd,
                 l.line_type,
@@ -542,14 +537,7 @@ impl InternalLineRepository {
             LEFT JOIN aliases AS a ON la.alias_cd = a.id
             WHERE
                 l.line_cd = s.line_cd
-                AND l.e_status = 0
-            GROUP BY l.line_cd, l.company_cd, l.line_type, l.line_name, l.line_name_k, l.line_name_h, 
-                     l.line_name_r, l.line_name_zh, l.line_name_ko, l.line_color_c, l.line_symbol1, 
-                     l.line_symbol2, l.line_symbol3, l.line_symbol4, l.line_symbol1_color, 
-                     l.line_symbol2_color, l.line_symbol3_color, l.line_symbol4_color, 
-                     l.line_symbol1_shape, l.line_symbol2_shape, l.line_symbol3_shape, 
-                     l.line_symbol4_shape, l.e_status, l.e_sort, l.average_distance, 
-                     sst.line_group_cd, sst.type_cd, s.station_cd, s.station_g_cd"
+                AND l.e_status = 0"
         );
 
         let mut query = sqlx::query_as::<_, LineRow>(&query_str);
@@ -575,7 +563,7 @@ impl InternalLineRepository {
             .collect::<Vec<_>>()
             .join(", ");
         let query_str = format!(
-            "SELECT
+            "SELECT DISTINCT ON (l.line_cd)
                 l.line_cd,
                 l.company_cd,
                 l.line_type,
@@ -610,14 +598,7 @@ impl InternalLineRepository {
             JOIN stations AS s ON s.station_cd = sst.station_cd AND s.e_status = 0 AND s.line_cd = l.line_cd
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
             LEFT JOIN aliases AS a ON la.alias_cd = a.id
-            WHERE l.e_status = 0
-            GROUP BY l.line_cd, l.company_cd, l.line_type, l.line_name, l.line_name_k, l.line_name_h, 
-                     l.line_name_r, l.line_name_zh, l.line_name_ko, l.line_color_c, l.line_symbol1, 
-                     l.line_symbol2, l.line_symbol3, l.line_symbol4, l.line_symbol1_color, 
-                     l.line_symbol2_color, l.line_symbol3_color, l.line_symbol4_color, 
-                     l.line_symbol1_shape, l.line_symbol2_shape, l.line_symbol3_shape, 
-                     l.line_symbol4_shape, l.e_status, l.e_sort, l.average_distance, 
-                     sst.line_group_cd, sst.type_cd, s.station_cd, s.station_g_cd"
+            WHERE l.e_status = 0"
         );
 
         let mut query = sqlx::query_as::<_, LineRow>(&query_str);
