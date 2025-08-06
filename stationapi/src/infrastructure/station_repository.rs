@@ -1008,7 +1008,7 @@ impl InternalStationRepository {
                 NULL::int AS kind
             FROM stations AS s
                 LEFT JOIN from_stations AS fs
-                    ON fs.station_cd = s.station_cd
+                    ON fs.station_cd IS NOT NULL
                 LEFT JOIN station_station_types AS from_sst
                     ON from_sst.station_cd = fs.station_cd
                 LEFT JOIN station_station_types AS dst_sst
