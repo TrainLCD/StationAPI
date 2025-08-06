@@ -387,7 +387,7 @@ impl InternalStationRepository {
             .join(" ");
 
         let query_str = format!(
-            r#"SELECT DISTINCT
+            r#"SELECT
                 s.station_cd,
                 s.station_g_cd,
                 s.station_name,
@@ -453,6 +453,19 @@ impl InternalStationRepository {
             WHERE
                 s.station_cd IN ( {params} )
                 AND s.e_status = 0
+            GROUP BY
+                s.station_cd, s.station_g_cd, s.station_name, s.station_name_k,
+                s.station_name_r, s.station_name_rn, s.station_name_zh, s.station_name_ko,
+                s.station_number1, s.station_number2, s.station_number3, s.station_number4,
+                s.three_letter_code, s.line_cd, s.pref_cd, s.post, s.address, s.lon, s.lat,
+                s.open_ymd, s.close_ymd, s.e_status, s.e_sort, l.company_cd, l.line_type,
+                l.line_symbol1, l.line_symbol2, l.line_symbol3, l.line_symbol4,
+                l.line_symbol1_color, l.line_symbol2_color, l.line_symbol3_color, l.line_symbol4_color,
+                l.line_symbol1_shape, l.line_symbol2_shape, l.line_symbol3_shape, l.line_symbol4_shape,
+                l.average_distance, a.line_name, l.line_name, a.line_name_k, l.line_name_k,
+                a.line_name_h, l.line_name_h, a.line_name_r, l.line_name_r,
+                a.line_name_zh, l.line_name_zh, a.line_name_ko, l.line_name_ko,
+                a.line_color_c, l.line_color_c
             ORDER BY CASE s.station_cd {order_case} END"#
         );
 
