@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "WITH\n                from_cte AS (\n                    SELECT\n                        s.station_cd,\n                        s.line_cd\n                    FROM\n                        stations AS s\n                    WHERE\n                        s.station_g_cd = $1\n                        AND s.e_status = 0\n                ),\n                to_cte AS (\n                    SELECT\n                        s.station_cd,\n                        s.line_cd\n                    FROM\n                        stations AS s\n                    WHERE\n                        s.station_g_cd = $2\n                        AND s.e_status = 0\n                ),\n                sst_cte_c1 AS (\n                    SELECT\n                        sst.line_group_cd\n                    FROM\n                        station_station_types AS sst\n                        JOIN from_cte ON sst.station_cd = from_cte.station_cd\n                    WHERE\n                        sst.pass <> 1\n                ),\n                sst_cte_c2 AS (\n                    SELECT\n                        sst.line_group_cd\n                    FROM\n                        station_station_types AS sst\n                        JOIN to_cte ON sst.station_cd = to_cte.station_cd\n                    WHERE\n                        sst.pass <> 1\n                ),\n                sst_cte AS (\n                    SELECT\n                        sst.*\n                    FROM\n                        station_station_types AS sst\n                        JOIN sst_cte_c1 ON sst.line_group_cd = sst_cte_c1.line_group_cd\n                        JOIN sst_cte_c2 ON sst.line_group_cd = sst_cte_c2.line_group_cd\n                )\n            SELECT\n                sta.*,\n                lin.company_cd,\n                COALESCE(a.line_name, lin.line_name, '') AS \"line_name: String\",\n                COALESCE(a.line_name_k, lin.line_name_k, '') AS \"line_name_k: String\",\n                COALESCE(a.line_name_h, lin.line_name_h, '') AS \"line_name_h: String\",\n                COALESCE(a.line_name_r, lin.line_name_r, '') AS \"line_name_r: String\",\n                COALESCE(a.line_name_zh, lin.line_name_zh, '') AS \"line_name_zh: String\",\n                COALESCE(a.line_name_ko, lin.line_name_ko, '') AS \"line_name_ko: String\",\n                COALESCE(a.line_color_c, lin.line_color_c, '') AS \"line_color_c: String\",\n                lin.line_type,\n                lin.line_symbol1,\n                lin.line_symbol2,\n                lin.line_symbol3,\n                lin.line_symbol4,\n                lin.line_symbol1_color,\n                lin.line_symbol2_color,\n                lin.line_symbol3_color,\n                lin.line_symbol4_color,\n                lin.line_symbol1_shape,\n                lin.line_symbol2_shape,\n                lin.line_symbol3_shape,\n                lin.line_symbol4_shape,\n                COALESCE(lin.average_distance, 0.0) AS average_distance,\n                tt.id AS type_id,\n                sst.id AS sst_id,\n                sst.type_cd,\n                sst.line_group_cd,\n                sst.pass,\n                tt.type_name,\n                tt.type_name_k,\n                tt.type_name_r,\n                tt.type_name_zh,\n                tt.type_name_ko,\n                tt.color,\n                tt.direction,\n                tt.kind\n            FROM\n                stations AS sta\n                LEFT JOIN sst_cte AS sst ON sst.station_cd = sta.station_cd\n                LEFT JOIN types AS tt ON tt.type_cd = sst.type_cd\n                JOIN lines AS lin ON lin.line_cd = sta.line_cd\n                LEFT JOIN line_aliases AS la ON la.station_cd = sta.station_cd\n                LEFT JOIN aliases AS a ON a.id = la.alias_cd\n            WHERE\n                sta.station_cd = sst.station_cd\n                AND lin.e_status = 0\n                AND sta.e_status = 0\n            ORDER BY sst.id",
+  "query": "SELECT \n              s.station_cd,\n              s.station_g_cd,\n              s.station_name,\n              s.station_name_k,\n              s.station_name_r,\n              s.station_name_rn,\n              s.station_name_zh,\n              s.station_name_ko,\n              s.station_number1,\n              s.station_number2,\n              s.station_number3,\n              s.station_number4,\n              s.three_letter_code,\n              s.line_cd,\n              s.pref_cd,\n              s.post,\n              s.address,\n              s.lon,\n              s.lat,\n              s.open_ymd,\n              s.close_ymd,\n              s.e_status,\n              s.e_sort,\n              l.company_cd,\n              COALESCE(a.line_name, l.line_name, '')         AS line_name,\n              COALESCE(a.line_name_k, l.line_name_k, '')     AS line_name_k,\n              COALESCE(a.line_name_h, l.line_name_h, '')     AS line_name_h,\n              COALESCE(a.line_name_r, l.line_name_r, '')     AS line_name_r,\n              COALESCE(a.line_name_zh, l.line_name_zh, '')   AS line_name_zh,\n              COALESCE(a.line_name_ko, l.line_name_ko, '')   AS line_name_ko,\n              COALESCE(a.line_color_c, l.line_color_c, '')   AS line_color_c,\n              l.line_type,\n              l.line_symbol1,\n              l.line_symbol2,\n              l.line_symbol3,\n              l.line_symbol4,\n              l.line_symbol1_color,\n              l.line_symbol2_color,\n              l.line_symbol3_color,\n              l.line_symbol4_color,\n              l.line_symbol1_shape,\n              l.line_symbol2_shape,\n              l.line_symbol3_shape,\n              l.line_symbol4_shape,\n              COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,\n              NULL::int AS type_id,\n              NULL::int AS sst_id,\n              NULL::int AS type_cd,\n              NULL::int AS line_group_cd,\n              NULL::int AS pass,\n              NULL::text AS type_name,\n              NULL::text AS type_name_k,\n              NULL::text AS type_name_r,\n              NULL::text AS type_name_zh,\n              NULL::text AS type_name_ko,\n              NULL::text AS color,\n              NULL::int AS direction,\n              NULL::int AS kind\n              FROM stations AS s\n              JOIN lines AS l ON l.line_cd = s.line_cd\n              LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd\n              LEFT JOIN aliases AS a ON a.id = la.alias_cd\n            WHERE l.line_cd = $1\n              AND s.e_status = 0\n              AND l.e_status = 0\n            ORDER BY s.e_sort, s.station_cd ASC",
   "describe": {
     "columns": [
       {
@@ -91,12 +91,12 @@
       {
         "ordinal": 17,
         "name": "lon",
-        "type_info": "Float4"
+        "type_info": "Float8"
       },
       {
         "ordinal": 18,
         "name": "lat",
-        "type_info": "Float4"
+        "type_info": "Float8"
       },
       {
         "ordinal": 19,
@@ -125,37 +125,37 @@
       },
       {
         "ordinal": 24,
-        "name": "line_name: String",
+        "name": "line_name",
         "type_info": "Text"
       },
       {
         "ordinal": 25,
-        "name": "line_name_k: String",
+        "name": "line_name_k",
         "type_info": "Text"
       },
       {
         "ordinal": 26,
-        "name": "line_name_h: String",
+        "name": "line_name_h",
         "type_info": "Text"
       },
       {
         "ordinal": 27,
-        "name": "line_name_r: String",
+        "name": "line_name_r",
         "type_info": "Text"
       },
       {
         "ordinal": 28,
-        "name": "line_name_zh: String",
+        "name": "line_name_zh",
         "type_info": "Text"
       },
       {
         "ordinal": 29,
-        "name": "line_name_ko: String",
+        "name": "line_name_ko",
         "type_info": "Text"
       },
       {
         "ordinal": 30,
-        "name": "line_color_c: String",
+        "name": "line_color_c",
         "type_info": "Text"
       },
       {
@@ -226,7 +226,7 @@
       {
         "ordinal": 44,
         "name": "average_distance",
-        "type_info": "Float4"
+        "type_info": "Float8"
       },
       {
         "ordinal": 45,
@@ -296,7 +296,6 @@
     ],
     "parameters": {
       "Left": [
-        "Int4",
         "Int4"
       ]
     },
@@ -346,20 +345,20 @@
       true,
       true,
       null,
-      false,
-      false,
-      false,
-      false,
-      true,
-      false,
-      false,
-      false,
-      false,
-      false,
-      false,
-      true,
-      true
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
     ]
   },
-  "hash": "f8851efbccb7312fb45889fb3630aa746b2c12a47876c0a2fefbecb82dd9263b"
+  "hash": "ae36f78246eb406b00fb00709dd58561ebc8f4d05961dde7597d96457dbb2b9d"
 }

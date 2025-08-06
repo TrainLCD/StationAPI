@@ -35,8 +35,8 @@ struct StationRowWithDistance {
     pub pref_cd: i32,
     pub post: String,
     pub address: String,
-    pub lon: f32,
-    pub lat: f32,
+    pub lon: f64,
+    pub lat: f64,
     pub open_ymd: String,
     pub close_ymd: String,
     pub e_status: i32,
@@ -84,7 +84,7 @@ struct StationRowWithDistance {
     #[sqlx(default)]
     pub line_symbol4_shape: Option<String>,
     #[sqlx(default)]
-    pub average_distance: Option<f32>,
+    pub average_distance: Option<f64>,
     #[sqlx(default)]
     pub type_id: Option<i32>,
     #[sqlx(default)]
@@ -148,8 +148,8 @@ impl From<StationRowWithDistance> for Station {
             pref_cd: row.pref_cd,
             post: row.post,
             address: row.address,
-            lon: row.lon as f64,
-            lat: row.lat as f64,
+            lon: row.lon,
+            lat: row.lat,
             open_ymd: row.open_ymd,
             close_ymd: row.close_ymd,
             e_status: row.e_status,
@@ -179,7 +179,7 @@ impl From<StationRowWithDistance> for Station {
             line_symbol2_shape: row.line_symbol2_shape,
             line_symbol3_shape: row.line_symbol3_shape,
             line_symbol4_shape: row.line_symbol4_shape,
-            average_distance: row.average_distance.unwrap_or(0.0) as f64,
+            average_distance: row.average_distance.unwrap_or(0.0),
             type_id: row.type_id,
             sst_id: row.sst_id,
             type_cd: row.type_cd,
@@ -217,8 +217,8 @@ struct StationRow {
     pub pref_cd: i32,
     pub post: String,
     pub address: String,
-    pub lon: f32,
-    pub lat: f32,
+    pub lon: f64,
+    pub lat: f64,
     pub open_ymd: String,
     pub close_ymd: String,
     pub e_status: i32,
@@ -266,7 +266,7 @@ struct StationRow {
     #[sqlx(default)]
     pub line_symbol4_shape: Option<String>,
     #[sqlx(default)]
-    pub average_distance: Option<f32>,
+    pub average_distance: Option<f64>,
     #[sqlx(default)]
     pub type_id: Option<i32>,
     #[sqlx(default)]
@@ -327,8 +327,8 @@ impl From<StationRow> for Station {
             pref_cd: row.pref_cd,
             post: row.post,
             address: row.address,
-            lon: row.lon as f64,
-            lat: row.lat as f64,
+            lon: row.lon,
+            lat: row.lat,
             open_ymd: row.open_ymd,
             close_ymd: row.close_ymd,
             e_status: row.e_status,
@@ -358,7 +358,7 @@ impl From<StationRow> for Station {
             line_symbol2_shape: row.line_symbol2_shape,
             line_symbol3_shape: row.line_symbol3_shape,
             line_symbol4_shape: row.line_symbol4_shape,
-            average_distance: row.average_distance.unwrap_or(0.0) as f64,
+            average_distance: row.average_distance.unwrap_or(0.0),
             type_id: row.type_id,
             sst_id: row.sst_id,
             type_cd: row.type_cd,
@@ -538,7 +538,7 @@ impl InternalStationRepository {
             l.line_symbol2_shape,
             l.line_symbol3_shape,
             l.line_symbol4_shape,
-            COALESCE(l.average_distance, 0.0) AS average_distance,
+            COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
             COALESCE(a.line_name, l.line_name, '')         AS line_name,
             COALESCE(a.line_name_k, l.line_name_k, '')     AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h, '')     AS line_name_h,
@@ -620,7 +620,7 @@ impl InternalStationRepository {
                 l.line_symbol2_shape,
                 l.line_symbol3_shape,
                 l.line_symbol4_shape,
-                COALESCE(l.average_distance, 0.0) AS average_distance,
+                COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
                 COALESCE(a.line_name, l.line_name, '')         AS line_name,
                 COALESCE(a.line_name_k, l.line_name_k, '')     AS line_name_k,
                 COALESCE(a.line_name_h, l.line_name_h, '')     AS line_name_h,
@@ -716,7 +716,7 @@ impl InternalStationRepository {
               l.line_symbol2_shape,
               l.line_symbol3_shape,
               l.line_symbol4_shape,
-              COALESCE(l.average_distance, 0.0) AS average_distance,
+              COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
               NULL::int AS type_id,
               NULL::int AS sst_id,
               NULL::int AS type_cd,
@@ -773,7 +773,7 @@ impl InternalStationRepository {
                           l.line_symbol2_shape,
                           l.line_symbol3_shape,
                           l.line_symbol4_shape,
-                          COALESCE(l.average_distance, 0.0) AS average_distance,
+                          COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
                           COALESCE(a.line_name, l.line_name, '') AS "line_name: String",
                           COALESCE(a.line_name_k, l.line_name_k, '') AS "line_name_k: String",
                           COALESCE(a.line_name_h, l.line_name_h, '') AS "line_name_h: String",
@@ -848,7 +848,7 @@ impl InternalStationRepository {
             l.line_symbol2_shape,
             l.line_symbol3_shape,
             l.line_symbol4_shape,
-            COALESCE(l.average_distance, 0.0) AS average_distance,
+            COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
             COALESCE(a.line_name, l.line_name, '') AS "line_name: String",
             COALESCE(a.line_name_k, l.line_name_k, '') AS "line_name_k: String",
             COALESCE(a.line_name_h, l.line_name_h, '') AS "line_name_h: String",
@@ -920,7 +920,7 @@ impl InternalStationRepository {
             l.line_symbol2_shape,
             l.line_symbol3_shape,
             l.line_symbol4_shape,
-            COALESCE(l.average_distance, 0.0) AS average_distance,
+            COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
             COALESCE(a.line_name, l.line_name, '')         AS line_name,
             COALESCE(a.line_name_k, l.line_name_k, '')     AS line_name_k,
             COALESCE(a.line_name_h, l.line_name_h, '')     AS line_name_h,
@@ -1000,7 +1000,7 @@ impl InternalStationRepository {
                 l.line_symbol2_shape,
                 l.line_symbol3_shape,
                 l.line_symbol4_shape,
-                COALESCE(l.average_distance, 0.0) AS average_distance,
+                COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
               NULL::int AS type_id,
               NULL::int AS sst_id,
               NULL::int AS type_cd,
@@ -1081,7 +1081,7 @@ impl InternalStationRepository {
                 l.line_symbol2_shape,
                 l.line_symbol3_shape,
                 l.line_symbol4_shape,
-                COALESCE(l.average_distance, 0.0) AS average_distance,
+                COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
                 dst_sst.id AS sst_id,
                 dst_sst.type_cd,
                 dst_sst.line_group_cd,
@@ -1208,7 +1208,7 @@ impl InternalStationRepository {
             l.line_symbol2_shape,
             l.line_symbol3_shape,
             l.line_symbol4_shape,
-            COALESCE(l.average_distance, 0.0) AS average_distance,
+            COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
             sst.id AS sst_id,
             sst.type_cd,
             sst.line_group_cd,
@@ -1331,7 +1331,7 @@ impl InternalStationRepository {
             lin.line_symbol2_shape,
             lin.line_symbol3_shape,
             lin.line_symbol4_shape,
-            COALESCE(lin.average_distance, 0.0) AS average_distance,
+            COALESCE(lin.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
             NULL::int AS type_id,
             NULL::int AS sst_id,
             NULL::int AS type_cd,
@@ -1438,7 +1438,7 @@ impl InternalStationRepository {
                 lin.line_symbol2_shape,
                 lin.line_symbol3_shape,
                 lin.line_symbol4_shape,
-                COALESCE(lin.average_distance, 0.0) AS average_distance,
+                COALESCE(lin.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
                 tt.id AS type_id,
                 sst.id AS sst_id,
                 sst.type_cd,
@@ -1474,5 +1474,301 @@ impl InternalStationRepository {
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(stations)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::proto::StopCondition;
+
+    #[tokio::test]
+    async fn test_station_row_to_station_conversion() {
+        let station_row = StationRow {
+            station_cd: 1,
+            station_g_cd: 1,
+            station_name: "Test Station".to_string(),
+            station_name_k: "テスト駅".to_string(),
+            station_name_r: Some("Test Station".to_string()),
+            station_name_rn: None,
+            station_name_zh: None,
+            station_name_ko: None,
+            station_number1: Some("A01".to_string()),
+            station_number2: None,
+            station_number3: None,
+            station_number4: None,
+            three_letter_code: Some("TST".to_string()),
+            line_cd: 1,
+            pref_cd: 13,
+            post: "100-0001".to_string(),
+            address: "Test Address".to_string(),
+            lon: 139.7673068,
+            lat: 35.6809591,
+            open_ymd: "19900101".to_string(),
+            close_ymd: "99991231".to_string(),
+            e_status: 0,
+            e_sort: 1,
+            company_cd: Some(1),
+            line_name: Some("Test Line".to_string()),
+            line_name_k: Some("テストライン".to_string()),
+            line_name_h: Some("テストライン".to_string()),
+            line_name_r: Some("Test Line".to_string()),
+            line_name_zh: None,
+            line_name_ko: None,
+            line_color_c: Some("#FF0000".to_string()),
+            line_type: Some(1),
+            line_symbol1: None,
+            line_symbol2: None,
+            line_symbol3: None,
+            line_symbol4: None,
+            line_symbol1_color: None,
+            line_symbol2_color: None,
+            line_symbol3_color: None,
+            line_symbol4_color: None,
+            line_symbol1_shape: None,
+            line_symbol2_shape: None,
+            line_symbol3_shape: None,
+            line_symbol4_shape: None,
+            average_distance: Some(1.5),
+            type_id: Some(1),
+            sst_id: Some(1),
+            type_cd: Some(1),
+            line_group_cd: Some(1),
+            pass: Some(0),
+            type_name: Some("Local".to_string()),
+            type_name_k: Some("各駅停車".to_string()),
+            type_name_r: Some("Local".to_string()),
+            type_name_zh: None,
+            type_name_ko: None,
+            color: Some("#008000".to_string()),
+            direction: Some(0),
+            kind: Some(0),
+        };
+
+        let station: Station = station_row.into();
+
+        assert_eq!(station.station_cd, 1);
+        assert_eq!(station.station_g_cd, 1);
+        assert_eq!(station.station_name, "Test Station");
+        assert_eq!(station.station_name_k, "テスト駅");
+        assert_eq!(station.line_cd, 1);
+        assert_eq!(station.stop_condition, StopCondition::All);
+        // Use approximate comparison for floating point values
+        assert!((station.lon - 139.7673068).abs() < 0.0001);
+        assert!((station.lat - 35.6809591).abs() < 0.0001);
+    }
+
+    #[tokio::test]
+    async fn test_stop_condition_conversion() {
+        // Test all stop condition values
+        let test_cases = vec![
+            (0, StopCondition::All),
+            (1, StopCondition::Not),
+            (2, StopCondition::Partial),
+            (3, StopCondition::Weekday),
+            (4, StopCondition::Holiday),
+            (5, StopCondition::PartialStop),
+            (99, StopCondition::All), // Invalid value should default to All
+        ];
+
+        for (pass_value, expected_condition) in test_cases {
+            let station_row = StationRow {
+                station_cd: 1,
+                station_g_cd: 1,
+                station_name: "Test".to_string(),
+                station_name_k: "テスト".to_string(),
+                station_name_r: None,
+                station_name_rn: None,
+                station_name_zh: None,
+                station_name_ko: None,
+                station_number1: None,
+                station_number2: None,
+                station_number3: None,
+                station_number4: None,
+                three_letter_code: None,
+                line_cd: 1,
+                pref_cd: 13,
+                post: "".to_string(),
+                address: "".to_string(),
+                lon: 0.0,
+                lat: 0.0,
+                open_ymd: "".to_string(),
+                close_ymd: "".to_string(),
+                e_status: 0,
+                e_sort: 1,
+                company_cd: None,
+                line_name: None,
+                line_name_k: None,
+                line_name_h: None,
+                line_name_r: None,
+                line_name_zh: None,
+                line_name_ko: None,
+                line_color_c: None,
+                line_type: None,
+                line_symbol1: None,
+                line_symbol2: None,
+                line_symbol3: None,
+                line_symbol4: None,
+                line_symbol1_color: None,
+                line_symbol2_color: None,
+                line_symbol3_color: None,
+                line_symbol4_color: None,
+                line_symbol1_shape: None,
+                line_symbol2_shape: None,
+                line_symbol3_shape: None,
+                line_symbol4_shape: None,
+                average_distance: None,
+                type_id: None,
+                sst_id: None,
+                type_cd: None,
+                line_group_cd: None,
+                pass: Some(pass_value),
+                type_name: None,
+                type_name_k: None,
+                type_name_r: None,
+                type_name_zh: None,
+                type_name_ko: None,
+                color: None,
+                direction: None,
+                kind: None,
+            };
+
+            let station: Station = station_row.into();
+            assert_eq!(station.stop_condition, expected_condition);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_mock_station_repository() {
+        use crate::infrastructure::mock_repositories::MockStationRepository;
+        use crate::domain::repository::station_repository::StationRepository;
+
+        let mock_repo = MockStationRepository;
+        
+        let result = mock_repo.get_by_id_vec(&[]).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 0);
+
+        let result = mock_repo.get_by_station_group_id_vec(&[]).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 0);
+
+        let result = mock_repo.find_by_id(1).await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_sql_query_generation_with_order() {
+        let ids = vec![1, 2, 3];
+        let params = (1..=ids.len())
+            .map(|i| format!("${i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let order_case = ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("WHEN ${} THEN {}", i + 1, i))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        assert_eq!(params, "$1, $2, $3");
+        assert_eq!(order_case, "WHEN $1 THEN 0 WHEN $2 THEN 1 WHEN $3 THEN 2");
+    }
+
+    #[tokio::test]
+    async fn test_coordinate_bounds_calculation() {
+        let latitude: f64 = 35.6809591;
+        let longitude: f64 = 139.7673068;
+        
+        let lat_min = latitude - 0.1;
+        let lat_max = latitude + 0.1;
+        let lon_min = longitude - 0.1;
+        let lon_max = longitude + 0.1;
+
+        // Use approximate comparison for floating point values
+        assert!((lat_min - 35.5809591).abs() < 0.0001);
+        assert!((lat_max - 35.7809591).abs() < 0.0001);
+        assert!((lon_min - 139.6673068).abs() < 0.0001);
+        assert!((lon_max - 139.8673068).abs() < 0.0001);
+    }
+
+    #[tokio::test]
+    async fn test_station_row_with_distance_conversion() {
+        let station_row = StationRowWithDistance {
+            station_cd: 1,
+            station_g_cd: 1,
+            station_name: "Test Station".to_string(),
+            station_name_k: "テスト駅".to_string(),
+            station_name_r: Some("Test Station".to_string()),
+            station_name_rn: None,
+            station_name_zh: None,
+            station_name_ko: None,
+            station_number1: Some("A01".to_string()),
+            station_number2: None,
+            station_number3: None,
+            station_number4: None,
+            three_letter_code: Some("TST".to_string()),
+            line_cd: 1,
+            pref_cd: 13,
+            post: "100-0001".to_string(),
+            address: "Test Address".to_string(),
+            lon: 139.7673068,
+            lat: 35.6809591,
+            open_ymd: "19900101".to_string(),
+            close_ymd: "99991231".to_string(),
+            e_status: 0,
+            e_sort: 1,
+            company_cd: Some(1),
+            line_name: Some("Test Line".to_string()),
+            line_name_k: Some("テストライン".to_string()),
+            line_name_h: Some("テストライン".to_string()),
+            line_name_r: Some("Test Line".to_string()),
+            line_name_zh: None,
+            line_name_ko: None,
+            line_color_c: Some("#FF0000".to_string()),
+            line_type: Some(1),
+            line_symbol1: None,
+            line_symbol2: None,
+            line_symbol3: None,
+            line_symbol4: None,
+            line_symbol1_color: None,
+            line_symbol2_color: None,
+            line_symbol3_color: None,
+            line_symbol4_color: None,
+            line_symbol1_shape: None,
+            line_symbol2_shape: None,
+            line_symbol3_shape: None,
+            line_symbol4_shape: None,
+            average_distance: Some(1.5),
+            type_id: Some(1),
+            sst_id: Some(1),
+            type_cd: Some(1),
+            line_group_cd: Some(1),
+            pass: Some(0),
+            type_name: Some("Local".to_string()),
+            type_name_k: Some("各駅停車".to_string()),
+            type_name_r: Some("Local".to_string()),
+            type_name_zh: None,
+            type_name_ko: None,
+            color: Some("#008000".to_string()),
+            direction: Some(0),
+            kind: Some(0),
+            distance_sq: Some(0.5),
+        };
+
+        let station: Station = station_row.into();
+
+        assert_eq!(station.station_cd, 1);
+        assert_eq!(station.station_name, "Test Station");
+        assert_eq!(station.average_distance, 1.5);
+    }
+
+    #[tokio::test]
+    #[ignore] // Requires actual database setup
+    async fn test_find_by_id_with_database() {
+        // This test would require proper database setup and test data
+        // Skipped in regular test runs
     }
 }

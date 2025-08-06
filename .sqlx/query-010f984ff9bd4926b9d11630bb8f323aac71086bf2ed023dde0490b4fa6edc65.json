@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.station_cd,\n            s.station_g_cd,\n            s.station_name,\n            s.station_name_k,\n            s.station_name_r,\n            s.station_name_rn,\n            s.station_name_zh,\n            s.station_name_ko,\n            s.station_number1,\n            s.station_number2,\n            s.station_number3,\n            s.station_number4,\n            s.three_letter_code,\n            s.line_cd,\n            s.pref_cd,\n            s.post,\n            s.address,\n            s.lon,\n            s.lat,\n            s.open_ymd,\n            s.close_ymd,\n            s.e_status,\n            s.e_sort,\n            l.company_cd,\n            l.line_type,\n            l.line_symbol1,\n            l.line_symbol2,\n            l.line_symbol3,\n            l.line_symbol4,\n            l.line_symbol1_color,\n            l.line_symbol2_color,\n            l.line_symbol3_color,\n            l.line_symbol4_color,\n            l.line_symbol1_shape,\n            l.line_symbol2_shape,\n            l.line_symbol3_shape,\n            l.line_symbol4_shape,\n            COALESCE(l.average_distance, 0.0) AS average_distance,\n            COALESCE(a.line_name, l.line_name, '')         AS line_name,\n            COALESCE(a.line_name_k, l.line_name_k, '')     AS line_name_k,\n            COALESCE(a.line_name_h, l.line_name_h, '')     AS line_name_h,\n            COALESCE(a.line_name_r, l.line_name_r, '')     AS line_name_r,\n            COALESCE(a.line_name_zh, l.line_name_zh, '')   AS line_name_zh,\n            COALESCE(a.line_name_ko, l.line_name_ko, '')   AS line_name_ko,\n            COALESCE(a.line_color_c, l.line_color_c, '')   AS line_color_c,\n            sst.id AS sst_id,\n            sst.type_cd,\n            sst.line_group_cd,\n            sst.pass,\n            t.id AS type_id,\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.direction,\n            t.kind\n          FROM stations AS s\n          JOIN lines AS l ON l.line_cd = s.line_cd\n          LEFT JOIN station_station_types AS sst ON sst.station_cd = s.station_cd\n          LEFT JOIN types AS t ON t.type_cd = sst.type_cd\n          LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd\n          LEFT JOIN aliases AS a ON a.id = la.alias_cd\n          WHERE s.station_cd = $1\n            AND s.e_status = 0\n            AND l.e_status = 0\n          LIMIT 1",
+  "query": "SELECT DISTINCT ON (s.station_cd) s.station_cd,\n            s.station_g_cd,\n            s.station_name,\n            s.station_name_k,\n            s.station_name_r,\n            s.station_name_rn,\n            s.station_name_zh,\n            s.station_name_ko,\n            s.station_number1,\n            s.station_number2,\n            s.station_number3,\n            s.station_number4,\n            s.three_letter_code,\n            s.line_cd,\n            s.pref_cd,\n            s.post,\n            s.address,\n            s.lon,\n            s.lat,\n            s.open_ymd,\n            s.close_ymd,\n            s.e_status,\n            s.e_sort,\n            COALESCE(a.line_name, l.line_name, '') AS \"line_name: String\",\n            COALESCE(a.line_name_k, l.line_name_k, '') AS \"line_name_k: String\",\n            COALESCE(a.line_name_h, l.line_name_h, '') AS \"line_name_h: String\",\n            COALESCE(a.line_name_r, l.line_name_r, '') AS \"line_name_r: String\",\n            COALESCE(a.line_name_zh, l.line_name_zh, '') AS \"line_name_zh: String\",\n            COALESCE(a.line_name_ko, l.line_name_ko, '') AS \"line_name_ko: String\",\n            COALESCE(a.line_color_c, l.line_color_c, '') AS \"line_color_c: String\",\n            l.company_cd,\n            l.line_type,\n            l.line_symbol1,\n            l.line_symbol2,\n            l.line_symbol3,\n            l.line_symbol4,\n            l.line_symbol1_color,\n            l.line_symbol2_color,\n            l.line_symbol3_color,\n            l.line_symbol4_color,\n            l.line_symbol1_shape,\n            l.line_symbol2_shape,\n            l.line_symbol3_shape,\n            l.line_symbol4_shape,\n            COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,\n            sst.id AS sst_id,\n            sst.type_cd,\n            sst.line_group_cd,\n            sst.pass,\n            t.id AS type_id,\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.direction,\n            t.kind\n          FROM stations AS s\n          JOIN lines AS l ON l.line_cd = s.line_cd AND l.e_status = 0\n          LEFT JOIN station_station_types AS sst ON sst.line_group_cd = $1\n          LEFT JOIN types AS t ON t.type_cd = sst.type_cd\n          LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd\n          LEFT JOIN aliases AS a ON a.id = la.alias_cd\n          WHERE\n            s.line_cd = l.line_cd\n            AND s.station_cd = sst.station_cd\n            AND s.e_status = 0\n          ORDER BY s.station_cd, sst.id",
   "describe": {
     "columns": [
       {
@@ -91,12 +91,12 @@
       {
         "ordinal": 17,
         "name": "lon",
-        "type_info": "Float4"
+        "type_info": "Float8"
       },
       {
         "ordinal": 18,
         "name": "lat",
-        "type_info": "Float4"
+        "type_info": "Float8"
       },
       {
         "ordinal": 19,
@@ -120,113 +120,113 @@
       },
       {
         "ordinal": 23,
-        "name": "company_cd",
-        "type_info": "Int4"
+        "name": "line_name: String",
+        "type_info": "Text"
       },
       {
         "ordinal": 24,
-        "name": "line_type",
-        "type_info": "Int4"
+        "name": "line_name_k: String",
+        "type_info": "Text"
       },
       {
         "ordinal": 25,
-        "name": "line_symbol1",
+        "name": "line_name_h: String",
         "type_info": "Text"
       },
       {
         "ordinal": 26,
-        "name": "line_symbol2",
+        "name": "line_name_r: String",
         "type_info": "Text"
       },
       {
         "ordinal": 27,
-        "name": "line_symbol3",
+        "name": "line_name_zh: String",
         "type_info": "Text"
       },
       {
         "ordinal": 28,
-        "name": "line_symbol4",
+        "name": "line_name_ko: String",
         "type_info": "Text"
       },
       {
         "ordinal": 29,
-        "name": "line_symbol1_color",
+        "name": "line_color_c: String",
         "type_info": "Text"
       },
       {
         "ordinal": 30,
-        "name": "line_symbol2_color",
-        "type_info": "Text"
+        "name": "company_cd",
+        "type_info": "Int4"
       },
       {
         "ordinal": 31,
-        "name": "line_symbol3_color",
-        "type_info": "Text"
+        "name": "line_type",
+        "type_info": "Int4"
       },
       {
         "ordinal": 32,
-        "name": "line_symbol4_color",
+        "name": "line_symbol1",
         "type_info": "Text"
       },
       {
         "ordinal": 33,
-        "name": "line_symbol1_shape",
+        "name": "line_symbol2",
         "type_info": "Text"
       },
       {
         "ordinal": 34,
-        "name": "line_symbol2_shape",
+        "name": "line_symbol3",
         "type_info": "Text"
       },
       {
         "ordinal": 35,
-        "name": "line_symbol3_shape",
+        "name": "line_symbol4",
         "type_info": "Text"
       },
       {
         "ordinal": 36,
-        "name": "line_symbol4_shape",
+        "name": "line_symbol1_color",
         "type_info": "Text"
       },
       {
         "ordinal": 37,
-        "name": "average_distance",
-        "type_info": "Float4"
+        "name": "line_symbol2_color",
+        "type_info": "Text"
       },
       {
         "ordinal": 38,
-        "name": "line_name",
+        "name": "line_symbol3_color",
         "type_info": "Text"
       },
       {
         "ordinal": 39,
-        "name": "line_name_k",
+        "name": "line_symbol4_color",
         "type_info": "Text"
       },
       {
         "ordinal": 40,
-        "name": "line_name_h",
+        "name": "line_symbol1_shape",
         "type_info": "Text"
       },
       {
         "ordinal": 41,
-        "name": "line_name_r",
+        "name": "line_symbol2_shape",
         "type_info": "Text"
       },
       {
         "ordinal": 42,
-        "name": "line_name_zh",
+        "name": "line_symbol3_shape",
         "type_info": "Text"
       },
       {
         "ordinal": 43,
-        "name": "line_name_ko",
+        "name": "line_symbol4_shape",
         "type_info": "Text"
       },
       {
         "ordinal": 44,
-        "name": "line_color_c",
-        "type_info": "Text"
+        "name": "average_distance",
+        "type_info": "Float8"
       },
       {
         "ordinal": 45,
@@ -323,6 +323,13 @@
       false,
       false,
       false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
       false,
       false,
       true,
@@ -337,13 +344,6 @@
       true,
       true,
       true,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
       null,
       false,
       false,
@@ -360,5 +360,5 @@
       true
     ]
   },
-  "hash": "f25515a08724aae4a7d52787364d98a3623b311e35cbbc14a2bc685d0a4cd35c"
+  "hash": "010f984ff9bd4926b9d11630bb8f323aac71086bf2ed023dde0490b4fa6edc65"
 }

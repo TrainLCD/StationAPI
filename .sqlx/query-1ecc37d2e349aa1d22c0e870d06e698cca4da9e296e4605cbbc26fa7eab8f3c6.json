@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT DISTINCT l.line_cd,\n            l.company_cd,\n            l.line_type,\n            l.line_symbol1,\n            l.line_symbol2,\n            l.line_symbol3,\n            l.line_symbol4,\n            l.line_symbol1_color,\n            l.line_symbol2_color,\n            l.line_symbol3_color,\n            l.line_symbol4_color,\n            l.line_symbol1_shape,\n            l.line_symbol2_shape,\n            l.line_symbol3_shape,\n            l.line_symbol4_shape,\n            l.e_status,\n            l.e_sort,\n            COALESCE(l.average_distance, 0.0) AS average_distance,\n            s.station_cd,\n            s.station_g_cd,\n            sst.line_group_cd,\n            sst.type_cd,\n            COALESCE(a.line_name, l.line_name) AS line_name,\n            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,\n            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,\n            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,\n            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,\n            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,\n            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c\n        FROM lines AS l\n            JOIN stations AS s ON s.station_cd = $1\n            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1\n            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd\n            LEFT JOIN aliases AS a ON la.alias_cd = a.id\n        WHERE l.line_cd = s.line_cd",
+  "query": "SELECT DISTINCT l.line_cd,\n            l.company_cd,\n            l.line_type,\n            l.line_symbol1,\n            l.line_symbol2,\n            l.line_symbol3,\n            l.line_symbol4,\n            l.line_symbol1_color,\n            l.line_symbol2_color,\n            l.line_symbol3_color,\n            l.line_symbol4_color,\n            l.line_symbol1_shape,\n            l.line_symbol2_shape,\n            l.line_symbol3_shape,\n            l.line_symbol4_shape,\n            l.e_status,\n            l.e_sort,\n            COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,\n            s.station_cd,\n            s.station_g_cd,\n            sst.line_group_cd,\n            sst.type_cd,\n            COALESCE(a.line_name, l.line_name) AS line_name,\n            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,\n            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,\n            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,\n            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,\n            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,\n            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c\n        FROM lines AS l\n            JOIN stations AS s ON s.station_cd = $1\n            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1\n            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd\n            LEFT JOIN aliases AS a ON la.alias_cd = a.id\n        WHERE l.line_cd = s.line_cd",
   "describe": {
     "columns": [
       {
@@ -91,7 +91,7 @@
       {
         "ordinal": 17,
         "name": "average_distance",
-        "type_info": "Float4"
+        "type_info": "Float8"
       },
       {
         "ordinal": 18,
@@ -186,5 +186,5 @@
       null
     ]
   },
-  "hash": "502a57cf9032e7c7fc10d57ebd0cf22486cd0cb3f47b70f1ae6c533d4253d3e3"
+  "hash": "1ecc37d2e349aa1d22c0e870d06e698cca4da9e296e4605cbbc26fa7eab8f3c6"
 }
