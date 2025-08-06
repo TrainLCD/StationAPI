@@ -20,7 +20,7 @@ impl From<Station> for GrpcStation {
             longitude: station.lon,
             opened_at: station.open_ymd,
             closed_at: station.close_ymd,
-            status: station.e_status as i32,
+            status: station.e_status,
             station_numbers: station
                 .station_numbers
                 .into_iter()

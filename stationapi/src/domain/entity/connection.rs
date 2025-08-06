@@ -75,7 +75,7 @@ mod tests {
     #[test]
     fn debug_test() {
         let connection = Connection::new(5, 5500501, 5500502, 3.7);
-        let debug_string = format!("{:?}", connection);
+        let debug_string = format!("{connection:?}");
         assert!(debug_string.contains("Connection"));
         assert!(debug_string.contains("id: 5"));
         assert!(debug_string.contains("station_cd1: 5500501"));

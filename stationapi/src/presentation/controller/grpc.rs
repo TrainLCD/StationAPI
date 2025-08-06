@@ -38,8 +38,7 @@ impl StationApi for MyApi {
             Ok(Some(station)) => station,
             Ok(None) => {
                 return Err(PresentationalError::NotFound(format!(
-                    "Station with id {} not found",
-                    station_id
+                    "Station with id {station_id} not found"
                 ))
                 .into())
             }
@@ -243,8 +242,7 @@ impl StationApi for MyApi {
             Ok(Some(line)) => line,
             Ok(None) => {
                 return Err(PresentationalError::NotFound(format!(
-                    "Line with id {} not found",
-                    line_id
+                    "Line with id {line_id} not found"
                 ))
                 .into())
             }

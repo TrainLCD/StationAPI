@@ -1,0 +1,35 @@
+name: stationapi
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./docker/api/Dockerfile
+    depends_on:
+      - psql
+    volumes:
+      - .:/app
+    environment:
+      DATABASE_URL: postgresql://stationapi:stationapi@psql/stationapi
+      DISABLE_GRPC_WEB: false
+      HOST: 0.0.0.0
+    ports:
+      - 50051:50051
+    networks:
+      - sapi-link
+    restart: always
+
+  psql:
+    image: postgres:17.5
+    environment:
+      POSTGRES_USER: stationapi
+      POSTGRES_PASSWORD: stationapi
+      POSTGRES_DB: stationapi
+    ports:
+      - 5432:5432
+    networks:
+      - sapi-link
+    restart: always
+
+networks:
+  sapi-link:

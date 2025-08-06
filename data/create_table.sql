@@ -1,190 +1,486 @@
-PRAGMA journal_mode = MEMORY;
-PRAGMA synchronous = OFF;
-PRAGMA foreign_keys = OFF;
-PRAGMA ignore_check_constraints = OFF;
-PRAGMA auto_vacuum = NONE;
-PRAGMA secure_delete = OFF;
-BEGIN TRANSACTION;
+--
+-- PostgreSQL database dump
+--
 
-DROP TABLE IF EXISTS `aliases`;
+-- Dumped from database version 17.4 (Debian 17.4-1.pgdg120+2)
+-- Dumped by pg_dump version 17.4 (Homebrew)
 
-CREATE TABLE `aliases` (
-`id` INTEGER NOT NULL,
-`line_name` TEXT DEFAULT NULL,
-`line_name_k` TEXT DEFAULT NULL,
-`line_name_h` TEXT DEFAULT NULL,
-`line_name_r` TEXT DEFAULT NULL,
-`line_name_zh` TEXT DEFAULT NULL,
-`line_name_ko` TEXT DEFAULT NULL,
-`line_color_c` TEXT DEFAULT NULL,
-PRIMARY KEY (`id`)
-);
-DROP TABLE IF EXISTS `companies`;
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
 
-CREATE TABLE `companies` (
-`company_cd` INTEGER NOT NULL,
-`rr_cd` INTEGER NOT NULL,
-`company_name` TEXT NOT NULL,
-`company_name_k` TEXT NOT NULL,
-`company_name_h` TEXT NOT NULL,
-`company_name_r` TEXT NOT NULL,
-`company_name_en` TEXT NOT NULL,
-`company_name_full_en` TEXT NOT NULL,
-`company_url` TEXT DEFAULT NULL,
-`company_type` INTEGER NOT NULL,
-`e_status` INTEGER NOT NULL,
-`e_sort` INTEGER NOT NULL,
-PRIMARY KEY (`company_cd`)
-);
-DROP TABLE IF EXISTS `connections`;
+ALTER TABLE IF EXISTS ONLY public.stations DROP CONSTRAINT IF EXISTS stations_line_cd_fkey;
+ALTER TABLE IF EXISTS ONLY public.station_station_types DROP CONSTRAINT IF EXISTS station_station_types_type_cd_fkey;
+ALTER TABLE IF EXISTS ONLY public.station_station_types DROP CONSTRAINT IF EXISTS station_station_types_station_cd_fkey;
+ALTER TABLE IF EXISTS ONLY public.lines DROP CONSTRAINT IF EXISTS lines_company_cd_fkey;
+ALTER TABLE IF EXISTS ONLY public.line_aliases DROP CONSTRAINT IF EXISTS line_aliases_station_cd_fkey;
+ALTER TABLE IF EXISTS ONLY public.line_aliases DROP CONSTRAINT IF EXISTS line_aliases_alias_cd_fkey;
+DROP INDEX IF EXISTS public.idx_16432_types_type_cd;
+DROP INDEX IF EXISTS public.idx_16426_stations_station_g_cd;
+DROP INDEX IF EXISTS public.idx_16426_stations_line_cd;
+DROP INDEX IF EXISTS public.idx_16426_stations_lat_lon;
+DROP INDEX IF EXISTS public.idx_16426_stations_e_sort_station_cd;
+DROP INDEX IF EXISTS public.idx_16421_station_station_types_type_cd;
+DROP INDEX IF EXISTS public.idx_16421_station_station_types_station_cd;
+DROP INDEX IF EXISTS public.idx_16421_station_station_types_line_group_cd;
+DROP INDEX IF EXISTS public.idx_16407_lines_e_sort;
+DROP INDEX IF EXISTS public.idx_16407_lines_company_cd;
+DROP INDEX IF EXISTS public.idx_16403_line_aliases_station_cd;
+DROP INDEX IF EXISTS public.idx_16403_line_aliases_alias_cd;
+ALTER TABLE IF EXISTS ONLY public.types DROP CONSTRAINT IF EXISTS idx_16432_types_pkey;
+ALTER TABLE IF EXISTS ONLY public.stations DROP CONSTRAINT IF EXISTS idx_16426_stations_pkey;
+ALTER TABLE IF EXISTS ONLY public.station_station_types DROP CONSTRAINT IF EXISTS idx_16421_station_station_types_pkey;
+ALTER TABLE IF EXISTS ONLY public.lines DROP CONSTRAINT IF EXISTS idx_16407_lines_pkey;
+ALTER TABLE IF EXISTS ONLY public.line_aliases DROP CONSTRAINT IF EXISTS idx_16403_line_aliases_pkey;
+ALTER TABLE IF EXISTS ONLY public.connections DROP CONSTRAINT IF EXISTS idx_16399_connections_pkey;
+ALTER TABLE IF EXISTS ONLY public.companies DROP CONSTRAINT IF EXISTS idx_16394_companies_pkey;
+ALTER TABLE IF EXISTS ONLY public.aliases DROP CONSTRAINT IF EXISTS idx_16389_aliases_pkey;
+ALTER TABLE IF EXISTS public.types ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.station_station_types ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.line_aliases ALTER COLUMN id DROP DEFAULT;
+DROP SEQUENCE IF EXISTS public.types_id_seq;
+DROP TABLE IF EXISTS public.types;
+DROP TABLE IF EXISTS public.stations;
+DROP SEQUENCE IF EXISTS public.station_station_types_id_seq;
+DROP TABLE IF EXISTS public.station_station_types;
+DROP TABLE IF EXISTS public.lines;
+DROP SEQUENCE IF EXISTS public.line_aliases_id_seq;
+DROP TABLE IF EXISTS public.line_aliases;
+DROP TABLE IF EXISTS public.connections;
+DROP TABLE IF EXISTS public.companies;
+DROP TABLE IF EXISTS public.aliases;
+SET default_tablespace = '';
 
-CREATE TABLE `connections` (
-`id` INTEGER NOT NULL ,
-`station_cd1` INTEGER NOT NULL,
-`station_cd2` INTEGER NOT NULL,
-`distance` REAL NOT NULL,
-PRIMARY KEY (`id`)
-);
-DROP TABLE IF EXISTS `line_aliases`;
+SET default_table_access_method = heap;
 
-CREATE TABLE `line_aliases` (
-`id` INTEGER PRIMARY KEY AUTOINCREMENT,
-`station_cd` INTEGER NOT NULL,
-`alias_cd` INTEGER NOT NULL,
-FOREIGN KEY (`station_cd`) REFERENCES `stations` (`station_cd`),
-FOREIGN KEY (`alias_cd`) REFERENCES `aliases` (`id`)
-);
-DROP TABLE IF EXISTS `lines`;
+--
+-- Name: aliases; Type: TABLE; Schema: public; Owner: stationapi
+--
 
-CREATE TABLE `lines` (
-`line_cd` INTEGER NOT NULL,
-`company_cd` INTEGER NOT NULL,
-`line_name` TEXT DEFAULT '',
-`line_name_k` TEXT DEFAULT '',
-`line_name_h` TEXT DEFAULT '',
-`line_name_r` TEXT DEFAULT '',
-`line_name_rn` TEXT DEFAULT '',
-`line_name_zh` TEXT DEFAULT '',
-`line_name_ko` TEXT DEFAULT '',
-`line_color_c` TEXT NOT NULL,
-`line_type` INTEGER NOT NULL,
-`line_symbol1` TEXT DEFAULT NULL,
-`line_symbol2` TEXT DEFAULT NULL,
-`line_symbol3` TEXT DEFAULT NULL,
-`line_symbol4` TEXT DEFAULT NULL,
-`line_symbol1_color` TEXT DEFAULT NULL,
-`line_symbol2_color` TEXT DEFAULT NULL,
-`line_symbol3_color` TEXT DEFAULT NULL,
-`line_symbol4_color` TEXT DEFAULT NULL,
-`line_symbol1_shape` TEXT DEFAULT NULL,
-`line_symbol2_shape` TEXT DEFAULT NULL,
-`line_symbol3_shape` TEXT DEFAULT NULL,
-`line_symbol4_shape` TEXT DEFAULT NULL,
-`e_status` INTEGER NOT NULL,
-`e_sort` INTEGER NOT NULL,
-`average_distance` REAL NOT NULL DEFAULT 0.0,
-PRIMARY KEY (`line_cd`),
-FOREIGN KEY (`company_cd`) REFERENCES `companies` (`company_cd`)
-);
-DROP TABLE IF EXISTS `station_station_types`;
-
-CREATE TABLE `station_station_types` (
-`id` INTEGER PRIMARY KEY AUTOINCREMENT,
-`station_cd` INTEGER NOT NULL,
-`type_cd` INTEGER NOT NULL,
-`line_group_cd` INTEGER NOT NULL,
-`pass` INTEGER NOT NULL DEFAULT 0,
-FOREIGN KEY (`station_cd`) REFERENCES `stations` (`station_cd`),
-FOREIGN KEY (`type_cd`) REFERENCES `types` (`type_cd`)
-);
-DROP TABLE IF EXISTS `stations`;
-
-CREATE TABLE `stations` (
-`station_cd` INTEGER NOT NULL,
-`station_g_cd` INTEGER NOT NULL,
-`station_name` TEXT NOT NULL,
-`station_name_k` TEXT NOT NULL,
-`station_name_r` TEXT DEFAULT NULL,
-`station_name_rn` TEXT DEFAULT NULL,
-`station_name_zh` TEXT DEFAULT NULL,
-`station_name_ko` TEXT DEFAULT NULL,
-`station_number1` TEXT DEFAULT NULL,
-`station_number2` TEXT DEFAULT NULL,
-`station_number3` TEXT DEFAULT NULL,
-`station_number4` TEXT DEFAULT NULL,
-`three_letter_code` TEXT DEFAULT NULL,
-`line_cd` INTEGER NOT NULL,
-`pref_cd` INTEGER NOT NULL,
-`post` TEXT NOT NULL,
-`address` TEXT NOT NULL,
-`lon` REAL NOT NULL,
-`lat` REAL NOT NULL,
-`open_ymd` TEXT NOT NULL,
-`close_ymd` TEXT NOT NULL,
-`e_status` INTEGER NOT NULL,
-`e_sort` INTEGER NOT NULL,
-PRIMARY KEY (`station_cd`),
-FOREIGN KEY (`line_cd`) REFERENCES `lines` (`line_cd`)
-);
-DROP TABLE IF EXISTS `types`;
-
-CREATE TABLE `types` (
-`id` INTEGER PRIMARY KEY AUTOINCREMENT,
-`type_cd` INTEGER NOT NULL,
-`type_name` TEXT NOT NULL,
-`type_name_k` TEXT NOT NULL,
-`type_name_r` TEXT NOT NULL,
-`type_name_zh` TEXT NOT NULL,
-`type_name_ko` TEXT NOT NULL,
-`color` TEXT NOT NULL,
-`direction` INTEGER NOT NULL DEFAULT 0,
-`kind` INTEGER NOT NULL DEFAULT 0,
-`priority` INTEGER NOT NULL DEFAULT 0
-);
-DROP TABLE IF EXISTS `station_rtree`;
-
-CREATE VIRTUAL TABLE station_rtree USING rtree(
-  station_cd,
-  min_lat, max_lat,
-  min_lon, max_lon
+CREATE UNLOGGED TABLE public.aliases (
+    id integer NOT NULL,
+    line_name text,
+    line_name_k text,
+    line_name_h text,
+    line_name_r text,
+    line_name_zh text,
+    line_name_ko text,
+    line_color_c text
 );
 
 
-CREATE INDEX `connections_station_cd1` ON `connections` (`station_cd1`);
-CREATE INDEX `connections_station_cd2` ON `connections` (`station_cd2`);
-CREATE INDEX `connections_station_cd1_cd2` ON `connections` (`station_cd1`, `station_cd2`);
-CREATE INDEX `companies_e_status` ON `companies` (`e_status`);
-CREATE INDEX `lines_company_cd` ON `lines` (`company_cd`);
-CREATE INDEX `lines_e_status` ON `lines` (`e_status`);
-CREATE INDEX `station_station_types_type_cd` ON `station_station_types` (`type_cd`);
-CREATE INDEX `station_station_types_station_cd` ON `station_station_types` (`station_cd`);
-CREATE INDEX `station_station_types_line_group_cd` ON `station_station_types` (`line_group_cd`);
-CREATE INDEX `station_station_types_station_type` ON `station_station_types` (`station_cd`, `type_cd`);
-CREATE INDEX `station_station_types_line_group_type` ON `station_station_types` (`line_group_cd`, `type_cd`);
-CREATE INDEX `stations_line_cd` ON `stations` (`line_cd`);
-CREATE INDEX `stations_e_status` ON `stations` (`e_status`);
-CREATE INDEX `stations_station_name` ON `stations` (`station_name`);
-CREATE INDEX `stations_station_name_k` ON `stations` (`station_name_k`);
-CREATE INDEX `stations_line_cd_e_status` ON `stations` (`line_cd`, `e_status`);
-CREATE INDEX `station_station_types_station_pass_type` ON `station_station_types` (`station_cd`, `pass`, `type_cd`);
-CREATE INDEX `station_station_types_linegroup_pass_type` ON `station_station_types` (`line_group_cd`, `pass`, `type_cd`);
-CREATE INDEX `station_station_types_station_linegroup_pass` ON `station_station_types` (`station_cd`, `line_group_cd`, `pass`);
-CREATE INDEX `types_priority_kind` ON `types` (`priority`, `kind`);
-CREATE INDEX `types_type_priority_kind` ON `types` (`type_cd`, `priority`, `kind`);
-CREATE INDEX `stations_line_status_sort` ON `stations` (`line_cd`, `e_status`, `e_sort`);
-CREATE INDEX `stations_group_status_line` ON `stations` (`station_g_cd`, `e_status`, `line_cd`);
-CREATE INDEX `stations_station_name_status` ON `stations` (`station_name`, `e_status`);
-CREATE INDEX `stations_station_name_k_status` ON `stations` (`station_name_k`, `e_status`);
-CREATE INDEX `lines_company_status` ON `lines` (`company_cd`, `e_status`);
-CREATE INDEX `line_aliases_station_alias` ON `line_aliases` (`station_cd`, `alias_cd`);
-CREATE INDEX `station_station_types_pass_linegroup` ON `station_station_types` (`pass`, `line_group_cd`);
-CREATE INDEX `stations_lat_lon_status` ON `stations` (`lat`, `lon`, `e_status`);
-ANALYZE;
-CREATE INDEX `stations_name_group_status` ON `stations` (`station_name`, `station_g_cd`, `e_status`);
-CREATE INDEX `stations_active_only` ON `stations` (`station_cd`) WHERE `e_status` = 0;
-CREATE INDEX `lines_active_only` ON `lines` (`line_cd`) WHERE `e_status` = 0;
-CREATE INDEX `station_station_types_active_only` ON `station_station_types` (`station_cd`, `type_cd`) WHERE `pass` <> 1; 
+ALTER TABLE public.aliases OWNER TO stationapi;
 
-CREATE UNIQUE INDEX `types_type_cd` ON `types` (`type_cd`);
+--
+-- Name: companies; Type: TABLE; Schema: public; Owner: stationapi
+--
 
-COMMIT;
+CREATE UNLOGGED TABLE public.companies (
+    company_cd integer NOT NULL,
+    rr_cd integer NOT NULL,
+    company_name text NOT NULL,
+    company_name_k text NOT NULL,
+    company_name_h text NOT NULL,
+    company_name_r text NOT NULL,
+    company_name_en text NOT NULL,
+    company_name_full_en text NOT NULL,
+    company_url text,
+    company_type integer NOT NULL,
+    e_status integer NOT NULL,
+    e_sort integer NOT NULL
+);
+
+
+ALTER TABLE public.companies OWNER TO stationapi;
+
+--
+-- Name: connections; Type: TABLE; Schema: public; Owner: stationapi
+--
+
+CREATE UNLOGGED TABLE public.connections (
+    id integer NOT NULL,
+    station_cd1 integer NOT NULL,
+    station_cd2 integer NOT NULL,
+    distance real DEFAULT '0'::real
+);
+
+
+ALTER TABLE public.connections OWNER TO stationapi;
+
+--
+-- Name: line_aliases; Type: TABLE; Schema: public; Owner: stationapi
+--
+
+CREATE UNLOGGED TABLE public.line_aliases (
+    id integer NOT NULL,
+    station_cd integer NOT NULL,
+    alias_cd integer NOT NULL
+);
+
+
+ALTER TABLE public.line_aliases OWNER TO stationapi;
+
+--
+-- Name: line_aliases_id_seq; Type: SEQUENCE; Schema: public; Owner: stationapi
+--
+
+CREATE SEQUENCE public.line_aliases_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.line_aliases_id_seq OWNER TO stationapi;
+
+--
+-- Name: line_aliases_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: stationapi
+--
+
+ALTER SEQUENCE public.line_aliases_id_seq OWNED BY public.line_aliases.id;
+
+
+--
+-- Name: lines; Type: TABLE; Schema: public; Owner: stationapi
+--
+
+CREATE UNLOGGED TABLE public.lines (
+    line_cd integer NOT NULL,
+    company_cd integer NOT NULL,
+    line_name text NOT NULL,
+    line_name_k text NOT NULL,
+    line_name_h text NOT NULL,
+    line_name_r text NOT NULL DEFAULT ''::text,
+    line_name_rn text NOT NULL DEFAULT ''::text,
+    line_name_zh text DEFAULT ''::text,
+    line_name_ko text DEFAULT ''::text,
+    line_color_c text NOT NULL,
+    line_type integer NOT NULL,
+    line_symbol1 text,
+    line_symbol2 text,
+    line_symbol3 text,
+    line_symbol4 text,
+    line_symbol1_color text,
+    line_symbol2_color text,
+    line_symbol3_color text,
+    line_symbol4_color text,
+    line_symbol1_shape text,
+    line_symbol2_shape text,
+    line_symbol3_shape text,
+    line_symbol4_shape text,
+    e_status integer NOT NULL,
+    e_sort integer NOT NULL,
+    average_distance real DEFAULT '0'::real
+);
+
+
+ALTER TABLE public.lines OWNER TO stationapi;
+
+--
+-- Name: station_station_types; Type: TABLE; Schema: public; Owner: stationapi
+--
+
+CREATE UNLOGGED TABLE public.station_station_types (
+    id integer NOT NULL,
+    station_cd integer NOT NULL,
+    type_cd integer NOT NULL,
+    line_group_cd integer NOT NULL,
+    pass integer DEFAULT '0'::integer
+);
+
+
+ALTER TABLE public.station_station_types OWNER TO stationapi;
+
+--
+-- Name: station_station_types_id_seq; Type: SEQUENCE; Schema: public; Owner: stationapi
+--
+
+CREATE SEQUENCE public.station_station_types_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.station_station_types_id_seq OWNER TO stationapi;
+
+--
+-- Name: station_station_types_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: stationapi
+--
+
+ALTER SEQUENCE public.station_station_types_id_seq OWNED BY public.station_station_types.id;
+
+
+--
+-- Name: stations; Type: TABLE; Schema: public; Owner: stationapi
+--
+
+CREATE UNLOGGED TABLE public.stations (
+    station_cd integer NOT NULL,
+    station_g_cd integer NOT NULL,
+    station_name text NOT NULL,
+    station_name_k text NOT NULL,
+    station_name_r text,
+    station_name_rn text,
+    station_name_zh text,
+    station_name_ko text,
+    station_number1 text,
+    station_number2 text,
+    station_number3 text,
+    station_number4 text,
+    three_letter_code text,
+    line_cd integer NOT NULL,
+    pref_cd integer NOT NULL,
+    post text NOT NULL,
+    address text NOT NULL,
+    lon DOUBLE PRECISION NOT NULL,
+    lat DOUBLE PRECISION NOT NULL,
+    open_ymd text NOT NULL,
+    close_ymd text NOT NULL,
+    e_status integer NOT NULL,
+    e_sort integer NOT NULL
+);
+
+
+ALTER TABLE public.stations OWNER TO stationapi;
+
+--
+-- Name: types; Type: TABLE; Schema: public; Owner: stationapi
+--
+
+CREATE UNLOGGED TABLE public.types (
+    id integer NOT NULL,
+    type_cd integer NOT NULL,
+    type_name text NOT NULL,
+    type_name_k text NOT NULL,
+    type_name_r text NOT NULL,
+    type_name_zh text NOT NULL,
+    type_name_ko text NOT NULL,
+    color text NOT NULL,
+    direction integer DEFAULT '0'::integer,
+    kind integer DEFAULT '0'::integer,
+    priority integer NOT NULL DEFAULT '0'::integer
+);
+
+
+ALTER TABLE public.types OWNER TO stationapi;
+
+--
+-- Name: types_id_seq; Type: SEQUENCE; Schema: public; Owner: stationapi
+--
+
+CREATE SEQUENCE public.types_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.types_id_seq OWNER TO stationapi;
+
+--
+-- Name: types_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: stationapi
+--
+
+ALTER SEQUENCE public.types_id_seq OWNED BY public.types.id;
+
+
+--
+-- Name: line_aliases id; Type: DEFAULT; Schema: public; Owner: stationapi
+--
+
+ALTER TABLE ONLY public.line_aliases ALTER COLUMN id SET DEFAULT nextval('public.line_aliases_id_seq'::regclass);
+
+
+--
+-- Name: station_station_types id; Type: DEFAULT; Schema: public; Owner: stationapi
+--
+
+ALTER TABLE ONLY public.station_station_types ALTER COLUMN id SET DEFAULT nextval('public.station_station_types_id_seq'::regclass);
+
+
+--
+-- Name: types id; Type: DEFAULT; Schema: public; Owner: stationapi
+--
+
+ALTER TABLE ONLY public.types ALTER COLUMN id SET DEFAULT nextval('public.types_id_seq'::regclass);
+
+
+--
+-- Name: aliases idx_16389_aliases_pkey; Type: CONSTRAINT; Schema: public; Owner: stationapi
+--
+
+ALTER TABLE ONLY public.aliases
+    ADD CONSTRAINT idx_16389_aliases_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: companies idx_16394_companies_pkey; Type: CONSTRAINT; Schema: public; Owner: stationapi
+--
+
+ALTER TABLE ONLY public.companies
+    ADD CONSTRAINT idx_16394_companies_pkey PRIMARY KEY (company_cd);
+
+
+--
+-- Name: lines idx_16407_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: stationapi
+--
+
+ALTER TABLE ONLY public.lines
+    ADD CONSTRAINT idx_16407_lines_pkey PRIMARY KEY (line_cd);
+
+
+--
+-- Name: stations idx_16426_stations_pkey; Type: CONSTRAINT; Schema: public; Owner: stationapi
+--
+
+ALTER TABLE ONLY public.stations
+    ADD CONSTRAINT idx_16426_stations_pkey PRIMARY KEY (station_cd);
+
+
+--
+-- Name: idx_16403_line_aliases_alias_cd; Type: INDEX; Schema: public; Owner: stationapi
+--
+
+CREATE INDEX idx_16403_line_aliases_alias_cd ON public.line_aliases USING btree (alias_cd);
+
+
+--
+-- Name: idx_16403_line_aliases_station_cd; Type: INDEX; Schema: public; Owner: stationapi
+--
+
+CREATE INDEX idx_16403_line_aliases_station_cd ON public.line_aliases USING btree (station_cd);
+
+
+--
+-- Name: idx_16407_lines_company_cd; Type: INDEX; Schema: public; Owner: stationapi
+--
+
+CREATE INDEX idx_16407_lines_company_cd ON public.lines USING btree (company_cd);
+
+
+--
+-- Name: idx_16407_lines_e_sort; Type: INDEX; Schema: public; Owner: stationapi
+--
+
+CREATE INDEX idx_16407_lines_e_sort ON public.lines USING btree (e_sort);
+
+
+--
+-- Name: idx_16421_station_station_types_line_group_cd; Type: INDEX; Schema: public; Owner: stationapi
+--
+
+CREATE INDEX idx_16421_station_station_types_line_group_cd ON public.station_station_types USING btree (line_group_cd);
+
+
+--
+-- Name: idx_16421_station_station_types_station_cd; Type: INDEX; Schema: public; Owner: stationapi
+--
+
+CREATE INDEX idx_16421_station_station_types_station_cd ON public.station_station_types USING btree (station_cd);
+
+
+--
+-- Name: idx_16421_station_station_types_type_cd; Type: INDEX; Schema: public; Owner: stationapi
+--
+
+CREATE INDEX idx_16421_station_station_types_type_cd ON public.station_station_types USING btree (type_cd);
+
+
+--
+-- Name: idx_16426_stations_e_sort_station_cd; Type: INDEX; Schema: public; Owner: stationapi
+--
+
+CREATE INDEX idx_16426_stations_e_sort_station_cd ON public.stations USING btree (e_sort, station_cd);
+
+
+--
+-- Name: idx_16426_stations_lat_lon; Type: INDEX; Schema: public; Owner: stationapi
+--
+
+CREATE INDEX idx_16426_stations_lat_lon ON public.stations USING btree (lat, lon);
+
+
+--
+-- Name: idx_16426_stations_line_cd; Type: INDEX; Schema: public; Owner: stationapi
+--
+
+CREATE INDEX idx_16426_stations_line_cd ON public.stations USING btree (line_cd);
+
+
+--
+-- Name: idx_16426_stations_station_g_cd; Type: INDEX; Schema: public; Owner: stationapi
+--
+
+CREATE INDEX idx_16426_stations_station_g_cd ON public.stations USING btree (station_g_cd);
+
+
+--
+-- Name: idx_16432_types_type_cd; Type: INDEX; Schema: public; Owner: stationapi
+--
+
+CREATE UNIQUE INDEX idx_16432_types_type_cd ON public.types USING btree (type_cd);
+
+
+--
+-- Name: line_aliases line_aliases_alias_cd_fkey; Type: FK CONSTRAINT; Schema: public; Owner: stationapi
+--
+
+ALTER TABLE ONLY public.line_aliases
+    ADD CONSTRAINT line_aliases_alias_cd_fkey FOREIGN KEY (alias_cd) REFERENCES public.aliases(id);
+
+
+--
+-- Name: line_aliases line_aliases_station_cd_fkey; Type: FK CONSTRAINT; Schema: public; Owner: stationapi
+--
+
+ALTER TABLE ONLY public.line_aliases
+    ADD CONSTRAINT line_aliases_station_cd_fkey FOREIGN KEY (station_cd) REFERENCES public.stations(station_cd);
+
+
+--
+-- Name: lines lines_company_cd_fkey; Type: FK CONSTRAINT; Schema: public; Owner: stationapi
+--
+
+ALTER TABLE ONLY public.lines
+    ADD CONSTRAINT lines_company_cd_fkey FOREIGN KEY (company_cd) REFERENCES public.companies(company_cd);
+
+
+--
+-- Name: station_station_types station_station_types_station_cd_fkey; Type: FK CONSTRAINT; Schema: public; Owner: stationapi
+--
+
+ALTER TABLE ONLY public.station_station_types
+    ADD CONSTRAINT station_station_types_station_cd_fkey FOREIGN KEY (station_cd) REFERENCES public.stations(station_cd);
+
+
+--
+-- Name: station_station_types station_station_types_type_cd_fkey; Type: FK CONSTRAINT; Schema: public; Owner: stationapi
+--
+
+ALTER TABLE ONLY public.station_station_types
+    ADD CONSTRAINT station_station_types_type_cd_fkey FOREIGN KEY (type_cd) REFERENCES public.types(type_cd);
+
+
+--
+-- Name: stations stations_line_cd_fkey; Type: FK CONSTRAINT; Schema: public; Owner: stationapi
+--
+
+ALTER TABLE ONLY public.stations
+    ADD CONSTRAINT stations_line_cd_fkey FOREIGN KEY (line_cd) REFERENCES public.lines(line_cd);
+
+
+--
+-- PostgreSQL database dump complete
+--

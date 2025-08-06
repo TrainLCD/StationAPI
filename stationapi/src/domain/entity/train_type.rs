@@ -4,39 +4,39 @@ use super::line::Line;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct TrainType {
-    pub id: Option<i64>,
-    pub station_cd: Option<i64>,
-    pub type_cd: Option<i64>,
-    pub line_group_cd: Option<i64>,
-    pub pass: Option<i64>,
+    pub id: Option<i32>,
+    pub station_cd: Option<i32>,
+    pub type_cd: Option<i32>,
+    pub line_group_cd: Option<i32>,
+    pub pass: Option<i32>,
     pub type_name: String,
     pub type_name_k: String,
     pub type_name_r: Option<String>,
     pub type_name_zh: Option<String>,
     pub type_name_ko: Option<String>,
     pub color: String,
-    pub direction: Option<i64>,
+    pub direction: Option<i32>,
     pub line: Option<Box<Line>>,
     pub lines: Vec<Line>,
-    pub kind: Option<i64>,
+    pub kind: Option<i32>,
 }
 
 impl TrainType {
     #![allow(clippy::too_many_arguments)]
     pub fn new(
-        id: Option<i64>,
-        station_cd: Option<i64>,
-        type_cd: Option<i64>,
-        line_group_cd: Option<i64>,
-        pass: Option<i64>,
+        id: Option<i32>,
+        station_cd: Option<i32>,
+        type_cd: Option<i32>,
+        line_group_cd: Option<i32>,
+        pass: Option<i32>,
         type_name: String,
         type_name_k: String,
         type_name_r: Option<String>,
         type_name_zh: Option<String>,
         type_name_ko: Option<String>,
         color: String,
-        direction: Option<i64>,
-        kind: Option<i64>,
+        direction: Option<i32>,
+        kind: Option<i32>,
     ) -> Self {
         Self {
             id,
@@ -95,7 +95,7 @@ mod tests {
             Some(1001),                        // line_group_cd
             Some(11302),                       // station_cd
             Some(1130201),                     // station_g_cd
-            0.97,                              // average_distance
+            Some(0.97),                        // average_distance
             None,                              // type_cd
         )
     }
@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn test_train_type_debug() {
         let train_type = create_test_train_type();
-        let debug_string = format!("{:?}", train_type);
+        let debug_string = format!("{train_type:?}");
 
         assert!(debug_string.contains("TrainType"));
         assert!(debug_string.contains("快速"));
@@ -257,7 +257,7 @@ mod tests {
     fn test_train_type_field_types() {
         let train_type = create_test_train_type();
 
-        // Option<i64>フィールドのテスト
+        // Option<i32>フィールドのテスト
         assert!(train_type.id.is_some());
         assert!(train_type.station_cd.is_some());
         assert!(train_type.type_cd.is_some());
@@ -329,8 +329,8 @@ mod tests {
     fn test_train_type_edge_cases() {
         // 極値のテスト
         let train_type = TrainType::new(
-            Some(i64::MAX),
-            Some(i64::MIN),
+            Some(i32::MAX),
+            Some(i32::MIN),
             Some(0),
             Some(-1),
             Some(999999),
@@ -340,13 +340,13 @@ mod tests {
             None,
             None,
             "#FFFFFF".to_string(),
-            Some(i64::MAX),
-            Some(i64::MIN),
+            Some(i32::MAX),
+            Some(i32::MIN),
         );
 
-        assert_eq!(train_type.id, Some(i64::MAX));
-        assert_eq!(train_type.station_cd, Some(i64::MIN));
-        assert_eq!(train_type.direction, Some(i64::MAX));
-        assert_eq!(train_type.kind, Some(i64::MIN));
+        assert_eq!(train_type.id, Some(i32::MAX));
+        assert_eq!(train_type.station_cd, Some(i32::MIN));
+        assert_eq!(train_type.direction, Some(i32::MAX));
+        assert_eq!(train_type.kind, Some(i32::MIN));
     }
 }

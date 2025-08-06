@@ -5,5 +5,3 @@ Dockerfile
 .gitignore
 .env
 .env.local
-libsqlitefunctions.so
-db.db*

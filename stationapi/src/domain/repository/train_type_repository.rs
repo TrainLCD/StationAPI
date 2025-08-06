@@ -35,7 +35,7 @@ mod tests {
 
     // モック実装
     pub struct MockTrainTypeRepository {
-        train_types: HashMap<i64, TrainType>,
+        train_types: HashMap<i32, TrainType>,
     }
 
     impl MockTrainTypeRepository {
@@ -106,7 +106,7 @@ mod tests {
             let result: Vec<TrainType> = self
                 .train_types
                 .values()
-                .filter(|train_type| train_type.line_group_cd == Some(line_group_id as i64))
+                .filter(|train_type| train_type.line_group_cd == Some(line_group_id as i32))
                 .cloned()
                 .collect();
             Ok(result)
@@ -116,7 +116,7 @@ mod tests {
             let result: Vec<TrainType> = self
                 .train_types
                 .values()
-                .filter(|train_type| train_type.station_cd == Some(station_id as i64))
+                .filter(|train_type| train_type.station_cd == Some(station_id as i32))
                 .cloned()
                 .collect();
             Ok(result)
@@ -131,8 +131,8 @@ mod tests {
                 .train_types
                 .values()
                 .find(|train_type| {
-                    train_type.line_group_cd == Some(line_group_id as i64)
-                        && train_type.type_cd == Some(line_id as i64)
+                    train_type.line_group_cd == Some(line_group_id as i32)
+                        && train_type.type_cd == Some(line_id as i32)
                 })
                 .cloned();
             Ok(result)
@@ -153,7 +153,7 @@ mod tests {
                         .unwrap_or(false);
 
                     let line_group_match = match line_group_id {
-                        Some(group_id) => train_type.line_group_cd == Some(group_id as i64),
+                        Some(group_id) => train_type.line_group_cd == Some(group_id as i32),
                         None => true,
                     };
 
@@ -195,16 +195,17 @@ mod tests {
 
     // テスト用のTrainType作成ヘルパー関数
     fn create_test_train_type(
-        id: i64,
-        station_cd: i64,
-        type_cd: i64,
-        line_group_cd: i64,
+        id: i32,
+        station_cd: i32,
+        type_cd: i32,
+        line_group_cd: i32,
         type_name: &str,
         type_name_k: &str,
         type_name_r: Option<&str>,
         color: &str,
-        kind: i64,
+        kind: i32,
     ) -> TrainType {
+        #![allow(clippy::too_many_arguments)]
         TrainType::new(
             Some(id),
             Some(station_cd),
@@ -214,8 +215,8 @@ mod tests {
             type_name.to_string(),
             type_name_k.to_string(),
             type_name_r.map(|s| s.to_string()),
-            Some(format!("{}_zh", type_name)),
-            Some(format!("{}_ko", type_name)),
+            Some(format!("{type_name}_zh")),
+            Some(format!("{type_name}_ko")),
             color.to_string(),
             Some(0),
             Some(kind),
