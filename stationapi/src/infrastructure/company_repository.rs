@@ -73,7 +73,7 @@ impl InternalCompanyRepository {
 
         let params: Vec<String> = (1..=id_vec.len()).map(|i| format!("${i}")).collect();
         let params_str = params.join(", ");
-        let query_str = format!("SELECT * FROM companies WHERE company_cd IN ( {params_str} )");
+        let query_str = format!("SELECT company_cd, rr_cd, company_name, company_name_k, company_name_h, company_name_r, company_name_en, company_name_full_en, company_url, company_type, e_status, e_sort FROM companies WHERE company_cd IN ( {params_str} )");
 
         let mut query = sqlx::query_as::<_, CompanyRow>(&query_str);
         for id in id_vec {

@@ -1220,7 +1220,11 @@ impl InternalStationRepository {
                 ),
                 sst_cte AS (
                     SELECT
-                        sst.*
+                        sst.id,
+                        sst.station_cd,
+                        sst.type_cd,
+                        sst.line_group_cd,
+                        sst.pass
                     FROM
                         station_station_types AS sst
                         JOIN sst_cte_c1 ON sst.line_group_cd = sst_cte_c1.line_group_cd
@@ -1349,7 +1353,11 @@ impl InternalStationRepository {
                 ),
                 sst_cte AS (
                     SELECT
-                        sst.*
+                        sst.id,
+                        sst.station_cd,
+                        sst.type_cd,
+                        sst.line_group_cd,
+                        sst.pass
                     FROM
                         station_station_types AS sst
                         JOIN sst_cte_c1 ON sst.line_group_cd = sst_cte_c1.line_group_cd
