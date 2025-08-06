@@ -650,13 +650,12 @@ impl InternalStationRepository {
                           sst.line_group_cd,
                           sst.pass
                           FROM stations AS s
-                          JOIN station_station_types AS sst ON sst.line_group_cd = (SELECT line_group_cd FROM target_line_group)
+                          JOIN station_station_types AS sst ON sst.line_group_cd = (SELECT line_group_cd FROM target_line_group) AND sst.station_cd = s.station_cd
                           JOIN types AS t ON t.type_cd = sst.type_cd
                           JOIN lines AS l ON l.line_cd = s.line_cd
                           LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
                           LEFT JOIN aliases AS a ON a.id = la.alias_cd
-                          WHERE sst.station_cd = s.station_cd
-                            AND s.e_status = 0
+                          WHERE s.e_status = 0
                             AND l.e_status = 0
                           ORDER BY sst.id"#,
                         station_id as i32
