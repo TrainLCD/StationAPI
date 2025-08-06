@@ -1607,7 +1607,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sql_query_generation_with_order() {
-        let ids = vec![1, 2, 3];
+        let ids = [1, 2, 3];
         let params = (1..=ids.len())
             .map(|i| format!("${i}"))
             .collect::<Vec<_>>()
