@@ -391,7 +391,6 @@ impl InternalTrainTypeRepository {
             FROM 
             types as t
             JOIN station_station_types AS sst ON sst.line_group_cd IN ( {params} ) AND sst.pass <> 1 AND sst.type_cd = t.type_cd
-            JOIN stations AS s ON s.station_cd = sst.station_cd
             WHERE sst.pass <> 1 AND sst.type_cd = t.type_cd
             ORDER BY sst.id"
         );
