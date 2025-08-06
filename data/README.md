@@ -94,10 +94,10 @@
 | `station_name_rn`   | 文字列 | -    | 駅名（ローマ字、正規化版）                  | `Tokyo`                         |
 | `station_name_zh`   | 文字列 | -    | 駅名（中国語）                              | `东京`                          |
 | `station_name_ko`   | 文字列 | -    | 駅名（韓国語）                              | `도쿄`                          |
-| `station_number1`   | 文字列 | -    | 駅番号・駅記号 1                            | `JR01`, `T01`                   |
-| `station_number2`   | 文字列 | -    | 駅番号・駅記号 2                            | -                               |
-| `station_number3`   | 文字列 | -    | 駅番号・駅記号 3                            | -                               |
-| `station_number4`   | 文字列 | -    | 駅番号・駅記号 4                            | -                               |
+| `station_number1`   | 文字列 | -    | 駅番号・駅記号 1                            | `01`                            |
+| `station_number2`   | 文字列 | -    | 駅番号・駅記号 2                            | `09`                            |
+| `station_number3`   | 文字列 | -    | 駅番号・駅記号 3                            | `11`                            |
+| `station_number4`   | 文字列 | -    | 駅番号・駅記号 4                            | `14`                            |
 | `three_letter_code` | 文字列 | -    | スリーレターコード                          | `TYO`                           |
 | `line_cd`           | 数値   | ✓    | 路線コード（lines テーブルとリンク）        | `1002`                          |
 | `pref_cd`           | 数値   | ✓    | 都道府県コード                              | `13`                            |
