@@ -12,7 +12,7 @@ use crate::{
 
 #[derive(sqlx::FromRow)]
 struct TrainTypesCountRow {
-    train_types_count: Option<i64>,
+    train_types_count: Option<i32>,
 }
 
 #[derive(sqlx::FromRow, Clone)]
@@ -265,7 +265,7 @@ impl InternalStationRepository {
     ) -> Result<bool, DomainError> {
         let row: TrainTypesCountRow = sqlx::query_as!(
             TrainTypesCountRow,
-            "SELECT COUNT(sst.line_group_cd) AS train_types_count
+            "SELECT COUNT(sst.line_group_cd)::integer AS train_types_count
             FROM station_station_types AS sst
                 JOIN types AS t ON t.type_cd = sst.type_cd
             WHERE sst.station_cd = $1
