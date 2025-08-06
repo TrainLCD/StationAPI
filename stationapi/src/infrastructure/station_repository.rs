@@ -558,10 +558,13 @@ impl InternalStationRepository {
         station_id: u32,
         conn: &mut PgConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let stations: Vec<Station> =
-            match Self::fetch_has_local_train_types_by_station_id(station_id, conn).await? {
-                true => {
-                    let rows = sqlx::query_as!(
+        let stations: Vec<Station> = match Self::fetch_has_local_train_types_by_station_id(
+            station_id, conn,
+        )
+        .await?
+        {
+            true => {
+                let rows = sqlx::query_as!(
                         StationRow,
                         r#"SELECT s.station_cd,
                           s.station_g_cd,
@@ -646,10 +649,10 @@ impl InternalStationRepository {
                     )
                     .fetch_all(conn)
                     .await?;
-                    rows.into_iter().map(|row| row.into()).collect()
-                }
-                false => Self::get_by_line_id_without_train_types(line_id, conn).await?,
-            };
+                rows.into_iter().map(|row| row.into()).collect()
+            }
+            false => Self::get_by_line_id_without_train_types(line_id, conn).await?,
+        };
 
         Ok(stations)
     }
@@ -842,7 +845,6 @@ impl InternalStationRepository {
         limit: Option<u32>,
         conn: &mut PgConnection,
     ) -> Result<Vec<Station>, DomainError> {
-    
         let rows = sqlx::query_as::<_, StationRow>(
             r#"SELECT
                 s.station_cd,
@@ -1489,7 +1491,7 @@ mod tests {
             type_name_ko: None,
             color: Some("#008000".to_string()),
             direction: Some(0),
-            kind: Some(0)
+            kind: Some(0),
         };
 
         let station: Station = station_row.into();

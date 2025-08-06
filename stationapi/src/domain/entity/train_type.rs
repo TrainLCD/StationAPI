@@ -95,7 +95,7 @@ mod tests {
             Some(1001),                        // line_group_cd
             Some(11302),                       // station_cd
             Some(1130201),                     // station_g_cd
-            Some(0.97),                            // average_distance
+            Some(0.97),                        // average_distance
             None,                              // type_cd
         )
     }
