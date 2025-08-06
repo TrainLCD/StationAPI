@@ -213,7 +213,7 @@ impl InternalLineRepository {
         let station_id = station_id as i32;
         let rows: Option<LineRow> = sqlx::query_as!(
             LineRow,
-            "SELECT DISTINCT l.line_cd,
+            "SELECT l.line_cd,
             l.company_cd,
             l.line_type,
             l.line_symbol1,
@@ -235,18 +235,31 @@ impl InternalLineRepository {
             s.station_g_cd,
             sst.line_group_cd,
             sst.type_cd,
-            COALESCE(a.line_name, l.line_name) AS line_name,
-            COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
+            COALESCE(alias_data.line_name, l.line_name) AS line_name,
+            COALESCE(alias_data.line_name_k, l.line_name_k) AS line_name_k,
+            COALESCE(alias_data.line_name_h, l.line_name_h) AS line_name_h,
+            COALESCE(alias_data.line_name_r, l.line_name_r) AS line_name_r,
+            COALESCE(alias_data.line_name_zh, l.line_name_zh) AS line_name_zh,
+            COALESCE(alias_data.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(alias_data.line_color_c, l.line_color_c) AS line_color_c
         FROM lines AS l
             JOIN stations AS s ON s.station_cd = $1
             JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1
-            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
-            LEFT JOIN aliases AS a ON la.alias_cd = a.id
+            LEFT JOIN (
+                SELECT DISTINCT ON (la.station_cd) 
+                    la.station_cd,
+                    a.line_name,
+                    a.line_name_k,
+                    a.line_name_h,
+                    a.line_name_r,
+                    a.line_name_zh,
+                    a.line_name_ko,
+                    a.line_color_c
+                FROM line_aliases AS la
+                JOIN aliases AS a ON la.alias_cd = a.id
+                WHERE la.station_cd = $1
+                LIMIT 1
+            ) AS alias_data ON alias_data.station_cd = s.station_cd
         WHERE l.line_cd = s.line_cd",
             station_id,
         )
