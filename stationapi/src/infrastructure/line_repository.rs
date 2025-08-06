@@ -32,7 +32,6 @@ pub struct LineRow {
     pub line_symbol4_shape: Option<String>,
     pub e_status: i32,
     pub e_sort: i32,
-    #[sqlx(default)]
     pub average_distance: Option<f64>,
     pub line_group_cd: Option<i32>,
     pub station_cd: Option<i32>,
@@ -74,7 +73,7 @@ impl From<LineRow> for Line {
             line_group_cd: row.line_group_cd,
             station_cd: row.station_cd,
             station_g_cd: row.station_g_cd,
-            average_distance: row.average_distance.unwrap_or(0.0),
+            average_distance: row.average_distance,
             type_cd: row.type_cd,
         }
     }

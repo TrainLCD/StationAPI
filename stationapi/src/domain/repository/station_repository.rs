@@ -270,7 +270,7 @@ mod tests {
             None,
             None,
             Some(1000),
-            5.5,
+            Some(5.5),
             Some(0),
             Some(1),
             Some(1),

@@ -57,7 +57,7 @@ pub struct Station {
     pub line_symbol2_shape: Option<String>,
     pub line_symbol3_shape: Option<String>,
     pub line_symbol4_shape: Option<String>,
-    pub average_distance: f64,
+    pub average_distance: Option<f64>,
     // station_station_typesからJOIN
     pub type_id: Option<i32>,
     pub sst_id: Option<i32>,
@@ -129,7 +129,7 @@ impl Station {
         line_symbol3_shape: Option<String>,
         line_symbol4_shape: Option<String>,
         line_group_cd: Option<i32>,
-        average_distance: f64,
+        average_distance: Option<f64>,
         pass: Option<i32>,
         type_id: Option<i32>,
         sst_id: Option<i32>,
@@ -259,7 +259,7 @@ mod tests {
             Some(1001),                        // line_group_cd
             Some(11302),                       // station_cd
             Some(1130201),                     // station_g_cd
-            0.97,                              // average_distance
+            Some(0.97),                            // average_distance
             None,                              // type_cd
         )
     }
@@ -335,7 +335,7 @@ mod tests {
             None,                                     // line_symbol3_shape
             None,                                     // line_symbol4_shape
             Some(1001),                               // line_group_cd
-            0.97,                                     // average_distance
+            Some(0.97),                               // average_distance
             Some(0),                                  // pass
             Some(1),                                  // type_id
             Some(1),                                  // sst_id
@@ -404,7 +404,7 @@ mod tests {
             None,                     // line_symbol3_shape
             None,                     // line_symbol4_shape
             None,                     // line_group_cd
-            0.0,                      // average_distance
+            None,                     // average_distance
             None,                     // pass
             None,                     // type_id
             None,                     // sst_id

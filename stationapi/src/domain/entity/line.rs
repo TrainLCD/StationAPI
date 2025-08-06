@@ -30,7 +30,7 @@ pub struct Line {
     pub line_symbol4_shape: Option<String>,
     pub e_status: i32,
     pub e_sort: i32,
-    pub average_distance: f64,
+    pub average_distance: Option<f64>,
     pub station: Option<Station>,
     pub train_type: Option<TrainType>,
     pub line_group_cd: Option<i32>,
@@ -73,7 +73,7 @@ impl Line {
         line_group_cd: Option<i32>,
         station_cd: Option<i32>,
         station_g_cd: Option<i32>,
-        average_distance: f64,
+        average_distance: Option<f64>,
         type_cd: Option<i32>,
     ) -> Self {
         Self {
@@ -176,7 +176,7 @@ mod tests {
             Some(1001),                        // line_group_cd
             Some(11302),                       // station_cd
             Some(1130201),                     // station_g_cd
-            0.97,                              // average_distance
+            Some(0.97),                        // average_distance
             Some(1),                           // type_cd
         )
     }
@@ -214,7 +214,7 @@ mod tests {
             None,                       // line_group_cd
             None,                       // station_cd
             None,                       // station_g_cd
-            0.0,                        // average_distance
+            None,                       // average_distance
             None,                       // type_cd
         )
     }
@@ -240,7 +240,7 @@ mod tests {
         assert_eq!(line.line_symbol1_shape, Some("square".to_string()));
         assert_eq!(line.e_status, 1);
         assert_eq!(line.e_sort, 1130201);
-        assert_eq!(line.average_distance, 0.97);
+        assert_eq!(line.average_distance, Some(0.97));
         assert_eq!(line.line_group_cd, Some(1001));
         assert_eq!(line.station_cd, Some(11302));
         assert_eq!(line.station_g_cd, Some(1130201));
@@ -275,7 +275,7 @@ mod tests {
         assert_eq!(line.line_symbol2_shape, None);
         assert_eq!(line.line_symbol3_shape, None);
         assert_eq!(line.line_symbol4_shape, None);
-        assert_eq!(line.average_distance, 0.0);
+        assert_eq!(line.average_distance, None);
         assert_eq!(line.line_group_cd, None);
         assert_eq!(line.station_cd, None);
         assert_eq!(line.station_g_cd, None);
@@ -401,7 +401,7 @@ mod tests {
             None,
             None,
             None,
-            0.97,
+            Some(0.97),
             Some(2),
         );
 
@@ -446,7 +446,7 @@ mod tests {
         let _: Option<String> = line.line_symbol4_shape;
         let _: i32 = line.e_status;
         let _: i32 = line.e_sort;
-        let _: f64 = line.average_distance;
+        let _: Option<f64> = line.average_distance;
         let _: Option<Station> = line.station;
         let _: Option<TrainType> = line.train_type;
         let _: Option<i32> = line.line_group_cd;
@@ -489,7 +489,7 @@ mod tests {
             None,
             None,
             None,
-            515.4,
+            Some(515.4),
             Some(7),
         );
 
@@ -536,7 +536,7 @@ mod tests {
             Some(0),
             Some(0),
             Some(0),
-            0.0,
+            Some(0.0),
             Some(0),
         );
 
@@ -584,7 +584,7 @@ mod tests {
             Some(-1),
             Some(-1),
             Some(-1),
-            -1.0,
+            Some(-1.0),
             Some(-1),
         );
 
@@ -593,7 +593,7 @@ mod tests {
         assert_eq!(line.line_type, Some(-1));
         assert_eq!(line.e_status, -1);
         assert_eq!(line.e_sort, -1);
-        assert_eq!(line.average_distance, -1.0);
+        assert_eq!(line.average_distance, Some(-1.0));
         assert_eq!(line.line_group_cd, Some(-1));
         assert_eq!(line.station_cd, Some(-1));
         assert_eq!(line.station_g_cd, Some(-1));
@@ -645,7 +645,7 @@ mod tests {
                 None,
                 None,
                 None,
-                1.0,
+                Some(1.0),
                 type_cd,
             );
 
@@ -688,7 +688,7 @@ mod tests {
             Some(9999),
             Some(8888),
             Some(7777),
-            123.45,
+            Some(123.45),
             Some(99),
         );
 
@@ -758,7 +758,7 @@ mod tests {
             None,
             None,
             None,
-            1.0,
+            Some(1.0),
             Some(42),
         );
 
