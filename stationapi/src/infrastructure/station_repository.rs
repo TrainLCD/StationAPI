@@ -566,7 +566,19 @@ impl InternalStationRepository {
             true => {
                 let rows = sqlx::query_as!(
                         StationRow,
-                        r#"SELECT s.station_cd,
+                        r#"WITH target_line_group AS (
+                            SELECT sst_inner.line_group_cd
+                            FROM station_station_types AS sst_inner
+                              LEFT JOIN types AS t_inner ON sst_inner.type_cd = t_inner.type_cd
+                            WHERE sst_inner.station_cd = $1
+                            AND (
+                                (t_inner.priority > 0 AND sst_inner.pass <> 1 AND sst_inner.type_cd = t_inner.type_cd)
+                                OR (NOT (t_inner.priority > 0 AND sst_inner.pass <> 1) AND t_inner.kind IN (0,1))
+                              )
+                            ORDER BY t_inner.priority DESC
+                            LIMIT 1
+                          )
+                          SELECT s.station_cd,
                           s.station_g_cd,
                           s.station_name,
                           s.station_name_k,
@@ -625,18 +637,7 @@ impl InternalStationRepository {
                           sst.line_group_cd,
                           sst.pass
                           FROM stations AS s
-                          JOIN station_station_types AS sst ON sst.line_group_cd = (
-                            SELECT sst.line_group_cd
-                            FROM station_station_types AS sst
-                              LEFT JOIN types AS t ON sst.type_cd = t.type_cd
-                            WHERE sst.station_cd = $1
-                            AND (
-                                (t.priority > 0 AND sst.pass <> 1 AND sst.type_cd = t.type_cd)
-                                OR (NOT (t.priority > 0 AND sst.pass <> 1) AND t.kind IN (0,1))
-                              )
-                            ORDER BY t.priority DESC
-                            LIMIT 1
-                          )
+                          JOIN station_station_types AS sst ON sst.line_group_cd = (SELECT line_group_cd FROM target_line_group)
                           JOIN types AS t ON t.type_cd = sst.type_cd
                           JOIN lines AS l ON l.line_cd = s.line_cd
                           LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
