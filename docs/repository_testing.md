@@ -65,7 +65,7 @@ make test-all
 
 ### 環境変数
 
-```
+```bash
 TEST_DATABASE_URL=postgres://test:test@localhost/stationapi_test
 ```
 
