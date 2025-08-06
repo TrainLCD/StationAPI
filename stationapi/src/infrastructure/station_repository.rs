@@ -1404,14 +1404,12 @@ impl InternalStationRepository {
             FROM
                 stations AS sta
                 LEFT JOIN sst_cte AS sst ON sst.station_cd = sta.station_cd
-                LEFT JOIN types AS tt ON tt.type_cd = sst.type_cd
-                JOIN lines AS lin ON lin.line_cd = sta.line_cd
+                JOIN types AS tt ON tt.type_cd = sst.type_cd
+                JOIN lines AS lin ON lin.line_cd = sta.line_cd AND lin.e_status = 0
                 LEFT JOIN line_aliases AS la ON la.station_cd = sta.station_cd
                 LEFT JOIN aliases AS a ON a.id = la.alias_cd
             WHERE
-                sta.station_cd = sst.station_cd
-                AND lin.e_status = 0
-                AND sta.e_status = 0
+                sta.e_status = 0
             ORDER BY sst.id"#,
             from_station_id as i32,
             to_station_id as i32,
