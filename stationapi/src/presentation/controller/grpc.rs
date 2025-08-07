@@ -38,8 +38,7 @@ impl StationApi for MyApi {
             Ok(Some(station)) => station,
             Ok(None) => {
                 return Err(PresentationalError::NotFound(format!(
-                    "Station with id {} not found",
-                    station_id
+                    "Station with id {station_id} not found"
                 ))
                 .into())
             }
@@ -142,7 +141,7 @@ impl StationApi for MyApi {
         match self
             .query_use_case
             .get_stations_by_name(
-                query_station_name.clone(),
+                query_station_name.to_string(),
                 query_limit,
                 from_station_group_id,
             )
@@ -243,8 +242,7 @@ impl StationApi for MyApi {
             Ok(Some(line)) => line,
             Ok(None) => {
                 return Err(PresentationalError::NotFound(format!(
-                    "Line with id {} not found",
-                    line_id
+                    "Line with id {line_id} not found"
                 ))
                 .into())
             }
@@ -268,7 +266,7 @@ impl StationApi for MyApi {
 
         match self
             .query_use_case
-            .get_lines_by_name(line_name.clone(), limit)
+            .get_lines_by_name(line_name.to_string(), limit)
             .await
         {
             Ok(lines) => {

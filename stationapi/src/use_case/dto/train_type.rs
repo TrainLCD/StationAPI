@@ -31,8 +31,8 @@ impl From<TrainType> for GrpcTrainType {
             color,
             line: line.map(|line| Box::new((*line).into())),
             lines: lines.into_iter().map(|line| line.into()).collect(),
-            direction: direction.map(|direction| direction as i32).unwrap_or(0),
-            kind: kind.map(|kind| kind as i32).unwrap_or(0),
+            direction: direction.unwrap_or(0),
+            kind: kind.unwrap_or(0),
         }
     }
 }

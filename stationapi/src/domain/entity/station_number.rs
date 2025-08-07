@@ -97,7 +97,7 @@ mod tests {
             "01".to_string(),
         );
 
-        let debug_string = format!("{:?}", station_number);
+        let debug_string = format!("{station_number:?}");
         assert!(debug_string.contains("StationNumber"));
         assert!(debug_string.contains("JY"));
         assert!(debug_string.contains("#00a650"));

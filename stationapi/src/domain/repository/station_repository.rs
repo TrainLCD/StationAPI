@@ -93,7 +93,7 @@ mod tests {
             let result: Vec<Station> = self
                 .stations
                 .values()
-                .filter(|station| station.line_cd == line_id as i64)
+                .filter(|station| station.line_cd == line_id as i32)
                 .cloned()
                 .collect();
             Ok(result)
@@ -106,7 +106,7 @@ mod tests {
             let result: Vec<Station> = self
                 .stations
                 .values()
-                .filter(|station| station.station_g_cd == station_group_id as i64)
+                .filter(|station| station.station_g_cd == station_group_id as i32)
                 .cloned()
                 .collect();
             Ok(result)
@@ -182,7 +182,7 @@ mod tests {
             let result: Vec<Station> = self
                 .stations
                 .values()
-                .filter(|station| station.line_group_cd == Some(line_group_id as i64))
+                .filter(|station| station.line_group_cd == Some(line_group_id as i32))
                 .cloned()
                 .collect();
             Ok(result)
@@ -212,9 +212,9 @@ mod tests {
 
     // テスト用のStation作成ヘルパー関数
     fn create_test_station(
-        station_cd: i64,
+        station_cd: i32,
         station_name: &str,
-        line_cd: i64,
+        line_cd: i32,
         lat: f64,
         lon: f64,
     ) -> Station {
@@ -222,10 +222,10 @@ mod tests {
             station_cd,
             station_cd, // station_g_cd
             station_name.to_string(),
-            format!("{}_k", station_name),
-            Some(format!("{}_r", station_name)),
-            Some(format!("{}_zh", station_name)),
-            Some(format!("{}_ko", station_name)),
+            format!("{station_name}_k"),
+            Some(format!("{station_name}_r")),
+            Some(format!("{station_name}_zh")),
+            Some(format!("{station_name}_ko")),
             vec![],
             None,
             None,
@@ -270,7 +270,7 @@ mod tests {
             None,
             None,
             Some(1000),
-            5.5,
+            Some(5.5),
             Some(0),
             Some(1),
             Some(1),

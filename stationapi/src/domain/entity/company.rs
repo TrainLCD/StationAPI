@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Company {
-    pub company_cd: i64,
-    pub rr_cd: i64,
+    pub company_cd: i32,
+    pub rr_cd: i32,
     pub company_name: String,
     pub company_name_k: String,
     pub company_name_h: String,
@@ -11,16 +11,16 @@ pub struct Company {
     pub company_name_en: String,
     pub company_name_full_en: String,
     pub company_url: Option<String>,
-    pub company_type: i64,
-    pub e_status: i64,
-    pub e_sort: i64,
+    pub company_type: i32,
+    pub e_status: i32,
+    pub e_sort: i32,
 }
 
 impl Company {
     #![allow(clippy::too_many_arguments)]
     pub fn new(
-        company_cd: i64,
-        rr_cd: i64,
+        company_cd: i32,
+        rr_cd: i32,
         company_name: String,
         company_name_k: String,
         company_name_h: String,
@@ -28,9 +28,9 @@ impl Company {
         company_name_en: String,
         company_name_full_en: String,
         company_url: Option<String>,
-        company_type: i64,
-        e_status: i64,
-        e_sort: i64,
+        company_type: i32,
+        e_status: i32,
+        e_sort: i32,
     ) -> Self {
         Self {
             company_cd,
@@ -142,7 +142,7 @@ mod tests {
     #[test]
     fn test_company_debug() {
         let company = create_test_company();
-        let debug_string = format!("{:?}", company);
+        let debug_string = format!("{company:?}");
 
         assert!(debug_string.contains("Company"));
         assert!(debug_string.contains("company_cd: 1001"));
@@ -185,8 +185,8 @@ mod tests {
         let company = create_test_company();
 
         // 各フィールドの型が期待されるものであることを確認
-        let _: i64 = company.company_cd;
-        let _: i64 = company.rr_cd;
+        let _: i32 = company.company_cd;
+        let _: i32 = company.rr_cd;
         let _: String = company.company_name;
         let _: String = company.company_name_k;
         let _: String = company.company_name_h;
@@ -194,9 +194,9 @@ mod tests {
         let _: String = company.company_name_en;
         let _: String = company.company_name_full_en;
         let _: Option<String> = company.company_url;
-        let _: i64 = company.company_type;
-        let _: i64 = company.e_status;
-        let _: i64 = company.e_sort;
+        let _: i32 = company.company_type;
+        let _: i32 = company.e_status;
+        let _: i32 = company.e_sort;
     }
 
     #[test]

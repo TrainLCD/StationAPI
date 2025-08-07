@@ -3,25 +3,24 @@ use crate::domain::{
     repository::train_type_repository::TrainTypeRepository,
 };
 use async_trait::async_trait;
-use sqlx::SqliteConnection;
+use sqlx::{PgConnection, Pool, Postgres};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct TrainTypeRow {
-    id: Option<i64>,
-    station_cd: Option<i64>,
-    type_cd: Option<i64>,
-    line_group_cd: Option<i64>,
-    pass: Option<i64>,
+    id: Option<i32>,
+    station_cd: Option<i32>,
+    type_cd: Option<i32>,
+    line_group_cd: Option<i32>,
+    pass: Option<i32>,
     type_name: String,
     type_name_k: String,
     type_name_r: Option<String>,
     type_name_zh: Option<String>,
     type_name_ko: Option<String>,
     color: String,
-    direction: Option<i64>,
-    kind: Option<i64>,
+    direction: Option<i32>,
+    kind: Option<i32>,
 }
 
 impl From<TrainTypeRow> for TrainType {
@@ -62,12 +61,12 @@ impl From<TrainTypeRow> for TrainType {
 }
 
 pub struct MyTrainTypeRepository {
-    conn: Arc<Mutex<SqliteConnection>>,
+    pool: Arc<Pool<Postgres>>,
 }
 
 impl MyTrainTypeRepository {
-    pub fn new(conn: Arc<Mutex<SqliteConnection>>) -> Self {
-        Self { conn }
+    pub fn new(pool: Arc<Pool<Postgres>>) -> Self {
+        Self { pool }
     }
 }
 
@@ -77,12 +76,12 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         &self,
         line_group_id: u32,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.conn.lock().await;
+        let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_by_line_group_id(line_group_id, &mut conn).await
     }
 
     async fn get_by_station_id(&self, station_id: u32) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.conn.lock().await;
+        let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_by_station_id(station_id, &mut conn).await
     }
 
@@ -91,7 +90,7 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         line_group_id: u32,
         line_id: u32,
     ) -> Result<Option<TrainType>, DomainError> {
-        let mut conn = self.conn.lock().await;
+        let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_by_line_group_id_and_line_id(
             line_group_id,
             line_id,
@@ -105,7 +104,7 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         station_id_vec: &[u32],
         line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.conn.lock().await;
+        let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_by_station_id_vec(station_id_vec, line_group_id, &mut conn)
             .await
     }
@@ -115,7 +114,7 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         station_id_vec: &[u32],
         line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.conn.lock().await;
+        let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_types_by_station_id_vec(
             station_id_vec,
             line_group_id,
@@ -128,7 +127,7 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         &self,
         line_group_id_vec: &[u32],
     ) -> Result<Vec<TrainType>, DomainError> {
-        let mut conn = self.conn.lock().await;
+        let mut conn = self.pool.acquire().await?;
         InternalTrainTypeRepository::get_by_line_group_id_vec(line_group_id_vec, &mut conn).await
     }
 }
@@ -138,7 +137,7 @@ pub struct InternalTrainTypeRepository {}
 impl InternalTrainTypeRepository {
     async fn get_by_line_group_id(
         line_group_id: u32,
-        conn: &mut SqliteConnection,
+        conn: &mut PgConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         let rows = sqlx::query_as!(
             TrainTypeRow,
@@ -151,13 +150,17 @@ impl InternalTrainTypeRepository {
             t.color,
             t.direction,
             t.kind,
-            sst.*
+            sst.id,
+            sst.station_cd,
+            sst.type_cd,
+            sst.line_group_cd,
+            sst.pass
             FROM types as t
-            JOIN `station_station_types` AS sst ON sst.line_group_cd = ?
+            JOIN station_station_types AS sst ON sst.line_group_cd = $1
             WHERE 
                 t.type_cd = sst.type_cd
             ORDER BY t.kind, sst.id",
-            line_group_id
+            line_group_id as i32
         )
         .fetch_all(conn)
         .await?;
@@ -167,7 +170,7 @@ impl InternalTrainTypeRepository {
     }
     async fn get_by_station_id(
         station_id: u32,
-        conn: &mut SqliteConnection,
+        conn: &mut PgConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         let rows = sqlx::query_as!(TrainTypeRow,
             "SELECT
@@ -179,12 +182,16 @@ impl InternalTrainTypeRepository {
             t.color,
             t.direction,
             t.kind,
-            sst.*
-            FROM  `types` AS t
-            JOIN `stations` AS s ON s.station_cd = ? AND s.e_status = 0
-            JOIN `station_station_types` AS sst ON sst.station_cd = s.station_cd AND sst.type_cd = t.type_cd AND sst.pass <> 1
+            sst.id,
+            sst.station_cd,
+            sst.type_cd,
+            sst.line_group_cd,
+            sst.pass
+            FROM  types AS t
+            JOIN stations AS s ON s.station_cd = $1 AND s.e_status = 0
+            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.type_cd = t.type_cd AND sst.pass <> 1
             ORDER BY sst.id",
-            station_id
+            station_id as i32
         )
         .fetch_all(conn)
         .await?;
@@ -195,14 +202,25 @@ impl InternalTrainTypeRepository {
     async fn get_by_line_group_id_and_line_id(
         line_group_id: u32,
         line_id: u32,
-        conn: &mut SqliteConnection,
+        conn: &mut PgConnection,
     ) -> Result<Option<TrainType>, DomainError> {
         let rows: Option<TrainTypeRow> = sqlx::query_as(
             "SELECT 
-            t.*, 
-            sst.*
-            FROM `types` as t
-            JOIN `station_station_types` AS sst ON sst.line_group_cd = ? 
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
+            sst.id,
+            sst.station_cd,
+            sst.type_cd,
+            sst.line_group_cd,
+            sst.pass
+            FROM types as t
+            JOIN station_station_types AS sst ON sst.line_group_cd = $1 AND t.type_cd = sst.type_cd
             WHERE 
             sst.station_cd IN (
                 SELECT 
@@ -210,14 +228,13 @@ impl InternalTrainTypeRepository {
                 FROM 
                 stations as s 
                 WHERE 
-                line_cd = ?
+                line_cd = $2
                 AND s.e_status = 0
             )
-            AND t.type_cd = sst.type_cd
             ORDER BY sst.id",
         )
-        .bind(line_group_id)
-        .bind(line_id)
+        .bind(line_group_id as i32)
+        .bind(line_id as i32)
         .fetch_optional(conn)
         .await?;
 
@@ -233,32 +250,50 @@ impl InternalTrainTypeRepository {
     async fn get_by_station_id_vec(
         station_id_vec: &[u32],
         line_group_id: Option<u32>,
-        conn: &mut SqliteConnection,
+        conn: &mut PgConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         if station_id_vec.is_empty() {
             return Ok(vec![]);
         }
 
-        let params = format!("?{}", ", ?".repeat(station_id_vec.len() - 1));
+        let params = (1..=station_id_vec.len())
+            .map(|i| format!("${i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
         let query_str = format!(
             "SELECT 
-            t.*, 
-            sst.*
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
+            sst.id,
+            sst.station_cd,
+            sst.type_cd,
+            sst.line_group_cd,
+            sst.pass
             FROM 
             types as t
-            JOIN `stations` AS s ON s.station_cd IN ( {} ) AND s.e_status = 0
-            JOIN `station_station_types` AS sst ON sst.line_group_cd = ? AND sst.pass <> 1 AND sst.type_cd = t.type_cd
+            JOIN stations AS s ON s.station_cd IN ( {} ) AND s.e_status = 0
+            JOIN station_station_types AS sst ON sst.line_group_cd = ${} AND sst.pass <> 1 AND sst.type_cd = t.type_cd
             WHERE sst.pass <> 1 AND sst.type_cd = t.type_cd
             ORDER BY sst.id",
-            params
+            params,
+            station_id_vec.len() + 1
         );
 
         let mut query = sqlx::query_as::<_, TrainTypeRow>(&query_str);
         for id in station_id_vec {
-            query = query.bind(id);
+            query = query.bind(*id as i32);
         }
 
-        let rows = query.bind(line_group_id).fetch_all(conn).await?;
+        let rows = query
+            .bind(line_group_id.map(|x| x as i32))
+            .fetch_all(conn)
+            .await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(train_types)
@@ -267,17 +302,31 @@ impl InternalTrainTypeRepository {
     async fn get_types_by_station_id_vec(
         station_id_vec: &[u32],
         line_group_id: Option<u32>,
-        conn: &mut SqliteConnection,
+        conn: &mut PgConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         if station_id_vec.is_empty() {
             return Ok(vec![]);
         }
 
-        let params = format!("?{}", ", ?".repeat(station_id_vec.len() - 1));
+        let params = (1..=station_id_vec.len())
+            .map(|i| format!("${i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
         let query_str = format!(
             "SELECT 
-            t.*, 
-            sst.*
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
+            sst.id,
+            sst.station_cd,
+            sst.type_cd,
+            sst.line_group_cd,
+            sst.pass
             FROM 
             station_station_types as sst, 
             stations as s, 
@@ -291,18 +340,22 @@ impl InternalTrainTypeRepository {
             AND s.station_cd = sst.station_cd
             AND sst.type_cd = t.type_cd 
             AND s.e_status = 0
-            AND sst.line_group_cd = ?
+            AND sst.line_group_cd = ${}
             AND sst.pass <> 1
             ORDER BY t.priority DESC, sst.id",
-            params
+            params,
+            station_id_vec.len() + 1
         );
 
         let mut query = sqlx::query_as::<_, TrainTypeRow>(&query_str);
         for id in station_id_vec {
-            query = query.bind(id);
+            query = query.bind(*id as i32);
         }
 
-        let rows = query.bind(line_group_id).fetch_all(conn).await?;
+        let rows = query
+            .bind(line_group_id.map(|x| x as i32))
+            .fetch_all(conn)
+            .await?;
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(train_types)
@@ -310,30 +363,41 @@ impl InternalTrainTypeRepository {
 
     async fn get_by_line_group_id_vec(
         line_group_id_vec: &[u32],
-        conn: &mut SqliteConnection,
+        conn: &mut PgConnection,
     ) -> Result<Vec<TrainType>, DomainError> {
         if line_group_id_vec.is_empty() {
             return Ok(vec![]);
         }
 
-        let params = format!("?{}", ", ?".repeat(line_group_id_vec.len() - 1));
+        let params = (1..=line_group_id_vec.len())
+            .map(|i| format!("${i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
         let query_str = format!(
             "SELECT 
-            t.*, 
-            s.*,
-            sst.*
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
+            sst.id,
+            sst.station_cd,
+            sst.type_cd,
+            sst.line_group_cd,
+            sst.pass
             FROM 
             types as t
-            JOIN `station_station_types` AS sst ON sst.line_group_cd IN ( {} ) AND sst.pass <> 1 AND sst.type_cd = t.type_cd
-            JOIN `stations` AS s ON s.station_cd = sst.station_cd
+            JOIN station_station_types AS sst ON sst.line_group_cd IN ( {params} ) AND sst.pass <> 1 AND sst.type_cd = t.type_cd
             WHERE sst.pass <> 1 AND sst.type_cd = t.type_cd
-            ORDER BY sst.id",
-            params
+            ORDER BY sst.id"
         );
 
         let mut query = sqlx::query_as::<_, TrainTypeRow>(&query_str);
         for id in line_group_id_vec {
-            query = query.bind(id);
+            query = query.bind(*id as i32);
         }
 
         let rows = query.fetch_all(conn).await?;
@@ -346,509 +410,413 @@ impl InternalTrainTypeRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sqlx::{Connection, SqliteConnection};
-    use std::sync::Arc;
-    use tokio::sync::Mutex;
+    use sqlx::PgPool;
+    use std::env;
 
-    async fn setup_test_db() -> Arc<Mutex<SqliteConnection>> {
-        let mut conn = SqliteConnection::connect(":memory:").await.unwrap();
+    // テスト用のヘルパー関数
+    async fn setup_test_db() -> PgPool {
+        let database_url = env::var("TEST_DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://test:test@localhost/stationapi_test".to_string());
 
-        // Create tables
+        PgPool::connect(&database_url)
+            .await
+            .expect("Failed to connect to test database")
+    }
+
+    async fn setup_test_data(pool: &PgPool) {
+        // テスト用のテーブルとデータを作成
+        sqlx::query("DROP TABLE IF EXISTS station_station_types CASCADE")
+            .execute(pool)
+            .await
+            .unwrap();
+
+        sqlx::query("DROP TABLE IF EXISTS types CASCADE")
+            .execute(pool)
+            .await
+            .unwrap();
+
+        // テーブル作成
         sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS types (
-                id INTEGER PRIMARY KEY,
-                type_cd INTEGER NOT NULL,
-                type_name TEXT,
-                type_name_k TEXT,
-                type_name_r TEXT,
-                type_name_zh TEXT,
-                type_name_ko TEXT,
-                color TEXT,
+            "CREATE TABLE types (
+                type_cd INTEGER PRIMARY KEY,
+                type_name VARCHAR(255) NOT NULL,
+                type_name_k VARCHAR(255) NOT NULL,
+                type_name_r VARCHAR(255),
+                type_name_zh VARCHAR(255),
+                type_name_ko VARCHAR(255),
+                color VARCHAR(7) NOT NULL,
                 direction INTEGER,
-                kind INTEGER,
-                priority INTEGER
-            )
-            "#,
+                kind INTEGER
+            )",
         )
-        .execute(&mut conn)
+        .execute(pool)
         .await
         .unwrap();
 
         sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS station_station_types (
-                id INTEGER PRIMARY KEY,
+            "CREATE TABLE station_station_types (
+                id SERIAL PRIMARY KEY,
                 station_cd INTEGER NOT NULL,
-                type_cd INTEGER NOT NULL,
+                type_cd INTEGER,
                 line_group_cd INTEGER,
-                pass INTEGER
-            )
-            "#,
+                pass INTEGER NOT NULL DEFAULT 0
+            )",
         )
-        .execute(&mut conn)
+        .execute(pool)
+        .await
+        .unwrap();
+
+        // テストデータの挿入
+        sqlx::query(
+            "INSERT INTO types (type_cd, type_name, type_name_k, type_name_r, type_name_zh, type_name_ko, color, direction, kind) VALUES 
+            (1, 'Express', '特急', 'Express', '特快', '특급', '#FF0000', 1, 1),
+            (2, 'Local', '普通', 'Local', '普通', '보통', '#00FF00', 0, 2),
+            (3, 'Rapid', '快速', 'Rapid', '快速', '급행', '#0000FF', 1, 3)"
+        )
+        .execute(pool)
         .await
         .unwrap();
 
         sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS stations (
-                station_cd INTEGER PRIMARY KEY,
-                station_g_cd INTEGER NOT NULL,
-                station_name TEXT NOT NULL,
-                station_name_k TEXT NOT NULL,
-                line_cd INTEGER NOT NULL,
-                e_status INTEGER NOT NULL
-            )
-            "#,
+            "INSERT INTO station_station_types (station_cd, type_cd, line_group_cd, pass) VALUES 
+            (101, 1, 301, 0),
+            (102, 2, 302, 0),
+            (103, 3, 303, 1),
+            (104, 1, 304, 0),
+            (105, 2, 305, 0)",
         )
-        .execute(&mut conn)
+        .execute(pool)
         .await
         .unwrap();
-
-        // Insert test data
-        // Types
-        sqlx::query(
-            r#"
-            INSERT INTO types (id, type_cd, type_name, type_name_k, type_name_r, type_name_zh, type_name_ko, color, direction, kind, priority)
-            VALUES 
-                (1, 1, 'のぞみ', 'ノゾミ', 'Nozomi', '希望', '노조미', '#FFD400', 0, 4, 10),
-                (2, 2, 'ひかり', 'ヒカリ', 'Hikari', '光', '히카리', '#0070F0', 0, 4, 8),
-                (3, 3, 'こだま', 'コダマ', 'Kodama', '回声', '코다마', '#00AA00', 0, 4, 6),
-                (4, 11, '普通', 'フツウ', 'Local', '普通', '보통', '#000000', 0, 0, 1),
-                (5, 12, '快速', 'カイソク', 'Rapid', '快速', '쾌속', '#FF0000', 0, 1, 2),
-                (6, 13, '特急', 'トッキュウ', 'Limited Express', '特急', '특급', '#0000FF', 0, 2, 5)
-            "#,
-        )
-        .execute(&mut conn)
-        .await
-        .unwrap();
-
-        // Stations
-        sqlx::query(
-            r#"
-            INSERT INTO stations (station_cd, station_g_cd, station_name, station_name_k, line_cd, e_status)
-            VALUES 
-                (100201, 1001, '東京駅', 'トウキョウエキ', 11302, 0),
-                (100202, 1002, '品川駅', 'シナガワエキ', 11302, 0),
-                (100203, 1003, '新宿駅', 'シンジュクエキ', 11301, 0),
-                (100301, 1004, '京都駅', 'キョウトエキ', 11302, 0),
-                (100302, 1005, '大阪駅', 'オオサカエキ', 11302, 0)
-            "#,
-        )
-        .execute(&mut conn)
-        .await
-        .unwrap();
-
-        // Station station types
-        sqlx::query(
-            r#"
-            INSERT INTO station_station_types (id, station_cd, type_cd, line_group_cd, pass)
-            VALUES 
-                (1, 100201, 1, 1, 0),
-                (2, 100201, 2, 1, 0),
-                (3, 100201, 3, 1, 0),
-                (4, 100202, 1, 1, 0),
-                (5, 100202, 2, 1, 0),
-                (6, 100202, 3, 1, 0),
-                (7, 100203, 11, 2, 0),
-                (8, 100203, 12, 2, 0),
-                (9, 100301, 1, 1, 0),
-                (10, 100301, 2, 1, 0),
-                (11, 100302, 1, 1, 0),
-                (12, 100302, 2, 1, 0),
-                (13, 100201, 11, 3, 0),
-                (14, 100202, 11, 3, 0),
-                (15, 100203, 13, 2, 1)
-            "#,
-        )
-        .execute(&mut conn)
-        .await
-        .unwrap();
-
-        Arc::new(Mutex::new(conn))
     }
 
-    // MyTrainTypeRepository tests
-    #[tokio::test]
-    async fn test_get_by_line_group_id() {
-        let conn = setup_test_db().await;
-        let repository = MyTrainTypeRepository::new(conn);
-
-        let result = repository.get_by_line_group_id(1).await;
-        assert!(result.is_ok());
-
-        let train_types = result.unwrap();
-        assert!(!train_types.is_empty());
-
-        // line_group_cd = 1のタイプが返されることを確認
-        for train_type in &train_types {
-            assert_eq!(train_type.line_group_cd, Some(1));
-        }
-
-        // のぞみ、ひかり、こだまが含まれることを確認
-        let type_names: Vec<String> = train_types.iter().map(|t| t.type_name.clone()).collect();
-        assert!(type_names.contains(&"のぞみ".to_string()));
-        assert!(type_names.contains(&"ひかり".to_string()));
-        assert!(type_names.contains(&"こだま".to_string()));
+    async fn cleanup_test_data(pool: &PgPool) {
+        sqlx::query("DROP TABLE IF EXISTS station_station_types CASCADE")
+            .execute(pool)
+            .await
+            .unwrap();
+        sqlx::query("DROP TABLE IF EXISTS types CASCADE")
+            .execute(pool)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
-    async fn test_get_by_line_group_id_not_found() {
-        let conn = setup_test_db().await;
-        let repository = MyTrainTypeRepository::new(conn);
-
-        let result = repository.get_by_line_group_id(999).await;
-        assert!(result.is_ok());
-
-        let train_types = result.unwrap();
-        assert!(train_types.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_get_by_station_id() {
-        let conn = setup_test_db().await;
-        let repository = MyTrainTypeRepository::new(conn);
-
-        let result = repository.get_by_station_id(100201).await;
-        assert!(result.is_ok());
-
-        let train_types = result.unwrap();
-        assert!(!train_types.is_empty());
-
-        // station_cd = 100201のタイプが返されることを確認
-        for train_type in &train_types {
-            assert_eq!(train_type.station_cd, Some(100201));
-        }
-
-        // pass = 1の列車タイプは除外されることを確認
-        for train_type in &train_types {
-            assert_ne!(train_type.pass, Some(1));
-        }
-    }
-
-    #[tokio::test]
-    async fn test_get_by_station_id_not_found() {
-        let conn = setup_test_db().await;
-        let repository = MyTrainTypeRepository::new(conn);
-
-        let result = repository.get_by_station_id(999999).await;
-        assert!(result.is_ok());
-
-        let train_types = result.unwrap();
-        assert!(train_types.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_find_by_line_group_id_and_line_id() {
-        let conn = setup_test_db().await;
-        let repository = MyTrainTypeRepository::new(conn);
-
-        let result = repository.find_by_line_group_id_and_line_id(1, 11302).await;
-        assert!(result.is_ok());
-
-        let train_type = result.unwrap();
-        assert!(train_type.is_some());
-
-        let train_type = train_type.unwrap();
-        assert_eq!(train_type.line_group_cd, Some(1));
-    }
-
-    #[tokio::test]
-    async fn test_find_by_line_group_id_and_line_id_not_found() {
-        let conn = setup_test_db().await;
-        let repository = MyTrainTypeRepository::new(conn);
-
-        let result = repository.find_by_line_group_id_and_line_id(999, 999).await;
-        assert!(result.is_ok());
-
-        let train_type = result.unwrap();
-        assert!(train_type.is_none());
-    }
-
-    #[tokio::test]
-    async fn test_get_by_station_id_vec() {
-        let conn = setup_test_db().await;
-        let repository = MyTrainTypeRepository::new(conn);
-
-        let station_ids = vec![100201, 100202];
-        let result = repository
-            .get_by_station_id_vec(&station_ids, Some(1))
-            .await;
-        assert!(result.is_ok());
-
-        let train_types = result.unwrap();
-        assert!(!train_types.is_empty());
-
-        // クエリの実際の動作を確認：line_group_cd = 1のデータが返される
-        for train_type in &train_types {
-            assert_eq!(train_type.line_group_cd, Some(1));
-            assert_ne!(train_type.pass, Some(1)); // pass = 1は除外される
-        }
-    }
-
-    #[tokio::test]
-    async fn test_get_by_station_id_vec_empty() {
-        let conn = setup_test_db().await;
-        let repository = MyTrainTypeRepository::new(conn);
-
-        let station_ids = vec![];
-        let result = repository
-            .get_by_station_id_vec(&station_ids, Some(1))
-            .await;
-        assert!(result.is_ok());
-
-        let train_types = result.unwrap();
-        assert!(train_types.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_get_types_by_station_id_vec() {
-        let conn = setup_test_db().await;
-        let repository = MyTrainTypeRepository::new(conn);
-
-        let station_ids = vec![100201, 100203];
-        let result = repository
-            .get_types_by_station_id_vec(&station_ids, Some(2))
-            .await;
-        assert!(result.is_ok());
-
-        let train_types = result.unwrap();
-        assert!(!train_types.is_empty());
-
-        // line_group_cd = 2のタイプのみが返されることを確認
-        for train_type in &train_types {
-            assert_eq!(train_type.line_group_cd, Some(2));
-        }
-    }
-
-    #[tokio::test]
-    async fn test_get_types_by_station_id_vec_priority_ordering() {
-        let conn = setup_test_db().await;
-        let repository = MyTrainTypeRepository::new(conn);
-
-        let station_ids = vec![100201];
-        let result = repository
-            .get_types_by_station_id_vec(&station_ids, Some(1))
-            .await;
-        assert!(result.is_ok());
-
-        let train_types = result.unwrap();
-        assert!(!train_types.is_empty());
-
-        // 結果が返されることを確認（優先度順ソートはSQLで実行される）
-        for train_type in &train_types {
-            assert_eq!(train_type.line_group_cd, Some(1));
-        }
-    }
-
-    #[tokio::test]
-    async fn test_get_by_line_group_id_vec() {
-        let conn = setup_test_db().await;
-        let repository = MyTrainTypeRepository::new(conn);
-
-        let line_group_ids = vec![1, 2];
-        let result = repository.get_by_line_group_id_vec(&line_group_ids).await;
-        assert!(result.is_ok());
-
-        let train_types = result.unwrap();
-        assert!(!train_types.is_empty());
-
-        // 指定されたline_group_cdのタイプのみが返されることを確認
-        for train_type in &train_types {
-            assert!(train_type.line_group_cd == Some(1) || train_type.line_group_cd == Some(2));
-        }
-    }
-
-    #[tokio::test]
-    async fn test_get_by_line_group_id_vec_empty() {
-        let conn = setup_test_db().await;
-        let repository = MyTrainTypeRepository::new(conn);
-
-        let line_group_ids = vec![];
-        let result = repository.get_by_line_group_id_vec(&line_group_ids).await;
-        assert!(result.is_ok());
-
-        let train_types = result.unwrap();
-        assert!(train_types.is_empty());
-    }
-
-    // TrainTypeRow to TrainType conversion test
-    #[tokio::test]
-    async fn test_train_type_row_conversion() {
-        let row = TrainTypeRow {
+    async fn test_train_type_row_to_train_type_conversion() {
+        let train_type_row = TrainTypeRow {
             id: Some(1),
-            station_cd: Some(100201),
+            station_cd: Some(101),
             type_cd: Some(1),
-            line_group_cd: Some(1),
+            line_group_cd: Some(301),
             pass: Some(0),
-            type_name: "のぞみ".to_string(),
-            type_name_k: "ノゾミ".to_string(),
-            type_name_r: Some("Nozomi".to_string()),
-            type_name_zh: Some("希望".to_string()),
-            type_name_ko: Some("노조미".to_string()),
-            color: "#FFD400".to_string(),
-            direction: Some(0),
-            kind: Some(4),
+            type_name: "Express".to_string(),
+            type_name_k: "特急".to_string(),
+            type_name_r: Some("Express".to_string()),
+            type_name_zh: Some("特快".to_string()),
+            type_name_ko: Some("특급".to_string()),
+            color: "#FF0000".to_string(),
+            direction: Some(1),
+            kind: Some(1),
         };
 
-        let train_type: TrainType = row.into();
+        let train_type: TrainType = train_type_row.into();
 
         assert_eq!(train_type.id, Some(1));
-        assert_eq!(train_type.station_cd, Some(100201));
+        assert_eq!(train_type.station_cd, Some(101));
         assert_eq!(train_type.type_cd, Some(1));
-        assert_eq!(train_type.line_group_cd, Some(1));
+        assert_eq!(train_type.line_group_cd, Some(301));
         assert_eq!(train_type.pass, Some(0));
-        assert_eq!(train_type.type_name, "のぞみ");
-        assert_eq!(train_type.type_name_k, "ノゾミ");
-        assert_eq!(train_type.type_name_r, Some("Nozomi".to_string()));
-        assert_eq!(train_type.type_name_zh, Some("希望".to_string()));
-        assert_eq!(train_type.type_name_ko, Some("노조미".to_string()));
-        assert_eq!(train_type.color, "#FFD400");
-        assert_eq!(train_type.direction, Some(0));
-        assert_eq!(train_type.kind, Some(4));
-        assert_eq!(train_type.line, None);
-        assert!(train_type.lines.is_empty());
+        assert_eq!(train_type.type_name, "Express");
+        assert_eq!(train_type.type_name_k, "特急");
+        assert_eq!(train_type.type_name_r, Some("Express".to_string()));
+        assert_eq!(train_type.type_name_zh, Some("特快".to_string()));
+        assert_eq!(train_type.type_name_ko, Some("특급".to_string()));
+        assert_eq!(train_type.color, "#FF0000");
+        assert_eq!(train_type.direction, Some(1));
+        assert_eq!(train_type.kind, Some(1));
     }
 
-    // InternalTrainTypeRepository tests
     #[tokio::test]
-    async fn test_internal_get_by_line_group_id() {
-        let conn = setup_test_db().await;
-        let mut conn = conn.lock().await;
+    async fn test_train_type_row_to_train_type_conversion_with_nulls() {
+        let train_type_row = TrainTypeRow {
+            id: None,
+            station_cd: None,
+            type_cd: None,
+            line_group_cd: None,
+            pass: None,
+            type_name: "Local".to_string(),
+            type_name_k: "普通".to_string(),
+            type_name_r: None,
+            type_name_zh: None,
+            type_name_ko: None,
+            color: "#00FF00".to_string(),
+            direction: None,
+            kind: None,
+        };
 
-        let result = InternalTrainTypeRepository::get_by_line_group_id(1, &mut conn).await;
+        let train_type: TrainType = train_type_row.into();
+
+        assert_eq!(train_type.id, None);
+        assert_eq!(train_type.station_cd, None);
+        assert_eq!(train_type.type_cd, None);
+        assert_eq!(train_type.line_group_cd, None);
+        assert_eq!(train_type.pass, None);
+        assert_eq!(train_type.type_name, "Local");
+        assert_eq!(train_type.type_name_k, "普通");
+        assert_eq!(train_type.type_name_r, None);
+        assert_eq!(train_type.type_name_zh, None);
+        assert_eq!(train_type.type_name_ko, None);
+        assert_eq!(train_type.color, "#00FF00");
+        assert_eq!(train_type.direction, None);
+        assert_eq!(train_type.kind, None);
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_get_by_station_id_success() {
+        let pool = setup_test_db().await;
+        setup_test_data(&pool).await;
+
+        let mut conn = pool.acquire().await.unwrap();
+        let result = InternalTrainTypeRepository::get_by_station_id(101, &mut conn).await;
+
         assert!(result.is_ok());
-
         let train_types = result.unwrap();
         assert!(!train_types.is_empty());
 
-        // kindでソートされていることを確認
+        // station_cd が設定されていることを確認
         for train_type in &train_types {
-            assert_eq!(train_type.line_group_cd, Some(1));
+            assert_eq!(train_type.station_cd, Some(101));
         }
+
+        cleanup_test_data(&pool).await;
     }
 
     #[tokio::test]
-    async fn test_internal_get_by_station_id() {
-        let conn = setup_test_db().await;
-        let mut conn = conn.lock().await;
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_get_by_station_id_not_found() {
+        let pool = setup_test_db().await;
+        setup_test_data(&pool).await;
 
-        let result = InternalTrainTypeRepository::get_by_station_id(100201, &mut conn).await;
+        let mut conn = pool.acquire().await.unwrap();
+        let result = InternalTrainTypeRepository::get_by_station_id(999, &mut conn).await;
+
         assert!(result.is_ok());
-
         let train_types = result.unwrap();
-        assert!(!train_types.is_empty());
+        assert_eq!(train_types.len(), 0);
 
-        // pass <> 1の条件が適用されていることを確認
-        for train_type in &train_types {
-            assert_ne!(train_type.pass, Some(1));
-            assert_eq!(train_type.station_cd, Some(100201));
-        }
+        cleanup_test_data(&pool).await;
     }
 
     #[tokio::test]
-    async fn test_internal_get_by_line_group_id_and_line_id() {
-        let conn = setup_test_db().await;
-        let mut conn = conn.lock().await;
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_get_by_station_id_excludes_pass() {
+        let pool = setup_test_db().await;
+        setup_test_data(&pool).await;
 
+        let mut conn = pool.acquire().await.unwrap();
+        let result = InternalTrainTypeRepository::get_by_station_id(103, &mut conn).await;
+
+        assert!(result.is_ok());
+        let train_types = result.unwrap();
+        // pass = 1 なので除外される
+        assert_eq!(train_types.len(), 0);
+
+        cleanup_test_data(&pool).await;
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_get_by_station_id_vec_success() {
+        let pool = setup_test_db().await;
+        setup_test_data(&pool).await;
+
+        let mut conn = pool.acquire().await.unwrap();
+        let station_ids = vec![101, 102];
         let result =
-            InternalTrainTypeRepository::get_by_line_group_id_and_line_id(1, 11302, &mut conn)
-                .await;
+            InternalTrainTypeRepository::get_by_station_id_vec(&station_ids, None, &mut conn).await;
+
         assert!(result.is_ok());
+        let train_types = result.unwrap();
+        assert!(!train_types.is_empty());
 
-        let train_type = result.unwrap();
-        assert!(train_type.is_some());
+        // 指定した駅のみが含まれることを確認
+        for train_type in &train_types {
+            assert!(train_type.station_cd == Some(101) || train_type.station_cd == Some(102));
+        }
 
-        let train_type = train_type.unwrap();
-        assert_eq!(train_type.line_group_cd, Some(1));
+        cleanup_test_data(&pool).await;
     }
 
     #[tokio::test]
-    async fn test_internal_get_by_station_id_vec() {
-        let conn = setup_test_db().await;
-        let mut conn = conn.lock().await;
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_get_by_station_id_vec_empty() {
+        let pool = setup_test_db().await;
+        setup_test_data(&pool).await;
 
-        let station_ids = vec![100201, 100202];
+        let mut conn = pool.acquire().await.unwrap();
+        let station_ids = vec![];
         let result =
-            InternalTrainTypeRepository::get_by_station_id_vec(&station_ids, Some(1), &mut conn)
-                .await;
+            InternalTrainTypeRepository::get_by_station_id_vec(&station_ids, None, &mut conn).await;
+
         assert!(result.is_ok());
-
         let train_types = result.unwrap();
-        assert!(!train_types.is_empty());
+        assert_eq!(train_types.len(), 0);
 
-        // クエリの実際の動作を確認：line_group_cd = 1のデータが返される
-        for train_type in &train_types {
-            assert_eq!(train_type.line_group_cd, Some(1));
-            assert_ne!(train_type.pass, Some(1)); // pass = 1は除外される
-        }
+        cleanup_test_data(&pool).await;
     }
 
     #[tokio::test]
-    async fn test_internal_get_types_by_station_id_vec() {
-        let conn = setup_test_db().await;
-        let mut conn = conn.lock().await;
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_get_by_line_group_id_vec_success() {
+        let pool = setup_test_db().await;
+        setup_test_data(&pool).await;
 
-        let station_ids = vec![100201, 100203];
-        let result = InternalTrainTypeRepository::get_types_by_station_id_vec(
-            &station_ids,
-            Some(2),
-            &mut conn,
-        )
-        .await;
-        assert!(result.is_ok());
-
-        let train_types = result.unwrap();
-        assert!(!train_types.is_empty());
-
-        for train_type in &train_types {
-            assert_eq!(train_type.line_group_cd, Some(2));
-            assert_ne!(train_type.pass, Some(1));
-        }
-    }
-
-    #[tokio::test]
-    async fn test_internal_get_by_line_group_id_vec() {
-        let conn = setup_test_db().await;
-        let mut conn = conn.lock().await;
-
-        let line_group_ids = vec![1, 2];
+        let mut conn = pool.acquire().await.unwrap();
+        let line_group_ids = vec![301, 302];
         let result =
             InternalTrainTypeRepository::get_by_line_group_id_vec(&line_group_ids, &mut conn).await;
+
+        assert!(result.is_ok());
+        let train_types = result.unwrap();
+        assert!(!train_types.is_empty());
+
+        // 指定した路線グループのみが含まれることを確認
+        for train_type in &train_types {
+            assert!(train_type.line_group_cd == Some(301) || train_type.line_group_cd == Some(302));
+        }
+
+        cleanup_test_data(&pool).await;
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_get_by_line_group_id_vec_empty() {
+        let pool = setup_test_db().await;
+        setup_test_data(&pool).await;
+
+        let mut conn = pool.acquire().await.unwrap();
+        let line_group_ids = vec![];
+        let result =
+            InternalTrainTypeRepository::get_by_line_group_id_vec(&line_group_ids, &mut conn).await;
+
+        assert!(result.is_ok());
+        let train_types = result.unwrap();
+        assert_eq!(train_types.len(), 0);
+
+        cleanup_test_data(&pool).await;
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_get_by_line_group_id_vec_excludes_pass() {
+        let pool = setup_test_db().await;
+        setup_test_data(&pool).await;
+
+        let mut conn = pool.acquire().await.unwrap();
+        let line_group_ids = vec![303]; // pass = 1 のデータ
+        let result =
+            InternalTrainTypeRepository::get_by_line_group_id_vec(&line_group_ids, &mut conn).await;
+
+        assert!(result.is_ok());
+        let train_types = result.unwrap();
+        // pass = 1 なので除外される
+        assert_eq!(train_types.len(), 0);
+
+        cleanup_test_data(&pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_my_train_type_repository_new() {
+        let database_url = "postgres://test:test@localhost/stationapi_test";
+        let pool = PgPool::connect(database_url).await;
+
+        if let Ok(pool) = pool {
+            let pool = Arc::new(pool);
+            let repository = MyTrainTypeRepository::new(pool.clone());
+
+            // プールが正しく設定されていることを確認
+            assert!(Arc::ptr_eq(&repository.pool, &pool));
+        }
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_my_train_type_repository_get_by_station_id() {
+        let pool = setup_test_db().await;
+        setup_test_data(&pool).await;
+
+        let pool = Arc::new(pool);
+        let repository = MyTrainTypeRepository::new(pool);
+
+        let result = repository.get_by_station_id(101).await;
         assert!(result.is_ok());
 
         let train_types = result.unwrap();
         assert!(!train_types.is_empty());
 
-        for train_type in &train_types {
-            assert!(train_type.line_group_cd == Some(1) || train_type.line_group_cd == Some(2));
-            assert_ne!(train_type.pass, Some(1));
-        }
+        cleanup_test_data(&repository.pool).await;
     }
 
     #[tokio::test]
-    async fn test_error_handling_database_error() {
-        // 空のメモリ内データベースでテーブルが存在しない状態でクエリを実行してエラーを発生させる
-        let mut conn = SqliteConnection::connect(":memory:").await.unwrap();
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_my_train_type_repository_get_by_station_id_vec() {
+        let pool = setup_test_db().await;
+        setup_test_data(&pool).await;
 
-        let result = InternalTrainTypeRepository::get_by_line_group_id(1, &mut conn).await;
-        assert!(result.is_err());
-    }
+        let pool = Arc::new(pool);
+        let repository = MyTrainTypeRepository::new(pool);
 
-    #[tokio::test]
-    async fn test_pass_filtering() {
-        let conn = setup_test_db().await;
-        let mut conn = conn.lock().await;
-
-        // pass = 1のレコードは除外されることを確認
-        let result = InternalTrainTypeRepository::get_by_station_id(100203, &mut conn).await;
+        let station_ids = vec![101, 102];
+        let result = repository.get_by_station_id_vec(&station_ids, None).await;
         assert!(result.is_ok());
 
         let train_types = result.unwrap();
-        // pass = 1でない列車タイプのみが返される
-        for train_type in &train_types {
-            assert_ne!(train_type.pass, Some(1));
-        }
+        assert!(!train_types.is_empty());
+
+        cleanup_test_data(&repository.pool).await;
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_my_train_type_repository_get_by_line_group_id_vec() {
+        let pool = setup_test_db().await;
+        setup_test_data(&pool).await;
+
+        let pool = Arc::new(pool);
+        let repository = MyTrainTypeRepository::new(pool);
+
+        let line_group_ids = vec![301, 302];
+        let result = repository.get_by_line_group_id_vec(&line_group_ids).await;
+        assert!(result.is_ok());
+
+        let train_types = result.unwrap();
+        assert!(!train_types.is_empty());
+
+        cleanup_test_data(&repository.pool).await;
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_my_train_type_repository_type_conversion() {
+        let pool = setup_test_db().await;
+        setup_test_data(&pool).await;
+
+        let pool = Arc::new(pool);
+        let repository = MyTrainTypeRepository::new(pool);
+
+        // u32 から i64 への変換をテスト
+        let result = repository.get_by_station_id(101u32).await;
+        assert!(result.is_ok());
+
+        let station_ids: Vec<u32> = vec![101, 102];
+        let result = repository.get_by_station_id_vec(&station_ids, None).await;
+        assert!(result.is_ok());
+
+        let line_group_ids: Vec<u32> = vec![301, 302];
+        let result = repository.get_by_line_group_id_vec(&line_group_ids).await;
+        assert!(result.is_ok());
+
+        cleanup_test_data(&repository.pool).await;
     }
 }

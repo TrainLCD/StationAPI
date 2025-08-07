@@ -4,8 +4,8 @@ use super::{company::Company, line_symbol::LineSymbol, station::Station, train_t
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Line {
-    pub line_cd: i64,
-    pub company_cd: i64,
+    pub line_cd: i32,
+    pub company_cd: i32,
     pub company: Option<Company>,
     pub line_name: String,
     pub line_name_k: String,
@@ -14,7 +14,7 @@ pub struct Line {
     pub line_name_zh: Option<String>,
     pub line_name_ko: Option<String>,
     pub line_color_c: Option<String>,
-    pub line_type: Option<i64>,
+    pub line_type: Option<i32>,
     pub line_symbols: Vec<LineSymbol>,
     pub line_symbol1: Option<String>,
     pub line_symbol2: Option<String>,
@@ -28,22 +28,22 @@ pub struct Line {
     pub line_symbol2_shape: Option<String>,
     pub line_symbol3_shape: Option<String>,
     pub line_symbol4_shape: Option<String>,
-    pub e_status: i64,
-    pub e_sort: i64,
-    pub average_distance: f64,
+    pub e_status: i32,
+    pub e_sort: i32,
+    pub average_distance: Option<f64>,
     pub station: Option<Station>,
     pub train_type: Option<TrainType>,
-    pub line_group_cd: Option<i64>,
-    pub station_cd: Option<i64>,
-    pub station_g_cd: Option<i64>,
-    pub type_cd: Option<i64>,
+    pub line_group_cd: Option<i32>,
+    pub station_cd: Option<i32>,
+    pub station_g_cd: Option<i32>,
+    pub type_cd: Option<i32>,
 }
 
 impl Line {
     #![allow(clippy::too_many_arguments)]
     pub fn new(
-        line_cd: i64,
-        company_cd: i64,
+        line_cd: i32,
+        company_cd: i32,
         company: Option<Company>,
         line_name: String,
         line_name_k: String,
@@ -52,7 +52,7 @@ impl Line {
         line_name_zh: Option<String>,
         line_name_ko: Option<String>,
         line_color_c: Option<String>,
-        line_type: Option<i64>,
+        line_type: Option<i32>,
         line_symbols: Vec<LineSymbol>,
         line_symbol1: Option<String>,
         line_symbol2: Option<String>,
@@ -66,15 +66,15 @@ impl Line {
         line_symbol2_shape: Option<String>,
         line_symbol3_shape: Option<String>,
         line_symbol4_shape: Option<String>,
-        e_status: i64,
-        e_sort: i64,
+        e_status: i32,
+        e_sort: i32,
         station: Option<Station>,
         train_type: Option<TrainType>,
-        line_group_cd: Option<i64>,
-        station_cd: Option<i64>,
-        station_g_cd: Option<i64>,
-        average_distance: f64,
-        type_cd: Option<i64>,
+        line_group_cd: Option<i32>,
+        station_cd: Option<i32>,
+        station_g_cd: Option<i32>,
+        average_distance: Option<f64>,
+        type_cd: Option<i32>,
     ) -> Self {
         Self {
             line_cd,
@@ -176,7 +176,7 @@ mod tests {
             Some(1001),                        // line_group_cd
             Some(11302),                       // station_cd
             Some(1130201),                     // station_g_cd
-            0.97,                              // average_distance
+            Some(0.97),                        // average_distance
             Some(1),                           // type_cd
         )
     }
@@ -214,7 +214,7 @@ mod tests {
             None,                       // line_group_cd
             None,                       // station_cd
             None,                       // station_g_cd
-            0.0,                        // average_distance
+            None,                       // average_distance
             None,                       // type_cd
         )
     }
@@ -240,7 +240,7 @@ mod tests {
         assert_eq!(line.line_symbol1_shape, Some("square".to_string()));
         assert_eq!(line.e_status, 1);
         assert_eq!(line.e_sort, 1130201);
-        assert_eq!(line.average_distance, 0.97);
+        assert_eq!(line.average_distance, Some(0.97));
         assert_eq!(line.line_group_cd, Some(1001));
         assert_eq!(line.station_cd, Some(11302));
         assert_eq!(line.station_g_cd, Some(1130201));
@@ -275,7 +275,7 @@ mod tests {
         assert_eq!(line.line_symbol2_shape, None);
         assert_eq!(line.line_symbol3_shape, None);
         assert_eq!(line.line_symbol4_shape, None);
-        assert_eq!(line.average_distance, 0.0);
+        assert_eq!(line.average_distance, None);
         assert_eq!(line.line_group_cd, None);
         assert_eq!(line.station_cd, None);
         assert_eq!(line.station_g_cd, None);
@@ -345,7 +345,7 @@ mod tests {
     #[test]
     fn test_line_debug() {
         let line = create_test_line();
-        let debug_string = format!("{:?}", line);
+        let debug_string = format!("{line:?}");
 
         assert!(debug_string.contains("Line"));
         assert!(debug_string.contains("line_cd: 11302"));
@@ -401,7 +401,7 @@ mod tests {
             None,
             None,
             None,
-            0.97,
+            Some(0.97),
             Some(2),
         );
 
@@ -420,8 +420,8 @@ mod tests {
         let line = create_test_line();
 
         // 各フィールドの型が期待されるものであることを確認
-        let _: i64 = line.line_cd;
-        let _: i64 = line.company_cd;
+        let _: i32 = line.line_cd;
+        let _: i32 = line.company_cd;
         let _: Option<Company> = line.company;
         let _: String = line.line_name;
         let _: String = line.line_name_k;
@@ -430,7 +430,7 @@ mod tests {
         let _: Option<String> = line.line_name_zh;
         let _: Option<String> = line.line_name_ko;
         let _: Option<String> = line.line_color_c;
-        let _: Option<i64> = line.line_type;
+        let _: Option<i32> = line.line_type;
         let _: Vec<LineSymbol> = line.line_symbols;
         let _: Option<String> = line.line_symbol1;
         let _: Option<String> = line.line_symbol2;
@@ -444,15 +444,15 @@ mod tests {
         let _: Option<String> = line.line_symbol2_shape;
         let _: Option<String> = line.line_symbol3_shape;
         let _: Option<String> = line.line_symbol4_shape;
-        let _: i64 = line.e_status;
-        let _: i64 = line.e_sort;
-        let _: f64 = line.average_distance;
+        let _: i32 = line.e_status;
+        let _: i32 = line.e_sort;
+        let _: Option<f64> = line.average_distance;
         let _: Option<Station> = line.station;
         let _: Option<TrainType> = line.train_type;
-        let _: Option<i64> = line.line_group_cd;
-        let _: Option<i64> = line.station_cd;
-        let _: Option<i64> = line.station_g_cd;
-        let _: Option<i64> = line.type_cd;
+        let _: Option<i32> = line.line_group_cd;
+        let _: Option<i32> = line.station_cd;
+        let _: Option<i32> = line.station_g_cd;
+        let _: Option<i32> = line.type_cd;
     }
 
     #[test]
@@ -467,7 +467,7 @@ mod tests {
             Some("Tōkaidō Shinkansen".to_string()),
             Some("东海道新干线".to_string()),
             Some("도카이도 신칸센".to_string()),
-            Some("#FFD400".to_string()),
+            Some(("#FFD400").to_string()),
             Some(7),
             vec![],
             None,
@@ -489,7 +489,7 @@ mod tests {
             None,
             None,
             None,
-            515.4,
+            Some(515.4),
             Some(7),
         );
 
@@ -536,7 +536,7 @@ mod tests {
             Some(0),
             Some(0),
             Some(0),
-            0.0,
+            Some(0.0),
             Some(0),
         );
 
@@ -584,7 +584,7 @@ mod tests {
             Some(-1),
             Some(-1),
             Some(-1),
-            -1.0,
+            Some(-1.0),
             Some(-1),
         );
 
@@ -593,7 +593,7 @@ mod tests {
         assert_eq!(line.line_type, Some(-1));
         assert_eq!(line.e_status, -1);
         assert_eq!(line.e_sort, -1);
-        assert_eq!(line.average_distance, -1.0);
+        assert_eq!(line.average_distance, Some(-1.0));
         assert_eq!(line.line_group_cd, Some(-1));
         assert_eq!(line.station_cd, Some(-1));
         assert_eq!(line.station_g_cd, Some(-1));
@@ -617,7 +617,7 @@ mod tests {
                 1,
                 1,
                 None,
-                format!("テスト線 ({})", description),
+                format!("テスト線 ({description})"),
                 "テストセン".to_string(),
                 "てすとせん".to_string(),
                 None,
@@ -645,7 +645,7 @@ mod tests {
                 None,
                 None,
                 None,
-                1.0,
+                Some(1.0),
                 type_cd,
             );
 
@@ -688,7 +688,7 @@ mod tests {
             Some(9999),
             Some(8888),
             Some(7777),
-            123.45,
+            Some(123.45),
             Some(99),
         );
 
@@ -758,7 +758,7 @@ mod tests {
             None,
             None,
             None,
-            1.0,
+            Some(1.0),
             Some(42),
         );
 
