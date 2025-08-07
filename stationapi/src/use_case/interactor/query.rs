@@ -546,7 +546,7 @@ where
                         if let Some(tt_line) =
                             tt_lines.iter().find(|line| line.line_cd == row.line_cd)
                         {
-                            let tt_lines_cloned: Vec<Line> = tt_lines.iter().cloned().collect();
+                            let tt_lines_cloned: Vec<Line> = tt_lines.to_vec();
 
                             let train_type = match row.type_id.is_some() {
                                 true => Some(Box::new(TrainType {

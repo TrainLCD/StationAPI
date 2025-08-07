@@ -1150,7 +1150,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         cleanup_test_data(&pool).await;
     }
@@ -1169,7 +1169,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         cleanup_test_data(&pool).await;
     }
@@ -1204,7 +1204,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         cleanup_test_data(&pool).await;
     }
@@ -1222,7 +1222,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         cleanup_test_data(&pool).await;
     }
@@ -1259,7 +1259,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         cleanup_test_data(&pool).await;
     }
@@ -1295,7 +1295,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         // テスト名に "Test" を含む線路が見つかることを確認
         for line in &lines {
@@ -1507,7 +1507,7 @@ mod tests {
         assert!(result.is_ok());
 
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         cleanup_test_data(&repository.pool).await;
     }

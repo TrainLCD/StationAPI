@@ -582,7 +582,7 @@ mod tests {
 
         assert!(result.is_ok());
         let train_types = result.unwrap();
-        assert!(train_types.len() > 0);
+        assert!(!train_types.is_empty());
 
         // station_cd が設定されていることを確認
         for train_type in &train_types {
@@ -638,7 +638,7 @@ mod tests {
 
         assert!(result.is_ok());
         let train_types = result.unwrap();
-        assert!(train_types.len() > 0);
+        assert!(!train_types.is_empty());
 
         // 指定した駅のみが含まれることを確認
         for train_type in &train_types {
@@ -679,7 +679,7 @@ mod tests {
 
         assert!(result.is_ok());
         let train_types = result.unwrap();
-        assert!(train_types.len() > 0);
+        assert!(!train_types.is_empty());
 
         // 指定した路線グループのみが含まれることを確認
         for train_type in &train_types {
@@ -753,7 +753,7 @@ mod tests {
         assert!(result.is_ok());
 
         let train_types = result.unwrap();
-        assert!(train_types.len() > 0);
+        assert!(!train_types.is_empty());
 
         cleanup_test_data(&repository.pool).await;
     }
@@ -772,7 +772,7 @@ mod tests {
         assert!(result.is_ok());
 
         let train_types = result.unwrap();
-        assert!(train_types.len() > 0);
+        assert!(!train_types.is_empty());
 
         cleanup_test_data(&repository.pool).await;
     }
@@ -791,7 +791,7 @@ mod tests {
         assert!(result.is_ok());
 
         let train_types = result.unwrap();
-        assert!(train_types.len() > 0);
+        assert!(!train_types.is_empty());
 
         cleanup_test_data(&repository.pool).await;
     }
