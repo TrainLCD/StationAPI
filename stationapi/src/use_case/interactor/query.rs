@@ -220,11 +220,16 @@ where
                 station.train_type = Some(tt);
             };
 
+            let mut seen_line_cds = std::collections::HashSet::new();
             let mut lines: Vec<Line> = lines
                 .iter()
-                .filter(|&l| l.station_g_cd.unwrap_or(0) == station.station_g_cd)
+                .filter(|&l| {
+                    l.station_g_cd.unwrap_or(0) == station.station_g_cd
+                        && seen_line_cds.insert(l.line_cd)
+                })
                 .cloned()
                 .collect();
+
             for line in lines.iter_mut() {
                 line.company = companies
                     .iter()
