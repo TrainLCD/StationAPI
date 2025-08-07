@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashSet},
-    sync::{Arc, Mutex},
-};
+use std::collections::{BTreeMap, HashSet};
 
 use crate::{
     domain::{
@@ -171,18 +168,13 @@ where
     }
     async fn update_station_vec_with_attributes(
         &self,
-        stations: Vec<Station>,
+        mut stations: Vec<Station>,
         line_group_id: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let stations = Arc::new(Mutex::new(stations));
-
-        let station_group_ids = {
-            let stations_guard = stations.lock().unwrap();
-            stations_guard
-                .iter()
-                .map(|station| station.station_g_cd as u32)
-                .collect::<Vec<u32>>()
-        };
+        let station_group_ids = stations
+            .iter()
+            .map(|station| station.station_g_cd as u32)
+            .collect::<Vec<u32>>();
 
         let stations_by_group_ids = self
             .get_stations_by_group_id_vec(&station_group_ids)
@@ -207,70 +199,62 @@ where
             .get_train_types_by_station_id_vec(&station_ids, line_group_id)
             .await?;
 
-        let stations = {
-            let mut stations_guard = stations.lock().unwrap();
-            stations_guard
-                .iter_mut()
-                .map(|station| {
-                    let mut line = self.extract_line_from_station(station);
-                    line.line_symbols = self.get_line_symbols(&line);
-                    line.company = companies
-                        .iter()
-                        .find(|c| c.company_cd == line.company_cd)
-                        .cloned();
-                    line.station = Some(station.clone());
+        for station in stations.iter_mut() {
+            let mut line = self.extract_line_from_station(station);
+            line.line_symbols = self.get_line_symbols(&line);
+            line.company = companies
+                .iter()
+                .find(|c| c.company_cd == line.company_cd)
+                .cloned();
+            line.station = Some(station.clone());
 
-                    let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
-                    station.station_numbers = station_numbers;
-                    station.line = Some(Box::new(line));
+            let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
+            station.station_numbers = station_numbers;
+            station.line = Some(Box::new(line));
+            if let Some(tt) = train_types
+                .iter()
+                .find(|tt| tt.station_cd == Some(station.station_cd))
+                .cloned()
+                .map(Box::new)
+            {
+                station.train_type = Some(tt);
+            };
+
+            let mut lines: Vec<Line> = lines
+                .iter()
+                .filter(|&l| l.station_g_cd.unwrap_or(0) == station.station_g_cd)
+                .cloned()
+                .collect();
+            for line in lines.iter_mut() {
+                line.company = companies
+                    .iter()
+                    .find(|c| c.company_cd == line.company_cd)
+                    .cloned();
+                line.line_symbols = self.get_line_symbols(line);
+                if let Some(station_ref) = stations_by_group_ids
+                    .iter()
+                    .filter(|s| s.line_cd == line.line_cd)
+                    .find(|s| s.station_g_cd == station.station_g_cd)
+                {
+                    let mut station_copy = station_ref.clone();
+                    let station_numbers: Vec<StationNumber> =
+                        self.get_station_numbers(&station_copy);
+                    station_copy.station_numbers = station_numbers;
                     if let Some(tt) = train_types
                         .iter()
-                        .find(|tt| tt.station_cd == Some(station.station_cd))
+                        .find(|tt| tt.station_cd == Some(station_copy.station_cd))
                         .cloned()
                         .map(Box::new)
                     {
-                        station.train_type = Some(tt);
+                        station_copy.train_type = Some(tt);
                     };
-
-                    let mut lines: Vec<Line> = lines
-                        .iter()
-                        .filter(|&l| l.station_g_cd.unwrap_or(0) == station.station_g_cd)
-                        .cloned()
-                        .collect();
-                    for line in lines.iter_mut() {
-                        line.company = companies
-                            .iter()
-                            .find(|c| c.company_cd == line.company_cd)
-                            .cloned();
-                        line.line_symbols = self.get_line_symbols(line);
-                        if let Some(station_ref) = stations_by_group_ids
-                            .iter()
-                            .filter(|s| s.line_cd == line.line_cd)
-                            .find(|s| s.station_g_cd == station.station_g_cd)
-                        {
-                            let mut station_copy = station_ref.clone();
-                            let station_numbers: Vec<StationNumber> =
-                                self.get_station_numbers(&station_copy);
-                            station_copy.station_numbers = station_numbers;
-                            if let Some(tt) = train_types
-                                .iter()
-                                .find(|tt| tt.station_cd == Some(station_copy.station_cd))
-                                .cloned()
-                                .map(Box::new)
-                            {
-                                station_copy.train_type = Some(tt);
-                            };
-                            line.station = Some(station_copy);
-                        }
-                    }
-                    let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
-                    station.station_numbers = station_numbers;
-                    station.lines = lines;
-
-                    station.clone()
-                })
-                .collect()
-        };
+                    line.station = Some(station_copy);
+                }
+            }
+            let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
+            station.station_numbers = station_numbers;
+            station.lines = lines;
+        }
 
         Ok(stations)
     }
@@ -308,33 +292,33 @@ where
             &station.line_symbol4,
         ];
 
-        let line_symbol_colors_raw: Vec<String> = vec![
-            station.line_symbol1_color.clone().unwrap_or_default(),
-            station.line_symbol2_color.clone().unwrap_or_default(),
-            station.line_symbol3_color.clone().unwrap_or_default(),
-            station.line_symbol4_color.clone().unwrap_or_default(),
+        let line_symbol_colors_raw: [&str; 4] = [
+            station.line_symbol1_color.as_deref().unwrap_or_default(),
+            station.line_symbol2_color.as_deref().unwrap_or_default(),
+            station.line_symbol3_color.as_deref().unwrap_or_default(),
+            station.line_symbol4_color.as_deref().unwrap_or_default(),
         ];
 
-        let station_numbers_raw = vec![
-            station.station_number1.clone().unwrap_or_default(),
-            station.station_number2.clone().unwrap_or_default(),
-            station.station_number3.clone().unwrap_or_default(),
-            station.station_number4.clone().unwrap_or_default(),
+        let station_numbers_raw = [
+            station.station_number1.as_deref().unwrap_or_default(),
+            station.station_number2.as_deref().unwrap_or_default(),
+            station.station_number3.as_deref().unwrap_or_default(),
+            station.station_number4.as_deref().unwrap_or_default(),
         ];
 
-        let line_symbols_shape_raw: Vec<String> = vec![
-            station.line_symbol1_shape.clone().unwrap_or_default(),
-            station.line_symbol2_shape.clone().unwrap_or_default(),
-            station.line_symbol3_shape.clone().unwrap_or_default(),
-            station.line_symbol4_shape.clone().unwrap_or_default(),
+        let line_symbols_shape_raw: [&str; 4] = [
+            station.line_symbol1_shape.as_deref().unwrap_or_default(),
+            station.line_symbol2_shape.as_deref().unwrap_or_default(),
+            station.line_symbol3_shape.as_deref().unwrap_or_default(),
+            station.line_symbol4_shape.as_deref().unwrap_or_default(),
         ];
 
         station_numbers_raw
             .into_iter()
             .enumerate()
             .filter_map(|(index, station_number)| {
-                let sym_color = line_symbol_colors_raw[index].to_string();
-                let sym_shape = line_symbols_shape_raw[index].to_string();
+                let sym_color = line_symbol_colors_raw[index];
+                let sym_shape = line_symbols_shape_raw[index];
 
                 if station_number.is_empty() {
                     return None;
@@ -345,17 +329,17 @@ where
 
                     let station_number = StationNumber {
                         line_symbol: sym.to_string(),
-                        line_symbol_color: sym_color,
-                        line_symbol_shape: sym_shape,
+                        line_symbol_color: sym_color.to_string(),
+                        line_symbol_shape: sym_shape.to_string(),
                         station_number: station_number_string,
                     };
                     return Some(station_number);
                 }
                 let station_number = StationNumber {
                     line_symbol: "".to_string(),
-                    line_symbol_color: sym_color,
-                    line_symbol_shape: sym_shape,
-                    station_number,
+                    line_symbol_color: sym_color.to_string(),
+                    line_symbol_shape: sym_shape.to_string(),
+                    station_number: station_number.to_string(),
                 };
                 Some(station_number)
             })
@@ -366,9 +350,17 @@ where
             line_cd: station.line_cd,
             company_cd: station.company_cd.unwrap_or_default(),
             company: None,
-            line_name: station.line_name.clone().unwrap_or_default(),
-            line_name_k: station.line_name_k.clone().unwrap_or_default(),
-            line_name_h: station.line_name_h.clone().unwrap_or_default(),
+            line_name: station.line_name.as_deref().unwrap_or_default().to_string(),
+            line_name_k: station
+                .line_name_k
+                .as_deref()
+                .unwrap_or_default()
+                .to_string(),
+            line_name_h: station
+                .line_name_h
+                .as_deref()
+                .unwrap_or_default()
+                .to_string(),
             line_name_r: station.line_name_r.clone(),
             line_name_zh: station.line_name_zh.clone(),
             line_name_ko: station.line_name_ko.clone(),
@@ -428,9 +420,9 @@ where
                 let color = line_symbol_colors_raw[index].cloned().unwrap_or_default();
 
                 Some(LineSymbol {
-                    symbol: symbol.clone(),
+                    symbol: symbol.to_string(),
                     color,
-                    shape: shape.clone(),
+                    shape: shape.to_string(),
                 })
             })
             .collect()
@@ -449,7 +441,7 @@ where
             .filter_map(|tt| tt.line_group_cd.map(|id| id as u32))
             .collect::<Vec<u32>>();
 
-        let mut lines = self
+        let lines = self
             .line_repository
             .get_by_line_group_id_vec(&train_type_ids)
             .await?;
@@ -469,10 +461,10 @@ where
         for tt in train_types.iter_mut() {
             if let Some(line_group_cd) = tt.line_group_cd {
                 let mut lines: Vec<Line> = lines
-                    .iter_mut()
-                    .map(|l| l.clone())
+                    .iter()
                     .filter(|l| l.line_group_cd.is_some())
                     .filter(|l| l.line_group_cd.unwrap() == line_group_cd)
+                    .cloned()
                     .collect::<Vec<Line>>();
 
                 for line in lines.iter_mut() {
@@ -528,9 +520,8 @@ where
             .station_repository
             .get_route_stops(from_station_id, to_station_id)
             .await?;
-        let stops = Arc::new(stops);
 
-        let line_group_id_vec = Arc::clone(&stops)
+        let line_group_id_vec = stops
             .iter()
             .filter_map(|row| row.line_group_cd.map(|id| id as u32))
             .collect::<Vec<u32>>();
@@ -540,9 +531,7 @@ where
             .get_by_line_group_id_vec_for_routes(&line_group_id_vec)
             .await?;
 
-        let tt_lines = Arc::new(tt_lines);
-
-        let route_row_tree_map: BTreeMap<i32, Vec<Station>> = Arc::clone(&stops).iter().fold(
+        let route_row_tree_map: BTreeMap<i32, Vec<Station>> = stops.iter().fold(
             BTreeMap::new(),
             |mut acc: BTreeMap<i32, Vec<Station>>, value| {
                 if let Some(line_group_cd) = value.line_group_cd {
@@ -565,8 +554,6 @@ where
                         if let Some(tt_line) =
                             tt_lines.iter().find(|line| line.line_cd == row.line_cd)
                         {
-                            let tt_lines_cloned: Vec<Line> = tt_lines.iter().cloned().collect();
-
                             let train_type = match row.type_id.is_some() {
                                 true => Some(Box::new(TrainType {
                                     id: row.type_id,
@@ -583,7 +570,7 @@ where
                                     direction: row.direction,
                                     kind: row.kind,
                                     line: Some(Box::new(tt_line.clone())),
-                                    lines: tt_lines_cloned,
+                                    lines: tt_lines.to_vec(),
                                 })),
                                 false => None,
                             };
@@ -755,9 +742,8 @@ where
             .station_repository
             .get_route_stops(from_station_id, to_station_id)
             .await?;
-        let stops = Arc::new(stops);
 
-        let line_group_id_vec: Vec<u32> = Arc::clone(&stops)
+        let line_group_id_vec: Vec<u32> = stops
             .iter()
             .filter_map(|stop| stop.line_group_cd.map(|id| id as u32))
             .collect::<HashSet<u32>>()

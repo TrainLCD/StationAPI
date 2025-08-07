@@ -425,11 +425,11 @@ impl InternalLineRepository {
             FROM lines AS l
             JOIN stations AS s ON s.station_g_cd IN ( {params} )
             AND s.e_status = 0
+            AND s.line_cd = l.line_cd
             LEFT JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
             LEFT JOIN aliases AS a ON la.alias_cd = a.id
-            WHERE l.line_cd = s.line_cd
-            AND l.e_status = 0
+            WHERE l.e_status = 0
             AND (
                 (sst.line_group_cd IS NOT NULL AND sst.pass <> 1)
                 OR sst.line_group_cd IS NULL
@@ -1150,7 +1150,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         cleanup_test_data(&pool).await;
     }
@@ -1169,7 +1169,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         cleanup_test_data(&pool).await;
     }
@@ -1204,7 +1204,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         cleanup_test_data(&pool).await;
     }
@@ -1222,7 +1222,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         cleanup_test_data(&pool).await;
     }
@@ -1259,7 +1259,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         cleanup_test_data(&pool).await;
     }
@@ -1295,7 +1295,7 @@ mod tests {
 
         assert!(result.is_ok());
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         // テスト名に "Test" を含む線路が見つかることを確認
         for line in &lines {
@@ -1507,7 +1507,7 @@ mod tests {
         assert!(result.is_ok());
 
         let lines = result.unwrap();
-        assert!(lines.len() > 0);
+        assert!(!lines.is_empty());
 
         cleanup_test_data(&repository.pool).await;
     }
