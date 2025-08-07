@@ -546,8 +546,6 @@ where
                         if let Some(tt_line) =
                             tt_lines.iter().find(|line| line.line_cd == row.line_cd)
                         {
-                            let tt_lines_cloned: Vec<Line> = tt_lines.to_vec();
-
                             let train_type = match row.type_id.is_some() {
                                 true => Some(Box::new(TrainType {
                                     id: row.type_id,
@@ -564,7 +562,7 @@ where
                                     direction: row.direction,
                                     kind: row.kind,
                                     line: Some(Box::new(tt_line.clone())),
-                                    lines: tt_lines_cloned,
+                                    lines: tt_lines.to_vec(),
                                 })),
                                 false => None,
                             };
