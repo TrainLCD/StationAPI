@@ -292,33 +292,33 @@ where
             &station.line_symbol4,
         ];
 
-        let line_symbol_colors_raw: Vec<String> = vec![
-            station.line_symbol1_color.clone().unwrap_or_default(),
-            station.line_symbol2_color.clone().unwrap_or_default(),
-            station.line_symbol3_color.clone().unwrap_or_default(),
-            station.line_symbol4_color.clone().unwrap_or_default(),
+        let line_symbol_colors_raw: [&str; 4] = [
+            station.line_symbol1_color.as_deref().unwrap_or_default(),
+            station.line_symbol2_color.as_deref().unwrap_or_default(),
+            station.line_symbol3_color.as_deref().unwrap_or_default(),
+            station.line_symbol4_color.as_deref().unwrap_or_default(),
         ];
 
-        let station_numbers_raw = vec![
-            station.station_number1.clone().unwrap_or_default(),
-            station.station_number2.clone().unwrap_or_default(),
-            station.station_number3.clone().unwrap_or_default(),
-            station.station_number4.clone().unwrap_or_default(),
+        let station_numbers_raw = [
+            station.station_number1.as_deref().unwrap_or_default(),
+            station.station_number2.as_deref().unwrap_or_default(),
+            station.station_number3.as_deref().unwrap_or_default(),
+            station.station_number4.as_deref().unwrap_or_default(),
         ];
 
-        let line_symbols_shape_raw: Vec<String> = vec![
-            station.line_symbol1_shape.clone().unwrap_or_default(),
-            station.line_symbol2_shape.clone().unwrap_or_default(),
-            station.line_symbol3_shape.clone().unwrap_or_default(),
-            station.line_symbol4_shape.clone().unwrap_or_default(),
+        let line_symbols_shape_raw: [&str; 4] = [
+            station.line_symbol1_shape.as_deref().unwrap_or_default(),
+            station.line_symbol2_shape.as_deref().unwrap_or_default(),
+            station.line_symbol3_shape.as_deref().unwrap_or_default(),
+            station.line_symbol4_shape.as_deref().unwrap_or_default(),
         ];
 
         station_numbers_raw
             .into_iter()
             .enumerate()
             .filter_map(|(index, station_number)| {
-                let sym_color = line_symbol_colors_raw[index].to_string();
-                let sym_shape = line_symbols_shape_raw[index].to_string();
+                let sym_color = line_symbol_colors_raw[index];
+                let sym_shape = line_symbols_shape_raw[index];
 
                 if station_number.is_empty() {
                     return None;
@@ -329,17 +329,17 @@ where
 
                     let station_number = StationNumber {
                         line_symbol: sym.to_string(),
-                        line_symbol_color: sym_color,
-                        line_symbol_shape: sym_shape,
+                        line_symbol_color: sym_color.to_string(),
+                        line_symbol_shape: sym_shape.to_string(),
                         station_number: station_number_string,
                     };
                     return Some(station_number);
                 }
                 let station_number = StationNumber {
                     line_symbol: "".to_string(),
-                    line_symbol_color: sym_color,
-                    line_symbol_shape: sym_shape,
-                    station_number,
+                    line_symbol_color: sym_color.to_string(),
+                    line_symbol_shape: sym_shape.to_string(),
+                    station_number: station_number.to_string(),
                 };
                 Some(station_number)
             })
@@ -350,9 +350,17 @@ where
             line_cd: station.line_cd,
             company_cd: station.company_cd.unwrap_or_default(),
             company: None,
-            line_name: station.line_name.clone().unwrap_or_default(),
-            line_name_k: station.line_name_k.clone().unwrap_or_default(),
-            line_name_h: station.line_name_h.clone().unwrap_or_default(),
+            line_name: station.line_name.as_deref().unwrap_or_default().to_string(),
+            line_name_k: station
+                .line_name_k
+                .as_deref()
+                .unwrap_or_default()
+                .to_string(),
+            line_name_h: station
+                .line_name_h
+                .as_deref()
+                .unwrap_or_default()
+                .to_string(),
             line_name_r: station.line_name_r.clone(),
             line_name_zh: station.line_name_zh.clone(),
             line_name_ko: station.line_name_ko.clone(),
@@ -412,9 +420,9 @@ where
                 let color = line_symbol_colors_raw[index].cloned().unwrap_or_default();
 
                 Some(LineSymbol {
-                    symbol: symbol.clone(),
+                    symbol: symbol.to_string(),
                     color,
-                    shape: shape.clone(),
+                    shape: shape.to_string(),
                 })
             })
             .collect()
@@ -433,7 +441,7 @@ where
             .filter_map(|tt| tt.line_group_cd.map(|id| id as u32))
             .collect::<Vec<u32>>();
 
-        let mut lines = self
+        let lines = self
             .line_repository
             .get_by_line_group_id_vec(&train_type_ids)
             .await?;
@@ -453,10 +461,10 @@ where
         for tt in train_types.iter_mut() {
             if let Some(line_group_cd) = tt.line_group_cd {
                 let mut lines: Vec<Line> = lines
-                    .iter_mut()
-                    .map(|l| l.clone())
+                    .iter()
                     .filter(|l| l.line_group_cd.is_some())
                     .filter(|l| l.line_group_cd.unwrap() == line_group_cd)
+                    .cloned()
                     .collect::<Vec<Line>>();
 
                 for line in lines.iter_mut() {
