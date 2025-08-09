@@ -1,0 +1,364 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n            s.station_cd,\n            s.station_g_cd,\n            s.station_name,\n            s.station_name_k,\n            s.station_name_r,\n            s.station_name_rn,\n            s.station_name_zh,\n            s.station_name_ko,\n            s.station_number1,\n            s.station_number2,\n            s.station_number3,\n            s.station_number4,\n            s.three_letter_code,\n            s.line_cd,\n            s.pref_cd,\n            s.post,\n            s.address,\n            s.lon,\n            s.lat,\n            s.open_ymd,\n            s.close_ymd,\n            s.e_status,\n            s.e_sort,\n            COALESCE(NULLIF(COALESCE(a.line_name, l.line_name), ''), NULL) AS line_name,\n            COALESCE(NULLIF(COALESCE(a.line_name_k, l.line_name_k), ''), NULL) AS line_name_k,\n            COALESCE(NULLIF(COALESCE(a.line_name_h, l.line_name_h), ''), NULL) AS line_name_h,\n            COALESCE(NULLIF(COALESCE(a.line_name_r, l.line_name_r), ''), NULL) AS line_name_r,\n            COALESCE(NULLIF(COALESCE(a.line_name_zh, l.line_name_zh), ''), NULL) AS line_name_zh,\n            COALESCE(NULLIF(COALESCE(a.line_name_ko, l.line_name_ko), ''), NULL) AS line_name_ko,\n            COALESCE(NULLIF(COALESCE(a.line_color_c, l.line_color_c), ''), NULL) AS line_color_c,\n            l.company_cd,\n            l.line_type,\n            l.line_symbol1,\n            l.line_symbol2,\n            l.line_symbol3,\n            l.line_symbol4,\n            l.line_symbol1_color,\n            l.line_symbol2_color,\n            l.line_symbol3_color,\n            l.line_symbol4_color,\n            l.line_symbol1_shape,\n            l.line_symbol2_shape,\n            l.line_symbol3_shape,\n            l.line_symbol4_shape,\n            COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,\n            sst.id AS sst_id,\n            sst.type_cd,\n            sst.line_group_cd,\n            sst.pass,\n            t.id AS type_id,\n            t.type_name,\n            t.type_name_k,\n            t.type_name_r,\n            t.type_name_zh,\n            t.type_name_ko,\n            t.color,\n            t.direction,\n            t.kind\n          FROM stations AS s\n          JOIN lines AS l ON l.line_cd = s.line_cd AND l.e_status = 0\n          LEFT JOIN station_station_types AS sst ON sst.line_group_cd = $1\n          LEFT JOIN types AS t ON t.type_cd = sst.type_cd\n          LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd\n          LEFT JOIN aliases AS a ON a.id = la.alias_cd\n          WHERE\n            s.line_cd = l.line_cd\n            AND s.station_cd = sst.station_cd\n            AND s.e_status = 0\n          ORDER BY sst.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "station_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "station_g_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "station_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "station_name_k",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "station_name_r",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "station_name_rn",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "station_name_zh",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "station_name_ko",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "station_number1",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "station_number2",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "station_number3",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "station_number4",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "three_letter_code",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "line_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 14,
+        "name": "pref_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 15,
+        "name": "post",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "address",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "lon",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 18,
+        "name": "lat",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 19,
+        "name": "open_ymd",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 20,
+        "name": "close_ymd",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 21,
+        "name": "e_status",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 22,
+        "name": "e_sort",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 23,
+        "name": "line_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 24,
+        "name": "line_name_k",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 25,
+        "name": "line_name_h",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 26,
+        "name": "line_name_r",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 27,
+        "name": "line_name_zh",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 28,
+        "name": "line_name_ko",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 29,
+        "name": "line_color_c",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 30,
+        "name": "company_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 31,
+        "name": "line_type",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 32,
+        "name": "line_symbol1",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 33,
+        "name": "line_symbol2",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 34,
+        "name": "line_symbol3",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 35,
+        "name": "line_symbol4",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 36,
+        "name": "line_symbol1_color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 37,
+        "name": "line_symbol2_color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 38,
+        "name": "line_symbol3_color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 39,
+        "name": "line_symbol4_color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 40,
+        "name": "line_symbol1_shape",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 41,
+        "name": "line_symbol2_shape",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 42,
+        "name": "line_symbol3_shape",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 43,
+        "name": "line_symbol4_shape",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 44,
+        "name": "average_distance",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 45,
+        "name": "sst_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 46,
+        "name": "type_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 47,
+        "name": "line_group_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 48,
+        "name": "pass",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 49,
+        "name": "type_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 50,
+        "name": "type_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 51,
+        "name": "type_name_k",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 52,
+        "name": "type_name_r",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 53,
+        "name": "type_name_zh",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 54,
+        "name": "type_name_ko",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 55,
+        "name": "color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 56,
+        "name": "direction",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 57,
+        "name": "kind",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      null,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "6711dff69e3c8d999743db687be404ee34f4b081e2662661873c44b6e3be1c43"
+}
