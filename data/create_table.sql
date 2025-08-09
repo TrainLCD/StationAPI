@@ -190,7 +190,7 @@ ALTER TABLE public.lines OWNER TO stationapi;
 --
 
 CREATE UNLOGGED TABLE public.station_station_types (
-    id integer NOT NULL,
+    id integer,
     station_cd integer NOT NULL,
     type_cd integer NOT NULL,
     line_group_cd integer NOT NULL,
