@@ -6,57 +6,123 @@
 -- Dumped by pg_dump version 17.4 (Homebrew)
 
 SET statement_timeout = 0;
+
 SET lock_timeout = 0;
+
 SET idle_in_transaction_session_timeout = 0;
+
 SET transaction_timeout = 0;
+
 SET client_encoding = 'UTF8';
+
 SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
+
+SELECT pg_catalog.set_config ('search_path', '', false);
+
 SET check_function_bodies = false;
+
 SET xmloption = content;
+
 SET client_min_messages = warning;
+
 SET row_security = off;
 
-ALTER TABLE IF EXISTS ONLY public.stations DROP CONSTRAINT IF EXISTS stations_line_cd_fkey;
-ALTER TABLE IF EXISTS ONLY public.station_station_types DROP CONSTRAINT IF EXISTS station_station_types_type_cd_fkey;
-ALTER TABLE IF EXISTS ONLY public.station_station_types DROP CONSTRAINT IF EXISTS station_station_types_station_cd_fkey;
-ALTER TABLE IF EXISTS ONLY public.lines DROP CONSTRAINT IF EXISTS lines_company_cd_fkey;
-ALTER TABLE IF EXISTS ONLY public.line_aliases DROP CONSTRAINT IF EXISTS line_aliases_station_cd_fkey;
-ALTER TABLE IF EXISTS ONLY public.line_aliases DROP CONSTRAINT IF EXISTS line_aliases_alias_cd_fkey;
+ALTER TABLE IF EXISTS ONLY public.stations
+DROP CONSTRAINT IF EXISTS stations_line_cd_fkey;
+
+ALTER TABLE IF EXISTS ONLY public.station_station_types
+DROP CONSTRAINT IF EXISTS station_station_types_type_cd_fkey;
+
+ALTER TABLE IF EXISTS ONLY public.station_station_types
+DROP CONSTRAINT IF EXISTS station_station_types_station_cd_fkey;
+
+ALTER TABLE IF EXISTS ONLY public.lines
+DROP CONSTRAINT IF EXISTS lines_company_cd_fkey;
+
+ALTER TABLE IF EXISTS ONLY public.line_aliases
+DROP CONSTRAINT IF EXISTS line_aliases_station_cd_fkey;
+
+ALTER TABLE IF EXISTS ONLY public.line_aliases
+DROP CONSTRAINT IF EXISTS line_aliases_alias_cd_fkey;
+
 DROP INDEX IF EXISTS public.idx_16432_types_type_cd;
+
 DROP INDEX IF EXISTS public.idx_16426_stations_station_g_cd;
+
 DROP INDEX IF EXISTS public.idx_16426_stations_line_cd;
+
 DROP INDEX IF EXISTS public.idx_16426_stations_lat_lon;
+
 DROP INDEX IF EXISTS public.idx_16426_stations_e_sort_station_cd;
+
 DROP INDEX IF EXISTS public.idx_16421_station_station_types_type_cd;
+
 DROP INDEX IF EXISTS public.idx_16421_station_station_types_station_cd;
+
 DROP INDEX IF EXISTS public.idx_16421_station_station_types_line_group_cd;
+
 DROP INDEX IF EXISTS public.idx_16407_lines_e_sort;
+
 DROP INDEX IF EXISTS public.idx_16407_lines_company_cd;
+
 DROP INDEX IF EXISTS public.idx_16403_line_aliases_station_cd;
+
 DROP INDEX IF EXISTS public.idx_16403_line_aliases_alias_cd;
-ALTER TABLE IF EXISTS ONLY public.types DROP CONSTRAINT IF EXISTS idx_16432_types_pkey;
-ALTER TABLE IF EXISTS ONLY public.stations DROP CONSTRAINT IF EXISTS idx_16426_stations_pkey;
-ALTER TABLE IF EXISTS ONLY public.station_station_types DROP CONSTRAINT IF EXISTS idx_16421_station_station_types_pkey;
-ALTER TABLE IF EXISTS ONLY public.lines DROP CONSTRAINT IF EXISTS idx_16407_lines_pkey;
-ALTER TABLE IF EXISTS ONLY public.line_aliases DROP CONSTRAINT IF EXISTS idx_16403_line_aliases_pkey;
-ALTER TABLE IF EXISTS ONLY public.connections DROP CONSTRAINT IF EXISTS idx_16399_connections_pkey;
-ALTER TABLE IF EXISTS ONLY public.companies DROP CONSTRAINT IF EXISTS idx_16394_companies_pkey;
-ALTER TABLE IF EXISTS ONLY public.aliases DROP CONSTRAINT IF EXISTS idx_16389_aliases_pkey;
+
+ALTER TABLE IF EXISTS ONLY public.types
+DROP CONSTRAINT IF EXISTS idx_16432_types_pkey;
+
+ALTER TABLE IF EXISTS ONLY public.stations
+DROP CONSTRAINT IF EXISTS idx_16426_stations_pkey;
+
+ALTER TABLE IF EXISTS ONLY public.station_station_types
+DROP CONSTRAINT IF EXISTS idx_16421_station_station_types_pkey;
+
+ALTER TABLE IF EXISTS ONLY public.lines
+DROP CONSTRAINT IF EXISTS idx_16407_lines_pkey;
+
+ALTER TABLE IF EXISTS ONLY public.line_aliases
+DROP CONSTRAINT IF EXISTS idx_16403_line_aliases_pkey;
+
+ALTER TABLE IF EXISTS ONLY public.connections
+DROP CONSTRAINT IF EXISTS idx_16399_connections_pkey;
+
+ALTER TABLE IF EXISTS ONLY public.companies
+DROP CONSTRAINT IF EXISTS idx_16394_companies_pkey;
+
+ALTER TABLE IF EXISTS ONLY public.aliases
+DROP CONSTRAINT IF EXISTS idx_16389_aliases_pkey;
+
 ALTER TABLE IF EXISTS public.types ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.station_station_types ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.line_aliases ALTER COLUMN id DROP DEFAULT;
+
+ALTER TABLE IF EXISTS public.station_station_types
+ALTER COLUMN id
+DROP DEFAULT;
+
+ALTER TABLE IF EXISTS public.line_aliases
+ALTER COLUMN id
+DROP DEFAULT;
+
 DROP SEQUENCE IF EXISTS public.types_id_seq;
+
 DROP TABLE IF EXISTS public.types;
+
 DROP TABLE IF EXISTS public.stations;
-DROP SEQUENCE IF EXISTS public.station_station_types_id_seq;
+
 DROP TABLE IF EXISTS public.station_station_types;
+
 DROP TABLE IF EXISTS public.lines;
+
 DROP SEQUENCE IF EXISTS public.line_aliases_id_seq;
+
 DROP TABLE IF EXISTS public.line_aliases;
+
 DROP TABLE IF EXISTS public.connections;
+
 DROP TABLE IF EXISTS public.companies;
+
 DROP TABLE IF EXISTS public.aliases;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -75,7 +141,6 @@ CREATE UNLOGGED TABLE public.aliases (
     line_name_ko text,
     line_color_c text
 );
-
 
 ALTER TABLE public.aliases OWNER TO stationapi;
 
@@ -98,7 +163,6 @@ CREATE UNLOGGED TABLE public.companies (
     e_sort integer NOT NULL
 );
 
-
 ALTER TABLE public.companies OWNER TO stationapi;
 
 --
@@ -112,7 +176,6 @@ CREATE UNLOGGED TABLE public.connections (
     distance real DEFAULT '0'::real
 );
 
-
 ALTER TABLE public.connections OWNER TO stationapi;
 
 --
@@ -125,20 +188,15 @@ CREATE UNLOGGED TABLE public.line_aliases (
     alias_cd integer NOT NULL
 );
 
-
 ALTER TABLE public.line_aliases OWNER TO stationapi;
 
 --
 -- Name: line_aliases_id_seq; Type: SEQUENCE; Schema: public; Owner: stationapi
 --
 
-CREATE SEQUENCE public.line_aliases_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
+CREATE SEQUENCE public.line_aliases_id_seq START
+WITH
+    1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1;
 
 ALTER SEQUENCE public.line_aliases_id_seq OWNER TO stationapi;
 
@@ -147,7 +205,6 @@ ALTER SEQUENCE public.line_aliases_id_seq OWNER TO stationapi;
 --
 
 ALTER SEQUENCE public.line_aliases_id_seq OWNED BY public.line_aliases.id;
-
 
 --
 -- Name: lines; Type: TABLE; Schema: public; Owner: stationapi
@@ -182,7 +239,6 @@ CREATE UNLOGGED TABLE public.lines (
     average_distance real DEFAULT '0'::real
 );
 
-
 ALTER TABLE public.lines OWNER TO stationapi;
 
 --
@@ -190,36 +246,14 @@ ALTER TABLE public.lines OWNER TO stationapi;
 --
 
 CREATE UNLOGGED TABLE public.station_station_types (
-    id integer NOT NULL,
+    id SERIAL NOT NULL,
     station_cd integer NOT NULL,
     type_cd integer NOT NULL,
     line_group_cd integer NOT NULL,
     pass integer DEFAULT '0'::integer
 );
 
-
 ALTER TABLE public.station_station_types OWNER TO stationapi;
-
---
--- Name: station_station_types_id_seq; Type: SEQUENCE; Schema: public; Owner: stationapi
---
-
-CREATE SEQUENCE public.station_station_types_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.station_station_types_id_seq OWNER TO stationapi;
-
---
--- Name: station_station_types_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: stationapi
---
-
-ALTER SEQUENCE public.station_station_types_id_seq OWNED BY public.station_station_types.id;
-
 
 --
 -- Name: stations; Type: TABLE; Schema: public; Owner: stationapi
@@ -251,7 +285,6 @@ CREATE UNLOGGED TABLE public.stations (
     e_sort integer NOT NULL
 );
 
-
 ALTER TABLE public.stations OWNER TO stationapi;
 
 --
@@ -272,20 +305,15 @@ CREATE UNLOGGED TABLE public.types (
     priority integer NOT NULL DEFAULT '0'::integer
 );
 
-
 ALTER TABLE public.types OWNER TO stationapi;
 
 --
 -- Name: types_id_seq; Type: SEQUENCE; Schema: public; Owner: stationapi
 --
 
-CREATE SEQUENCE public.types_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
+CREATE SEQUENCE public.types_id_seq START
+WITH
+    1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1;
 
 ALTER SEQUENCE public.types_id_seq OWNER TO stationapi;
 
@@ -295,59 +323,53 @@ ALTER SEQUENCE public.types_id_seq OWNER TO stationapi;
 
 ALTER SEQUENCE public.types_id_seq OWNED BY public.types.id;
 
-
 --
 -- Name: line_aliases id; Type: DEFAULT; Schema: public; Owner: stationapi
 --
 
-ALTER TABLE ONLY public.line_aliases ALTER COLUMN id SET DEFAULT nextval('public.line_aliases_id_seq'::regclass);
-
-
---
--- Name: station_station_types id; Type: DEFAULT; Schema: public; Owner: stationapi
---
-
-ALTER TABLE ONLY public.station_station_types ALTER COLUMN id SET DEFAULT nextval('public.station_station_types_id_seq'::regclass);
-
+ALTER TABLE ONLY public.line_aliases
+ALTER COLUMN id
+SET DEFAULT nextval(
+    'public.line_aliases_id_seq'::regclass
+);
 
 --
 -- Name: types id; Type: DEFAULT; Schema: public; Owner: stationapi
 --
 
-ALTER TABLE ONLY public.types ALTER COLUMN id SET DEFAULT nextval('public.types_id_seq'::regclass);
-
+ALTER TABLE ONLY public.types
+ALTER COLUMN id
+SET DEFAULT nextval(
+    'public.types_id_seq'::regclass
+);
 
 --
 -- Name: aliases idx_16389_aliases_pkey; Type: CONSTRAINT; Schema: public; Owner: stationapi
 --
 
 ALTER TABLE ONLY public.aliases
-    ADD CONSTRAINT idx_16389_aliases_pkey PRIMARY KEY (id);
-
+ADD CONSTRAINT idx_16389_aliases_pkey PRIMARY KEY (id);
 
 --
 -- Name: companies idx_16394_companies_pkey; Type: CONSTRAINT; Schema: public; Owner: stationapi
 --
 
 ALTER TABLE ONLY public.companies
-    ADD CONSTRAINT idx_16394_companies_pkey PRIMARY KEY (company_cd);
-
+ADD CONSTRAINT idx_16394_companies_pkey PRIMARY KEY (company_cd);
 
 --
 -- Name: lines idx_16407_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: stationapi
 --
 
 ALTER TABLE ONLY public.lines
-    ADD CONSTRAINT idx_16407_lines_pkey PRIMARY KEY (line_cd);
-
+ADD CONSTRAINT idx_16407_lines_pkey PRIMARY KEY (line_cd);
 
 --
 -- Name: stations idx_16426_stations_pkey; Type: CONSTRAINT; Schema: public; Owner: stationapi
 --
 
 ALTER TABLE ONLY public.stations
-    ADD CONSTRAINT idx_16426_stations_pkey PRIMARY KEY (station_cd);
-
+ADD CONSTRAINT idx_16426_stations_pkey PRIMARY KEY (station_cd);
 
 --
 -- Name: idx_16403_line_aliases_alias_cd; Type: INDEX; Schema: public; Owner: stationapi
@@ -355,13 +377,11 @@ ALTER TABLE ONLY public.stations
 
 CREATE INDEX idx_16403_line_aliases_alias_cd ON public.line_aliases USING btree (alias_cd);
 
-
 --
 -- Name: idx_16403_line_aliases_station_cd; Type: INDEX; Schema: public; Owner: stationapi
 --
 
 CREATE INDEX idx_16403_line_aliases_station_cd ON public.line_aliases USING btree (station_cd);
-
 
 --
 -- Name: idx_16407_lines_company_cd; Type: INDEX; Schema: public; Owner: stationapi
@@ -369,13 +389,11 @@ CREATE INDEX idx_16403_line_aliases_station_cd ON public.line_aliases USING btre
 
 CREATE INDEX idx_16407_lines_company_cd ON public.lines USING btree (company_cd);
 
-
 --
 -- Name: idx_16407_lines_e_sort; Type: INDEX; Schema: public; Owner: stationapi
 --
 
 CREATE INDEX idx_16407_lines_e_sort ON public.lines USING btree (e_sort);
-
 
 --
 -- Name: idx_16421_station_station_types_line_group_cd; Type: INDEX; Schema: public; Owner: stationapi
@@ -383,13 +401,11 @@ CREATE INDEX idx_16407_lines_e_sort ON public.lines USING btree (e_sort);
 
 CREATE INDEX idx_16421_station_station_types_line_group_cd ON public.station_station_types USING btree (line_group_cd);
 
-
 --
 -- Name: idx_16421_station_station_types_station_cd; Type: INDEX; Schema: public; Owner: stationapi
 --
 
 CREATE INDEX idx_16421_station_station_types_station_cd ON public.station_station_types USING btree (station_cd);
-
 
 --
 -- Name: idx_16421_station_station_types_type_cd; Type: INDEX; Schema: public; Owner: stationapi
@@ -397,13 +413,11 @@ CREATE INDEX idx_16421_station_station_types_station_cd ON public.station_statio
 
 CREATE INDEX idx_16421_station_station_types_type_cd ON public.station_station_types USING btree (type_cd);
 
-
 --
 -- Name: idx_16426_stations_e_sort_station_cd; Type: INDEX; Schema: public; Owner: stationapi
 --
 
 CREATE INDEX idx_16426_stations_e_sort_station_cd ON public.stations USING btree (e_sort, station_cd);
-
 
 --
 -- Name: idx_16426_stations_lat_lon; Type: INDEX; Schema: public; Owner: stationapi
@@ -411,13 +425,11 @@ CREATE INDEX idx_16426_stations_e_sort_station_cd ON public.stations USING btree
 
 CREATE INDEX idx_16426_stations_lat_lon ON public.stations USING btree (lat, lon);
 
-
 --
 -- Name: idx_16426_stations_line_cd; Type: INDEX; Schema: public; Owner: stationapi
 --
 
 CREATE INDEX idx_16426_stations_line_cd ON public.stations USING btree (line_cd);
-
 
 --
 -- Name: idx_16426_stations_station_g_cd; Type: INDEX; Schema: public; Owner: stationapi
@@ -425,61 +437,53 @@ CREATE INDEX idx_16426_stations_line_cd ON public.stations USING btree (line_cd)
 
 CREATE INDEX idx_16426_stations_station_g_cd ON public.stations USING btree (station_g_cd);
 
-
 --
 -- Name: idx_16432_types_type_cd; Type: INDEX; Schema: public; Owner: stationapi
 --
 
 CREATE UNIQUE INDEX idx_16432_types_type_cd ON public.types USING btree (type_cd);
 
-
 --
 -- Name: line_aliases line_aliases_alias_cd_fkey; Type: FK CONSTRAINT; Schema: public; Owner: stationapi
 --
 
 ALTER TABLE ONLY public.line_aliases
-    ADD CONSTRAINT line_aliases_alias_cd_fkey FOREIGN KEY (alias_cd) REFERENCES public.aliases(id);
-
+ADD CONSTRAINT line_aliases_alias_cd_fkey FOREIGN KEY (alias_cd) REFERENCES public.aliases (id);
 
 --
 -- Name: line_aliases line_aliases_station_cd_fkey; Type: FK CONSTRAINT; Schema: public; Owner: stationapi
 --
 
 ALTER TABLE ONLY public.line_aliases
-    ADD CONSTRAINT line_aliases_station_cd_fkey FOREIGN KEY (station_cd) REFERENCES public.stations(station_cd);
-
+ADD CONSTRAINT line_aliases_station_cd_fkey FOREIGN KEY (station_cd) REFERENCES public.stations (station_cd);
 
 --
 -- Name: lines lines_company_cd_fkey; Type: FK CONSTRAINT; Schema: public; Owner: stationapi
 --
 
 ALTER TABLE ONLY public.lines
-    ADD CONSTRAINT lines_company_cd_fkey FOREIGN KEY (company_cd) REFERENCES public.companies(company_cd);
-
+ADD CONSTRAINT lines_company_cd_fkey FOREIGN KEY (company_cd) REFERENCES public.companies (company_cd);
 
 --
 -- Name: station_station_types station_station_types_station_cd_fkey; Type: FK CONSTRAINT; Schema: public; Owner: stationapi
 --
 
 ALTER TABLE ONLY public.station_station_types
-    ADD CONSTRAINT station_station_types_station_cd_fkey FOREIGN KEY (station_cd) REFERENCES public.stations(station_cd);
-
+ADD CONSTRAINT station_station_types_station_cd_fkey FOREIGN KEY (station_cd) REFERENCES public.stations (station_cd);
 
 --
 -- Name: station_station_types station_station_types_type_cd_fkey; Type: FK CONSTRAINT; Schema: public; Owner: stationapi
 --
 
 ALTER TABLE ONLY public.station_station_types
-    ADD CONSTRAINT station_station_types_type_cd_fkey FOREIGN KEY (type_cd) REFERENCES public.types(type_cd);
-
+ADD CONSTRAINT station_station_types_type_cd_fkey FOREIGN KEY (type_cd) REFERENCES public.types (type_cd);
 
 --
 -- Name: stations stations_line_cd_fkey; Type: FK CONSTRAINT; Schema: public; Owner: stationapi
 --
 
 ALTER TABLE ONLY public.stations
-    ADD CONSTRAINT stations_line_cd_fkey FOREIGN KEY (line_cd) REFERENCES public.lines(line_cd);
-
+ADD CONSTRAINT stations_line_cd_fkey FOREIGN KEY (line_cd) REFERENCES public.lines (line_cd);
 
 --
 -- PostgreSQL database dump complete

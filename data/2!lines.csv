@@ -458,13 +458,13 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99405,158,長野電鉄長野線,ナガノデンテツナガノセン,長野電鉄長野線,Nagano Electric Railway Nagano Line,Nagano Electric Railway Nagano Line,,,#E21919,2,N,,,,#E21919,,,,ROUND,,,,0,99405,1335.199537
 99406,158,長野電鉄屋代線,ナガノデンテツヤシロセン,長野電鉄屋代線,Nagano Electric Railway Yashiro Line,Nagano Electric Railway Yashiro Line,,,#E21919,2,Y,,,,#E21919,,,,ROUND,,,,2,99406,1909.79814
 99407,159,上高地線,カミコウチセン,アルピコ交通上高地線,Kamikochi Line,Kamikochi Line,,,#465DAA,2,AK,,,,#465DAA,,,,ROUND,,,,0,99407,1086.699348
-99408,160,富山地鉄本線,トヤマチテツホンセン,富山地鉄本線,Toyama Chiho Railway Main Line,Toyama Chiho Railway Main Line,,,#1D1686,2,T,,,,,,,,,,,,0,99408,1299.637637
-99409,160,富山地鉄立山線,トヤマチテツタテヤマセン,富山地鉄立山線,Toyama Chiho Railway Tateyama Line,Toyama Chiho Railway Tateyama Line,,,#008000,2,T,,,,,,,,,,,,0,99409,1801.160048
-99410,160,富山地鉄不二越・上滝線,トヤマチテツフジコシ・カミダキセン,富山地鉄不二越・上滝線,Toyama Chiho Railway Fujikoshi-Kamidaki Line,Toyama Chiho Railway Fujikoshi-Kamidaki Line,,,#7E490A,2,T,,,,,,,,,,,,0,99410,1129.48993
+99408,160,富山地鉄本線,トヤマチテツホンセン,富山地鉄本線,Toyama Chiho Railway Main Line,Toyama Chiho Railway Main Line,,,#1D1686,2,T,,,,#1D1686,,,,SQUARE,,,,0,99408,1299.637637
+99409,160,富山地鉄立山線,トヤマチテツタテヤマセン,富山地鉄立山線,Toyama Chiho Railway Tateyama Line,Toyama Chiho Railway Tateyama Line,,,#008000,2,T,,,,#008000,,,,SQUARE,,,,0,99409,1801.160048
+99410,160,富山地鉄不二越・上滝線,トヤマチテツフジコシ・カミダキセン,富山地鉄不二越・上滝線,Toyama Chiho Railway Fujikoshi-Kamidaki Line,Toyama Chiho Railway Fujikoshi-Kamidaki Line,,,#7E490A,2,T,,,,#7E490A,,,,SQUARE,,,,0,99410,1129.48993
 99411,161,神岡鉄道神岡線,カミオカテツドウカミオカセン,神岡鉄道神岡線,Kamioka Railway Kamioka Line,Kamioka Railway Kamioka Line,,,#DC4C14,2,,,,,,,,,,,,,2,99411,2665.108373
 99412,162,黒部峡谷鉄道本線,クロベキョウコクテツドウホンセン,黒部峡谷鉄道本線,Kurobe Gorge Main Line,Kurobe Gorge Main Line,,,#EE7700,2,,,,,,,,,,,,,0,99412,5058.651672
-99413,160,富山地鉄市内線【１・２系統】,トヤマチテツシナイセン,富山地鉄市内線,Toyama City Tram Line Route 1/2,Toyama City Tram Line Route 1/2,,,#EF1731,4,C,,,,,,,,,,,,0,99413,349.5224301
-99422,160,富山地鉄富山都心線【３系統(環状線)】,トヤマチテツトヤマトシンセン,富山地鉄富山都心線,Toyama City Tram Line Route 3,Toyama City Tram Line Route 3,,,#4243BE,4,C,,,,,,,,,,,,0,99413,157.987708
+99413,160,富山地鉄市内線【１・２系統】,トヤマチテツシナイセン,富山地鉄市内線,Toyama City Tram Line Route 1/2,Toyama City Tram Line Route 1/2,,,#EF1731,4,C,,,,#EF1731,,,,ROUND,,,,0,99413,349.5224301
+99422,160,富山地鉄富山都心線【３系統(環状線)】,トヤマチテツトヤマトシンセン,富山地鉄富山都心線,Toyama City Tram Line Route 3,Toyama City Tram Line Route 3,,,#4243BE,4,C,,,,#4243BE,,,,ROUND,,,,0,99413,157.987708
 99414,163,万葉線,マンヨウセン,万葉線,Manyo Line,Manyo Line,,,#FF0B4B,4,,,,,,,,,,,,,0,99414,521.089882
 99415,160,富山港線,トヤマコウセン,富山港線,Toyamako line,Toyamako line,,,#3698C4,4,C,,,,,,,,,,,,0,99415,545.37464
 99416,165,北陸鉄道石川線,ホクリクテツドウイシカワセン,北陸鉄道石川線,Hokuriku Railroad Ishikawa Line,Hokuriku Railroad Ishikawa Line,,,#A9731E,2,I,,,,,,,,,,,,0,99416,854.0732615

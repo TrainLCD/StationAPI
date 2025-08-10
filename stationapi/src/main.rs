@@ -96,6 +96,8 @@ async fn import_csv() -> Result<(), Box<dyn std::error::Error>> {
 
                     if col.is_empty() {
                         Some("NULL".to_string())
+                    } else if col == "DEFAULT" {
+                        Some("DEFAULT".to_string())
                     } else {
                         Some(format!(
                             "'{}'",
