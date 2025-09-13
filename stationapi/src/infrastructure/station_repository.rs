@@ -1006,10 +1006,10 @@ impl InternalStationRepository {
                 l.line_symbol3_shape,
                 l.line_symbol4_shape,
                 COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
+                from_sst.line_group_cd, -- has_train_types用
                 NULL::int AS type_id,
                 NULL::int AS sst_id,
                 NULL::int AS type_cd,
-                NULL::int AS line_group_cd,
                 NULL::int AS pass,
                 NULL::text AS type_name,
                 NULL::text AS type_name_k,
@@ -1276,10 +1276,10 @@ impl InternalStationRepository {
             lin.line_symbol3_shape,
             lin.line_symbol4_shape,
             COALESCE(lin.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
+            sst.line_group_cd, -- has_train_types用
             NULL::int AS type_id,
             NULL::int AS sst_id,
             NULL::int AS type_cd,
-            NULL::int AS line_group_cd,
             NULL::int AS pass,
             NULL::text AS type_name,
             NULL::text AS type_name_k,
