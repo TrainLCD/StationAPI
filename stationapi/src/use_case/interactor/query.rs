@@ -559,7 +559,7 @@ where
                     if let Some(tt_line) =
                         tt_lines.iter_mut().find(|line| line.line_cd == row.line_cd)
                     {
-                        tt_line.line_symbols = self.get_line_symbols(&tt_line);
+                        tt_line.line_symbols = self.get_line_symbols(tt_line);
 
                         let train_type = match row.type_id.is_some() {
                             true => Some(Box::new(TrainType {
