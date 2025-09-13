@@ -388,9 +388,9 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99107,103,ふるさと銀河線,フルサトギンガセン,北海道ちほく高原鉄道ふるさと銀河線,Furusato Ginga Line,Furusato Ginga Line,,,#B63238,2,,,,,,,,,,,,,2,99107,4085.421449
 99108,248,道南いさりび鉄道線,ドウナンイサリビテツドウセン,道南いさりび鉄道線,South Hokkaido Railway Line,South Hokkaido Railway Line,,,#246DAC,2,sh,H,,,#246DAC,#0072BC,,,REVERSED_ROUND,ROUND,,,0,99108,3054.760803
 99201,104,津軽鉄道線,ツガルテツドウセン,津軽鉄道線,Tsugaru Railway Line,Tsugaru Railway Line,,,#8D8335,2,,,,,,,,,,,,,0,99201,1788.236219
-99202,105,弘南鉄道弘南線,コウナンテツドウコウナンセン,弘南鉄道弘南線,Konan Railway Konan Line,Konan Railway Konan Line,,,#1E9B49,2,,,,,,,,,,,,,0,99202,1322.903674
-99203,105,弘南鉄道大鰐線,コウナンテツドウオオワニセン,弘南鉄道大鰐線,Konan Railway Owani Line,Konan Railway Owani Line,,,#F39918,2,,,,,,,,,,,,,0,99203,1036.356749
-99204,106,十和田観光電鉄,トワダカンコウデンテツ,十和田観光電鉄,Towada Kanko Electric Railway Line,Towada Kanko Electric Railway Line,,,#2826FE,2,,,,,,,,,,,,,2,99204,1377.203599
+99202,105,弘南鉄道弘南線,コウナンテツドウコウナンセン,弘南鉄道弘南線,Konan Railway Konan Line,Konan Railway Konan Line,,,#1E9B49,2,KK,,,,#231816,,,,REVERSED_ROUND,,,,0,99202,1322.903674
+99203,105,弘南鉄道大鰐線,コウナンテツドウオオワニセン,弘南鉄道大鰐線,Konan Railway Owani Line,Konan Railway Owani Line,,,#F39918,2,KW,,,,#D80C18,,,,REVERSED_ROUND,,,,0,99203,1036.356749
+99204,106,十和田観光電鉄線,トワダカンコウデンテツセン,十和田観光電鉄線,Towada Kanko Electric Railway Line,Towada Kanko Electric Railway Line,,,#2826FE,2,,,,,,,,,,,,,2,99204,1377.203599
 99205,107,いわて銀河鉄道線,イワテギンガテツドウセン,いわて銀河鉄道線,Iwate Galaxy Railway Line,Iwate Galaxy Railway Line,,,#003399,2,,,,,,,,,,,,,0,99205,4528.568076
 99206,108,青い森鉄道線,アオイモリテツドウセン,青い森鉄道線,Aoimori Railway Line,Aoimori Railway Line,,,#00FFFF,2,,,,,,,,,,,,,0,99206,4446.902385
 99207,109,三陸鉄道北リアス線,サンリクテツドウキタリアスセン,三陸鉄道北リアス線,Sanriku Railway North Rias Line,Sanriku Railway North Rias Line,,,#EC6821,2,,,,,,,,,,,,,2,99207,0
@@ -400,8 +400,8 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99211,112,フラワー長井線,ヤマガタテツドウフラワーナガイセン,山形鉄道フラワー長井線,Flower Nagai Line,Flower Nagai Line,,,#F892F4,2,,,,,,,,,,,,,0,99211,1821.305787
 99212,113,くりはら田園鉄道線,クリハラデンエンテツドウセン,くりはら田園鉄道線,Kurihara Den'en Railway Line,Kurihara Den'en Railway Line,,,#8E2229,2,,,,,,,,,,,,,2,99212,1661.011168
 99213,114,阿武隈急行線,アブクマキュウコウセン,阿武隈急行線,Abukuma Express Line,Abukuma Express Line,,,#37CB7F,2,,,,,,,,,,,,,0,99213,2275.16124
-99214,115,仙台市営地下鉄南北線,センダイシエイチカテツナンボクセン,仙台市営地下鉄南北線,Sendai Subway Namboku Line,Sendai Subway Namboku Line,,,#339966,3,N,,,,#339966,,,,ROUND,,,,0,99214,864.0913804
-99218,115,仙台市営地下鉄東西線,センダイシエイチカテツトウザイセン,仙台市営地下鉄東西線,Sendai Subway Tozai Line,Sendai Subway Tozai Line,,,#00B1DD,3,T,,,,#00B1DD,,,,ROUND,,,,0,99214,1021.556907
+99214,115,仙台市地下鉄南北線,センダイシチカテツナンボクセン,仙台市地下鉄南北線,Sendai Subway Namboku Line,Sendai Subway Namboku Line,,,#339966,3,N,,,,#339966,,,,ROUND,,,,0,99214,864.0913804
+99218,115,仙台市地下鉄東西線,センダイシチカテツトウザイセン,仙台市地下鉄東西線,Sendai Subway Tozai Line,Sendai Subway Tozai Line,,,#00B1DD,3,T,,,,#00B1DD,,,,ROUND,,,,0,99214,1021.556907
 99215,116,福島交通飯坂線,フクシマシエイコウツウイイザカセン,福島交通飯坂線,Fukushima Kotsu Iizaka Line,Fukushima Kotsu Iizaka Line,,,#BFBFFF,2,,,,,,,,,,,,,0,99215,835.8891618
 99216,117,会津鉄道会津線,アイヅテツドウアイヅセン,会津鉄道会津線,Aizu Railway Aizu Line,Aizu Railway Aizu Line,,,#265613,2,,,,,,,,,,,,,0,99216,2658.546097
 99217,118,仙台空港線,センダイクウコウセン,仙台空港鉄道仙台空港線,Sendai Airport Line,Sendai Airport Line,,,#2A5CAA,2,,,,,,,,,,,,,0,99217,2019.273543
@@ -445,10 +445,10 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99336,148,東京モノレール,トウキョウモノレール,東京モノレール羽田空港線,Tokyo Monorail,Tokyo Monorail,东京单轨电车,도쿄 모노레일,#003686,5,MO,,,,#003686,,,,SQUARE,,,,0,99336,1609.51379
 99337,149,りんかい線,リンカイセン,東京臨海高速鉄道りんかい線,Rinkai Line,Rinkai Line,临海线,린카이선,#00418E,2,R,,,,#00418E,,,,TWR,,,,0,99337,1673.813084
 99338,150,東葉高速線,トウヨウコウソクセン,東葉高速鉄道東葉高速線,Toyo Rapid Railway Line,Toyo Rapid Railway Line,东叶高速线,도요 고속선,#66CC00,2,TR,,,,#66CC00,,,,ROUND,,,,0,99338,2009.696066
-99339,151,箱根登山鉄道鉄道線,ハコネトザンテツドウテツドウセン,箱根登山鉄道鉄道線,Hakone Tozan Line,Hakone Tozan Line,箱根登山铁道铁道线,하코네 등산 철도 철도선,#F04A00,2,OH,,,,#F04A00,,,,HAKONE,,,,0,99339,1172.462564
+99339,151,箱根登山線,ハコネトザンセン,小田急箱根鉄道線,Hakone Tozan Line,Hakone Tozan Line,箱根登山线,하코네 등산선,#F04A00,2,OH,,,,#F04A00,,,,HAKONE,,,,0,99339,1172.462564
 99340,152,北総鉄道北総線,ホクソウテツドウホクソウセン,北総鉄道北総線,Hokuso Line,Hokuso Line,北总铁道北总线,호쿠소 철도 호쿠소선,#3333FF,2,HS,KS,,,#3333FF,#005AAA,,,KEISEI,KEISEI,,,0,99340,2271.844657
 99341,153,野岩鉄道会津鬼怒川線,ヤガンテツドウアイヅキヌガワセン,野岩鉄道会津鬼怒川線,Yagan Railway Aizu Kinugawa Line,Yagan Railway Aizu Kinugawa Line,,,#00733C,2,,,,,,,,,,,,,0,99341,3614.444944
-99344,151,箱根登山ケーブルカー,ハコネトザンケーブルカー,箱根登山鉄道鋼索線,Hakone Tozan Cable Car,Hakone Tozan Cable Car,,,#BE3C27,0,,,,,,,,,,,,,0,99344,248.4990513
+99344,151,箱根登山ケーブルカー,ハコネトザンケーブルカー,小田急箱根鋼索線,Hakone Tozan Cable Car,Hakone Tozan Cable Car,,,#BE3C27,0,,,,,,,,,,,,,0,99344,248.4990513
 99345,250,芳賀・宇都宮LRT,ウツノミヤハガライトレールセン,宇都宮芳賀ライトレール線,Haga Utsunomiya LRT,Haga Utsunomiya LRT,芳贺/宇都宫LRT,하가 · 우츠노미야 LRT,#F9BE00,4,,,,,,,,,MONOCHROME_ROUND,,,,0,99345,774.0935022
 99401,154,富士急行線,フジキュウコウセン,富士急行線,Fujikyuko Line,Fujikyuko Line,,,#E83917,2,FJ,,,,#000000,,,,ROUND,,,,0,99401,1406.611505
 99402,155,北越急行ほくほく線,ホクエツキュウコウホクホクセン,北越急行ほくほく線,Hokuhoku Line,Hokuhoku Line,,,#CC3366,2,,,,,,,,,,,,,0,99402,5225.959771
@@ -567,7 +567,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99705,218,井原線,イバラセン,井原鉄道井原線,Ibara Line,Ibara Line,,,#00AD66,2,,,,,,,,,,,,,0,99705,2869.876875
 99706,219,東山線,ヒガシヤマセン,岡山電軌東山本線,Higashiyama Line,Higashiyama Line,,,#EF1731,4,H,,,,#EF1731,,,,ROUND,,,,0,99706,321.472682
 99707,219,清輝橋線,セイキバシセン,岡山電軌清輝橋線,Seikibashi Line,Seikibashi Line,,,#07502B,4,S,,,,#07502B,,,,ROUND,,,,0,99707,256.5629164
-99708,220,スカイレールみどり坂線,スカイレールミドリザカセン,広島短距離交通瀬野線,Skyrail Midorizaka Line,Skyrail Midorizaka Line,,,#F9F9F9,5,,,,,,,,,,,,,0,99708,591.7263347
+99708,220,スカイレールみどり坂線,スカイレールミドリザカセン,広島短距離交通瀬野線,Skyrail Midorizaka Line,Skyrail Midorizaka Line,,,#F9F9F9,5,,,,,,,,,,,,,2,99708,591.7263347
 99709,221,アストラムライン,アストラムライン,広島高速交通広島新交通1号線,Astram Line,Astram Line,,,#FFA500,5,,,,,,,,,,,,,0,99709,850.3427213
 99710,222,広電１号線(宇品線),ヒロデンイチゴウセン,広電１号線(宇品線),Hiroden Ujina Line,Hiroden Ujina Line,,,#FF5900,4,M,U,,,#00A85F,#0092D7,,,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,,,0,99710,297.6649521
 99711,222,広電２号線(宮島線),ヒロデンニゴウセン,広電２号線(宮島線),Hiroden Miyajima Line,Hiroden Miyajima Line,,,#EF1731,4,M,,,,#00A85F,,,,REVERSED_ROUND_HORIZONTAL,,,,0,99711,525.4362883
