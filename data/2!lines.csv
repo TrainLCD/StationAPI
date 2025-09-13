@@ -388,8 +388,8 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99107,103,ふるさと銀河線,フルサトギンガセン,北海道ちほく高原鉄道ふるさと銀河線,Furusato Ginga Line,Furusato Ginga Line,,,#B63238,2,,,,,,,,,,,,,2,99107,4085.421449
 99108,248,道南いさりび鉄道線,ドウナンイサリビテツドウセン,道南いさりび鉄道線,South Hokkaido Railway Line,South Hokkaido Railway Line,,,#246DAC,2,sh,H,,,#246DAC,#0072BC,,,REVERSED_ROUND,ROUND,,,0,99108,3054.760803
 99201,104,津軽鉄道線,ツガルテツドウセン,津軽鉄道線,Tsugaru Railway Line,Tsugaru Railway Line,,,#8D8335,2,,,,,,,,,,,,,0,99201,1788.236219
-99202,105,弘南鉄道弘南線,コウナンテツドウコウナンセン,弘南鉄道弘南線,Konan Railway Konan Line,Konan Railway Konan Line,,,#1E9B49,2,,,,,,,,,,,,,0,99202,1322.903674
-99203,105,弘南鉄道大鰐線,コウナンテツドウオオワニセン,弘南鉄道大鰐線,Konan Railway Owani Line,Konan Railway Owani Line,,,#F39918,2,,,,,,,,,,,,,0,99203,1036.356749
+99202,105,弘南鉄道弘南線,コウナンテツドウコウナンセン,弘南鉄道弘南線,Konan Railway Konan Line,Konan Railway Konan Line,,,#1E9B49,2,KK,,,,#231816,,,,REVERSED_ROUND,,,,0,99202,1322.903674
+99203,105,弘南鉄道大鰐線,コウナンテツドウオオワニセン,弘南鉄道大鰐線,Konan Railway Owani Line,Konan Railway Owani Line,,,#F39918,2,KW,,,,#D80C18,,,,REVERSED_ROUND,,,,0,99203,1036.356749
 99204,106,十和田観光電鉄線,トワダカンコウデンテツセン,十和田観光電鉄線,Towada Kanko Electric Railway Line,Towada Kanko Electric Railway Line,,,#2826FE,2,,,,,,,,,,,,,2,99204,1377.203599
 99205,107,いわて銀河鉄道線,イワテギンガテツドウセン,いわて銀河鉄道線,Iwate Galaxy Railway Line,Iwate Galaxy Railway Line,,,#003399,2,,,,,,,,,,,,,0,99205,4528.568076
 99206,108,青い森鉄道線,アオイモリテツドウセン,青い森鉄道線,Aoimori Railway Line,Aoimori Railway Line,,,#00FFFF,2,,,,,,,,,,,,,0,99206,4446.902385
