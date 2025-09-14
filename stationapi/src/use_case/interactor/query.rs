@@ -526,16 +526,6 @@ where
             .get_route_stops(from_station_id, to_station_id)
             .await?;
 
-        let line_group_id_vec = stops
-            .iter()
-            .filter_map(|row| row.line_group_cd.map(|id| id as u32))
-            .collect::<Vec<u32>>();
-
-        let tt_lines = self
-            .line_repository
-            .get_by_line_group_id_vec_for_routes(&line_group_id_vec)
-            .await?;
-
         let route_row_tree_map: BTreeMap<i32, Vec<Station>> = stops.iter().fold(
             BTreeMap::new(),
             |mut acc: BTreeMap<i32, Vec<Station>>, value| {
@@ -548,193 +538,74 @@ where
             },
         );
 
-        let routes: Vec<Route> = route_row_tree_map
-            .iter()
-            .filter_map(|(id, stops)| {
-                let stops = stops
-                    .iter()
-                    .map(|row| {
-                        let extracted_line = self.extract_line_from_station(row);
+        let mut routes: Vec<Route> = Vec::new();
 
-                        if let Some(tt_line) =
-                            tt_lines.iter().find(|line| line.line_cd == row.line_cd)
-                        {
-                            let train_type = match row.type_id.is_some() {
-                                true => Some(Box::new(TrainType {
-                                    id: row.type_id,
-                                    station_cd: Some(row.station_cd),
-                                    type_cd: row.type_cd,
-                                    line_group_cd: row.line_group_cd,
-                                    pass: row.pass,
-                                    type_name: row.type_name.clone().unwrap_or_default(),
-                                    type_name_k: row.type_name_k.clone().unwrap_or_default(),
-                                    type_name_r: row.type_name_r.clone(),
-                                    type_name_zh: row.type_name_zh.clone(),
-                                    type_name_ko: row.type_name_ko.clone(),
-                                    color: row.color.clone().unwrap_or_default(),
-                                    direction: row.direction,
-                                    kind: row.kind,
-                                    line: Some(Box::new(tt_line.clone())),
-                                    lines: tt_lines.to_vec(),
-                                })),
-                                false => None,
-                            };
+        for (id, stops) in route_row_tree_map.iter() {
+            let line_group_id_vec = stops
+                .iter()
+                .filter_map(|row| row.line_group_cd.map(|id| id as u32))
+                .collect::<Vec<u32>>();
 
-                            let stop = Station {
-                                station_cd: row.station_cd,
-                                station_g_cd: row.station_g_cd,
-                                station_name: row.station_name.clone(),
-                                station_name_k: row.station_name_k.clone(),
-                                station_name_r: row.station_name_r.clone(),
-                                station_name_zh: row.station_name_zh.clone(),
-                                station_name_ko: row.station_name_ko.clone(),
-                                station_numbers: self.get_station_numbers(row),
-                                station_number1: row.station_number1.clone(),
-                                station_number2: row.station_number2.clone(),
-                                station_number3: row.station_number3.clone(),
-                                station_number4: row.station_number4.clone(),
-                                three_letter_code: row.three_letter_code.clone(),
-                                line_cd: row.line_cd,
-                                line: Some(Box::new(extracted_line.clone())),
-                                lines: vec![],
-                                pref_cd: row.pref_cd,
-                                post: row.post.clone(),
-                                address: row.address.clone(),
-                                lon: row.lon,
-                                lat: row.lat,
-                                open_ymd: row.open_ymd.clone(),
-                                close_ymd: row.close_ymd.clone(),
-                                e_status: row.e_status,
-                                e_sort: row.e_sort,
-                                stop_condition: row.stop_condition,
-                                distance: row.distance,
-                                train_type,
-                                has_train_types: row.has_train_types,
-                                company_cd: row.company_cd,
-                                line_name: row.line_name.clone(),
-                                line_name_k: row.line_name_k.clone(),
-                                line_name_h: row.line_name_h.clone(),
-                                line_name_r: row.line_name_r.clone(),
-                                line_name_zh: row.line_name_zh.clone(),
-                                line_name_ko: row.line_name_ko.clone(),
-                                line_color_c: row.line_color_c.clone(),
-                                line_type: row.line_type,
-                                line_symbol1: row.line_symbol1.clone(),
-                                line_symbol2: row.line_symbol2.clone(),
-                                line_symbol3: row.line_symbol3.clone(),
-                                line_symbol4: row.line_symbol4.clone(),
-                                line_symbol1_color: row.line_symbol1_color.clone(),
-                                line_symbol2_color: row.line_symbol2_color.clone(),
-                                line_symbol3_color: row.line_symbol3_color.clone(),
-                                line_symbol4_color: row.line_symbol4_color.clone(),
-                                line_symbol1_shape: row.line_symbol1_shape.clone(),
-                                line_symbol2_shape: row.line_symbol2_shape.clone(),
-                                line_symbol3_shape: row.line_symbol3_shape.clone(),
-                                line_symbol4_shape: row.line_symbol4_shape.clone(),
-                                average_distance: row.average_distance,
-                                type_id: row.type_id,
-                                sst_id: row.sst_id,
+            let mut tt_lines = self
+                .line_repository
+                .get_by_line_group_id_vec_for_routes(&line_group_id_vec)
+                .await?;
+
+            let stops = stops
+                .iter()
+                .map(|row| {
+                    let extracted_line = self.extract_line_from_station(row);
+
+                    if let Some(tt_line) =
+                        tt_lines.iter_mut().find(|line| line.line_cd == row.line_cd)
+                    {
+                        tt_line.line_symbols = self.get_line_symbols(tt_line);
+
+                        let train_type = match row.type_id.is_some() {
+                            true => Some(Box::new(TrainType {
+                                id: row.type_id,
+                                station_cd: Some(row.station_cd),
                                 type_cd: row.type_cd,
                                 line_group_cd: row.line_group_cd,
                                 pass: row.pass,
-                                type_name: row.type_name.clone(),
-                                type_name_k: row.type_name_k.clone(),
+                                type_name: row.type_name.clone().unwrap_or_default(),
+                                type_name_k: row.type_name_k.clone().unwrap_or_default(),
                                 type_name_r: row.type_name_r.clone(),
                                 type_name_zh: row.type_name_zh.clone(),
                                 type_name_ko: row.type_name_ko.clone(),
-                                color: row.color.clone(),
+                                color: row.color.clone().unwrap_or_default(),
                                 direction: row.direction,
                                 kind: row.kind,
-                            };
-
-                            return stop.into();
-                        }
-
-                        let stop = Station {
-                            station_cd: row.station_cd,
-                            station_g_cd: row.station_g_cd,
-                            station_name: row.station_name.clone(),
-                            station_name_k: row.station_name_k.clone(),
-                            station_name_r: row.station_name_r.clone(),
-                            station_name_zh: row.station_name_zh.clone(),
-                            station_name_ko: row.station_name_ko.clone(),
-                            station_numbers: self.get_station_numbers(row),
-                            station_number1: row.station_number1.clone(),
-                            station_number2: row.station_number2.clone(),
-                            station_number3: row.station_number3.clone(),
-                            station_number4: row.station_number4.clone(),
-                            three_letter_code: row.three_letter_code.clone(),
-                            line_cd: row.line_cd,
-                            line: Some(Box::new(extracted_line.clone())),
-                            lines: vec![],
-                            pref_cd: row.pref_cd,
-                            post: row.post.clone(),
-                            address: row.address.clone(),
-                            lon: row.lon,
-                            lat: row.lat,
-                            open_ymd: row.open_ymd.clone(),
-                            close_ymd: row.close_ymd.clone(),
-                            e_status: row.e_status,
-                            e_sort: row.e_sort,
-                            stop_condition: row.stop_condition,
-                            distance: row.distance,
-                            train_type: None,
-                            has_train_types: row.has_train_types,
-                            company_cd: row.company_cd,
-                            line_name: row.line_name.clone(),
-                            line_name_k: row.line_name_k.clone(),
-                            line_name_h: row.line_name_h.clone(),
-                            line_name_r: row.line_name_r.clone(),
-                            line_name_zh: row.line_name_zh.clone(),
-                            line_name_ko: row.line_name_ko.clone(),
-                            line_color_c: row.line_color_c.clone(),
-                            line_type: row.line_type,
-                            line_symbol1: row.line_symbol1.clone(),
-                            line_symbol2: row.line_symbol2.clone(),
-                            line_symbol3: row.line_symbol3.clone(),
-                            line_symbol4: row.line_symbol4.clone(),
-                            line_symbol1_color: row.line_symbol1_color.clone(),
-                            line_symbol2_color: row.line_symbol2_color.clone(),
-                            line_symbol3_color: row.line_symbol3_color.clone(),
-                            line_symbol4_color: row.line_symbol4_color.clone(),
-                            line_symbol1_shape: row.line_symbol1_shape.clone(),
-                            line_symbol2_shape: row.line_symbol2_shape.clone(),
-                            line_symbol3_shape: row.line_symbol3_shape.clone(),
-                            line_symbol4_shape: row.line_symbol4_shape.clone(),
-                            average_distance: row.average_distance,
-                            type_id: row.type_id,
-                            sst_id: row.sst_id,
-                            type_cd: row.type_cd,
-                            line_group_cd: row.line_group_cd,
-                            pass: row.pass,
-                            type_name: row.type_name.clone(),
-                            type_name_k: row.type_name_k.clone(),
-                            type_name_r: row.type_name_r.clone(),
-                            type_name_zh: row.type_name_zh.clone(),
-                            type_name_ko: row.type_name_ko.clone(),
-                            color: row.color.clone(),
-                            direction: row.direction,
-                            kind: row.kind,
+                                line: Some(Box::new(tt_line.clone())),
+                                lines: tt_lines.to_vec(),
+                            })),
+                            false => None,
                         };
 
-                        stop.into()
-                    })
-                    .collect::<Vec<proto::Station>>();
+                        let stop = self.build_station_from_row(row, &extracted_line, train_type);
 
-                // TODO: SQLで同等の処理を行う
-                let includes_requested_station = stops
-                    .iter()
-                    .any(|stop| stop.group_id == from_station_id || stop.group_id == to_station_id);
-                if !includes_requested_station {
-                    return None;
-                }
+                        return stop.into();
+                    }
 
-                Some(Route {
-                    id: *id as u32,
-                    stops,
+                    let stop = self.build_station_from_row(row, &extracted_line, None);
+
+                    stop.into()
                 })
-            })
-            .collect();
+                .collect::<Vec<proto::Station>>();
+
+            // TODO: SQLで同等の処理を行う
+            let includes_requested_station = stops
+                .iter()
+                .any(|stop| stop.group_id == from_station_id || stop.group_id == to_station_id);
+            if !includes_requested_station {
+                continue;
+            }
+
+            routes.push(Route {
+                id: *id as u32,
+                stops,
+            });
+        }
         Ok(routes)
     }
 
@@ -846,5 +717,87 @@ where
         _to_station_id: u32,
     ) -> Result<Vec<Station>, UseCaseError> {
         Ok(vec![])
+    }
+}
+
+impl<SR, LR, TR, CR> QueryInteractor<SR, LR, TR, CR>
+where
+    SR: StationRepository,
+    LR: LineRepository,
+    TR: TrainTypeRepository,
+    CR: CompanyRepository,
+{
+    fn build_station_from_row(
+        &self,
+        row: &Station,
+        extracted_line: &Line,
+        train_type: Option<Box<TrainType>>,
+    ) -> Station {
+        Station {
+            station_cd: row.station_cd,
+            station_g_cd: row.station_g_cd,
+            station_name: row.station_name.clone(),
+            station_name_k: row.station_name_k.clone(),
+            station_name_r: row.station_name_r.clone(),
+            station_name_zh: row.station_name_zh.clone(),
+            station_name_ko: row.station_name_ko.clone(),
+            station_numbers: self.get_station_numbers(row),
+            station_number1: row.station_number1.clone(),
+            station_number2: row.station_number2.clone(),
+            station_number3: row.station_number3.clone(),
+            station_number4: row.station_number4.clone(),
+            three_letter_code: row.three_letter_code.clone(),
+            line_cd: row.line_cd,
+            line: Some(Box::new(extracted_line.clone())),
+            lines: vec![],
+            pref_cd: row.pref_cd,
+            post: row.post.clone(),
+            address: row.address.clone(),
+            lon: row.lon,
+            lat: row.lat,
+            open_ymd: row.open_ymd.clone(),
+            close_ymd: row.close_ymd.clone(),
+            e_status: row.e_status,
+            e_sort: row.e_sort,
+            stop_condition: row.stop_condition,
+            distance: row.distance,
+            train_type,
+            has_train_types: row.has_train_types,
+            company_cd: row.company_cd,
+            line_name: row.line_name.clone(),
+            line_name_k: row.line_name_k.clone(),
+            line_name_h: row.line_name_h.clone(),
+            line_name_r: row.line_name_r.clone(),
+            line_name_zh: row.line_name_zh.clone(),
+            line_name_ko: row.line_name_ko.clone(),
+            line_color_c: row.line_color_c.clone(),
+            line_type: row.line_type,
+            line_symbol1: row.line_symbol1.clone(),
+            line_symbol2: row.line_symbol2.clone(),
+            line_symbol3: row.line_symbol3.clone(),
+            line_symbol4: row.line_symbol4.clone(),
+            line_symbol1_color: row.line_symbol1_color.clone(),
+            line_symbol2_color: row.line_symbol2_color.clone(),
+            line_symbol3_color: row.line_symbol3_color.clone(),
+            line_symbol4_color: row.line_symbol4_color.clone(),
+            line_symbol1_shape: row.line_symbol1_shape.clone(),
+            line_symbol2_shape: row.line_symbol2_shape.clone(),
+            line_symbol3_shape: row.line_symbol3_shape.clone(),
+            line_symbol4_shape: row.line_symbol4_shape.clone(),
+            average_distance: row.average_distance,
+            type_id: row.type_id,
+            sst_id: row.sst_id,
+            type_cd: row.type_cd,
+            line_group_cd: row.line_group_cd,
+            pass: row.pass,
+            type_name: row.type_name.clone(),
+            type_name_k: row.type_name_k.clone(),
+            type_name_r: row.type_name_r.clone(),
+            type_name_zh: row.type_name_zh.clone(),
+            type_name_ko: row.type_name_ko.clone(),
+            color: row.color.clone(),
+            direction: row.direction,
+            kind: row.kind,
+        }
     }
 }

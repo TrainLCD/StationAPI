@@ -20,10 +20,10 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 23,33,京阪電鉄,ケイハンデンテツ,京阪電気鉄道株式会社,京阪,Keihan,Keihan Electric Railway,http://www.keihan.co.jp/,2,0,23
 24,34,阪急電鉄,ハンキュウデンテツ,阪急電鉄株式会社,阪急,Hankyu,Hankyu,http://rail.hankyu.co.jp/,2,0,24
 25,35,阪神電鉄,ハンシンデンテツ,阪神電気鉄道株式会社,阪神,Hanshin,Hanshin Electric Railway,http://rail.hanshin.co.jp/,2,0,25
-26,36,西日本鉄道,ニシニホンテツドウ,西日本鉄道株式会社,西鉄,Nishitetsu,Nishi-Nippon Railroad,http://www.nishitetsu.co.jp/,2,0,26
-101,99,札幌市交通局,サッポロシコウツウキョク,札幌市交通局,札幌市交通局,Sapporo City Transportation Bureau,Sapporo City Transportation Bureau,http://www.city.sapporo.jp/st/,0,0,101
+26,36,西日本鉄道,ニシニッポンテツドウ,西日本鉄道株式会社,西鉄,Nishitetsu,Nishi-Nippon Railroad,http://www.nishitetsu.co.jp/,2,0,26
+101,99,札幌市交通局,サッポロシコウツウキョク,札幌市交通局,札幌市営地下鉄,Sapporo City Transportation Bureau,Sapporo City Transportation Bureau,http://www.city.sapporo.jp/st/,0,0,101
 252,99,札幌市交通事業振興公社,サッポロシコウツウジギョウシンコウコウシャ,一般財団法人札幌市交通事業振興公社,札幌市電,Sapporo Streetcar,Sapporo Transportation Service Promotion Corporation,https://www.stsp.or.jp/,0,0,101
-102,99,函館市交通局,ハコダテシコウツウキョク,函館市交通局,函館市電,Hakodate Transportation Bureau,Hakodate Transportation Bureau,http://www.city.hakodate.hokkaido.jp/transport/,0,0,102
+102,99,函館市企業局交通部,ハコダテシキギョウキョクコウツウブ,函館市企業局交通部,函館市電,Hakodate City Tram Department,Hakodate City Tram Department,http://www.city.hakodate.hokkaido.jp/transport/,0,0,102
 103,99,北海道ちほく高原鉄道,ホッカイドウチホクコウゲンテツドウ,北海道ちほく高原鉄道株式会社,北海道ちほく高原鉄道,Hokkaidō Chihoku Kōgen Railway,Hokkaidō Chihoku Kōgen Railway,,0,2,103
 248,99,道南いさりび鉄道,ドウナンイサリビテツドウ,道南いさりび鉄道株式会社,道南いさりび,South Hokkaido Railway,South Hokkaido Railway,http://www.shr-isaribi.jp,0,0,103
 104,99,津軽鉄道,ツガルテツドウ,津軽鉄道株式会社,津軽鉄道,Tsugaru Railway,Tsugaru Railway,http://tsutetsu.com/,0,0,104
@@ -37,7 +37,7 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 112,99,山形鉄道,ヤマガタテツドウ,山形鉄道株式会社,山形鉄道,Yamagata Railway,Yamagata Railway,http://www.flower-liner.jp/,0,0,112
 113,99,くりはら田園鉄道,クリハラデンエンテツドウ,くりはら田園鉄道株式会社,栗原電鉄,Kurihara Den'en Railway,Kurihara Den'en Railway,,0,2,113
 114,99,阿武隈急行,アブクマキュウコウ,阿武隈急行株式会社,阿武隈急行,Abukuma Express,Abukuma Express,http://www.abukyu.co.jp/,0,0,114
-115,99,仙台市交通局,センダイシコウツウキョク,仙台市交通局,仙台市営地下鉄,Sendai City Transportation Bureau,Sendai City Transportation Bureau,http://www.kotsu.city.sendai.jp/,0,0,115
+115,99,仙台市交通局,センダイシコウツウキョク,仙台市交通局,仙台市地下鉄,Sendai City Transportation Bureau,Sendai City Transportation Bureau,http://www.kotsu.city.sendai.jp/,0,0,115
 116,99,福島交通,フクシマコウツウ,福島交通株式会社,福島交通,Fukushima Transportation,Fukushima Transportation,http://www.fukushima-koutu.co.jp/,0,0,116
 117,99,会津鉄道,アイヅテツドウ,会津鉄道株式会社,会津鉄道,Aizu Railway,Aizu Railway,http://www.aizutetsudo.jp/,0,0,117
 250,99,宇都宮ライトレール,ウツノミヤライトレール,宇都宮ライトレール株式会社,宇都宮ライトレール,Utsunomiya LRT,Utsunomiya Light Rail,https://www.miyarail.co.jp/,0,0,117
@@ -74,7 +74,7 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 148,99,東京モノレール,トウキョウモノレール,東京モノレール株式会社,東京モノレール,Tokyo Monorail,Tokyo Monorail,http://www.tokyo-monorail.co.jp/,0,0,148
 149,99,東京臨海高速鉄道,トウキョウリンカイコウソクテツドウ,東京臨海高速鉄道株式会社,東京臨海高速鉄道,Rinkai,Tokyo Waterfront Area Rapid Transit,http://www.twr.co.jp/,0,0,149
 150,99,東葉高速鉄道,トウヨウコウソクテツドウ,東葉高速鉄道株式会社,東葉高速鉄道,Keiyo Railway,Keiyo Railway,http://www.toyokosoku.co.jp/,0,0,150
-151,99,箱根登山鉄道,ハコネトザンテツドウ,箱根登山鉄道株式会社,箱根登山鉄道,Hakone Tozan Railway,Hakone Tozan Railway,http://www.hakone-tozan.co.jp/,0,0,151
+151,99,小田急箱根,オダキュウハコネ,株式会社小田急箱根,小田急箱根,Odakyu Hakone,Odakyu Hakone,http://www.odakyu-hakone.jp/,0,0,151
 152,99,北総鉄道,ホクソウテツドウ,北総鉄道株式会社,北総鉄道,Hokuso Railway,Hokuso Railway,http://www.hokuso-railway.co.jp/,0,0,152
 153,99,野岩鉄道,ヤガンテツドウ,野岩鉄道株式会社,野岩鉄道,YAGANTETSUDO RAILWAY,YAGANTETSUDO RAILWAY,http://www.yagan.co.jp/,0,0,153
 154,99,富士山麓電気鉄道,フジサンロクデンキテツドウ,富士山麓電気鉄道株式会社,富士急,FUJI KYUKO,FUJI KYUKO,http://www.fujikyu.co.jp/,0,0,154
@@ -149,7 +149,7 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 217,99,水島臨海鉄道,ミズシマリンカイテツドウ,水島臨海鉄道株式会社,水島臨海鉄道,Mizushima Rinkai Railway,Mizushima Rinkai Railway,http://www.mizurin.co.jp/,0,0,215
 218,99,井原鉄道,イバラテツドウ,井原鉄道株式会社,井原鉄道,Ibara Railway,Ibara Railway,http://plus.harenet.ne.jp/~ibarasen/,0,0,216
 219,99,岡山電気軌道,オカヤマデンキキドウ,岡山電気軌道株式会社,岡電,Okayama Electric Tramway,Okayama Electric Tramway,http://www.okayama-kido.co.jp/,0,0,217
-220,99,スカイレールサービス,スカイレールサービス,スカイレールサービス株式会社,スカイレールサービス,Sky Rail Service,Sky Rail Service,,0,0,218
+220,99,スカイレールサービス,スカイレールサービス,スカイレールサービス株式会社,スカイレールサービス,Sky Rail Service,Sky Rail Service,,0,2,218
 221,99,広島高速交通,ヒロシマコウソクコウツウ,広島高速交通株式会社,広島高速交通,Hiroshima Rapid Transit,Hiroshima Rapid Transit,http://astramline.co.jp/,0,0,219
 222,99,広島電鉄,ヒロシマデンテツ,広島電鉄株式会社,広電,Hiroshima Electric Railway,Hiroshima Electric Railway,http://www.hiroden.co.jp/,0,0,220
 223,99,錦川鉄道,ニシキガワテツドウ,錦川鉄道株式会社,錦川鉄道,NISHIKIGAWA TETUDOU,NISHIKIGAWA TETUDOU,http://nishikigawa.com/,0,0,221
