@@ -571,12 +571,11 @@ impl InternalLineRepository {
             return Ok(vec![]);
         }
 
-        let params = (1..=line_group_id_vec.len())
-            .map(|i| format!("${i}"))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let query_str = format!(
-            "SELECT DISTINCT ON (l.line_cd)
+        let line_group_id_vec: Vec<i32> = line_group_id_vec.iter().map(|x| *x as i32).collect();
+
+        let rows = sqlx::query_as!(
+            LineRow,
+            "SELECT DISTINCT ON (sst.id, l.line_cd)
                 l.line_cd,
                 l.company_cd,
                 l.line_type,
@@ -607,19 +606,16 @@ impl InternalLineRepository {
                 s.station_cd,
                 s.station_g_cd
             FROM lines AS l
-            JOIN station_station_types AS sst ON sst.line_group_cd IN ( {params} ) AND sst.pass <> 1
+            JOIN station_station_types AS sst ON sst.line_group_cd = ANY($1) AND sst.pass <> 1
             JOIN stations AS s ON s.station_cd = sst.station_cd AND s.e_status = 0 AND s.line_cd = l.line_cd
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
             LEFT JOIN aliases AS a ON la.alias_cd = a.id
-            WHERE l.e_status = 0"
-        );
-
-        let mut query = sqlx::query_as::<_, LineRow>(&query_str);
-        for id in line_group_id_vec {
-            query = query.bind(id);
-        }
-
-        let rows = query.fetch_all(conn).await?;
+            WHERE l.e_status = 0
+            ORDER BY sst.id, l.line_cd",
+            &line_group_id_vec
+        )
+        .fetch_all(conn)
+        .await?;
         let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(lines)
