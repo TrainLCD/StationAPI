@@ -611,7 +611,7 @@ impl InternalLineRepository {
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
             LEFT JOIN aliases AS a ON la.alias_cd = a.id
             WHERE l.e_status = 0
-            ORDER BY sst.id",
+            ORDER BY sst.id, l.line_cd",
             &line_group_id_vec
         )
         .fetch_all(conn)
