@@ -230,7 +230,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     } else {
         Server::builder()
             .accept_http1(true)
-            .add_service(tonic_web::enable(health_service))
+            .add_service(health_service)
             .add_service(tonic_web::enable(svc))
             .add_service(tonic_web::enable(reflection_svc))
             .serve(addr)
