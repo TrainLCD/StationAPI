@@ -926,7 +926,7 @@ impl InternalStationRepository {
                 LEFT JOIN aliases AS a
                 ON a.id = la.alias_cd
                 WHERE s.e_status = 0
-                ORDER BY ((s.lat - $1) * (s.lat - $1) + (s.lon - $2) * (s.lon - $2))
+                ORDER BY point(s.lat, s.lon) <-> point($1, $2)
                 LIMIT $3"#,
         )
         .bind(latitude)
