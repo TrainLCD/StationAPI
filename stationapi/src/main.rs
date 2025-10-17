@@ -129,9 +129,7 @@ async fn import_csv() -> Result<(), Box<dyn std::error::Error>> {
             .execute(&mut conn)
             .await?;
 
-        sqlx::query("ANALYZE;")
-        .execute(&mut conn)
-        .await?;
+        sqlx::query("ANALYZE;").execute(&mut conn).await?;
     }
 
     info!("CSV import completed successfully.");
