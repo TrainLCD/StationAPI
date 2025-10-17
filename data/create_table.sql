@@ -27,6 +27,28 @@ SET client_min_messages = warning;
 
 SET row_security = off;
 
+DO $$
+BEGIN
+    BEGIN
+        EXECUTE 'CREATE EXTENSION IF NOT EXISTS pg_trgm';
+    EXCEPTION
+        WHEN insufficient_privilege THEN
+            RAISE NOTICE 'pg_trgm extension could not be created due to insufficient privileges.';
+        WHEN undefined_file THEN
+            RAISE NOTICE 'pg_trgm extension not available on this server.';
+    END;
+
+    BEGIN
+        EXECUTE 'CREATE EXTENSION IF NOT EXISTS btree_gist';
+    EXCEPTION
+        WHEN insufficient_privilege THEN
+            RAISE NOTICE 'btree_gist extension could not be created due to insufficient privileges.';
+        WHEN undefined_file THEN
+            RAISE NOTICE 'btree_gist extension not available on this server.';
+    END;
+END
+$$;
+
 ALTER TABLE IF EXISTS ONLY public.stations
 DROP CONSTRAINT IF EXISTS stations_line_cd_fkey;
 
@@ -68,6 +90,18 @@ DROP INDEX IF EXISTS public.idx_16407_lines_company_cd;
 DROP INDEX IF EXISTS public.idx_16403_line_aliases_station_cd;
 
 DROP INDEX IF EXISTS public.idx_16403_line_aliases_alias_cd;
+
+DROP INDEX IF EXISTS public.idx_performance_stations_point;
+
+DROP INDEX IF EXISTS public.idx_performance_station_name_trgm;
+
+DROP INDEX IF EXISTS public.idx_performance_station_name_k_trgm;
+
+DROP INDEX IF EXISTS public.idx_performance_station_name_rn_trgm;
+
+DROP INDEX IF EXISTS public.idx_performance_station_name_zh_trgm;
+
+DROP INDEX IF EXISTS public.idx_performance_station_name_ko_trgm;
 
 ALTER TABLE IF EXISTS ONLY public.types
 DROP CONSTRAINT IF EXISTS idx_16432_types_pkey;
@@ -436,6 +470,36 @@ CREATE INDEX idx_16426_stations_line_cd ON public.stations USING btree (line_cd)
 --
 
 CREATE INDEX idx_16426_stations_station_g_cd ON public.stations USING btree (station_g_cd);
+
+DO $$
+BEGIN
+    BEGIN
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_performance_stations_point ON public.stations USING gist ((point(lat, lon)))';
+    EXCEPTION
+        WHEN undefined_object THEN
+            RAISE NOTICE 'Skipping GiST point index; required operator class is unavailable.';
+        WHEN insufficient_privilege THEN
+            RAISE NOTICE 'Skipping GiST point index; insufficient privileges.';
+    END;
+END
+$$;
+
+DO $$
+BEGIN
+    BEGIN
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_performance_station_name_trgm ON public.stations USING gin (station_name gin_trgm_ops)';
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_performance_station_name_k_trgm ON public.stations USING gin (station_name_k gin_trgm_ops)';
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_performance_station_name_rn_trgm ON public.stations USING gin (station_name_rn gin_trgm_ops)';
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_performance_station_name_zh_trgm ON public.stations USING gin (station_name_zh gin_trgm_ops)';
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_performance_station_name_ko_trgm ON public.stations USING gin (station_name_ko gin_trgm_ops)';
+    EXCEPTION
+        WHEN undefined_object THEN
+            RAISE NOTICE 'Skipping trigram GIN indexes; gin_trgm_ops operator class is unavailable.';
+        WHEN insufficient_privilege THEN
+            RAISE NOTICE 'Skipping trigram GIN indexes; insufficient privileges.';
+    END;
+END
+$$;
 
 --
 -- Name: idx_16432_types_type_cd; Type: INDEX; Schema: public; Owner: stationapi

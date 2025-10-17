@@ -26,6 +26,15 @@ async fn import_csv() -> Result<(), Box<dyn std::error::Error>> {
     let mut conn = PgConnection::connect(&db_url).await?;
     let data_path = Path::new("data");
 
+    // Ensure required extensions exist before running schema import
+    sqlx::query("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+        .execute(&mut conn)
+        .await?;
+
+    sqlx::query("CREATE EXTENSION IF NOT EXISTS btree_gist")
+        .execute(&mut conn)
+        .await?;
+
     let create_sql_path = data_path.join("create_table.sql");
     let create_sql_content = fs::read(&create_sql_path).map_err(|e| {
         tracing::error!("Failed to read create_table.sql: {}", e);
@@ -120,6 +129,8 @@ async fn import_csv() -> Result<(), Box<dyn std::error::Error>> {
             .execute(&mut conn)
             .await?;
     }
+
+    sqlx::query("ANALYZE;").execute(&mut conn).await?;
 
     info!("CSV import completed successfully.");
 
