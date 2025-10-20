@@ -642,11 +642,20 @@ where
                     let extracted_line = self.extract_line_from_station(row);
 
                     // Add line to the lines collection
+                    let line_symbols = self.get_line_symbols(&extracted_line);
                     let line_minimal = proto::LineMinimal {
                         id: extracted_line.line_cd as u32,
                         name_short: extracted_line.line_name,
                         color: extracted_line.line_color_c.unwrap_or_default(),
                         line_type: extracted_line.line_type.unwrap_or(0),
+                        line_symbols: line_symbols
+                            .into_iter()
+                            .map(|ls| proto::LineSymbol {
+                                symbol: ls.symbol,
+                                color: ls.color,
+                                shape: ls.shape,
+                            })
+                            .collect(),
                     };
                     all_lines.insert(line_minimal.id, line_minimal);
 
