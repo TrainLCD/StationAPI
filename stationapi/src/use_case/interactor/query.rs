@@ -648,7 +648,7 @@ where
                         color: extracted_line.line_color_c.unwrap_or_default(),
                         line_type: extracted_line.line_type.unwrap_or(0),
                     };
-                    all_lines.insert(line_minimal.id, line_minimal);
+                    all_lines.entry(line_minimal.id).or_insert(line_minimal);
 
                     // Create station minimal
                     let station_numbers = self
