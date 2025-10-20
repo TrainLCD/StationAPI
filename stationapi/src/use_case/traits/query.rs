@@ -5,7 +5,7 @@ use crate::{
         company::Company, line::Line, line_symbol::LineSymbol, station::Station,
         station_number::StationNumber, train_type::TrainType,
     },
-    proto::Route,
+    proto::{Route, RouteMinimalResponse},
     use_case::error::UseCaseError,
 };
 
@@ -79,6 +79,11 @@ pub trait QueryUseCase: Send + Sync + 'static {
         from_station_id: u32,
         to_station_id: u32,
     ) -> Result<Vec<Route>, UseCaseError>;
+    async fn get_routes_minimal(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+    ) -> Result<RouteMinimalResponse, UseCaseError>;
     async fn get_train_types(
         &self,
         from_station_id: u32,

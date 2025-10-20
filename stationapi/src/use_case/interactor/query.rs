@@ -609,6 +609,91 @@ where
         Ok(routes)
     }
 
+    async fn get_routes_minimal(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+    ) -> Result<proto::RouteMinimalResponse, UseCaseError> {
+        let stops = self
+            .station_repository
+            .get_route_stops(from_station_id, to_station_id)
+            .await?;
+
+        let route_row_tree_map: BTreeMap<i32, Vec<Station>> = stops.iter().fold(
+            BTreeMap::new(),
+            |mut acc: BTreeMap<i32, Vec<Station>>, value| {
+                if let Some(line_group_cd) = value.line_group_cd {
+                    acc.entry(line_group_cd).or_default().push(value.clone());
+                } else {
+                    acc.entry(value.line_cd).or_default().push(value.clone());
+                };
+                acc
+            },
+        );
+
+        let mut routes: Vec<proto::RouteMinimal> = Vec::new();
+        let mut all_lines: std::collections::HashMap<u32, proto::LineMinimal> = std::collections::HashMap::new();
+
+        for (id, stops) in route_row_tree_map.iter() {
+            let stops_minimal = stops
+                .iter()
+                .map(|row| {
+                    let extracted_line = self.extract_line_from_station(row);
+                    
+                    // Add line to the lines collection
+                    let line_minimal = proto::LineMinimal {
+                        id: extracted_line.line_cd as u32,
+                        name_short: extracted_line.line_name,
+                        color: extracted_line.line_color_c.unwrap_or_default(),
+                        line_type: extracted_line.line_type.unwrap_or(0),
+                    };
+                    all_lines.insert(line_minimal.id, line_minimal);
+
+                    // Create station minimal
+                    let station_numbers = self.get_station_numbers(row)
+                        .into_iter()
+                        .map(|sn| proto::StationNumber {
+                            line_symbol: sn.line_symbol,
+                            line_symbol_color: sn.line_symbol_color,
+                            line_symbol_shape: sn.line_symbol_shape,
+                            station_number: sn.station_number,
+                        })
+                        .collect();
+
+                    proto::StationMinimal {
+                        id: row.station_cd as u32,
+                        group_id: row.station_g_cd as u32,
+                        name: row.station_name.clone(),
+                        name_katakana: row.station_name_k.clone(),
+                        name_roman: row.station_name_r.clone(),
+                        line_ids: vec![extracted_line.line_cd as u32],
+                        station_numbers,
+                        stop_condition: row.pass.unwrap_or(0),
+                    }
+                })
+                .collect::<Vec<proto::StationMinimal>>();
+
+            // TODO: SQLで同等の処理を行う
+            let includes_requested_station = stops_minimal
+                .iter()
+                .any(|stop| stop.group_id == from_station_id || stop.group_id == to_station_id);
+            if !includes_requested_station {
+                continue;
+            }
+
+            routes.push(proto::RouteMinimal {
+                id: *id as u32,
+                stops: stops_minimal,
+            });
+        }
+
+        Ok(proto::RouteMinimalResponse {
+            routes,
+            lines: all_lines.into_values().collect(),
+            next_page_token: "".to_string(),
+        })
+    }
+
     async fn get_train_types(
         &self,
         from_station_id: u32,

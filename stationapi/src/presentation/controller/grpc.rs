@@ -10,8 +10,8 @@ use crate::{
         GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
         GetStationByLineIdRequest, GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
         GetTrainTypesByStationIdRequest, MultipleLineResponse, MultipleStationResponse,
-        MultipleTrainTypeResponse, Route, RouteResponse, RouteTypeResponse, SingleLineResponse,
-        SingleStationResponse,
+        MultipleTrainTypeResponse, Route, RouteResponse, RouteMinimalResponse, RouteTypeResponse, 
+        SingleLineResponse, SingleStationResponse,
     },
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
@@ -209,6 +209,21 @@ impl StationApi for MyApi {
                     routes,
                     next_page_token: "".to_string(),
                 }));
+            }
+            Err(err) => Err(PresentationalError::from(err).into()),
+        }
+    }
+
+    async fn get_routes_minimal(
+        &self,
+        request: tonic::Request<GetRouteRequest>,
+    ) -> Result<tonic::Response<RouteMinimalResponse>, tonic::Status> {
+        let from_id = request.get_ref().from_station_group_id;
+        let to_id = request.get_ref().to_station_group_id;
+
+        match self.query_use_case.get_routes_minimal(from_id, to_id).await {
+            Ok(response) => {
+                return Ok(Response::new(response));
             }
             Err(err) => Err(PresentationalError::from(err).into()),
         }
