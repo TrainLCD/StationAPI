@@ -6,12 +6,12 @@ use crate::{
     presentation::error::PresentationalError,
     proto::{
         station_api_server::StationApi, GetConnectedStationsRequest, GetLineByIdListRequest,
-        GetLineByIdRequest, GetLinesByNameRequest, GetRouteRequest,
-        GetStationByCoordinatesRequest, GetStationByGroupIdRequest, GetStationByIdListRequest,
-        GetStationByIdRequest, GetStationByLineIdRequest, GetStationsByLineGroupIdRequest,
-        GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleLineResponse,
-        MultipleStationResponse, MultipleTrainTypeResponse, Route, RouteMinimalResponse,
-        RouteResponse, RouteTypeResponse, SingleLineResponse, SingleStationResponse,
+        GetLineByIdRequest, GetLinesByNameRequest, GetRouteRequest, GetStationByCoordinatesRequest,
+        GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
+        GetStationByLineIdRequest, GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
+        GetTrainTypesByStationIdRequest, MultipleLineResponse, MultipleStationResponse,
+        MultipleTrainTypeResponse, Route, RouteMinimalResponse, RouteResponse, RouteTypeResponse,
+        SingleLineResponse, SingleStationResponse,
     },
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
