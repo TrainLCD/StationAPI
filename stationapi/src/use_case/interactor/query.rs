@@ -526,17 +526,7 @@ where
             .get_route_stops(from_station_id, to_station_id)
             .await?;
 
-        let route_row_tree_map: BTreeMap<i32, Vec<Station>> = stops.iter().fold(
-            BTreeMap::new(),
-            |mut acc: BTreeMap<i32, Vec<Station>>, value| {
-                if let Some(line_group_cd) = value.line_group_cd {
-                    acc.entry(line_group_cd).or_default().push(value.clone());
-                } else {
-                    acc.entry(value.line_cd).or_default().push(value.clone());
-                };
-                acc
-            },
-        );
+        let route_row_tree_map = self.build_route_tree_map(&stops);
 
         let mut routes: Vec<Route> = Vec::new();
 
@@ -619,17 +609,7 @@ where
             .get_route_stops(from_station_id, to_station_id)
             .await?;
 
-        let route_row_tree_map: BTreeMap<i32, Vec<Station>> = stops.iter().fold(
-            BTreeMap::new(),
-            |mut acc: BTreeMap<i32, Vec<Station>>, value| {
-                if let Some(line_group_cd) = value.line_group_cd {
-                    acc.entry(line_group_cd).or_default().push(value.clone());
-                } else {
-                    acc.entry(value.line_cd).or_default().push(value.clone());
-                };
-                acc
-            },
-        );
+        let route_row_tree_map = self.build_route_tree_map(&stops);
 
         let mut routes: Vec<proto::RouteMinimal> = Vec::new();
         let mut all_lines: std::collections::HashMap<u32, proto::LineMinimal> =
@@ -819,6 +799,20 @@ where
     TR: TrainTypeRepository,
     CR: CompanyRepository,
 {
+    fn build_route_tree_map(&self, stops: &[Station]) -> BTreeMap<i32, Vec<Station>> {
+        stops.iter().fold(
+            BTreeMap::new(),
+            |mut acc: BTreeMap<i32, Vec<Station>>, value| {
+                if let Some(line_group_cd) = value.line_group_cd {
+                    acc.entry(line_group_cd).or_default().push(value.clone());
+                } else {
+                    acc.entry(value.line_cd).or_default().push(value.clone());
+                };
+                acc
+            },
+        )
+    }
+
     fn build_station_from_row(
         &self,
         row: &Station,
