@@ -632,14 +632,15 @@ where
         );
 
         let mut routes: Vec<proto::RouteMinimal> = Vec::new();
-        let mut all_lines: std::collections::HashMap<u32, proto::LineMinimal> = std::collections::HashMap::new();
+        let mut all_lines: std::collections::HashMap<u32, proto::LineMinimal> =
+            std::collections::HashMap::new();
 
         for (id, stops) in route_row_tree_map.iter() {
             let stops_minimal = stops
                 .iter()
                 .map(|row| {
                     let extracted_line = self.extract_line_from_station(row);
-                    
+
                     // Add line to the lines collection
                     let line_minimal = proto::LineMinimal {
                         id: extracted_line.line_cd as u32,
@@ -650,7 +651,8 @@ where
                     all_lines.insert(line_minimal.id, line_minimal);
 
                     // Create station minimal
-                    let station_numbers = self.get_station_numbers(row)
+                    let station_numbers = self
+                        .get_station_numbers(row)
                         .into_iter()
                         .map(|sn| proto::StationNumber {
                             line_symbol: sn.line_symbol,

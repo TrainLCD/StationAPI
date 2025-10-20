@@ -10,7 +10,7 @@ use crate::{
         GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
         GetStationByLineIdRequest, GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
         GetTrainTypesByStationIdRequest, MultipleLineResponse, MultipleStationResponse,
-        MultipleTrainTypeResponse, Route, RouteResponse, RouteMinimalResponse, RouteTypeResponse, 
+        MultipleTrainTypeResponse, Route, RouteMinimalResponse, RouteResponse, RouteTypeResponse,
         SingleLineResponse, SingleStationResponse,
     },
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
