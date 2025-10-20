@@ -5,13 +5,13 @@ use crate::{
     },
     presentation::error::PresentationalError,
     proto::{
-        station_api_server::StationApi, GetConnectedStationsRequest, GetLineByIdRequest,
-        GetLinesByNameRequest, GetRouteRequest, GetStationByCoordinatesRequest,
-        GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
-        GetStationByLineIdRequest, GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
-        GetTrainTypesByStationIdRequest, MultipleLineResponse, MultipleStationResponse,
-        MultipleTrainTypeResponse, Route, RouteMinimalResponse, RouteResponse, RouteTypeResponse,
-        SingleLineResponse, SingleStationResponse,
+        station_api_server::StationApi, GetConnectedStationsRequest, GetLineByIdListRequest,
+        GetLineByIdRequest, GetLinesByNameRequest, GetRouteRequest,
+        GetStationByCoordinatesRequest, GetStationByGroupIdRequest, GetStationByIdListRequest,
+        GetStationByIdRequest, GetStationByLineIdRequest, GetStationsByLineGroupIdRequest,
+        GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleLineResponse,
+        MultipleStationResponse, MultipleTrainTypeResponse, Route, RouteMinimalResponse,
+        RouteResponse, RouteTypeResponse, SingleLineResponse, SingleStationResponse,
     },
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
@@ -268,6 +268,24 @@ impl StationApi for MyApi {
 
         Ok(Response::new(SingleLineResponse {
             line: Some(line.into()),
+        }))
+    }
+
+    async fn get_line_by_id_list(
+        &self,
+        request: tonic::Request<GetLineByIdListRequest>,
+    ) -> Result<tonic::Response<MultipleLineResponse>, tonic::Status> {
+        let line_ids = &request.get_ref().line_ids;
+
+        let lines = match self.query_use_case.get_lines_by_id_vec(line_ids).await {
+            Ok(lines) => lines,
+            Err(err) => {
+                return Err(PresentationalError::OtherError(anyhow::anyhow!(err).into()).into())
+            }
+        };
+
+        Ok(Response::new(MultipleLineResponse {
+            lines: lines.into_iter().map(|line| line.into()).collect(),
         }))
     }
 

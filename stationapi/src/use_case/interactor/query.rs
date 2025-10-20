@@ -642,20 +642,11 @@ where
                     let extracted_line = self.extract_line_from_station(row);
 
                     // Add line to the lines collection
-                    let line_symbols = self.get_line_symbols(&extracted_line);
                     let line_minimal = proto::LineMinimal {
                         id: extracted_line.line_cd as u32,
                         name_short: extracted_line.line_name,
                         color: extracted_line.line_color_c.unwrap_or_default(),
                         line_type: extracted_line.line_type.unwrap_or(0),
-                        line_symbols: line_symbols
-                            .into_iter()
-                            .map(|ls| proto::LineSymbol {
-                                symbol: ls.symbol,
-                                color: ls.color,
-                                shape: ls.shape,
-                            })
-                            .collect(),
                     };
                     all_lines.insert(line_minimal.id, line_minimal);
 
@@ -792,6 +783,11 @@ where
     async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError> {
         let line = self.line_repository.find_by_id(line_id).await?;
         Ok(line)
+    }
+
+    async fn get_lines_by_id_vec(&self, line_ids: &[u32]) -> Result<Vec<Line>, UseCaseError> {
+        let lines = self.line_repository.get_by_ids(line_ids).await?;
+        Ok(lines)
     }
 
     async fn get_lines_by_name(
