@@ -541,34 +541,51 @@ where
                 .get_by_line_group_id_vec_for_routes(&line_group_id_vec)
                 .await?;
 
+            // Add line_symbols to all lines first
+            for line in tt_lines.iter_mut() {
+                line.line_symbols = self.get_line_symbols(line);
+            }
+
             let stops = stops
                 .iter()
                 .map(|row| {
                     let extracted_line = self.extract_line_from_station(row);
 
-                    if let Some(tt_line) =
-                        tt_lines.iter_mut().find(|line| line.line_cd == row.line_cd)
+                    if let Some(tt_line) = tt_lines.iter().find(|line| line.line_cd == row.line_cd)
                     {
-                        tt_line.line_symbols = self.get_line_symbols(tt_line);
-
                         let train_type = match row.type_id.is_some() {
-                            true => Some(Box::new(TrainType {
-                                id: row.type_id,
-                                station_cd: Some(row.station_cd),
-                                type_cd: row.type_cd,
-                                line_group_cd: row.line_group_cd,
-                                pass: row.pass,
-                                type_name: row.type_name.clone().unwrap_or_default(),
-                                type_name_k: row.type_name_k.clone().unwrap_or_default(),
-                                type_name_r: row.type_name_r.clone(),
-                                type_name_zh: row.type_name_zh.clone(),
-                                type_name_ko: row.type_name_ko.clone(),
-                                color: row.color.clone().unwrap_or_default(),
-                                direction: row.direction,
-                                kind: row.kind,
-                                line: Some(Box::new(tt_line.clone())),
-                                lines: tt_lines.to_vec(),
-                            })),
+                            true => {
+                                // Filter lines to only include those with matching line_group_cd
+                                // and remove duplicates by line_cd
+                                let mut seen_line_cds = std::collections::HashSet::new();
+                                let filtered_lines: Vec<Line> = tt_lines
+                                    .iter()
+                                    .filter(|line| {
+                                        row.line_group_cd.is_some()
+                                            && line.line_group_cd == row.line_group_cd
+                                            && seen_line_cds.insert(line.line_cd)
+                                    })
+                                    .cloned()
+                                    .collect();
+
+                                Some(Box::new(TrainType {
+                                    id: row.type_id,
+                                    station_cd: Some(row.station_cd),
+                                    type_cd: row.type_cd,
+                                    line_group_cd: row.line_group_cd,
+                                    pass: row.pass,
+                                    type_name: row.type_name.clone().unwrap_or_default(),
+                                    type_name_k: row.type_name_k.clone().unwrap_or_default(),
+                                    type_name_r: row.type_name_r.clone(),
+                                    type_name_zh: row.type_name_zh.clone(),
+                                    type_name_ko: row.type_name_ko.clone(),
+                                    color: row.color.clone().unwrap_or_default(),
+                                    direction: row.direction,
+                                    kind: row.kind,
+                                    line: Some(Box::new(tt_line.clone())),
+                                    lines: filtered_lines,
+                                }))
+                            }
                             false => None,
                         };
 
@@ -622,13 +639,34 @@ where
                     let extracted_line = self.extract_line_from_station(row);
 
                     // Add line to the lines collection
+                    let line_symbols = self
+                        .get_line_symbols(&extracted_line)
+                        .into_iter()
+                        .map(|ls| proto::LineSymbol {
+                            symbol: ls.symbol,
+                            color: ls.color,
+                            shape: ls.shape,
+                        })
+                        .collect();
+
                     let line_minimal = proto::LineMinimal {
                         id: extracted_line.line_cd as u32,
                         name_short: extracted_line.line_name,
                         color: extracted_line.line_color_c.unwrap_or_default(),
                         line_type: extracted_line.line_type.unwrap_or(0),
+                        line_symbols,
                     };
-                    all_lines.entry(line_minimal.id).or_insert(line_minimal);
+                    
+                    // Update line: prefer entries with non-empty line_symbols
+                    all_lines
+                        .entry(line_minimal.id)
+                        .and_modify(|existing| {
+                            // Update if new line has symbols and existing doesn't
+                            if !line_minimal.line_symbols.is_empty() && existing.line_symbols.is_empty() {
+                                *existing = line_minimal.clone();
+                            }
+                        })
+                        .or_insert(line_minimal);
 
                     // Create station minimal
                     let station_numbers = self
@@ -651,6 +689,8 @@ where
                         line_ids: vec![extracted_line.line_cd as u32],
                         station_numbers,
                         stop_condition: row.pass.unwrap_or(0),
+                        has_train_types: Some(row.type_id.is_some()),
+                        train_type_id: row.type_id.map(|id| id as u32),
                     }
                 })
                 .collect::<Vec<proto::StationMinimal>>();
@@ -700,10 +740,15 @@ where
             .get_by_line_group_id_vec(&line_group_id_vec)
             .await?;
 
-        let tt_lines = self
+        let mut tt_lines = self
             .line_repository
             .get_by_line_group_id_vec(&line_group_id_vec)
             .await?;
+
+        // Add line_symbols to all lines first
+        for line in tt_lines.iter_mut() {
+            line.line_symbols = self.get_line_symbols(line);
+        }
 
         for mut train_type in train_types.clone() {
             if result
@@ -713,9 +758,13 @@ where
                 continue;
             }
 
+            let mut seen_line_cds = HashSet::new();
             train_type.lines = tt_lines
                 .iter()
-                .filter(|line| line.line_group_cd == train_type.line_group_cd)
+                .filter(|line| {
+                    line.line_group_cd == train_type.line_group_cd
+                        && seen_line_cds.insert(line.line_cd)
+                })
                 .map(|line| Line {
                     line_cd: line.line_cd,
                     company_cd: line.company_cd,
@@ -728,7 +777,7 @@ where
                     line_name_ko: line.line_name_ko.clone(),
                     line_color_c: line.line_color_c.clone(),
                     line_type: line.line_type,
-                    line_symbols: line.line_symbols.clone(),
+                    line_symbols: line.line_symbols.clone(),  // Now populated
                     line_symbol1: line.line_symbol1.clone(),
                     line_symbol2: line.line_symbol2.clone(),
                     line_symbol3: line.line_symbol3.clone(),
@@ -755,6 +804,10 @@ where
                     type_cd: line.type_cd,
                 })
                 .collect::<Vec<Line>>();
+            
+            // Set the line field to the first line in the lines vector
+            train_type.line = train_type.lines.first().map(|l| Box::new(l.clone()));
+            
             result.push(train_type);
         }
         Ok(result)
