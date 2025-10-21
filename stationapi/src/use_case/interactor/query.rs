@@ -656,13 +656,15 @@ where
                         line_type: extracted_line.line_type.unwrap_or(0),
                         line_symbols,
                     };
-                    
+
                     // Update line: prefer entries with non-empty line_symbols
                     all_lines
                         .entry(line_minimal.id)
                         .and_modify(|existing| {
                             // Update if new line has symbols and existing doesn't
-                            if !line_minimal.line_symbols.is_empty() && existing.line_symbols.is_empty() {
+                            if !line_minimal.line_symbols.is_empty()
+                                && existing.line_symbols.is_empty()
+                            {
                                 *existing = line_minimal.clone();
                             }
                         })
@@ -777,7 +779,7 @@ where
                     line_name_ko: line.line_name_ko.clone(),
                     line_color_c: line.line_color_c.clone(),
                     line_type: line.line_type,
-                    line_symbols: line.line_symbols.clone(),  // Now populated
+                    line_symbols: line.line_symbols.clone(),
                     line_symbol1: line.line_symbol1.clone(),
                     line_symbol2: line.line_symbol2.clone(),
                     line_symbol3: line.line_symbol3.clone(),
@@ -804,10 +806,10 @@ where
                     type_cd: line.type_cd,
                 })
                 .collect::<Vec<Line>>();
-            
+
             // Set the line field to the first line in the lines vector
             train_type.line = train_type.lines.first().map(|l| Box::new(l.clone()));
-            
+
             result.push(train_type);
         }
         Ok(result)
