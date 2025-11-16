@@ -5,13 +5,13 @@ use crate::{
     },
     presentation::error::PresentationalError,
     proto::{
-        station_api_server::StationApi, GetConnectedStationsRequest, GetLineByIdRequest,
-        GetLinesByNameRequest, GetRouteRequest, GetStationByCoordinatesRequest,
+        station_api_server::StationApi, GetConnectedStationsRequest, GetLineByIdListRequest,
+        GetLineByIdRequest, GetLinesByNameRequest, GetRouteRequest, GetStationByCoordinatesRequest,
         GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
         GetStationByLineIdRequest, GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
         GetTrainTypesByStationIdRequest, MultipleLineResponse, MultipleStationResponse,
-        MultipleTrainTypeResponse, Route, RouteResponse, RouteTypeResponse, SingleLineResponse,
-        SingleStationResponse,
+        MultipleTrainTypeResponse, Route, RouteMinimalResponse, RouteResponse, RouteTypeResponse,
+        SingleLineResponse, SingleStationResponse,
     },
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
@@ -214,6 +214,21 @@ impl StationApi for MyApi {
         }
     }
 
+    async fn get_routes_minimal(
+        &self,
+        request: tonic::Request<GetRouteRequest>,
+    ) -> Result<tonic::Response<RouteMinimalResponse>, tonic::Status> {
+        let from_id = request.get_ref().from_station_group_id;
+        let to_id = request.get_ref().to_station_group_id;
+
+        match self.query_use_case.get_routes_minimal(from_id, to_id).await {
+            Ok(response) => {
+                return Ok(Response::new(response));
+            }
+            Err(err) => Err(PresentationalError::from(err).into()),
+        }
+    }
+
     async fn get_route_types(
         &self,
         request: tonic::Request<GetRouteRequest>,
@@ -253,6 +268,24 @@ impl StationApi for MyApi {
 
         Ok(Response::new(SingleLineResponse {
             line: Some(line.into()),
+        }))
+    }
+
+    async fn get_line_by_id_list(
+        &self,
+        request: tonic::Request<GetLineByIdListRequest>,
+    ) -> Result<tonic::Response<MultipleLineResponse>, tonic::Status> {
+        let line_ids = &request.get_ref().line_ids;
+
+        let lines = match self.query_use_case.get_lines_by_id_vec(line_ids).await {
+            Ok(lines) => lines,
+            Err(err) => {
+                return Err(PresentationalError::OtherError(anyhow::anyhow!(err).into()).into())
+            }
+        };
+
+        Ok(Response::new(MultipleLineResponse {
+            lines: lines.into_iter().map(|line| line.into()).collect(),
         }))
     }
 
