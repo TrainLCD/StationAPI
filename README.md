@@ -10,6 +10,10 @@
 
 The gRPC-Web API for provides nearby japanese train station.
 
+## Documentation
+
+- For automation agent and contributor workflows, see [AGENTS.md](AGENTS.md).
+
 ## Data Contribution
 
 This project includes a comprehensive dataset of Japanese railway information in the `data/` directory. The data is maintained in CSV format and contributions are primarily targeted at Japanese speakers. For detailed information about data structure and contribution guidelines, please refer to [data/README.md](data/README.md).

@@ -25,6 +25,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "StopCondition",
             "#[derive(serde::Serialize, serde::Deserialize)]",
         )
+        .type_attribute(
+            "StationMinimal",
+            "#[derive(serde::Serialize, serde::Deserialize)]",
+        )
+        .type_attribute(
+            "LineMinimal",
+            "#[derive(serde::Serialize, serde::Deserialize)]",
+        )
+        .type_attribute(
+            "RouteMinimal",
+            "#[derive(serde::Serialize, serde::Deserialize)]",
+        )
+        .type_attribute(
+            "RouteMinimalResponse",
+            "#[derive(serde::Serialize, serde::Deserialize)]",
+        )
         .protoc_arg("--experimental_allow_proto3_optional")
         .file_descriptor_set_path(out_dir.join("stationapi_descriptor.bin"))
         .compile_protos(&["proto/stationapi.proto"], &["proto"])?;
