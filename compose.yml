@@ -15,8 +15,6 @@ services:
       HOST: 0.0.0.0
     ports:
       - 50051:50051
-    networks:
-      - sapi-link
     restart: always
 
   psql:
@@ -25,13 +23,6 @@ services:
       POSTGRES_USER: stationapi
       POSTGRES_PASSWORD: stationapi
       POSTGRES_DB: stationapi
-    ports:
-      - 5432:5432
-    networks:
-      - sapi-link
     restart: always
     volumes:
       - ./docker/postgres:/docker-entrypoint-initdb.d:ro
-
-networks:
-  sapi-link:
