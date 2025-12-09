@@ -959,105 +959,110 @@ impl InternalStationRepository {
                 FROM stations AS s
                 WHERE s.station_g_cd = $1
                 AND s.e_status = 0
+            ),
+            filtered AS (
+                SELECT DISTINCT ON (s.station_cd)
+                    s.station_cd,
+                    s.station_g_cd,
+                    s.station_name,
+                    s.station_name_k,
+                    s.station_name_r,
+                    s.station_name_rn,
+                    s.station_name_zh,
+                    s.station_name_ko,
+                    s.station_number1,
+                    s.station_number2,
+                    s.station_number3,
+                    s.station_number4,
+                    s.three_letter_code,
+                    s.line_cd,
+                    s.pref_cd,
+                    s.post,
+                    s.address,
+                    s.lon,
+                    s.lat,
+                    s.open_ymd,
+                    s.close_ymd,
+                    s.e_status,
+                    s.e_sort,
+                    l.company_cd,
+                    COALESCE(NULLIF(COALESCE(a.line_name, l.line_name), ''), NULL) AS line_name,
+                    COALESCE(NULLIF(COALESCE(a.line_name_k, l.line_name_k), ''), NULL) AS line_name_k,
+                    COALESCE(NULLIF(COALESCE(a.line_name_h, l.line_name_h), ''), NULL) AS line_name_h,
+                    COALESCE(NULLIF(COALESCE(a.line_name_r, l.line_name_r), ''), NULL) AS line_name_r,
+                    COALESCE(NULLIF(COALESCE(a.line_name_zh, l.line_name_zh), ''), NULL) AS line_name_zh,
+                    COALESCE(NULLIF(COALESCE(a.line_name_ko, l.line_name_ko), ''), NULL) AS line_name_ko,
+                    COALESCE(NULLIF(COALESCE(a.line_color_c, l.line_color_c), ''), NULL) AS line_color_c,
+                    l.line_type,
+                    l.line_symbol1,
+                    l.line_symbol2,
+                    l.line_symbol3,
+                    l.line_symbol4,
+                    l.line_symbol1_color,
+                    l.line_symbol2_color,
+                    l.line_symbol3_color,
+                    l.line_symbol4_color,
+                    l.line_symbol1_shape,
+                    l.line_symbol2_shape,
+                    l.line_symbol3_shape,
+                    l.line_symbol4_shape,
+                    COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
+                    COALESCE(from_sst.line_group_cd, NULL)::int AS line_group_cd, -- has_train_types用
+                    NULL::int AS type_id,
+                    NULL::int AS sst_id,
+                    NULL::int AS type_cd,
+                    NULL::int AS pass,
+                    NULL::text AS type_name,
+                    NULL::text AS type_name_k,
+                    NULL::text AS type_name_r,
+                    NULL::text AS type_name_zh,
+                    NULL::text AS type_name_ko,
+                    NULL::text AS color,
+                    NULL::int AS direction,
+                    NULL::int AS kind
+                FROM stations AS s
+                    LEFT JOIN from_stations AS fs
+                        ON fs.station_cd IS NOT NULL
+                    LEFT JOIN station_station_types AS from_sst
+                        ON from_sst.station_cd = fs.station_cd
+                    LEFT JOIN station_station_types AS dst_sst
+                        ON dst_sst.station_cd = s.station_cd
+                    LEFT JOIN types AS t
+                        ON t.type_cd = dst_sst.type_cd
+                    LEFT JOIN line_aliases AS la
+                        ON la.station_cd = s.station_cd
+                    LEFT JOIN aliases AS a
+                        ON la.alias_cd = a.id
+                    JOIN lines AS l
+                        ON l.line_cd = s.line_cd
+                        AND l.e_status = 0
+                WHERE
+                    (
+                        s.station_name   LIKE $2
+                        OR s.station_name_rn LIKE $3
+                        OR s.station_name_k LIKE $4
+                        OR s.station_name_zh LIKE $5
+                        OR s.station_name_ko LIKE $6
+                    )
+                    AND s.e_status = 0
+                    AND (
+                        (
+                            from_sst.id IS NOT NULL
+                            AND dst_sst.id IS NOT NULL
+                            AND from_sst.line_group_cd = dst_sst.line_group_cd
+                            AND dst_sst.pass <> 1
+                        )
+                        OR
+                        (
+                            (from_sst.id IS NULL OR dst_sst.id IS NULL)
+                            AND s.line_cd = COALESCE(fs.line_cd, s.line_cd)
+                        )
+                    )
+                ORDER BY s.station_cd, s.station_g_cd, s.station_name
             )
-            SELECT
-                s.station_cd,
-                s.station_g_cd,
-                s.station_name,
-                s.station_name_k,
-                s.station_name_r,
-                s.station_name_rn,
-                s.station_name_zh,
-                s.station_name_ko,
-                s.station_number1,
-                s.station_number2,
-                s.station_number3,
-                s.station_number4,
-                s.three_letter_code,
-                s.line_cd,
-                s.pref_cd,
-                s.post,
-                s.address,
-                s.lon,
-                s.lat,
-                s.open_ymd,
-                s.close_ymd,
-                s.e_status,
-                s.e_sort,
-                l.company_cd,
-                COALESCE(NULLIF(COALESCE(a.line_name, l.line_name), ''), NULL) AS line_name,
-                COALESCE(NULLIF(COALESCE(a.line_name_k, l.line_name_k), ''), NULL) AS line_name_k,
-                COALESCE(NULLIF(COALESCE(a.line_name_h, l.line_name_h), ''), NULL) AS line_name_h,
-                COALESCE(NULLIF(COALESCE(a.line_name_r, l.line_name_r), ''), NULL) AS line_name_r,
-                COALESCE(NULLIF(COALESCE(a.line_name_zh, l.line_name_zh), ''), NULL) AS line_name_zh,
-                COALESCE(NULLIF(COALESCE(a.line_name_ko, l.line_name_ko), ''), NULL) AS line_name_ko,
-                COALESCE(NULLIF(COALESCE(a.line_color_c, l.line_color_c), ''), NULL) AS line_color_c,
-                l.line_type,
-                l.line_symbol1,
-                l.line_symbol2,
-                l.line_symbol3,
-                l.line_symbol4,
-                l.line_symbol1_color,
-                l.line_symbol2_color,
-                l.line_symbol3_color,
-                l.line_symbol4_color,
-                l.line_symbol1_shape,
-                l.line_symbol2_shape,
-                l.line_symbol3_shape,
-                l.line_symbol4_shape,
-                COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
-                COALESCE(from_sst.line_group_cd, NULL)::int AS line_group_cd, -- has_train_types用
-                NULL::int AS type_id,
-                NULL::int AS sst_id,
-                NULL::int AS type_cd,
-                NULL::int AS pass,
-                NULL::text AS type_name,
-                NULL::text AS type_name_k,
-                NULL::text AS type_name_r,
-                NULL::text AS type_name_zh,
-                NULL::text AS type_name_ko,
-                NULL::text AS color,
-                NULL::int AS direction,
-                NULL::int AS kind
-            FROM stations AS s
-                LEFT JOIN from_stations AS fs
-                    ON fs.station_cd IS NOT NULL
-                LEFT JOIN station_station_types AS from_sst
-                    ON from_sst.station_cd = fs.station_cd
-                LEFT JOIN station_station_types AS dst_sst
-                    ON dst_sst.station_cd = s.station_cd
-                LEFT JOIN types AS t
-                    ON t.type_cd = dst_sst.type_cd
-                LEFT JOIN line_aliases AS la
-                    ON la.station_cd = s.station_cd
-                LEFT JOIN aliases AS a
-                    ON la.alias_cd = a.id
-                JOIN lines AS l
-                    ON l.line_cd = s.line_cd
-                    AND l.e_status = 0
-            WHERE
-                (
-                    s.station_name   LIKE $2
-                    OR s.station_name_rn LIKE $3
-                    OR s.station_name_k LIKE $4
-                    OR s.station_name_zh LIKE $5
-                    OR s.station_name_ko LIKE $6
-                )
-                AND s.e_status = 0
-                AND (
-                    (
-                        from_sst.id IS NOT NULL
-                        AND dst_sst.id IS NOT NULL
-                        AND from_sst.line_group_cd = dst_sst.line_group_cd
-                        AND dst_sst.pass <> 1
-                    )
-                    OR
-                    (
-                        (from_sst.id IS NULL OR dst_sst.id IS NULL)
-                        AND s.line_cd = COALESCE(fs.line_cd, s.line_cd)
-                    )
-                )
-            ORDER BY s.station_g_cd, s.station_name
+            SELECT *
+            FROM filtered
+            ORDER BY station_g_cd, station_name
             LIMIT $7"#,
             from_station_group_id,
             station_name,
