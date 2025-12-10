@@ -520,10 +520,11 @@ where
         &self,
         from_station_id: u32,
         to_station_id: u32,
+        via_line_id: Option<u32>,
     ) -> Result<Vec<Route>, UseCaseError> {
         let stops = self
             .station_repository
-            .get_route_stops(from_station_id, to_station_id)
+            .get_route_stops(from_station_id, to_station_id, via_line_id)
             .await?;
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
@@ -620,10 +621,11 @@ where
         &self,
         from_station_id: u32,
         to_station_id: u32,
+        via_line_id: Option<u32>,
     ) -> Result<proto::RouteMinimalResponse, UseCaseError> {
         let stops = self
             .station_repository
-            .get_route_stops(from_station_id, to_station_id)
+            .get_route_stops(from_station_id, to_station_id, via_line_id)
             .await?;
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
@@ -722,10 +724,11 @@ where
         &self,
         from_station_id: u32,
         to_station_id: u32,
+        via_line_id: Option<u32>,
     ) -> Result<Vec<TrainType>, UseCaseError> {
         let stops = self
             .station_repository
-            .get_route_stops(from_station_id, to_station_id)
+            .get_route_stops(from_station_id, to_station_id, via_line_id)
             .await?;
 
         let line_group_id_vec: Vec<u32> = stops

@@ -250,9 +250,16 @@ impl StationRepository for MyStationRepository {
         &self,
         from_station_id: u32,
         to_station_id: u32,
+        via_line_id: Option<u32>,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_route_stops(from_station_id, to_station_id, &mut conn).await
+        InternalStationRepository::get_route_stops(
+            from_station_id,
+            to_station_id,
+            via_line_id,
+            &mut conn,
+        )
+        .await
     }
 }
 
@@ -1169,8 +1176,10 @@ impl InternalStationRepository {
     async fn get_route_stops(
         from_station_id: u32,
         to_station_id: u32,
+        via_line_id: Option<u32>,
         conn: &mut PgConnection,
     ) -> Result<Vec<Station>, DomainError> {
+        let via_line_id = via_line_id.map(|id| id as i32);
         let mut rows = sqlx::query_as!(
             StationRow,
             r#"WITH
@@ -1197,6 +1206,7 @@ impl InternalStationRepository {
                     FROM stations s1
                     WHERE s1.station_g_cd = $3
                         AND s1.e_status = 0
+                        AND ($5::int IS NULL OR s1.line_cd = $5)
                         AND EXISTS (
                         SELECT 1
                         FROM stations s2
@@ -1311,6 +1321,7 @@ impl InternalStationRepository {
             to_station_id as i32,
             from_station_id as i32,
             to_station_id as i32,
+            via_line_id,
         )
         .fetch_all(&mut *conn)
         .await?;
@@ -1436,9 +1447,11 @@ impl InternalStationRepository {
                 LEFT JOIN aliases AS a ON a.id = la.alias_cd
             WHERE
                 sta.e_status = 0
+                AND ($3::int IS NULL OR sta.line_cd = $3)
             ORDER BY sst.id"#,
             from_station_id as i32,
             to_station_id as i32,
+            via_line_id,
         )
         .fetch_all(conn)
         .await?;

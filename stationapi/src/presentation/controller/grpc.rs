@@ -202,8 +202,13 @@ impl StationApi for MyApi {
     ) -> Result<tonic::Response<RouteResponse>, tonic::Status> {
         let from_id = request.get_ref().from_station_group_id;
         let to_id = request.get_ref().to_station_group_id;
+        let via_line_id = request.get_ref().via_line_id;
 
-        match self.query_use_case.get_routes(from_id, to_id).await {
+        match self
+            .query_use_case
+            .get_routes(from_id, to_id, via_line_id)
+            .await
+        {
             Ok(routes) => {
                 return Ok(Response::new(RouteResponse {
                     routes,
@@ -220,8 +225,13 @@ impl StationApi for MyApi {
     ) -> Result<tonic::Response<RouteMinimalResponse>, tonic::Status> {
         let from_id = request.get_ref().from_station_group_id;
         let to_id = request.get_ref().to_station_group_id;
+        let via_line_id = request.get_ref().via_line_id;
 
-        match self.query_use_case.get_routes_minimal(from_id, to_id).await {
+        match self
+            .query_use_case
+            .get_routes_minimal(from_id, to_id, via_line_id)
+            .await
+        {
             Ok(response) => {
                 return Ok(Response::new(response));
             }
@@ -235,8 +245,13 @@ impl StationApi for MyApi {
     ) -> Result<tonic::Response<RouteTypeResponse>, tonic::Status> {
         let from_id = request.get_ref().from_station_group_id;
         let to_id = request.get_ref().to_station_group_id;
+        let via_line_id = request.get_ref().via_line_id;
 
-        match self.query_use_case.get_train_types(from_id, to_id).await {
+        match self
+            .query_use_case
+            .get_train_types(from_id, to_id, via_line_id)
+            .await
+        {
             Ok(train_types) => {
                 return Ok(Response::new(RouteTypeResponse {
                     train_types: train_types.into_iter().map(|t| t.into()).collect(),

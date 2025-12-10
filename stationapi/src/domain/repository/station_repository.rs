@@ -36,6 +36,7 @@ pub trait StationRepository: Send + Sync + 'static {
         &self,
         from_station_id: u32,
         to_station_id: u32,
+        via_line_id: Option<u32>,
     ) -> Result<Vec<Station>, DomainError>;
 }
 
