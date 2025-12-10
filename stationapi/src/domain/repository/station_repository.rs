@@ -36,6 +36,7 @@ pub trait StationRepository: Send + Sync + 'static {
         &self,
         from_station_id: u32,
         to_station_id: u32,
+        via_line_id: Option<u32>,
     ) -> Result<Vec<Station>, DomainError>;
 }
 
@@ -192,15 +193,28 @@ mod tests {
             &self,
             from_station_id: u32,
             to_station_id: u32,
+            via_line_id: Option<u32>,
         ) -> Result<Vec<Station>, DomainError> {
-            // 簡単なルート検索のモック実装
+            // シンプルなルート検索のモック実装。via_line_id が指定されている場合は
+            // 両駅がその路線に属していることを条件にする。
             let mut result = Vec::new();
 
-            if let Some(from_station) = self.stations.get(&from_station_id) {
+            let from_station = self.stations.get(&from_station_id);
+            let to_station = self.stations.get(&to_station_id);
+
+            if let Some(required_line) = via_line_id {
+                let line_match = |s: &Station| s.line_cd as u32 == required_line;
+                if !from_station.map_or(false, line_match) || !to_station.map_or(false, line_match)
+                {
+                    return Ok(result);
+                }
+            }
+
+            if let Some(from_station) = from_station {
                 result.push(from_station.clone());
             }
 
-            if let Some(to_station) = self.stations.get(&to_station_id) {
+            if let Some(to_station) = to_station {
                 if from_station_id != to_station_id {
                     result.push(to_station.clone());
                 }
@@ -380,7 +394,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_route_stops() {
         let repo = MockStationRepository::new();
-        let result = repo.get_route_stops(1, 2).await.unwrap();
+        let result = repo.get_route_stops(1, 2, None).await.unwrap();
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].station_cd, 1);
         assert_eq!(result[1].station_cd, 2);
@@ -389,7 +403,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_route_stops_same_station() {
         let repo = MockStationRepository::new();
-        let result = repo.get_route_stops(1, 1).await.unwrap();
+        let result = repo.get_route_stops(1, 1, None).await.unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].station_cd, 1);
     }
@@ -397,7 +411,25 @@ mod tests {
     #[tokio::test]
     async fn test_get_route_stops_not_found() {
         let repo = MockStationRepository::new();
-        let result = repo.get_route_stops(999, 1000).await.unwrap();
+        let result = repo.get_route_stops(999, 1000, None).await.unwrap();
         assert_eq!(result.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_route_stops_with_via_line_id_match() {
+        let repo = MockStationRepository::new();
+        // 東京駅(1) と 品川駅(4) は line_cd=1001 で一致する
+        let result = repo.get_route_stops(1, 4, Some(1001)).await.unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].station_cd, 1);
+        assert_eq!(result[1].station_cd, 4);
+    }
+
+    #[tokio::test]
+    async fn test_get_route_stops_with_via_line_id_mismatch() {
+        let repo = MockStationRepository::new();
+        // line_cd が一致しないためルートは返さない
+        let result = repo.get_route_stops(1, 2, Some(1001)).await.unwrap();
+        assert!(result.is_empty());
     }
 }
