@@ -35,7 +35,7 @@ pub trait LineRepository: Send + Sync + 'static {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::entity::{company::Company, line_symbol::LineSymbol};
+    use crate::domain::entity::{company::Company, gtfs::TransportType, line_symbol::LineSymbol};
     use std::collections::HashMap;
 
     // テスト用のモック実装
@@ -118,6 +118,7 @@ mod tests {
                 Some(1),
                 Some(1075.968412),
                 Some(0),
+                TransportType::Rail,
             );
 
             // 京浜東北線
@@ -155,6 +156,7 @@ mod tests {
                 Some(2),
                 Some(1234.567890),
                 Some(1),
+                TransportType::Rail,
             );
 
             // データを格納

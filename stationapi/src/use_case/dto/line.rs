@@ -1,4 +1,7 @@
-use crate::{domain::entity::line::Line, proto::Line as GrpcLine};
+use crate::{
+    domain::entity::{gtfs::TransportType, line::Line},
+    proto::{Line as GrpcLine, TransportType as GrpcTransportType},
+};
 
 impl From<Line> for GrpcLine {
     fn from(line: Line) -> Self {
@@ -20,6 +23,14 @@ impl From<Line> for GrpcLine {
                 .train_type
                 .map(|train_type| Box::new(train_type.into())),
             average_distance: line.average_distance.unwrap_or(0.0),
+            transport_type: convert_transport_type(line.transport_type),
         }
+    }
+}
+
+fn convert_transport_type(t: TransportType) -> i32 {
+    match t {
+        TransportType::Rail => GrpcTransportType::Rail as i32,
+        TransportType::Bus => GrpcTransportType::Bus as i32,
     }
 }

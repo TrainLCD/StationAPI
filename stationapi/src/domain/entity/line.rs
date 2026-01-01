@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use super::{company::Company, line_symbol::LineSymbol, station::Station, train_type::TrainType};
+use super::{
+    company::Company, gtfs::TransportType, line_symbol::LineSymbol, station::Station,
+    train_type::TrainType,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Line {
@@ -37,6 +40,7 @@ pub struct Line {
     pub station_cd: Option<i32>,
     pub station_g_cd: Option<i32>,
     pub type_cd: Option<i32>,
+    pub transport_type: TransportType,
 }
 
 impl Line {
@@ -75,6 +79,7 @@ impl Line {
         station_g_cd: Option<i32>,
         average_distance: Option<f64>,
         type_cd: Option<i32>,
+        transport_type: TransportType,
     ) -> Self {
         Self {
             line_cd,
@@ -110,6 +115,7 @@ impl Line {
             station_g_cd,
             average_distance,
             type_cd,
+            transport_type,
         }
     }
 }
@@ -178,6 +184,7 @@ mod tests {
             Some(1130201),                     // station_g_cd
             Some(0.97),                        // average_distance
             Some(1),                           // type_cd
+            TransportType::Rail,               // transport_type
         )
     }
 
@@ -216,6 +223,7 @@ mod tests {
             None,                       // station_g_cd
             None,                       // average_distance
             None,                       // type_cd
+            TransportType::Rail,        // transport_type
         )
     }
 
@@ -403,6 +411,7 @@ mod tests {
             None,
             Some(0.97),
             Some(2),
+            TransportType::Rail,
         );
 
         assert_eq!(line.line_symbols.len(), 2);
@@ -491,6 +500,7 @@ mod tests {
             None,
             Some(515.4),
             Some(7),
+            TransportType::Rail,
         );
 
         assert_eq!(line.line_name, "東海道新幹線");
@@ -538,6 +548,7 @@ mod tests {
             Some(0),
             Some(0.0),
             Some(0),
+            TransportType::Rail,
         );
 
         assert_eq!(line.line_name, "");
@@ -586,6 +597,7 @@ mod tests {
             Some(-1),
             Some(-1.0),
             Some(-1),
+            TransportType::Rail,
         );
 
         assert_eq!(line.line_cd, -1);
@@ -647,6 +659,7 @@ mod tests {
                 None,
                 Some(1.0),
                 type_cd,
+                TransportType::Rail,
             );
 
             assert_eq!(line.type_cd, type_cd);
@@ -690,6 +703,7 @@ mod tests {
             Some(7777),
             Some(123.45),
             Some(99),
+            TransportType::Rail,
         );
 
         // すべてのOptionalフィールドがSomeであることを確認
@@ -760,6 +774,7 @@ mod tests {
             None,
             Some(1.0),
             Some(42),
+            TransportType::Rail,
         );
 
         let json = serde_json::to_string(&line_with_type).expect("シリアライゼーションに失敗");
@@ -767,5 +782,53 @@ mod tests {
 
         let deserialized: Line = serde_json::from_str(&json).expect("デシリアライゼーションに失敗");
         assert_eq!(deserialized.type_cd, Some(42));
+    }
+
+    #[test]
+    fn test_line_with_bus_transport_type() {
+        let bus_line = Line::new(
+            99001,                       // line_cd
+            2001,                        // company_cd
+            None,                        // company
+            "都01系統".to_string(),      // line_name
+            "ト01ケイトウ".to_string(),  // line_name_k
+            "と01けいとう".to_string(),  // line_name_h
+            Some("Toei 01".to_string()), // line_name_r
+            None,                        // line_name_zh
+            None,                        // line_name_ko
+            Some("#00A0E9".to_string()), // line_color_c
+            None,                        // line_type
+            vec![],                      // line_symbols
+            None,                        // line_symbol1
+            None,                        // line_symbol2
+            None,                        // line_symbol3
+            None,                        // line_symbol4
+            None,                        // line_symbol1_color
+            None,                        // line_symbol2_color
+            None,                        // line_symbol3_color
+            None,                        // line_symbol4_color
+            None,                        // line_symbol1_shape
+            None,                        // line_symbol2_shape
+            None,                        // line_symbol3_shape
+            None,                        // line_symbol4_shape
+            0,                           // e_status
+            1,                           // e_sort
+            None,                        // station
+            None,                        // train_type
+            None,                        // line_group_cd
+            None,                        // station_cd
+            None,                        // station_g_cd
+            None,                        // average_distance
+            None,                        // type_cd
+            TransportType::Bus,          // transport_type
+        );
+
+        assert_eq!(bus_line.line_cd, 99001);
+        assert_eq!(bus_line.line_name, "都01系統");
+        assert_eq!(bus_line.transport_type, TransportType::Bus);
+
+        // JSONシリアライゼーションでtransport_typeが正しく出力されることを確認
+        let json = serde_json::to_string(&bus_line).expect("シリアライゼーションに失敗");
+        assert!(json.contains("\"transport_type\":\"Bus\"")); // Bus enum variant
     }
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT \n            l.line_cd,\n            l.company_cd,\n            l.line_type,\n            l.line_name,\n            l.line_name_k,\n            l.line_name_h,\n            l.line_name_r,\n            l.line_name_zh,\n            l.line_name_ko,\n            l.line_color_c,\n            l.line_symbol1,\n            l.line_symbol2,\n            l.line_symbol3,\n            l.line_symbol4,\n            l.line_symbol1_color,\n            l.line_symbol2_color,\n            l.line_symbol3_color,\n            l.line_symbol4_color,\n            l.line_symbol1_shape,\n            l.line_symbol2_shape,\n            l.line_symbol3_shape,\n            l.line_symbol4_shape,\n            l.e_status,\n            l.e_sort,\n            COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,\n            CAST(NULL AS INTEGER) AS line_group_cd,\n            CAST(NULL AS INTEGER) AS station_cd,\n            CAST(NULL AS INTEGER) AS station_g_cd,\n            CAST(NULL AS INTEGER) AS type_cd\n            FROM lines AS l\n            WHERE (\n                    l.line_name LIKE $1\n                    OR l.line_name_rn LIKE $2\n                    OR l.line_name_k LIKE $3\n                    OR l.line_name_zh LIKE $4\n                    OR l.line_name_ko LIKE $5\n                )\n                AND l.e_status = 0\n            LIMIT $6",
+  "query": "SELECT \n            l.line_cd,\n            l.company_cd,\n            l.line_type,\n            l.line_name,\n            l.line_name_k,\n            l.line_name_h,\n            l.line_name_r,\n            l.line_name_zh,\n            l.line_name_ko,\n            l.line_color_c,\n            l.line_symbol1,\n            l.line_symbol2,\n            l.line_symbol3,\n            l.line_symbol4,\n            l.line_symbol1_color,\n            l.line_symbol2_color,\n            l.line_symbol3_color,\n            l.line_symbol4_color,\n            l.line_symbol1_shape,\n            l.line_symbol2_shape,\n            l.line_symbol3_shape,\n            l.line_symbol4_shape,\n            l.e_status,\n            l.e_sort,\n            COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,\n            CAST(NULL AS INTEGER) AS line_group_cd,\n            CAST(NULL AS INTEGER) AS station_cd,\n            CAST(NULL AS INTEGER) AS station_g_cd,\n            CAST(NULL AS INTEGER) AS type_cd,\n            l.transport_type\n            FROM lines AS l\n            WHERE l.line_cd = $1\n            AND l.e_status = 0",
   "describe": {
     "columns": [
       {
@@ -147,16 +147,16 @@
         "ordinal": 28,
         "name": "type_cd",
         "type_info": "Int4"
+      },
+      {
+        "ordinal": 29,
+        "name": "transport_type",
+        "type_info": "Int4"
       }
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Text",
-        "Text",
-        "Text",
-        "Text",
-        "Int8"
+        "Int4"
       ]
     },
     "nullable": [
@@ -188,8 +188,9 @@
       null,
       null,
       null,
-      null
+      null,
+      false
     ]
   },
-  "hash": "1ffa93b133de68b60a7e0a6663f212f613c175a35beb700a0001efb82f184d10"
+  "hash": "01a96a6f40ab08c532b4e7f3cc493906213e6ec80d495a2fe569ccf1d94b4834"
 }

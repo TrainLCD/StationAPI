@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, HashSet};
 use crate::{
     domain::{
         entity::{
-            company::Company, line::Line, line_symbol::LineSymbol, station::Station,
-            station_number::StationNumber, train_type::TrainType,
+            company::Company, gtfs::TransportType, line::Line, line_symbol::LineSymbol,
+            station::Station, station_number::StationNumber, train_type::TrainType,
         },
         normalize::normalize_for_search,
         repository::{
@@ -97,10 +97,11 @@ where
         latitude: f64,
         longitude: f64,
         limit: Option<u32>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
-            .get_by_coordinates(latitude, longitude, limit)
+            .get_by_coordinates(latitude, longitude, limit, transport_type)
             .await?;
 
         let stations = self
@@ -113,10 +114,11 @@ where
         &self,
         line_id: u32,
         station_id: Option<u32>,
+        direction_id: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
-            .get_by_line_id(line_id, station_id)
+            .get_by_line_id(line_id, station_id, direction_id)
             .await?;
 
         let line_group_id = if let Some(sta) = stations
@@ -139,6 +141,7 @@ where
         station_name: String,
         limit: Option<u32>,
         from_station_group_id: Option<u32>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
@@ -146,6 +149,7 @@ where
                 normalize_for_search(&station_name),
                 limit,
                 from_station_group_id,
+                transport_type,
             )
             .await?;
 
@@ -393,6 +397,7 @@ where
             station_g_cd: Some(station.station_g_cd),
             average_distance: station.average_distance,
             type_cd: station.type_cd,
+            transport_type: station.transport_type,
         }
     }
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol> {
@@ -807,6 +812,7 @@ where
                     station_cd: line.station_cd,
                     station_g_cd: line.station_g_cd,
                     type_cd: line.type_cd,
+                    transport_type: line.transport_type,
                 })
                 .collect::<Vec<Line>>();
 
@@ -942,6 +948,7 @@ where
             color: row.color.clone(),
             direction: row.direction,
             kind: row.kind,
+            transport_type: row.transport_type,
         }
     }
 }

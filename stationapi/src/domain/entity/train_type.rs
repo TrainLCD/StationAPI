@@ -61,6 +61,7 @@ impl TrainType {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::entity::gtfs::TransportType;
 
     fn create_test_line() -> Line {
         Line::new(
@@ -97,6 +98,7 @@ mod tests {
             Some(1130201),                     // station_g_cd
             Some(0.97),                        // average_distance
             None,                              // type_cd
+            TransportType::Rail,               // transport_type
         )
     }
 
