@@ -4,7 +4,6 @@ use csv::{ReaderBuilder, StringRecord};
 use sqlx::{Connection, PgConnection};
 use stationapi::config::fetch_database_url;
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 use std::io::{Cursor, Read as _};
 use std::path::Path;
 use std::{env, fs};
@@ -1114,30 +1113,39 @@ fn is_bus_feature_disabled() -> bool {
 // GTFS to Stations/Lines Integration
 // ============================================================
 
+/// FNV-1a hash function for deterministic hashing across process invocations
+/// Unlike DefaultHasher, this produces consistent results across runs
+fn fnv1a_hash(data: &[u8]) -> u64 {
+    const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+
+    let mut hash = FNV_OFFSET_BASIS;
+    for byte in data {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
+}
+
 /// Generate deterministic line_cd from route_id
 /// Uses range starting at 100,000,000 to avoid conflicts with existing rail data
 fn generate_bus_line_cd(route_id: &str) -> i32 {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    route_id.hash(&mut hasher);
-    let hash = hasher.finish();
+    let hash = fnv1a_hash(route_id.as_bytes());
     100_000_000 + (hash % 10_000_000) as i32
 }
 
 /// Generate deterministic station_cd from stop_id and route_id
 /// Uses range starting at 200,000,000 to avoid conflicts with existing rail data
 fn generate_bus_station_cd(stop_id: &str, route_id: &str) -> i32 {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    format!("{}-{}", stop_id, route_id).hash(&mut hasher);
-    let hash = hasher.finish();
+    let combined = format!("{}-{}", stop_id, route_id);
+    let hash = fnv1a_hash(combined.as_bytes());
     200_000_000 + (hash % 100_000_000) as i32
 }
 
 /// Generate deterministic station_g_cd from stop_id only (shared across routes)
 /// Same bus stop on different routes will have the same station_g_cd
 fn generate_bus_station_g_cd(stop_id: &str) -> i32 {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    stop_id.hash(&mut hasher);
-    let hash = hasher.finish();
+    let hash = fnv1a_hash(stop_id.as_bytes());
     200_000_000 + (hash % 100_000_000) as i32
 }
 
