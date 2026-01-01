@@ -1,5 +1,6 @@
 pub mod company;
 pub mod connection;
+pub mod gtfs;
 pub mod line;
 pub mod line_symbol;
 pub mod station;

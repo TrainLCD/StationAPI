@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 
-use crate::domain::{entity::station::Station, error::DomainError};
+use crate::domain::{
+    entity::{gtfs::TransportType, station::Station},
+    error::DomainError,
+};
 
 #[async_trait]
 pub trait StationRepository: Send + Sync + 'static {
@@ -24,12 +27,14 @@ pub trait StationRepository: Send + Sync + 'static {
         latitude: f64,
         longitude: f64,
         limit: Option<u32>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_name(
         &self,
         station_name: String,
         limit: Option<u32>,
         from_station_group_id: Option<u32>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Station>, DomainError>;
     async fn get_route_stops(
@@ -131,10 +136,16 @@ mod tests {
             latitude: f64,
             longitude: f64,
             limit: Option<u32>,
+            transport_type: Option<TransportType>,
         ) -> Result<Vec<Station>, DomainError> {
             let mut result: Vec<Station> = self
                 .stations
                 .values()
+                .filter(|station| {
+                    transport_type
+                        .as_ref()
+                        .map_or(true, |tt| station.transport_type == *tt)
+                })
                 .map(|station| {
                     let mut s = station.clone();
                     let distance = ((station.lat - latitude).powi(2)
@@ -161,11 +172,17 @@ mod tests {
             station_name: String,
             limit: Option<u32>,
             _from_station_group_id: Option<u32>,
+            transport_type: Option<TransportType>,
         ) -> Result<Vec<Station>, DomainError> {
             let mut result: Vec<Station> = self
                 .stations
                 .values()
-                .filter(|station| station.station_name.contains(&station_name))
+                .filter(|station| {
+                    station.station_name.contains(&station_name)
+                        && transport_type
+                            .as_ref()
+                            .map_or(true, |tt| station.transport_type == *tt)
+                })
                 .cloned()
                 .collect();
 
@@ -356,7 +373,7 @@ mod tests {
         let repo = MockStationRepository::new();
         // 東京駅付近の座標
         let result = repo
-            .get_by_coordinates(35.681236, 139.767125, Some(2))
+            .get_by_coordinates(35.681236, 139.767125, Some(2), None)
             .await
             .unwrap();
         assert!(result.len() <= 2);
@@ -367,7 +384,7 @@ mod tests {
     async fn test_get_by_name() {
         let repo = MockStationRepository::new();
         let result = repo
-            .get_by_name("東京".to_string(), None, None)
+            .get_by_name("東京".to_string(), None, None, None)
             .await
             .unwrap();
         assert_eq!(result.len(), 1);
@@ -378,7 +395,7 @@ mod tests {
     async fn test_get_by_name_with_limit() {
         let repo = MockStationRepository::new();
         let result = repo
-            .get_by_name("駅".to_string(), Some(2), None)
+            .get_by_name("駅".to_string(), Some(2), None, None)
             .await
             .unwrap();
         assert!(result.len() <= 2);

@@ -2,8 +2,8 @@ use async_trait::async_trait;
 
 use crate::{
     domain::entity::{
-        company::Company, line::Line, line_symbol::LineSymbol, station::Station,
-        station_number::StationNumber, train_type::TrainType,
+        company::Company, gtfs::TransportType, line::Line, line_symbol::LineSymbol,
+        station::Station, station_number::StationNumber, train_type::TrainType,
     },
     proto::{Route, RouteMinimalResponse},
     use_case::error::UseCaseError,
@@ -29,6 +29,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
         latitude: f64,
         longitude: f64,
         limit: Option<u32>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_line_id(
         &self,
@@ -38,8 +39,9 @@ pub trait QueryUseCase: Send + Sync + 'static {
     async fn get_stations_by_name(
         &self,
         station_name: String,
-        get_stations_by_name: Option<u32>,
+        limit: Option<u32>,
         from_station_group_id: Option<u32>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn find_company_by_id_vec(
         &self,

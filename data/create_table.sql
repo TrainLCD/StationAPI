@@ -52,6 +52,19 @@ $$;
 ALTER TABLE IF EXISTS ONLY public.stations
 DROP CONSTRAINT IF EXISTS stations_line_cd_fkey;
 
+-- Drop GTFS foreign key constraints before dropping primary keys
+ALTER TABLE IF EXISTS ONLY public.gtfs_stops
+DROP CONSTRAINT IF EXISTS gtfs_stops_station_cd_fkey;
+
+ALTER TABLE IF EXISTS ONLY public.gtfs_routes
+DROP CONSTRAINT IF EXISTS gtfs_routes_line_cd_fkey;
+
+ALTER TABLE IF EXISTS ONLY public.gtfs_routes
+DROP CONSTRAINT IF EXISTS gtfs_routes_agency_id_fkey;
+
+ALTER TABLE IF EXISTS ONLY public.gtfs_agencies
+DROP CONSTRAINT IF EXISTS gtfs_agencies_company_cd_fkey;
+
 ALTER TABLE IF EXISTS ONLY public.station_station_types
 DROP CONSTRAINT IF EXISTS station_station_types_type_cd_fkey;
 
@@ -552,3 +565,294 @@ ADD CONSTRAINT stations_line_cd_fkey FOREIGN KEY (line_cd) REFERENCES public.lin
 --
 -- PostgreSQL database dump complete
 --
+
+-- ============================================================
+-- GTFS Bus Integration - Phase 1: Schema Extensions
+-- ============================================================
+
+--
+-- Add transport_type to stations table (0: Rail, 1: Bus)
+--
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'stations' AND column_name = 'transport_type'
+    ) THEN
+        ALTER TABLE public.stations ADD COLUMN transport_type INTEGER DEFAULT 0 NOT NULL;
+    END IF;
+END $$;
+
+--
+-- Add transport_type to lines table (0: Rail, 1: Bus)
+--
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'lines' AND column_name = 'transport_type'
+    ) THEN
+        ALTER TABLE public.lines ADD COLUMN transport_type INTEGER DEFAULT 0 NOT NULL;
+    END IF;
+END $$;
+
+--
+-- Create index for transport_type filtering
+--
+
+CREATE INDEX IF NOT EXISTS idx_stations_transport_type ON public.stations USING btree (transport_type);
+CREATE INDEX IF NOT EXISTS idx_lines_transport_type ON public.lines USING btree (transport_type);
+
+-- ============================================================
+-- GTFS Tables
+-- ============================================================
+
+--
+-- Name: gtfs_agencies; Type: TABLE; Schema: public
+-- GTFS agency information (bus operators)
+--
+
+DROP TABLE IF EXISTS public.gtfs_stop_times CASCADE;
+DROP TABLE IF EXISTS public.gtfs_trips CASCADE;
+DROP TABLE IF EXISTS public.gtfs_calendar_dates CASCADE;
+DROP TABLE IF EXISTS public.gtfs_calendar CASCADE;
+DROP TABLE IF EXISTS public.gtfs_stops CASCADE;
+DROP TABLE IF EXISTS public.gtfs_routes CASCADE;
+DROP TABLE IF EXISTS public.gtfs_agencies CASCADE;
+DROP TABLE IF EXISTS public.gtfs_shapes CASCADE;
+DROP TABLE IF EXISTS public.gtfs_feed_info CASCADE;
+
+CREATE UNLOGGED TABLE public.gtfs_agencies (
+    agency_id VARCHAR(255) PRIMARY KEY,
+    agency_name TEXT NOT NULL,
+    agency_name_k TEXT,
+    agency_name_r TEXT,
+    agency_name_zh TEXT,
+    agency_name_ko TEXT,
+    agency_url TEXT,
+    agency_timezone VARCHAR(50) DEFAULT 'Asia/Tokyo',
+    agency_lang VARCHAR(10) DEFAULT 'ja',
+    agency_phone TEXT,
+    agency_fare_url TEXT,
+    company_cd INTEGER REFERENCES public.companies(company_cd)
+);
+
+ALTER TABLE public.gtfs_agencies OWNER TO stationapi;
+
+--
+-- Name: gtfs_routes; Type: TABLE; Schema: public
+-- GTFS route information (bus lines)
+--
+
+CREATE UNLOGGED TABLE public.gtfs_routes (
+    route_id VARCHAR(255) PRIMARY KEY,
+    agency_id VARCHAR(255) REFERENCES public.gtfs_agencies(agency_id),
+    route_short_name TEXT,
+    route_long_name TEXT,
+    route_long_name_k TEXT,
+    route_long_name_r TEXT,
+    route_long_name_zh TEXT,
+    route_long_name_ko TEXT,
+    route_desc TEXT,
+    route_type INTEGER NOT NULL DEFAULT 3,  -- 3 = Bus
+    route_url TEXT,
+    route_color VARCHAR(6),
+    route_text_color VARCHAR(6),
+    route_sort_order INTEGER,
+    line_cd INTEGER REFERENCES public.lines(line_cd)
+);
+
+ALTER TABLE public.gtfs_routes OWNER TO stationapi;
+
+CREATE INDEX idx_gtfs_routes_agency_id ON public.gtfs_routes USING btree (agency_id);
+CREATE INDEX idx_gtfs_routes_line_cd ON public.gtfs_routes USING btree (line_cd);
+
+--
+-- Name: gtfs_stops; Type: TABLE; Schema: public
+-- GTFS stop information (bus stops)
+--
+
+CREATE UNLOGGED TABLE public.gtfs_stops (
+    stop_id VARCHAR(255) PRIMARY KEY,
+    stop_code VARCHAR(50),
+    stop_name TEXT NOT NULL,
+    stop_name_k TEXT,
+    stop_name_r TEXT,
+    stop_name_zh TEXT,
+    stop_name_ko TEXT,
+    stop_desc TEXT,
+    stop_lat DOUBLE PRECISION NOT NULL,
+    stop_lon DOUBLE PRECISION NOT NULL,
+    zone_id VARCHAR(255),
+    stop_url TEXT,
+    location_type INTEGER DEFAULT 0,  -- 0: stop, 1: station
+    parent_station VARCHAR(255),
+    stop_timezone VARCHAR(50),
+    wheelchair_boarding INTEGER,
+    platform_code VARCHAR(50),
+    station_cd INTEGER REFERENCES public.stations(station_cd)
+);
+
+ALTER TABLE public.gtfs_stops OWNER TO stationapi;
+
+CREATE INDEX idx_gtfs_stops_station_cd ON public.gtfs_stops USING btree (station_cd);
+CREATE INDEX idx_gtfs_stops_parent_station ON public.gtfs_stops USING btree (parent_station);
+
+DO $$
+BEGIN
+    BEGIN
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_gtfs_stops_point ON public.gtfs_stops USING gist ((point(stop_lat, stop_lon)))';
+    EXCEPTION
+        WHEN undefined_object THEN
+            RAISE NOTICE 'Skipping GiST point index for gtfs_stops; required operator class is unavailable.';
+        WHEN insufficient_privilege THEN
+            RAISE NOTICE 'Skipping GiST point index for gtfs_stops; insufficient privileges.';
+    END;
+END $$;
+
+DO $$
+BEGIN
+    BEGIN
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_gtfs_stops_name_trgm ON public.gtfs_stops USING gin (stop_name gin_trgm_ops)';
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_gtfs_stops_name_k_trgm ON public.gtfs_stops USING gin (stop_name_k gin_trgm_ops)';
+    EXCEPTION
+        WHEN undefined_object THEN
+            RAISE NOTICE 'Skipping trigram GIN indexes for gtfs_stops; gin_trgm_ops operator class is unavailable.';
+        WHEN insufficient_privilege THEN
+            RAISE NOTICE 'Skipping trigram GIN indexes for gtfs_stops; insufficient privileges.';
+    END;
+END $$;
+
+--
+-- Name: gtfs_calendar; Type: TABLE; Schema: public
+-- GTFS calendar (service schedules)
+--
+
+CREATE UNLOGGED TABLE public.gtfs_calendar (
+    service_id VARCHAR(255) PRIMARY KEY,
+    monday BOOLEAN NOT NULL DEFAULT FALSE,
+    tuesday BOOLEAN NOT NULL DEFAULT FALSE,
+    wednesday BOOLEAN NOT NULL DEFAULT FALSE,
+    thursday BOOLEAN NOT NULL DEFAULT FALSE,
+    friday BOOLEAN NOT NULL DEFAULT FALSE,
+    saturday BOOLEAN NOT NULL DEFAULT FALSE,
+    sunday BOOLEAN NOT NULL DEFAULT FALSE,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL
+);
+
+ALTER TABLE public.gtfs_calendar OWNER TO stationapi;
+
+--
+-- Name: gtfs_calendar_dates; Type: TABLE; Schema: public
+-- GTFS calendar dates (service exceptions)
+--
+
+CREATE UNLOGGED TABLE public.gtfs_calendar_dates (
+    id SERIAL PRIMARY KEY,
+    service_id VARCHAR(255) NOT NULL,
+    date DATE NOT NULL,
+    exception_type INTEGER NOT NULL  -- 1: added, 2: removed
+);
+
+ALTER TABLE public.gtfs_calendar_dates OWNER TO stationapi;
+
+CREATE INDEX idx_gtfs_calendar_dates_service_id ON public.gtfs_calendar_dates USING btree (service_id);
+CREATE INDEX idx_gtfs_calendar_dates_date ON public.gtfs_calendar_dates USING btree (date);
+
+--
+-- Name: gtfs_trips; Type: TABLE; Schema: public
+-- GTFS trip information
+--
+
+CREATE UNLOGGED TABLE public.gtfs_trips (
+    trip_id VARCHAR(255) PRIMARY KEY,
+    route_id VARCHAR(255) NOT NULL REFERENCES public.gtfs_routes(route_id),
+    service_id VARCHAR(255) NOT NULL,
+    trip_headsign TEXT,
+    trip_headsign_k TEXT,
+    trip_headsign_r TEXT,
+    trip_short_name TEXT,
+    direction_id INTEGER,  -- 0: outbound, 1: inbound
+    block_id VARCHAR(255),
+    shape_id VARCHAR(255),
+    wheelchair_accessible INTEGER,
+    bikes_allowed INTEGER
+);
+
+ALTER TABLE public.gtfs_trips OWNER TO stationapi;
+
+CREATE INDEX idx_gtfs_trips_route_id ON public.gtfs_trips USING btree (route_id);
+CREATE INDEX idx_gtfs_trips_service_id ON public.gtfs_trips USING btree (service_id);
+CREATE INDEX idx_gtfs_trips_shape_id ON public.gtfs_trips USING btree (shape_id);
+
+--
+-- Name: gtfs_stop_times; Type: TABLE; Schema: public
+-- GTFS stop times (timetable)
+--
+
+CREATE UNLOGGED TABLE public.gtfs_stop_times (
+    id SERIAL PRIMARY KEY,
+    trip_id VARCHAR(255) NOT NULL REFERENCES public.gtfs_trips(trip_id),
+    arrival_time TIME,
+    departure_time TIME,
+    stop_id VARCHAR(255) NOT NULL REFERENCES public.gtfs_stops(stop_id),
+    stop_sequence INTEGER NOT NULL,
+    stop_headsign TEXT,
+    pickup_type INTEGER DEFAULT 0,
+    drop_off_type INTEGER DEFAULT 0,
+    shape_dist_traveled DOUBLE PRECISION,
+    timepoint INTEGER DEFAULT 1
+);
+
+ALTER TABLE public.gtfs_stop_times OWNER TO stationapi;
+
+CREATE INDEX idx_gtfs_stop_times_trip_id ON public.gtfs_stop_times USING btree (trip_id);
+CREATE INDEX idx_gtfs_stop_times_stop_id ON public.gtfs_stop_times USING btree (stop_id);
+CREATE INDEX idx_gtfs_stop_times_arrival_time ON public.gtfs_stop_times USING btree (arrival_time);
+CREATE UNIQUE INDEX idx_gtfs_stop_times_trip_stop_seq ON public.gtfs_stop_times USING btree (trip_id, stop_sequence);
+
+--
+-- Name: gtfs_shapes; Type: TABLE; Schema: public
+-- GTFS shapes (route geometry)
+--
+
+CREATE UNLOGGED TABLE public.gtfs_shapes (
+    id SERIAL PRIMARY KEY,
+    shape_id VARCHAR(255) NOT NULL,
+    shape_pt_lat DOUBLE PRECISION NOT NULL,
+    shape_pt_lon DOUBLE PRECISION NOT NULL,
+    shape_pt_sequence INTEGER NOT NULL,
+    shape_dist_traveled DOUBLE PRECISION
+);
+
+ALTER TABLE public.gtfs_shapes OWNER TO stationapi;
+
+CREATE INDEX idx_gtfs_shapes_shape_id ON public.gtfs_shapes USING btree (shape_id);
+CREATE UNIQUE INDEX idx_gtfs_shapes_id_seq ON public.gtfs_shapes USING btree (shape_id, shape_pt_sequence);
+
+--
+-- Name: gtfs_feed_info; Type: TABLE; Schema: public
+-- GTFS feed metadata
+--
+
+CREATE UNLOGGED TABLE public.gtfs_feed_info (
+    id SERIAL PRIMARY KEY,
+    feed_publisher_name TEXT NOT NULL,
+    feed_publisher_url TEXT,
+    feed_lang VARCHAR(10) DEFAULT 'ja',
+    feed_start_date DATE,
+    feed_end_date DATE,
+    feed_version TEXT,
+    feed_contact_email TEXT,
+    feed_contact_url TEXT,
+    imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE public.gtfs_feed_info OWNER TO stationapi;
+
+-- ============================================================
+-- End of GTFS Bus Integration Schema
+-- ============================================================

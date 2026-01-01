@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::proto::StopCondition;
 
-use super::{line::Line, station_number::StationNumber, train_type::TrainType as TrainTypeEntity};
+use super::{
+    gtfs::TransportType, line::Line, station_number::StationNumber,
+    train_type::TrainType as TrainTypeEntity,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Station {
@@ -73,6 +76,7 @@ pub struct Station {
     pub color: Option<String>,
     pub direction: Option<i32>,
     pub kind: Option<i32>,
+    pub transport_type: TransportType,
 }
 
 impl Station {
@@ -142,6 +146,7 @@ impl Station {
         color: Option<String>,
         direction: Option<i32>,
         kind: Option<i32>,
+        transport_type: TransportType,
     ) -> Self {
         Self {
             station_cd,
@@ -208,6 +213,7 @@ impl Station {
             color,
             direction,
             kind,
+            transport_type,
         }
     }
 }
@@ -261,6 +267,7 @@ mod tests {
             Some(1130201),                     // station_g_cd
             Some(0.97),                        // average_distance
             None,                              // type_cd
+            TransportType::Rail,               // transport_type
         )
     }
 
@@ -348,6 +355,7 @@ mod tests {
             Some("#0066CC".to_string()),              // color
             Some(0),                                  // direction
             Some(1),                                  // kind
+            TransportType::Rail,                      // transport_type
         )
     }
 
@@ -417,6 +425,7 @@ mod tests {
             None,                     // color
             None,                     // direction
             None,                     // kind
+            TransportType::Rail,      // transport_type
         )
     }
 

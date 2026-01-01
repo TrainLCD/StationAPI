@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT \n            l.line_cd,\n            l.company_cd,\n            l.line_type,\n            l.line_name,\n            l.line_name_k,\n            l.line_name_h,\n            l.line_name_r,\n            l.line_name_zh,\n            l.line_name_ko,\n            l.line_color_c,\n            l.line_symbol1,\n            l.line_symbol2,\n            l.line_symbol3,\n            l.line_symbol4,\n            l.line_symbol1_color,\n            l.line_symbol2_color,\n            l.line_symbol3_color,\n            l.line_symbol4_color,\n            l.line_symbol1_shape,\n            l.line_symbol2_shape,\n            l.line_symbol3_shape,\n            l.line_symbol4_shape,\n            l.e_status,\n            l.e_sort,\n            COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,\n            CAST(NULL AS INTEGER) AS line_group_cd,\n            CAST(NULL AS INTEGER) AS station_cd,\n            CAST(NULL AS INTEGER) AS station_g_cd,\n            CAST(NULL AS INTEGER) AS type_cd\n            FROM lines AS l\n            WHERE l.line_cd = $1\n            AND l.e_status = 0",
+  "query": "SELECT DISTINCT ON (sst.id, l.line_cd)\n                l.line_cd,\n                l.company_cd,\n                l.line_type,\n                l.line_name,\n                l.line_name_k,\n                l.line_name_h,\n                l.line_name_r,\n                l.line_name_zh,\n                l.line_name_ko,\n                l.line_color_c,\n                l.line_symbol1,\n                l.line_symbol2,\n                l.line_symbol3,\n                l.line_symbol4,\n                l.line_symbol1_color,\n                l.line_symbol2_color,\n                l.line_symbol3_color,\n                l.line_symbol4_color,\n                l.line_symbol1_shape,\n                l.line_symbol2_shape,\n                l.line_symbol3_shape,\n                l.line_symbol4_shape,\n                l.e_status,\n                l.e_sort,\n                COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,\n                sst.line_group_cd,\n                sst.type_cd,\n                s.station_cd,\n                s.station_g_cd,\n                l.transport_type\n            FROM lines AS l\n            JOIN station_station_types AS sst ON sst.line_group_cd = ANY($1) AND sst.pass <> 1\n            JOIN stations AS s ON s.station_cd = sst.station_cd AND s.e_status = 0 AND s.line_cd = l.line_cd\n            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd\n            LEFT JOIN aliases AS a ON la.alias_cd = a.id\n            WHERE l.e_status = 0\n            ORDER BY sst.id, l.line_cd",
   "describe": {
     "columns": [
       {
@@ -135,23 +135,28 @@
       },
       {
         "ordinal": 26,
-        "name": "station_cd",
+        "name": "type_cd",
         "type_info": "Int4"
       },
       {
         "ordinal": 27,
-        "name": "station_g_cd",
+        "name": "station_cd",
         "type_info": "Int4"
       },
       {
         "ordinal": 28,
-        "name": "type_cd",
+        "name": "station_g_cd",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 29,
+        "name": "transport_type",
         "type_info": "Int4"
       }
     ],
     "parameters": {
       "Left": [
-        "Int4"
+        "Int4Array"
       ]
     },
     "nullable": [
@@ -180,11 +185,12 @@
       false,
       false,
       null,
-      null,
-      null,
-      null,
-      null
+      false,
+      false,
+      false,
+      false,
+      false
     ]
   },
-  "hash": "85c490dd8992db5950dfd6c141b02048f361c5e9ac82cb7503fd8e75266cc06f"
+  "hash": "c08e746f79517801e8a235b4cbc4377f9addfa50f0a0b9ac5e2dacad55fb9a97"
 }

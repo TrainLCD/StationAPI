@@ -1,4 +1,16 @@
-use crate::{domain::entity::station::Station, proto::Station as GrpcStation};
+use crate::{
+    domain::entity::{gtfs::TransportType, station::Station},
+    proto::{Station as GrpcStation, TransportType as GrpcTransportType},
+};
+
+impl From<TransportType> for i32 {
+    fn from(value: TransportType) -> Self {
+        match value {
+            TransportType::Rail => GrpcTransportType::Rail as i32,
+            TransportType::Bus => GrpcTransportType::Bus as i32,
+        }
+    }
+}
 
 impl From<Station> for GrpcStation {
     fn from(station: Station) -> Self {
@@ -30,6 +42,7 @@ impl From<Station> for GrpcStation {
             distance: station.distance,
             has_train_types: Some(station.has_train_types),
             train_type: station.train_type.map(|tt| Box::new((*tt).into())),
+            transport_type: station.transport_type.into(),
         }
     }
 }

@@ -12,6 +12,7 @@ services:
     environment:
       DATABASE_URL: postgresql://stationapi:stationapi@psql/stationapi
       DISABLE_GRPC_WEB: false
+      DISABLE_BUS_FEATURE: false
       HOST: 0.0.0.0
     ports:
       - 50051:50051
@@ -23,6 +24,6 @@ services:
       POSTGRES_USER: stationapi
       POSTGRES_PASSWORD: stationapi
       POSTGRES_DB: stationapi
-    restart: always
+    restart: always 
     volumes:
       - ./docker/postgres:/docker-entrypoint-initdb.d:ro

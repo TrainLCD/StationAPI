@@ -1,4 +1,5 @@
 use crate::{
+    domain::entity::gtfs::TransportType,
     infrastructure::{
         company_repository::MyCompanyRepository, line_repository::MyLineRepository,
         station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
@@ -11,11 +12,21 @@ use crate::{
         GetStationByLineIdRequest, GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
         GetTrainTypesByStationIdRequest, MultipleLineResponse, MultipleStationResponse,
         MultipleTrainTypeResponse, Route, RouteMinimalResponse, RouteResponse, RouteTypeResponse,
-        SingleLineResponse, SingleStationResponse,
+        SingleLineResponse, SingleStationResponse, TransportType as GrpcTransportType,
     },
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
 use tonic::Response;
+
+/// Convert proto TransportType to domain TransportType
+/// Returns None if unspecified (no filter), Some(type) if specified
+fn convert_transport_type(proto_type: i32) -> Option<TransportType> {
+    match proto_type {
+        x if x == GrpcTransportType::Rail as i32 => Some(TransportType::Rail),
+        x if x == GrpcTransportType::Bus as i32 => Some(TransportType::Bus),
+        _ => None, // TransportTypeUnspecified or unknown = no filter
+    }
+}
 
 pub struct MyApi {
     pub query_use_case: QueryInteractor<
@@ -97,9 +108,12 @@ impl StationApi for MyApi {
         let latitude = request_ref.latitude;
         let longitude = request_ref.longitude;
         let limit = request_ref.limit;
+        let transport_type = request_ref
+            .transport_type
+            .and_then(convert_transport_type);
         let stations = match self
             .query_use_case
-            .get_stations_by_coordinates(latitude, longitude, limit)
+            .get_stations_by_coordinates(latitude, longitude, limit, transport_type)
             .await
         {
             Ok(stations) => stations,
@@ -138,12 +152,16 @@ impl StationApi for MyApi {
         let query_station_name = &request_ref.station_name;
         let query_limit = request_ref.limit;
         let from_station_group_id = request_ref.from_station_group_id;
+        let transport_type = request_ref
+            .transport_type
+            .and_then(convert_transport_type);
         match self
             .query_use_case
             .get_stations_by_name(
                 query_station_name.to_string(),
                 query_limit,
                 from_station_group_id,
+                transport_type,
             )
             .await
         {

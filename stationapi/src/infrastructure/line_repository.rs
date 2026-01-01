@@ -3,7 +3,9 @@ use sqlx::{PgConnection, Pool, Postgres};
 use std::sync::Arc;
 
 use crate::domain::{
-    entity::line::Line, error::DomainError, repository::line_repository::LineRepository,
+    entity::{gtfs::TransportType, line::Line},
+    error::DomainError,
+    repository::line_repository::LineRepository,
 };
 
 #[derive(sqlx::FromRow, Clone)]
@@ -37,6 +39,7 @@ pub struct LineRow {
     pub station_cd: Option<i32>,
     pub station_g_cd: Option<i32>,
     pub type_cd: Option<i32>,
+    pub transport_type: Option<i32>,
 }
 
 impl From<LineRow> for Line {
@@ -75,6 +78,7 @@ impl From<LineRow> for Line {
             station_g_cd: row.station_g_cd,
             average_distance: row.average_distance,
             type_cd: row.type_cd,
+            transport_type: TransportType::from(row.transport_type.unwrap_or(0))
         }
     }
 }
@@ -189,7 +193,8 @@ impl InternalLineRepository {
             CAST(NULL AS INTEGER) AS line_group_cd,
             CAST(NULL AS INTEGER) AS station_cd,
             CAST(NULL AS INTEGER) AS station_g_cd,
-            CAST(NULL AS INTEGER) AS type_cd
+            CAST(NULL AS INTEGER) AS type_cd,
+            l.transport_type
             FROM lines AS l
             WHERE l.line_cd = $1
             AND l.e_status = 0",
@@ -241,12 +246,13 @@ impl InternalLineRepository {
             COALESCE(alias_data.line_name_r, l.line_name_r) AS line_name_r,
             COALESCE(alias_data.line_name_zh, l.line_name_zh) AS line_name_zh,
             COALESCE(alias_data.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(alias_data.line_color_c, l.line_color_c) AS line_color_c
+            COALESCE(alias_data.line_color_c, l.line_color_c) AS line_color_c,
+            l.transport_type
         FROM lines AS l
             JOIN stations AS s ON s.station_cd = $1
-            JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1
+            LEFT JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1
             LEFT JOIN (
-                SELECT DISTINCT ON (la.station_cd) 
+                SELECT DISTINCT ON (la.station_cd)
                     la.station_cd,
                     a.line_name,
                     a.line_name_k,
@@ -313,7 +319,8 @@ impl InternalLineRepository {
                 CAST(NULL AS INTEGER) AS line_group_cd,
                 CAST(NULL AS INTEGER) AS station_cd,
                 CAST(NULL AS INTEGER) AS station_g_cd,
-                CAST(NULL AS INTEGER) AS type_cd
+                CAST(NULL AS INTEGER) AS type_cd,
+                transport_type
             FROM lines WHERE line_cd IN ( {params} ) AND e_status = 0"
         );
 
@@ -363,11 +370,12 @@ impl InternalLineRepository {
             sst.line_group_cd,
             sst.type_cd,
             s.station_cd,
-            s.station_g_cd
+            s.station_g_cd,
+            l.transport_type
         FROM lines AS l
         JOIN stations AS s ON s.station_g_cd = $1
             AND s.e_status = 0
-        JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1
+        LEFT JOIN station_station_types AS sst ON sst.station_cd = s.station_cd AND sst.pass <> 1
         WHERE l.line_cd = s.line_cd
             AND l.e_status = 0",
             station_group_id
@@ -421,7 +429,8 @@ impl InternalLineRepository {
                 COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
                 COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
                 COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
-                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+                l.transport_type
             FROM lines AS l
             JOIN stations AS s ON s.station_g_cd IN ( {params} )
             AND s.e_status = 0
@@ -483,7 +492,8 @@ impl InternalLineRepository {
             l.line_name_r,
             l.line_name_zh,
             l.line_name_ko,
-            l.line_color_c
+            l.line_color_c,
+            l.transport_type
         FROM lines AS l
             JOIN station_station_types AS sst ON sst.line_group_cd = $1 AND sst.pass <> 1
             JOIN stations AS s ON s.station_cd = sst.station_cd
@@ -542,7 +552,8 @@ impl InternalLineRepository {
                 sst.line_group_cd,
                 sst.type_cd,
                 s.station_cd,
-                s.station_g_cd
+                s.station_g_cd,
+                l.transport_type
             FROM lines AS l
             JOIN station_station_types AS sst ON sst.line_group_cd IN ( {params} ) AND sst.pass <> 1
             JOIN stations AS s ON s.station_cd = sst.station_cd AND s.e_status = 0
@@ -604,7 +615,8 @@ impl InternalLineRepository {
                 sst.line_group_cd,
                 sst.type_cd,
                 s.station_cd,
-                s.station_g_cd
+                s.station_g_cd,
+                l.transport_type
             FROM lines AS l
             JOIN station_station_types AS sst ON sst.line_group_cd = ANY($1) AND sst.pass <> 1
             JOIN stations AS s ON s.station_cd = sst.station_cd AND s.e_status = 0 AND s.line_cd = l.line_cd
@@ -660,7 +672,8 @@ impl InternalLineRepository {
             CAST(NULL AS INTEGER) AS line_group_cd,
             CAST(NULL AS INTEGER) AS station_cd,
             CAST(NULL AS INTEGER) AS station_g_cd,
-            CAST(NULL AS INTEGER) AS type_cd
+            CAST(NULL AS INTEGER) AS type_cd,
+            l.transport_type
             FROM lines AS l
             WHERE (
                     l.line_name LIKE $1
