@@ -209,16 +209,24 @@ let station_numbers_raw = [
 
 ### 9. アーキテクチャドキュメント不足
 
-> **注意**: 本項目はオンボーディングを阻害する重要な問題であり、高優先度として対応を検討すべきです。
+> **ステータス**: ✅ **対応済み** (2026年1月)
+>
+> [docs/architecture.md](./architecture.md) にて以下を文書化しました。
 
-#### 不足している領域
+#### 対応済みの領域
+
+| 領域 | 対応状況 |
+|------|----------|
+| アーキテクチャドキュメント | ✅ 4層構造 (Domain/UseCase/Infrastructure/Presentation) の設計思想を文書化 |
+| 命名規則 | ✅ Row 構造体と Entity の区別を明確化 |
+| キャッシュ戦略 | ✅ バッチクエリによる暗黙的キャッシュと設計判断を文書化 (query.rs:169-265) |
+| データフロー | ✅ リクエストフローとエラー伝播チェーンを図示 |
+
+#### 残存する課題
 
 | 領域 | 内容 |
 |------|------|
-| アーキテクチャドキュメント | 3層構造 (Domain/UseCase/Infrastructure/Presentation) の設計思想が文書化されていない |
-| SQL 設計ドキュメント | 複雑なクエリの使用意図が不明確 |
-| 命名規則 | Row 構造体と Entity の区別が不明確 |
-| キャッシュ戦略 | 判断理由が未文書化 (query.rs:217付近) |
+| SQL 設計ドキュメント | 複雑なクエリの使用意図がインラインコメントに留まる |
 
 ---
 
@@ -308,7 +316,7 @@ let station_numbers_raw = [
 | **高** | Station 構造体の設計見直し | `src/domain/entity/station.rs` | 保守性、パフォーマンス |
 | **高** | SQL クエリの最適化 (TODO対応) | `src/use_case/interactor/query.rs:604,702` | パフォーマンス |
 | **高** | Clone の過度な使用削減 | `src/use_case/interactor/query.rs` | メモリ効率 |
-| **高** | アーキテクチャドキュメント作成 | `docs/` | オンボーディング、保守性 |
+| ~~高~~ | ~~アーキテクチャドキュメント作成~~ | ✅ 対応済み ([docs/architecture.md](./architecture.md)) | オンボーディング、保守性 |
 | **中** | Row 構造体のコード生成検討 | `src/infrastructure/*.rs` | メンテナンス性 |
 | **中** | メソッド命名の改善 | `src/domain/repository/line_repository.rs:23` | 可読性 |
 | **中** | ハードコード値の定数化 | 複数ファイル | 保守性 |
