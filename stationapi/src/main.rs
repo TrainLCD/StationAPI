@@ -175,7 +175,6 @@ fn fetch_addr() -> Result<SocketAddr, AddrParseError> {
     }
 }
 
-
 fn fetch_disable_grpc_web_flag() -> bool {
     match env::var("DISABLE_GRPC_WEB") {
         Ok(s) => s.parse().expect("Failed to parse $DISABLE_GRPC_WEB"),
