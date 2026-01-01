@@ -76,11 +76,12 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     }
 
     // Integrate GTFS data into stations/lines tables
+    // This is wrapped in a transaction - if any step fails, all changes are rolled back
     if let Err(e) = import::integrate_gtfs_to_stations().await {
-        warn!(
-            "Failed to integrate GTFS to stations: {}. Continuing without integrated bus data.",
+        return Err(anyhow::anyhow!(
+            "Failed to integrate GTFS to stations (transaction rolled back): {}",
             e
-        );
+        ));
     }
 
     let db_url = &fetch_database_url();
