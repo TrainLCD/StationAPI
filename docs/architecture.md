@@ -36,7 +36,7 @@ StationAPI は日本の鉄道駅情報を提供する gRPC API です。**クリ
 
 StationAPI は4つの層で構成されています。各層は依存性の方向が内側（Domain）に向かうよう設計されています。
 
-```
+```txt
 ┌─────────────────────────────────────────────────────────┐
 │                    Presentation 層                       │
 │            (gRPC Controller, エラーハンドリング)           │
@@ -248,7 +248,7 @@ pub struct Station {
 
 ### 変換フロー
 
-```
+```txt
 Database (PostgreSQL)
     ↓
 Row (sqlx::FromRow)      ← 直接マッピング: StationRow
@@ -329,7 +329,7 @@ let lines: Vec<Line> = lines
 
 ### 典型的なリクエストフロー
 
-```
+```txt
 [Client]
     │
     ▼ gRPC Request
@@ -374,7 +374,7 @@ let lines: Vec<Line> = lines
 
 ### エラー伝播チェーン
 
-```
+```txt
 DomainError (sqlx エラー等)
     ↓ ?演算子
 UseCaseError (ユースケース層)
@@ -388,7 +388,7 @@ tonic::Status (gRPC ワイヤーフォーマット)
 
 ## ディレクトリ構造
 
-```
+```txt
 stationapi/src/
 ├── domain/                          # コアビジネスロジック
 │   ├── entity/                      # ドメインエンティティ
