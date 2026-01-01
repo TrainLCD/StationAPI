@@ -105,6 +105,12 @@ pub async fn import_csv() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
+        // Skip empty CSV files to avoid generating invalid INSERT statements
+        if csv_data.is_empty() {
+            tracing::warn!("Skipping empty CSV file: {}", file_name);
+            continue;
+        }
+
         let mut sql_lines_inner = Vec::new();
         sql_lines_inner.push(format!("INSERT INTO public.{table_name} VALUES "));
 

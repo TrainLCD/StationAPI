@@ -783,4 +783,52 @@ mod tests {
         let deserialized: Line = serde_json::from_str(&json).expect("デシリアライゼーションに失敗");
         assert_eq!(deserialized.type_cd, Some(42));
     }
+
+    #[test]
+    fn test_line_with_bus_transport_type() {
+        let bus_line = Line::new(
+            99001,                             // line_cd
+            2001,                              // company_cd
+            None,                              // company
+            "都01系統".to_string(),            // line_name
+            "ト01ケイトウ".to_string(),        // line_name_k
+            "と01けいとう".to_string(),        // line_name_h
+            Some("Toei 01".to_string()),       // line_name_r
+            None,                              // line_name_zh
+            None,                              // line_name_ko
+            Some("#00A0E9".to_string()),       // line_color_c
+            None,                              // line_type
+            vec![],                            // line_symbols
+            None,                              // line_symbol1
+            None,                              // line_symbol2
+            None,                              // line_symbol3
+            None,                              // line_symbol4
+            None,                              // line_symbol1_color
+            None,                              // line_symbol2_color
+            None,                              // line_symbol3_color
+            None,                              // line_symbol4_color
+            None,                              // line_symbol1_shape
+            None,                              // line_symbol2_shape
+            None,                              // line_symbol3_shape
+            None,                              // line_symbol4_shape
+            0,                                 // e_status
+            1,                                 // e_sort
+            None,                              // station
+            None,                              // train_type
+            None,                              // line_group_cd
+            None,                              // station_cd
+            None,                              // station_g_cd
+            None,                              // average_distance
+            None,                              // type_cd
+            TransportType::Bus,                // transport_type
+        );
+
+        assert_eq!(bus_line.line_cd, 99001);
+        assert_eq!(bus_line.line_name, "都01系統");
+        assert_eq!(bus_line.transport_type, TransportType::Bus);
+
+        // JSONシリアライゼーションでtransport_typeが正しく出力されることを確認
+        let json = serde_json::to_string(&bus_line).expect("シリアライゼーションに失敗");
+        assert!(json.contains("\"transport_type\":\"Bus\"")); // Bus enum variant
+    }
 }
