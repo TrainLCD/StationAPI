@@ -20,7 +20,7 @@
 
 ### 1.2 データモデル
 
-```
+```text
 companies (鉄道会社)
     ↓
 lines (路線)
@@ -86,7 +86,7 @@ types (列車種別)
 
 ### 2.2 GTFSデータモデル
 
-```
+```text
 agency (事業者)
     ↓
 routes (路線)
@@ -139,7 +139,7 @@ company_cd: u32  // 数値型
 
 #### GTFSのID体系
 
-```
+```text
 stop_id: String    // 文字列型（例: "0001_01"）
 route_id: String   // 文字列型
 agency_id: String  // 文字列型
@@ -484,7 +484,7 @@ distance     -- 駅間距離（メートル）
 
 ### 4.2 推奨アプローチ
 
-**段階的な統合拡張（B案のバリエーション）**
+#### 段階的な統合拡張（B案のバリエーション）
 
 #### Phase 1: 基盤整備
 - transport_type の導入（鉄道=0, バス=1）
