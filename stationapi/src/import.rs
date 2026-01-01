@@ -345,6 +345,7 @@ fn load_gtfs_translations(
 
         // Only process stop_name translations for now
         if table_name == "stops" && field_name == "stop_name" {
+            // Store translation for the exact record_id (e.g., "0001-01")
             let key = ("stops".to_string(), record_id.to_string());
             let entry = translations.entry(key).or_default();
 
@@ -355,6 +356,43 @@ fn load_gtfs_translations(
                 "zh-Hans" | "zh-Hant" | "zh" => entry.zh = Some(translation_text.to_string()),
                 "ko" => entry.ko = Some(translation_text.to_string()),
                 _ => {}
+            }
+
+            // Also store translation for parent stop_id (without suffix like "-01", "-02")
+            // This allows parent stops (location_type=1) to find translations
+            if let Some(parent_id) = record_id.rfind('-').map(|pos| &record_id[..pos]) {
+                let parent_key = ("stops".to_string(), parent_id.to_string());
+                // Only insert if not already present (first child's translation wins)
+                translations
+                    .entry(parent_key)
+                    .or_insert_with(|| Translation {
+                        ja: None,
+                        ja_hrkt: None,
+                        en: None,
+                        zh: None,
+                        ko: None,
+                    });
+                let parent_entry = translations
+                    .get_mut(&("stops".to_string(), parent_id.to_string()))
+                    .unwrap();
+                match language {
+                    "ja" if parent_entry.ja.is_none() => {
+                        parent_entry.ja = Some(translation_text.to_string())
+                    }
+                    "ja-Hrkt" if parent_entry.ja_hrkt.is_none() => {
+                        parent_entry.ja_hrkt = Some(translation_text.to_string())
+                    }
+                    "en" if parent_entry.en.is_none() => {
+                        parent_entry.en = Some(translation_text.to_string())
+                    }
+                    "zh-Hans" | "zh-Hant" | "zh" if parent_entry.zh.is_none() => {
+                        parent_entry.zh = Some(translation_text.to_string())
+                    }
+                    "ko" if parent_entry.ko.is_none() => {
+                        parent_entry.ko = Some(translation_text.to_string())
+                    }
+                    _ => {}
+                }
             }
         }
     }
@@ -491,7 +529,7 @@ async fn import_gtfs_stops(
             .and_then(|s| s.parse().ok());
         let platform_code = record.get(12).filter(|s| !s.is_empty());
 
-        // Get translations
+        // Get translations (keyed by both child stop ID and parent stop ID)
         let key = ("stops".to_string(), stop_id.to_string());
         let translation = translations.get(&key);
 
@@ -1198,6 +1236,7 @@ struct GtfsStopRow {
     stop_url: Option<String>,
     #[allow(dead_code)]
     location_type: Option<i32>,
+    #[allow(dead_code)]
     parent_station: Option<String>,
     #[allow(dead_code)]
     stop_timezone: Option<String>,

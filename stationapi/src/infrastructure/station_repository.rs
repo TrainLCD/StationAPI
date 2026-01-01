@@ -714,9 +714,7 @@ impl InternalStationRepository {
                     .await?;
                 rows.into_iter().map(|row| row.into()).collect()
             }
-            false => {
-                Self::get_by_line_id_without_train_types(line_id, direction_id, conn).await?
-            }
+            false => Self::get_by_line_id_without_train_types(line_id, direction_id, conn).await?,
         };
 
         Ok(stations)
