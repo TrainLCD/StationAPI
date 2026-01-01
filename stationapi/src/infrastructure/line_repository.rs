@@ -78,7 +78,7 @@ impl From<LineRow> for Line {
             station_g_cd: row.station_g_cd,
             average_distance: row.average_distance,
             type_cd: row.type_cd,
-            transport_type: TransportType::from(row.transport_type.unwrap_or(0))
+            transport_type: TransportType::from(row.transport_type.unwrap_or(0)),
         }
     }
 }

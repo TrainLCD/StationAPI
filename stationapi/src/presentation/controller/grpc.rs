@@ -108,9 +108,7 @@ impl StationApi for MyApi {
         let latitude = request_ref.latitude;
         let longitude = request_ref.longitude;
         let limit = request_ref.limit;
-        let transport_type = request_ref
-            .transport_type
-            .and_then(convert_transport_type);
+        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
         let stations = match self
             .query_use_case
             .get_stations_by_coordinates(latitude, longitude, limit, transport_type)
@@ -152,9 +150,7 @@ impl StationApi for MyApi {
         let query_station_name = &request_ref.station_name;
         let query_limit = request_ref.limit;
         let from_station_group_id = request_ref.from_station_group_id;
-        let transport_type = request_ref
-            .transport_type
-            .and_then(convert_transport_type);
+        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
         match self
             .query_use_case
             .get_stations_by_name(

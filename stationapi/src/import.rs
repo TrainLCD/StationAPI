@@ -166,7 +166,8 @@ struct Translation {
 }
 
 /// GTFS download URL for Toei Bus
-const TOEI_BUS_GTFS_URL: &str = "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip";
+const TOEI_BUS_GTFS_URL: &str =
+    "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip";
 
 /// Download and extract GTFS data from ODPT API
 fn download_gtfs() -> Result<(), Box<dyn std::error::Error>> {
@@ -735,14 +736,26 @@ async fn import_gtfs_trips(
         let route_id = record.get(0).unwrap_or("").to_string();
         let service_id = record.get(1).unwrap_or("").to_string();
         let trip_id = record.get(2).unwrap_or("").to_string();
-        let trip_headsign = record.get(3).filter(|s| !s.is_empty()).map(|s| s.to_string());
-        let trip_short_name = record.get(4).filter(|s| !s.is_empty()).map(|s| s.to_string());
+        let trip_headsign = record
+            .get(3)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+        let trip_short_name = record
+            .get(4)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
         let direction_id: Option<i32> = record
             .get(5)
             .filter(|s| !s.is_empty())
             .and_then(|s| s.parse().ok());
-        let block_id = record.get(6).filter(|s| !s.is_empty()).map(|s| s.to_string());
-        let shape_id = record.get(7).filter(|s| !s.is_empty()).map(|s| s.to_string());
+        let block_id = record
+            .get(6)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+        let shape_id = record
+            .get(7)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
         let wheelchair_accessible: Option<i32> = record
             .get(8)
             .filter(|s| !s.is_empty())
@@ -887,7 +900,10 @@ async fn import_gtfs_stop_times(
         let departure_time = parse_gtfs_time(record.get(2).unwrap_or(""));
         let stop_id = record.get(3).unwrap_or("").to_string();
         let stop_sequence: i32 = record.get(4).unwrap_or("0").parse().unwrap_or(0);
-        let stop_headsign = record.get(5).filter(|s| !s.is_empty()).map(|s| s.to_string());
+        let stop_headsign = record
+            .get(5)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
         let pickup_type: Option<i32> = record
             .get(6)
             .filter(|s| !s.is_empty())
@@ -1292,23 +1308,27 @@ async fn integrate_gtfs_routes_to_lines(
     Ok(())
 }
 
-/// Build mapping of stop_id -> list of route_ids from gtfs_stop_times
+/// Build mapping of (stop_id, route_id) -> stop_sequence from gtfs_stop_times
 async fn build_stop_route_mapping(
     conn: &mut PgConnection,
-) -> Result<HashMap<String, Vec<String>>, Box<dyn std::error::Error>> {
-    let rows: Vec<(String, String)> = sqlx::query_as(
-        r#"SELECT DISTINCT gs.stop_id, gt.route_id
+) -> Result<HashMap<String, Vec<(String, i32)>>, Box<dyn std::error::Error>> {
+    // Get the minimum stop_sequence for each stop on each route
+    let rows: Vec<(String, String, i32)> = sqlx::query_as(
+        r#"SELECT gs.stop_id, gt.route_id, MIN(gst.stop_sequence) as min_seq
            FROM gtfs_stops gs
            JOIN gtfs_stop_times gst ON gs.stop_id = gst.stop_id
            JOIN gtfs_trips gt ON gst.trip_id = gt.trip_id
+           GROUP BY gs.stop_id, gt.route_id
            ORDER BY gs.stop_id, gt.route_id"#,
     )
     .fetch_all(&mut *conn)
     .await?;
 
-    let mut map: HashMap<String, Vec<String>> = HashMap::new();
-    for (stop_id, route_id) in rows {
-        map.entry(stop_id).or_default().push(route_id);
+    let mut map: HashMap<String, Vec<(String, i32)>> = HashMap::new();
+    for (stop_id, route_id, stop_sequence) in rows {
+        map.entry(stop_id)
+            .or_default()
+            .push((route_id, stop_sequence));
     }
 
     info!("Built stop-route mapping for {} stops.", map.len());
@@ -1318,7 +1338,7 @@ async fn build_stop_route_mapping(
 /// Integrate gtfs_stops into stations table (one record per route served)
 async fn integrate_gtfs_stops_to_stations(
     conn: &mut PgConnection,
-    stop_route_map: &HashMap<String, Vec<String>>,
+    stop_route_map: &HashMap<String, Vec<(String, i32)>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let stops: Vec<GtfsStopRow> = sqlx::query_as("SELECT * FROM gtfs_stops")
         .fetch_all(&mut *conn)
@@ -1331,14 +1351,14 @@ async fn integrate_gtfs_stops_to_stations(
         let parent_stop_id = stop.parent_station.as_ref().unwrap_or(&stop.stop_id);
         let station_g_cd = generate_bus_station_g_cd(parent_stop_id);
 
-        // Get routes for this stop
+        // Get routes for this stop (with stop_sequence)
         let routes = match stop_route_map.get(&stop.stop_id) {
             Some(r) => r.clone(),
             None => continue, // Skip stops not on any route
         };
 
         // Create a station record for each route this stop serves
-        for route_id in &routes {
+        for (route_id, stop_sequence) in &routes {
             let station_cd = generate_bus_station_cd(&stop.stop_id, route_id);
             let line_cd = generate_bus_line_cd(route_id);
 
@@ -1350,7 +1370,7 @@ async fn integrate_gtfs_stops_to_stations(
                     open_ymd, close_ymd, e_status, e_sort, transport_type
                 ) VALUES (
                     $1, $2, $3, $4, $5, $6, $7, $8, 13, '', '', $9, $10,
-                    '', '', 0, $1, 1
+                    '', '', 0, $11, 1
                 )
                 ON CONFLICT (station_cd) DO NOTHING"#,
             )
@@ -1364,6 +1384,7 @@ async fn integrate_gtfs_stops_to_stations(
             .bind(line_cd)
             .bind(stop.stop_lon)
             .bind(stop.stop_lat)
+            .bind(stop_sequence)
             .execute(&mut *conn)
             .await?;
 
@@ -1382,11 +1403,11 @@ async fn integrate_gtfs_stops_to_stations(
 /// Update cross-references in GTFS tables (gtfs_stops.station_cd, gtfs_routes.line_cd)
 async fn update_gtfs_crossreferences(
     conn: &mut PgConnection,
-    stop_route_map: &HashMap<String, Vec<String>>,
+    stop_route_map: &HashMap<String, Vec<(String, i32)>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Update gtfs_stops with primary station_cd (using first route)
     for (stop_id, routes) in stop_route_map {
-        if let Some(route_id) = routes.first() {
+        if let Some((route_id, _)) = routes.first() {
             let station_cd = generate_bus_station_cd(stop_id, route_id);
             sqlx::query("UPDATE gtfs_stops SET station_cd = $1 WHERE stop_id = $2")
                 .bind(station_cd)

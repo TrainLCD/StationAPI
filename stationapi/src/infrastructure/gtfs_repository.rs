@@ -45,7 +45,9 @@ impl From<GtfsAgencyRow> for GtfsAgency {
             agency_name_zh: row.agency_name_zh,
             agency_name_ko: row.agency_name_ko,
             agency_url: row.agency_url,
-            agency_timezone: row.agency_timezone.unwrap_or_else(|| "Asia/Tokyo".to_string()),
+            agency_timezone: row
+                .agency_timezone
+                .unwrap_or_else(|| "Asia/Tokyo".to_string()),
             agency_lang: row.agency_lang,
             agency_phone: row.agency_phone,
             agency_fare_url: row.agency_fare_url,

@@ -455,7 +455,6 @@ impl From<i32> for TransportType {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
