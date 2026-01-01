@@ -233,8 +233,8 @@ impl From<GtfsTripRow> for GtfsTrip {
 struct GtfsStopTimeRow {
     id: i32,
     trip_id: String,
-    arrival_time: Option<chrono::NaiveTime>,
-    departure_time: Option<chrono::NaiveTime>,
+    arrival_time: Option<String>,
+    departure_time: Option<String>,
     stop_id: String,
     stop_sequence: i32,
     stop_headsign: Option<String>,
@@ -249,8 +249,8 @@ impl From<GtfsStopTimeRow> for GtfsStopTime {
         Self {
             id: row.id,
             trip_id: row.trip_id,
-            arrival_time: row.arrival_time.map(|t| t.format("%H:%M:%S").to_string()),
-            departure_time: row.departure_time.map(|t| t.format("%H:%M:%S").to_string()),
+            arrival_time: row.arrival_time,
+            departure_time: row.departure_time,
             stop_id: row.stop_id,
             stop_sequence: row.stop_sequence,
             stop_headsign: row.stop_headsign,
@@ -690,8 +690,6 @@ impl GtfsStopTimeRepository for MyGtfsStopTimeRepository {
         from_time: &str,
         limit: Option<u32>,
     ) -> Result<Vec<GtfsStopTime>, DomainError> {
-        let from_time = chrono::NaiveTime::parse_from_str(from_time, "%H:%M:%S")
-            .map_err(|e| DomainError::Unexpected(e.to_string()))?;
         let limit = limit.unwrap_or(10) as i64;
 
         let rows = sqlx::query_as::<_, GtfsStopTimeRow>(

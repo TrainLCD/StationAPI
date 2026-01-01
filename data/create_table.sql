@@ -796,8 +796,8 @@ CREATE INDEX idx_gtfs_trips_shape_id ON public.gtfs_trips USING btree (shape_id)
 CREATE UNLOGGED TABLE public.gtfs_stop_times (
     id SERIAL PRIMARY KEY,
     trip_id VARCHAR(255) NOT NULL REFERENCES public.gtfs_trips(trip_id),
-    arrival_time TIME,
-    departure_time TIME,
+    arrival_time TEXT,  -- GTFS allows times > 24:00 (e.g., "25:30:00")
+    departure_time TEXT,
     stop_id VARCHAR(255) NOT NULL REFERENCES public.gtfs_stops(stop_id),
     stop_sequence INTEGER NOT NULL,
     stop_headsign TEXT,

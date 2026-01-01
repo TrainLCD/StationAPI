@@ -27,8 +27,8 @@ type TripBatchRow = (
 /// Type alias for GTFS stop_times batch row
 type StopTimeBatchRow = (
     String,
-    Option<chrono::NaiveTime>,
-    Option<chrono::NaiveTime>,
+    Option<String>,
+    Option<String>,
     String,
     i32,
     Option<String>,
@@ -956,7 +956,8 @@ async fn import_gtfs_stop_times(
 }
 
 /// Parse GTFS time format (HH:MM:SS, can be > 24:00:00 for times past midnight)
-fn parse_gtfs_time(time_str: &str) -> Option<chrono::NaiveTime> {
+/// Returns the time string as-is to support 24+ hour times (e.g., "25:30:00")
+fn parse_gtfs_time(time_str: &str) -> Option<String> {
     if time_str.is_empty() {
         return None;
     }
@@ -966,14 +967,13 @@ fn parse_gtfs_time(time_str: &str) -> Option<chrono::NaiveTime> {
         return None;
     }
 
-    let hours: u32 = parts[0].parse().ok()?;
-    let minutes: u32 = parts[1].parse().ok()?;
-    let seconds: u32 = parts[2].parse().ok()?;
+    // Validate that all parts are valid numbers
+    let _hours: u32 = parts[0].parse().ok()?;
+    let _minutes: u32 = parts[1].parse().ok()?;
+    let _seconds: u32 = parts[2].parse().ok()?;
 
-    // Handle times > 24:00:00 by wrapping around
-    let hours = hours % 24;
-
-    chrono::NaiveTime::from_hms_opt(hours, minutes, seconds)
+    // Return the original string to support times > 24:00:00
+    Some(time_str.to_string())
 }
 
 async fn insert_stop_times_batch(
@@ -1004,9 +1004,11 @@ async fn insert_stop_times_batch(
     ) in batch
     {
         let arrival_str = arrival_time
+            .as_ref()
             .map(|t| format!("'{}'", t))
             .unwrap_or_else(|| "NULL".to_string());
         let departure_str = departure_time
+            .as_ref()
             .map(|t| format!("'{}'", t))
             .unwrap_or_else(|| "NULL".to_string());
         let headsign_str = stop_headsign
