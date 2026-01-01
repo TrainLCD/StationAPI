@@ -2,6 +2,7 @@ mod import;
 
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Connection, PgConnection};
+use stationapi::config::fetch_database_url;
 use stationapi::infrastructure::company_repository::MyCompanyRepository;
 use stationapi::infrastructure::line_repository::MyLineRepository;
 use stationapi::infrastructure::station_repository::MyStationRepository;
@@ -174,13 +175,6 @@ fn fetch_addr() -> Result<SocketAddr, AddrParseError> {
     }
 }
 
-fn fetch_database_url() -> String {
-    match env::var("DATABASE_URL") {
-        Ok(s) => s,
-        Err(env::VarError::NotPresent) => panic!("$DATABASE_URL is not set."),
-        Err(VarError::NotUnicode(_)) => panic!("$DATABASE_URL should be written in Unicode."),
-    }
-}
 
 fn fetch_disable_grpc_web_flag() -> bool {
     match env::var("DISABLE_GRPC_WEB") {

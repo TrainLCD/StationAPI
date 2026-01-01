@@ -2,6 +2,7 @@
 
 use csv::{ReaderBuilder, StringRecord};
 use sqlx::{Connection, PgConnection};
+use stationapi::config::fetch_database_url;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::{Cursor, Read as _};
@@ -170,7 +171,7 @@ const TOEI_BUS_GTFS_URL: &str =
     "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip";
 
 /// Download and extract GTFS data from ODPT API
-fn download_gtfs() -> Result<(), Box<dyn std::error::Error>> {
+fn download_gtfs() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let gtfs_path = Path::new("data/ToeiBus-GTFS");
 
     // Skip if directory already exists
@@ -237,8 +238,11 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // Download GTFS data if not present
-    download_gtfs()?;
+    // Download GTFS data if not present (use spawn_blocking to avoid blocking async runtime)
+    tokio::task::spawn_blocking(download_gtfs)
+        .await
+        .map_err(|e| format!("Failed to spawn blocking task: {}", e))?
+        .map_err(|e| -> Box<dyn std::error::Error> { e })?;
 
     let gtfs_path = Path::new("data/ToeiBus-GTFS");
 
@@ -1099,14 +1103,6 @@ async fn import_gtfs_feed_info(
     Ok(())
 }
 
-fn fetch_database_url() -> String {
-    match env::var("DATABASE_URL") {
-        Ok(s) => s,
-        Err(env::VarError::NotPresent) => panic!("$DATABASE_URL is not set."),
-        Err(env::VarError::NotUnicode(_)) => panic!("$DATABASE_URL should be written in Unicode."),
-    }
-}
-
 fn is_bus_feature_disabled() -> bool {
     match env::var("DISABLE_BUS_FEATURE") {
         Ok(s) => s.eq_ignore_ascii_case("true") || s == "1",
@@ -1314,14 +1310,27 @@ async fn integrate_gtfs_routes_to_lines(
 async fn build_stop_route_mapping(
     conn: &mut PgConnection,
 ) -> Result<HashMap<String, Vec<(String, i32)>>, Box<dyn std::error::Error>> {
-    // Get the minimum stop_sequence for each stop on each route
+    // For each route, find the representative trip (the one with the most stops)
+    // This ensures consistent stop ordering within a route
+    // Use direction_id = 0 (outbound) preferentially
     let rows: Vec<(String, String, i32)> = sqlx::query_as(
-        r#"SELECT gs.stop_id, gt.route_id, MIN(gst.stop_sequence) as min_seq
-           FROM gtfs_stops gs
-           JOIN gtfs_stop_times gst ON gs.stop_id = gst.stop_id
-           JOIN gtfs_trips gt ON gst.trip_id = gt.trip_id
-           GROUP BY gs.stop_id, gt.route_id
-           ORDER BY gs.stop_id, gt.route_id"#,
+        r#"WITH representative_trips AS (
+               -- Find the trip with the most stops for each route (prefer direction_id = 0)
+               SELECT DISTINCT ON (gt.route_id)
+                   gt.route_id,
+                   gt.trip_id,
+                   COUNT(*) as stop_count
+               FROM gtfs_trips gt
+               JOIN gtfs_stop_times gst ON gt.trip_id = gst.trip_id
+               GROUP BY gt.route_id, gt.trip_id, gt.direction_id
+               ORDER BY gt.route_id,
+                        CASE WHEN gt.direction_id = 0 THEN 0 ELSE 1 END,
+                        COUNT(*) DESC
+           )
+           SELECT gst.stop_id, rt.route_id, gst.stop_sequence
+           FROM representative_trips rt
+           JOIN gtfs_stop_times gst ON rt.trip_id = gst.trip_id
+           ORDER BY rt.route_id, gst.stop_sequence"#,
     )
     .fetch_all(&mut *conn)
     .await?;
