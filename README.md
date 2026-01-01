@@ -13,6 +13,7 @@ The gRPC-Web API for provides nearby japanese train station.
 ## Documentation
 
 - For automation agent and contributor workflows, see [AGENTS.md](AGENTS.md).
+- For technical debt analysis and architectural concerns, see [docs/technical_debt.md](docs/technical_debt.md).
 
 ## Data Contribution
 

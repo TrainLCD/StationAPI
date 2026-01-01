@@ -39,7 +39,7 @@
 #### Station 構造体
 
 - **ファイル**: `stationapi/src/domain/entity/station.rs:8-76`
-- **フィールド数**: 66個
+- **フィールド数**: 64個
 - **問題点**:
   - 駅情報、路線情報、列車種別情報が1つの構造体に混在
   - `Line`, `TrainType`, `StationNumber` などの関連データを包含
@@ -51,14 +51,14 @@ pub struct Station {
     // 駅情報 (station_cd, station_g_cd, station_name, ...)
     // 路線情報 (line_cd, line, lines, line_name, line_symbol1, ...)
     // 列車種別情報 (train_type, type_name, ...)
-    // 合計66フィールド
+    // 合計64フィールド
 }
 ```
 
 #### Line 構造体
 
 - **ファイル**: `stationapi/src/domain/entity/line.rs:6-41`
-- **フィールド数**: 39個以上
+- **フィールド数**: 33個
 - **問題点**:
   - `Station` の埋め込み参照を含む (循環参照の可能性)
   - `TrainType` の埋め込み参照を含む
@@ -74,7 +74,7 @@ pub struct Station {
 
 #### Clippy 警告の抑制
 
-以下の箇所で `#[allow(clippy::too_many_arguments)]` が使用されています:
+以下の箇所で `#![allow(clippy::too_many_arguments)]` が impl ブロック内で使用されています:
 
 | ファイル | 構造体 |
 |----------|--------|
@@ -125,11 +125,11 @@ let includes_requested_station = stops
 let mut lines: Vec<Line> = lines
     .iter()
     .filter(|&l| { ... })
-    .cloned()      // <-- 66フィールドの構造体を全てクローン
+    .cloned()      // <-- 64フィールドの構造体を全てクローン
     .collect();
 ```
 
-**影響**: Station が 66 フィールド × clone → メモリ使用量増加、不要なアロケーション
+**影響**: Station が 64 フィールド × clone → メモリ使用量増加、不要なアロケーション
 
 ---
 
@@ -207,7 +207,22 @@ let station_numbers_raw = [
 
 ## 低優先度の技術負債
 
-### 9. テスト関連
+### 9. アーキテクチャドキュメント不足
+
+> **注意**: 本項目はオンボーディングを阻害する重要な問題であり、高優先度として対応を検討すべきです。
+
+#### 不足している領域
+
+| 領域 | 内容 |
+|------|------|
+| アーキテクチャドキュメント | 3層構造 (Domain/UseCase/Infrastructure/Presentation) の設計思想が文書化されていない |
+| SQL 設計ドキュメント | 複雑なクエリの使用意図が不明確 |
+| 命名規則 | Row 構造体と Entity の区別が不明確 |
+| キャッシュ戦略 | 判断理由が未文書化 (query.rs:217付近) |
+
+---
+
+### 10. テスト関連
 
 #### 現状
 
@@ -222,26 +237,6 @@ let station_numbers_raw = [
 | gRPC コントローラーテスト | `src/presentation/controller/grpc.rs` (353行) がテスト対象外 |
 | End-to-End テスト | なし |
 | パフォーマンステスト | なし |
-
----
-
-### 10. ドキュメント不足
-
-#### 存在するドキュメント
-
-- `README.md`: プロジェクト概要
-- `docs/repository_testing.md`: テスト詳細ガイド
-- `data/README.md`: データ構造説明
-- `AGENTS.md`: 自動化エージェント向けドキュメント
-
-#### 不足している領域
-
-| 領域 | 内容 |
-|------|------|
-| アーキテクチャドキュメント | 3層構造の設計思想が文書化されていない |
-| SQL 設計ドキュメント | 複雑なクエリの使用意図が不明確 |
-| 命名規則 | Row 構造体と Entity の区別が不明確 |
-| キャッシュ戦略 | 判断理由が未文書化 (query.rs:217付近) |
 
 ---
 
@@ -313,6 +308,7 @@ let station_numbers_raw = [
 | **高** | Station 構造体の設計見直し | `src/domain/entity/station.rs` | 保守性、パフォーマンス |
 | **高** | SQL クエリの最適化 (TODO対応) | `src/use_case/interactor/query.rs:604,702` | パフォーマンス |
 | **高** | Clone の過度な使用削減 | `src/use_case/interactor/query.rs` | メモリ効率 |
+| **高** | アーキテクチャドキュメント作成 | `docs/` | オンボーディング、保守性 |
 | **中** | Row 構造体のコード生成検討 | `src/infrastructure/*.rs` | メンテナンス性 |
 | **中** | メソッド命名の改善 | `src/domain/repository/line_repository.rs:23` | 可読性 |
 | **中** | ハードコード値の定数化 | 複数ファイル | 保守性 |
