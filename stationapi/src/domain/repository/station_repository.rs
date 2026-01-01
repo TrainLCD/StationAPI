@@ -314,6 +314,7 @@ mod tests {
             Some("#000000".to_string()),
             Some(0),
             Some(1),
+            TransportType::Rail,
         )
     }
 

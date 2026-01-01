@@ -1562,6 +1562,7 @@ mod tests {
             color: Some("#008000".to_string()),
             direction: Some(0),
             kind: Some(0),
+            transport_type: Some(0),
         };
 
         let station: Station = station_row.into();
@@ -1650,6 +1651,7 @@ mod tests {
                 color: None,
                 direction: None,
                 kind: None,
+                transport_type: None,
             };
 
             let station: Station = station_row.into();

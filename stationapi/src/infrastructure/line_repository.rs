@@ -933,6 +933,7 @@ mod tests {
             station_cd: Some(101),
             station_g_cd: Some(201),
             type_cd: Some(1),
+            transport_type: Some(0),
         };
 
         let line: Line = line_row.into();
@@ -988,6 +989,7 @@ mod tests {
             station_cd: None,
             station_g_cd: None,
             type_cd: None,
+            transport_type: None,
         };
 
         let line: Line = line_row.into();

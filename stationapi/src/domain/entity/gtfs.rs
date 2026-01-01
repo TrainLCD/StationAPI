@@ -572,8 +572,8 @@ mod tests {
         assert_eq!(TransportType::from(1), TransportType::Bus);
         assert_eq!(TransportType::from(99), TransportType::Rail); // Default to Rail
 
-        assert_eq!(i32::from(TransportType::Rail), 0);
-        assert_eq!(i32::from(TransportType::Bus), 1);
+        assert_eq!(TransportType::Rail as i32, 0);
+        assert_eq!(TransportType::Bus as i32, 1);
     }
 
     #[test]
