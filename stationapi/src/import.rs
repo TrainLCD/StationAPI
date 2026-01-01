@@ -1245,16 +1245,16 @@ pub async fn integrate_gtfs_to_stations() -> Result<(), Box<dyn std::error::Erro
     info!("Cleared existing bus data from stations/lines tables.");
 
     // Step 2: Insert bus routes as lines
-    integrate_gtfs_routes_to_lines(&mut *tx).await?;
+    integrate_gtfs_routes_to_lines(&mut tx).await?;
 
     // Step 3: Build stop-route mapping from stop_times
-    let stop_route_map = build_stop_route_mapping(&mut *tx).await?;
+    let stop_route_map = build_stop_route_mapping(&mut tx).await?;
 
     // Step 4: Insert bus stops as stations
-    integrate_gtfs_stops_to_stations(&mut *tx, &stop_route_map).await?;
+    integrate_gtfs_stops_to_stations(&mut tx, &stop_route_map).await?;
 
     // Step 5: Update cross-references in GTFS tables
-    update_gtfs_crossreferences(&mut *tx, &stop_route_map).await?;
+    update_gtfs_crossreferences(&mut tx, &stop_route_map).await?;
 
     sqlx::query("ANALYZE;").execute(&mut *tx).await?;
 
