@@ -21,10 +21,10 @@ use tonic::Response;
 /// Convert proto TransportType to domain TransportType
 /// Returns None if unspecified (no filter), Some(type) if specified
 fn convert_transport_type(proto_type: i32) -> Option<TransportType> {
-    match proto_type {
-        x if x == GrpcTransportType::Rail as i32 => Some(TransportType::Rail),
-        x if x == GrpcTransportType::Bus as i32 => Some(TransportType::Bus),
-        _ => None, // TransportTypeUnspecified or unknown = no filter
+    match GrpcTransportType::try_from(proto_type) {
+        Ok(GrpcTransportType::Rail) => Some(TransportType::Rail),
+        Ok(GrpcTransportType::Bus) => Some(TransportType::Bus),
+        _ => None, // Unspecified or unknown = no filter
     }
 }
 
