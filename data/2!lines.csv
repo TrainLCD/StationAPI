@@ -177,7 +177,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 11701,4,山陰本線,サンインホンセン,山陰本線(米子～益田),San’in Main Line,San’in Main Line,山阴本线,산인 본선,#BAE541,2,,,,,,,,,,,,,0,11701,3948.395125
 11702,4,山陰本線,サンインホンセン,山陰本線(益田～下関),San’in Main Line,San’in Main Line,山阴本线,산인 본선,#BAE541,2,,,,,,,,,,,,,0,11702,3915.767279
 11703,4,伯備線,ハクビセン,伯備線,Hakubi Line,Hakubi Line,伯备线,하쿠비선,#FF4500,2,,,,,,,,,,,,,0,11703,4414.982848
-11704,4,因美線,インビセン,因美線,Inbi Line,Inbi Line,因美线,인비선,#000080,2,B,,,,#000080,,,,REVERSED_SQUARE_WEST,,,,0,11704,3525.634867
+11704,4,因美線,インビセン,因美線,Inbi Line,Inbi Line,因美线,인비선,#AA731C,2,B,,,,#AA731C,,,,REVERSED_SQUARE_WEST,,,,0,11704,3525.634867
 11705,4,境線,サカイセン,境線,Sakai Line,Sakai Line,境线,사카이선,#00FFFF,2,C,,,,#00FFFF,,,,REVERSED_SQUARE_WEST,,,,0,11705,1188.965154
 11706,4,木次線,キスキセン,木次線,Kisuki Line,Kisuki Line,木次线,기스키선,#339966,2,E,,,,#339966,,,,REVERSED_SQUARE_WEST,,,,0,11706,3810.633068
 11707,4,三江線,サンコウセン,三江線,Sanko Line,Sanko Line,三江线,산코선,#C9090B,2,,,,,,,,,,,,,2,11707,2733.853709
@@ -454,7 +454,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99402,155,北越急行ほくほく線,ホクエツキュウコウホクホクセン,北越急行ほくほく線,Hokuhoku Line,Hokuhoku Line,,,#CC3366,2,,,,,,,,,,,,,0,99402,5225.959771
 99403,156,しなの鉄道線,シナノテツドウセン,しなの鉄道線,Shinano Railway Line,Shinano Railway Line,,,#F0A401,2,,,,,,,,,,,,,0,99403,3245.235758
 99427,156,北しなの線,キタシナノセン,北しなの線,Kita-Shinano Line,Kita-Shinano Line,,,#FEC9FE,2,,,,,,,,,,,,,0,99403,4478.301701
-99404,157,上田電鉄別所線,ウエダデンテツベッショセン,上田電鉄別所線,Ueda Electric Railway Bessho Line,Ueda Electric Railway Bessho Line,,,#E0F3C7,2,BE,,,,#0B2846,,,,REVERSED_ROUND,,,,0,99404,786.3767532
+99404,157,上田電鉄別所線,ウエダデンテツベッショセン,上田電鉄別所線,Ueda Electric Railway Bessho Line,Ueda Electric Railway Bessho Line,,,#0B2846,2,BE,,,,#0B2846,,,,REVERSED_ROUND,,,,0,99404,786.3767532
 99405,158,長野電鉄長野線,ナガノデンテツナガノセン,長野電鉄長野線,Nagano Electric Railway Nagano Line,Nagano Electric Railway Nagano Line,,,#E21919,2,N,,,,#E21919,,,,ROUND,,,,0,99405,1335.199537
 99406,158,長野電鉄屋代線,ナガノデンテツヤシロセン,長野電鉄屋代線,Nagano Electric Railway Yashiro Line,Nagano Electric Railway Yashiro Line,,,#E21919,2,Y,,,,#E21919,,,,ROUND,,,,2,99406,1909.79814
 99407,159,上高地線,カミコウチセン,アルピコ交通上高地線,Kamikochi Line,Kamikochi Line,,,#465DAA,2,AK,,,,#465DAA,,,,ROUND,,,,0,99407,1086.699348
