@@ -13,6 +13,7 @@ pub trait StationRepository: Send + Sync + 'static {
         &self,
         line_id: u32,
         station_id: Option<u32>,
+        direction_id: Option<u32>,
     ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_station_group_id(
         &self,
@@ -95,6 +96,7 @@ mod tests {
             &self,
             line_id: u32,
             _station_id: Option<u32>,
+            _direction_id: Option<u32>,
         ) -> Result<Vec<Station>, DomainError> {
             let result: Vec<Station> = self
                 .stations
@@ -348,7 +350,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_by_line_id() {
         let repo = MockStationRepository::new();
-        let result = repo.get_by_line_id(1001, None).await.unwrap();
+        let result = repo.get_by_line_id(1001, None, None).await.unwrap();
         assert_eq!(result.len(), 2); // 東京駅と品川駅
         assert!(result.iter().all(|s| s.line_cd == 1001));
     }

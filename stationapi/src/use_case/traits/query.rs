@@ -35,6 +35,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
         &self,
         line_id: u32,
         station_id: Option<u32>,
+        direction_id: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_name(
         &self,

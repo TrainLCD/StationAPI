@@ -128,10 +128,11 @@ impl StationApi for MyApi {
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let line_id = request.get_ref().line_id;
         let station_id = request.get_ref().station_id;
+        let direction_id = request.get_ref().direction_id;
 
         match self
             .query_use_case
-            .get_stations_by_line_id(line_id, station_id)
+            .get_stations_by_line_id(line_id, station_id, direction_id)
             .await
         {
             Ok(stations) => {

@@ -114,10 +114,11 @@ where
         &self,
         line_id: u32,
         station_id: Option<u32>,
+        direction_id: Option<u32>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
-            .get_by_line_id(line_id, station_id)
+            .get_by_line_id(line_id, station_id, direction_id)
             .await?;
 
         let line_group_id = if let Some(sta) = stations

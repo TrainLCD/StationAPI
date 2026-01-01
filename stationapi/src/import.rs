@@ -1323,19 +1323,37 @@ async fn integrate_gtfs_routes_to_lines(
     Ok(())
 }
 
-/// Build mapping of (stop_id, route_id) -> stop_sequence from gtfs_stop_times
+/// Build mapping of (parent_stop_id, route_id) -> stop_sequence from gtfs_stop_times
+/// Groups child stops by their parent_station to represent physical bus stops
+///
+/// # Ordering Strategy
+///
+/// ## 1. Main trip sequence
+/// - Select the trip with most stops as "main trip" (prefer direction_id=0)
+/// - Use stop_sequence from main trip directly
+///
+/// ## 2. Variant stop estimation
+/// For stops only on variant trips:
+/// - Use LAG/LEAD to find neighboring stops on the variant trip
+/// - Look up neighbors' positions on the main trip
+/// - Interpolate position based on neighbor positions
+/// - Terminal stops (next_stop_id IS NULL) are placed at the end
+/// - Start stops (prev_stop_id IS NULL) are placed at the beginning
 async fn build_stop_route_mapping(
     conn: &mut PgConnection,
 ) -> Result<HashMap<String, Vec<(String, i32)>>, Box<dyn std::error::Error>> {
-    // For each route, find the representative trip (the one with the most stops)
-    // This ensures consistent stop ordering within a route
-    // Use direction_id = 0 (outbound) preferentially
+    // Strategy:
+    // 1. Find the "main" trip for each route (most stops, prefer direction_id=0)
+    // 2. Use stop_sequence from main trip for stops on it
+    // 3. For variant-only stops, use LAG/LEAD to find neighbors, then look up their
+    //    main trip positions to estimate where the variant stop should go
     let rows: Vec<(String, String, i32)> = sqlx::query_as(
-        r#"WITH representative_trips AS (
-               -- Find the trip with the most stops for each route (prefer direction_id = 0)
+        r#"WITH RECURSIVE main_trips AS (
+               -- Find the trip with the most stops for each route (prefer direction_id=0)
                SELECT DISTINCT ON (gt.route_id)
                    gt.route_id,
                    gt.trip_id,
+                   gt.direction_id as main_direction_id,
                    COUNT(*) as stop_count
                FROM gtfs_trips gt
                JOIN gtfs_stop_times gst ON gt.trip_id = gst.trip_id
@@ -1343,49 +1361,302 @@ async fn build_stop_route_mapping(
                ORDER BY gt.route_id,
                         CASE WHEN gt.direction_id = 0 THEN 0 ELSE 1 END,
                         COUNT(*) DESC
+           ),
+           main_trip_stops AS (
+               -- Get stops from main trips with their sequence
+               SELECT DISTINCT ON (COALESCE(gs.parent_station, gs.stop_id), mt.route_id)
+                   COALESCE(gs.parent_station, gs.stop_id) as parent_stop_id,
+                   mt.route_id,
+                   gst.stop_sequence
+               FROM main_trips mt
+               JOIN gtfs_stop_times gst ON mt.trip_id = gst.trip_id
+               JOIN gtfs_stops gs ON gst.stop_id = gs.stop_id
+               ORDER BY COALESCE(gs.parent_station, gs.stop_id), mt.route_id, gst.stop_sequence
+           ),
+           main_trip_max_seq AS (
+               SELECT route_id, MAX(stop_sequence) as max_seq
+               FROM main_trip_stops
+               GROUP BY route_id
+           ),
+           -- Get variant trips (non-main trips) with their stops and neighbors using window functions
+           variant_trip_stops_with_neighbors AS (
+               SELECT
+                   COALESCE(gs.parent_station, gs.stop_id) as parent_stop_id,
+                   gt.route_id,
+                   gt.trip_id,
+                   gt.direction_id as variant_direction_id,
+                   gst.stop_sequence,
+                   LAG(COALESCE(gs.parent_station, gs.stop_id)) OVER (
+                       PARTITION BY gt.trip_id ORDER BY gst.stop_sequence
+                   ) as prev_stop_id,
+                   LEAD(COALESCE(gs.parent_station, gs.stop_id)) OVER (
+                       PARTITION BY gt.trip_id ORDER BY gst.stop_sequence
+                   ) as next_stop_id
+               FROM gtfs_trips gt
+               JOIN gtfs_stop_times gst ON gt.trip_id = gst.trip_id
+               JOIN gtfs_stops gs ON gst.stop_id = gs.stop_id
+               WHERE NOT EXISTS (
+                   SELECT 1 FROM main_trips mt WHERE mt.trip_id = gt.trip_id
+               )
+           ),
+           -- Find variant-only stops (not on main trip) with their neighbor info
+           -- Exclude stops that ONLY appear on NULL direction_id trips (loop routes)
+           variant_only_with_neighbors AS (
+               SELECT DISTINCT ON (vts.parent_stop_id, vts.route_id)
+                   vts.parent_stop_id,
+                   vts.route_id,
+                   vts.variant_direction_id,
+                   vts.prev_stop_id,
+                   vts.next_stop_id
+               FROM variant_trip_stops_with_neighbors vts
+               WHERE NOT EXISTS (
+                   SELECT 1 FROM main_trip_stops mts
+                   WHERE mts.parent_stop_id = vts.parent_stop_id
+                     AND mts.route_id = vts.route_id
+               )
+               -- Only include stops that appear on at least one non-NULL direction_id trip
+               AND EXISTS (
+                   SELECT 1 FROM gtfs_trips gt2
+                   JOIN gtfs_stop_times gst2 ON gt2.trip_id = gst2.trip_id
+                   JOIN gtfs_stops gs2 ON gst2.stop_id = gs2.stop_id
+                   WHERE gt2.route_id = vts.route_id
+                     AND COALESCE(gs2.parent_station, gs2.stop_id) = vts.parent_stop_id
+                     AND gt2.direction_id IS NOT NULL
+               )
+               ORDER BY vts.parent_stop_id, vts.route_id, vts.stop_sequence
+           ),
+           -- Recursive CTE to find the nearest main-trip stop by following prev chain
+           prev_chain AS (
+               -- Base case: start from each variant stop
+               SELECT
+                   von.parent_stop_id as origin_stop_id,
+                   von.route_id,
+                   von.prev_stop_id as current_stop_id,
+                   1 as depth,
+                   ARRAY[von.parent_stop_id::TEXT] as visited
+               FROM variant_only_with_neighbors von
+               WHERE von.prev_stop_id IS NOT NULL
+
+               UNION ALL
+
+               -- Recursive case: if current stop is also variant-only, follow its prev
+               SELECT
+                   pc.origin_stop_id,
+                   pc.route_id,
+                   von2.prev_stop_id as current_stop_id,
+                   pc.depth + 1,
+                   pc.visited || pc.current_stop_id::TEXT
+               FROM prev_chain pc
+               JOIN variant_only_with_neighbors von2
+                   ON pc.current_stop_id = von2.parent_stop_id
+                   AND pc.route_id = von2.route_id
+               WHERE pc.depth < 10
+                   AND von2.prev_stop_id IS NOT NULL
+                   AND NOT pc.current_stop_id::TEXT = ANY(pc.visited)
+                   -- Stop if we already found a main-trip stop
+                   AND NOT EXISTS (
+                       SELECT 1 FROM main_trip_stops mts
+                       WHERE mts.parent_stop_id = pc.current_stop_id
+                         AND mts.route_id = pc.route_id
+                   )
+           ),
+           prev_resolved AS (
+               -- For each origin stop, find the first stop in the chain that's on main trip
+               SELECT DISTINCT ON (pc.origin_stop_id, pc.route_id)
+                   pc.origin_stop_id,
+                   pc.route_id,
+                   mts.stop_sequence as prev_main_seq,
+                   pc.depth as prev_depth
+               FROM prev_chain pc
+               JOIN main_trip_stops mts
+                   ON pc.current_stop_id = mts.parent_stop_id
+                   AND pc.route_id = mts.route_id
+               ORDER BY pc.origin_stop_id, pc.route_id, pc.depth
+           ),
+           -- Similarly, recursive CTE for next chain
+           next_chain AS (
+               SELECT
+                   von.parent_stop_id as origin_stop_id,
+                   von.route_id,
+                   von.next_stop_id as current_stop_id,
+                   1 as depth,
+                   ARRAY[von.parent_stop_id::TEXT] as visited
+               FROM variant_only_with_neighbors von
+               WHERE von.next_stop_id IS NOT NULL
+
+               UNION ALL
+
+               SELECT
+                   nc.origin_stop_id,
+                   nc.route_id,
+                   von2.next_stop_id as current_stop_id,
+                   nc.depth + 1,
+                   nc.visited || nc.current_stop_id::TEXT
+               FROM next_chain nc
+               JOIN variant_only_with_neighbors von2
+                   ON nc.current_stop_id = von2.parent_stop_id
+                   AND nc.route_id = von2.route_id
+               WHERE nc.depth < 10
+                   AND von2.next_stop_id IS NOT NULL
+                   AND NOT nc.current_stop_id::TEXT = ANY(nc.visited)
+                   AND NOT EXISTS (
+                       SELECT 1 FROM main_trip_stops mts
+                       WHERE mts.parent_stop_id = nc.current_stop_id
+                         AND mts.route_id = nc.route_id
+                   )
+           ),
+           next_resolved AS (
+               SELECT DISTINCT ON (nc.origin_stop_id, nc.route_id)
+                   nc.origin_stop_id,
+                   nc.route_id,
+                   mts.stop_sequence as next_main_seq,
+                   nc.depth as next_depth
+               FROM next_chain nc
+               JOIN main_trip_stops mts
+                   ON nc.current_stop_id = mts.parent_stop_id
+                   AND nc.route_id = mts.route_id
+               ORDER BY nc.origin_stop_id, nc.route_id, nc.depth
+           ),
+           -- Look up main trip sequences for the neighbors (with recursive fallback)
+           -- When variant trip has different direction_id than main trip, swap prev/next
+           variant_estimated AS (
+               SELECT
+                   von.parent_stop_id,
+                   von.route_id,
+                   CASE
+                       -- Direct neighbors on main trip (single-level lookup)
+                       WHEN prev_mts.stop_sequence IS NOT NULL AND next_mts.stop_sequence IS NOT NULL
+                           THEN ((prev_mts.stop_sequence + next_mts.stop_sequence) / 2.0)
+                       WHEN prev_mts.stop_sequence IS NOT NULL
+                           THEN CASE WHEN von.variant_direction_id IS NULL
+                                          OR von.variant_direction_id = mt.main_direction_id
+                                     THEN (prev_mts.stop_sequence + 0.5)
+                                     ELSE (prev_mts.stop_sequence - 0.5)
+                                END
+                       WHEN next_mts.stop_sequence IS NOT NULL
+                           THEN CASE WHEN von.variant_direction_id IS NULL
+                                          OR von.variant_direction_id = mt.main_direction_id
+                                     THEN (next_mts.stop_sequence - 0.5)
+                                     ELSE (next_mts.stop_sequence + 0.5)
+                                END
+                       -- Recursive fallback: use resolved chains
+                       WHEN pr.prev_main_seq IS NOT NULL AND nr.next_main_seq IS NOT NULL
+                           THEN (pr.prev_main_seq + nr.next_main_seq) / 2.0
+                               + (pr.prev_depth - nr.next_depth) * 0.01  -- Slight offset based on depth difference
+                       WHEN pr.prev_main_seq IS NOT NULL
+                           THEN CASE WHEN von.variant_direction_id IS NULL
+                                          OR von.variant_direction_id = mt.main_direction_id
+                                     THEN (pr.prev_main_seq + 0.1 * pr.prev_depth)
+                                     ELSE (pr.prev_main_seq - 0.1 * pr.prev_depth)
+                                END
+                       WHEN nr.next_main_seq IS NOT NULL
+                           THEN CASE WHEN von.variant_direction_id IS NULL
+                                          OR von.variant_direction_id = mt.main_direction_id
+                                     THEN (nr.next_main_seq - 0.1 * nr.next_depth)
+                                     ELSE (nr.next_main_seq + 0.1 * nr.next_depth)
+                                END
+                       -- TERMINAL stop (next_stop_id IS NULL, no neighbors on main trip): put at END or START based on direction
+                       WHEN von.next_stop_id IS NULL
+                           THEN CASE WHEN von.variant_direction_id IS NULL
+                                          OR von.variant_direction_id = mt.main_direction_id
+                                     THEN (mtms.max_seq + 0.5)
+                                     ELSE 0.5
+                                END
+                       -- START stop (prev_stop_id IS NULL, no neighbors on main trip): put at START or END based on direction
+                       WHEN von.prev_stop_id IS NULL
+                           THEN CASE WHEN von.variant_direction_id IS NULL
+                                          OR von.variant_direction_id = mt.main_direction_id
+                                     THEN 0.5
+                                     ELSE (mtms.max_seq + 0.5)
+                                END
+                       -- Fallback: put at end
+                       ELSE (mtms.max_seq + 9999)
+                   END as estimated_seq
+               FROM variant_only_with_neighbors von
+               JOIN main_trips mt ON von.route_id = mt.route_id
+               JOIN main_trip_max_seq mtms ON von.route_id = mtms.route_id
+               LEFT JOIN main_trip_stops prev_mts
+                   ON von.prev_stop_id = prev_mts.parent_stop_id
+                   AND von.route_id = prev_mts.route_id
+               LEFT JOIN main_trip_stops next_mts
+                   ON von.next_stop_id = next_mts.parent_stop_id
+                   AND von.route_id = next_mts.route_id
+               LEFT JOIN prev_resolved pr
+                   ON von.parent_stop_id = pr.origin_stop_id
+                   AND von.route_id = pr.route_id
+               LEFT JOIN next_resolved nr
+                   ON von.parent_stop_id = nr.origin_stop_id
+                   AND von.route_id = nr.route_id
+           ),
+           combined AS (
+               SELECT parent_stop_id, route_id, stop_sequence::FLOAT as seq, 1 as priority
+               FROM main_trip_stops
+               UNION ALL
+               SELECT parent_stop_id, route_id, estimated_seq as seq, 2 as priority
+               FROM variant_estimated
+           ),
+           unique_stops AS (
+               -- Deduplicate: prefer shape distance > main trip > variant
+               SELECT DISTINCT ON (parent_stop_id, route_id)
+                   parent_stop_id,
+                   route_id,
+                   seq
+               FROM combined
+               ORDER BY parent_stop_id, route_id, priority, seq
+           ),
+           numbered AS (
+               -- Re-number sequences to be consecutive integers
+               SELECT
+                   parent_stop_id,
+                   route_id,
+                   ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY seq, parent_stop_id)::INT as stop_sequence
+               FROM unique_stops
            )
-           SELECT gst.stop_id, rt.route_id, gst.stop_sequence
-           FROM representative_trips rt
-           JOIN gtfs_stop_times gst ON rt.trip_id = gst.trip_id
-           ORDER BY rt.route_id, gst.stop_sequence"#,
+           SELECT parent_stop_id, route_id, stop_sequence
+           FROM numbered
+           ORDER BY route_id, stop_sequence"#,
     )
     .fetch_all(&mut *conn)
     .await?;
 
     let mut map: HashMap<String, Vec<(String, i32)>> = HashMap::new();
-    for (stop_id, route_id, stop_sequence) in rows {
-        map.entry(stop_id)
+    for (parent_stop_id, route_id, stop_sequence) in rows {
+        map.entry(parent_stop_id)
             .or_default()
             .push((route_id, stop_sequence));
     }
 
-    info!("Built stop-route mapping for {} stops.", map.len());
+    info!("Built stop-route mapping for {} physical stops.", map.len());
     Ok(map)
 }
 
-/// Integrate gtfs_stops into stations table (one record per route served)
+/// Integrate gtfs_stops into stations table (one record per physical stop per route)
+/// Only processes parent stops (stops without parent_station) to avoid duplicates
 async fn integrate_gtfs_stops_to_stations(
     conn: &mut PgConnection,
     stop_route_map: &HashMap<String, Vec<(String, i32)>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let stops: Vec<GtfsStopRow> = sqlx::query_as("SELECT * FROM gtfs_stops")
-        .fetch_all(&mut *conn)
-        .await?;
+    // Only fetch parent stops (stops that have no parent_station)
+    // These represent physical bus stops, child stops are just different poles
+    let stops: Vec<GtfsStopRow> = sqlx::query_as(
+        "SELECT * FROM gtfs_stops WHERE parent_station IS NULL OR parent_station = ''",
+    )
+    .fetch_all(&mut *conn)
+    .await?;
 
     let mut inserted_count = 0;
 
     for stop in &stops {
-        // Use parent_station for station_g_cd if available, otherwise use stop_id
-        let parent_stop_id = stop.parent_station.as_ref().unwrap_or(&stop.stop_id);
-        let station_g_cd = generate_bus_station_g_cd(parent_stop_id);
+        let station_g_cd = generate_bus_station_g_cd(&stop.stop_id);
 
-        // Get routes for this stop (with stop_sequence)
+        // Get routes for this parent stop (with stop_sequence)
+        // The mapping now uses parent_stop_id as key
         let routes = match stop_route_map.get(&stop.stop_id) {
             Some(r) => r.clone(),
             None => continue, // Skip stops not on any route
         };
 
-        // Create a station record for each route this stop serves
+        // Create a station record for each route this physical stop serves
         for (route_id, stop_sequence) in &routes {
             let station_cd = generate_bus_station_cd(&stop.stop_id, route_id);
             let line_cd = generate_bus_line_cd(route_id);
@@ -1434,14 +1705,18 @@ async fn update_gtfs_crossreferences(
     stop_route_map: &HashMap<String, Vec<(String, i32)>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Update gtfs_stops with primary station_cd (using first route)
-    for (stop_id, routes) in stop_route_map {
+    // Updates both parent stops and their child stops with the same station_cd
+    for (parent_stop_id, routes) in stop_route_map {
         if let Some((route_id, _)) = routes.first() {
-            let station_cd = generate_bus_station_cd(stop_id, route_id);
-            sqlx::query("UPDATE gtfs_stops SET station_cd = $1 WHERE stop_id = $2")
-                .bind(station_cd)
-                .bind(stop_id)
-                .execute(&mut *conn)
-                .await?;
+            let station_cd = generate_bus_station_cd(parent_stop_id, route_id);
+            // Update parent stop and all its children
+            sqlx::query(
+                "UPDATE gtfs_stops SET station_cd = $1 WHERE stop_id = $2 OR parent_station = $2",
+            )
+            .bind(station_cd)
+            .bind(parent_stop_id)
+            .execute(&mut *conn)
+            .await?;
         }
     }
 
