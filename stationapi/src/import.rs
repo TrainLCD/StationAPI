@@ -1157,6 +1157,21 @@ fn is_bus_feature_disabled() -> bool {
 // GTFS to Stations/Lines Integration
 // ============================================================
 
+/// Convert hiragana characters to katakana
+/// Hiragana range: U+3041 to U+3096
+/// Katakana range: U+30A1 to U+30F6
+fn hiragana_to_katakana(s: &str) -> String {
+    s.chars()
+        .map(|c| {
+            if ('\u{3041}'..='\u{3096}').contains(&c) {
+                char::from_u32(c as u32 + 0x60).unwrap_or(c)
+            } else {
+                c
+            }
+        })
+        .collect()
+}
+
 /// FNV-1a hash function for deterministic hashing across process invocations
 /// Unlike DefaultHasher, this produces consistent results across runs
 fn fnv1a_hash(data: &[u8]) -> u64 {
@@ -1721,7 +1736,12 @@ async fn integrate_gtfs_stops_to_stations(
             .bind(station_cd)
             .bind(station_g_cd)
             .bind(&stop.stop_name)
-            .bind(stop.stop_name_k.as_ref().unwrap_or(&stop.stop_name))
+            .bind(
+                stop.stop_name_k
+                    .as_ref()
+                    .map(|k| hiragana_to_katakana(k))
+                    .unwrap_or_else(|| stop.stop_name.clone()),
+            )
             .bind(&stop.stop_name_r)
             .bind(&stop.stop_name_zh)
             .bind(&stop.stop_name_ko)
