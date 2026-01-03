@@ -24,6 +24,8 @@ services:
       POSTGRES_USER: stationapi
       POSTGRES_PASSWORD: stationapi
       POSTGRES_DB: stationapi
-    restart: always 
+    restart: always
+    ports:
+      - 5432:5432
     volumes:
       - ./docker/postgres:/docker-entrypoint-initdb.d:ro

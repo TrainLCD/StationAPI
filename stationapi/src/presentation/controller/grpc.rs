@@ -43,9 +43,15 @@ impl StationApi for MyApi {
         &self,
         request: tonic::Request<GetStationByIdRequest>,
     ) -> Result<tonic::Response<SingleStationResponse>, tonic::Status> {
-        let station_id = request.get_ref().id;
+        let request_ref = request.get_ref();
+        let station_id = request_ref.id;
+        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
 
-        let station = match self.query_use_case.find_station_by_id(station_id).await {
+        let station = match self
+            .query_use_case
+            .find_station_by_id(station_id, transport_type)
+            .await
+        {
             Ok(Some(station)) => station,
             Ok(None) => {
                 return Err(PresentationalError::NotFound(format!(
@@ -67,11 +73,13 @@ impl StationApi for MyApi {
         &self,
         request: tonic::Request<GetStationByIdListRequest>,
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
-        let station_ids = &request.get_ref().ids;
+        let request_ref = request.get_ref();
+        let station_ids = &request_ref.ids;
+        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
 
         let stations = match self
             .query_use_case
-            .get_stations_by_id_vec(station_ids)
+            .get_stations_by_id_vec(station_ids, transport_type)
             .await
         {
             Ok(stations) => stations,
@@ -89,9 +97,15 @@ impl StationApi for MyApi {
         &self,
         request: tonic::Request<GetStationByGroupIdRequest>,
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
-        let group_id = request.get_ref().group_id;
+        let request_ref = request.get_ref();
+        let group_id = request_ref.group_id;
+        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
 
-        match self.query_use_case.get_stations_by_group_id(group_id).await {
+        match self
+            .query_use_case
+            .get_stations_by_group_id(group_id, transport_type)
+            .await
+        {
             Ok(stations) => {
                 return Ok(Response::new(MultipleStationResponse {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
@@ -126,13 +140,15 @@ impl StationApi for MyApi {
         &self,
         request: tonic::Request<GetStationByLineIdRequest>,
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
-        let line_id = request.get_ref().line_id;
-        let station_id = request.get_ref().station_id;
-        let direction_id = request.get_ref().direction_id;
+        let request_ref = request.get_ref();
+        let line_id = request_ref.line_id;
+        let station_id = request_ref.station_id;
+        let direction_id = request_ref.direction_id;
+        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
 
         match self
             .query_use_case
-            .get_stations_by_line_id(line_id, station_id, direction_id)
+            .get_stations_by_line_id(line_id, station_id, direction_id, transport_type)
             .await
         {
             Ok(stations) => {
@@ -177,10 +193,11 @@ impl StationApi for MyApi {
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let request_ref = request.get_ref();
         let query_line_group_id = request_ref.line_group_id;
+        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
 
         match self
             .query_use_case
-            .get_stations_by_line_group_id(query_line_group_id)
+            .get_stations_by_line_group_id(query_line_group_id, transport_type)
             .await
         {
             Ok(stations) => {
@@ -532,6 +549,7 @@ mod tests {
         async fn find_station_by_id(
             &self,
             _station_id: u32,
+            _transport_type: Option<TransportType>,
         ) -> Result<Option<Station>, UseCaseError> {
             Ok(None)
         }
@@ -539,6 +557,7 @@ mod tests {
         async fn get_stations_by_id_vec(
             &self,
             _station_ids: &[u32],
+            _transport_type: Option<TransportType>,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(vec![])
         }
@@ -546,6 +565,7 @@ mod tests {
         async fn get_stations_by_group_id(
             &self,
             _station_group_id: u32,
+            _transport_type: Option<TransportType>,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(vec![])
         }
@@ -584,6 +604,7 @@ mod tests {
             _line_id: u32,
             _station_id: Option<u32>,
             _direction_id: Option<u32>,
+            _transport_type: Option<TransportType>,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(vec![])
         }
@@ -621,6 +642,7 @@ mod tests {
             &self,
             stations: Vec<Station>,
             _line_group_id: Option<u32>,
+            _transport_type: Option<TransportType>,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(stations)
         }
@@ -689,6 +711,7 @@ mod tests {
         async fn get_stations_by_line_group_id(
             &self,
             _line_group_id: u32,
+            _transport_type: Option<TransportType>,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(vec![])
         }
