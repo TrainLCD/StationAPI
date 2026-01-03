@@ -273,8 +273,8 @@ where
 
             // For rail stations, add nearby bus routes to lines array
             // Only add bus routes if transport_type is not specified or is not Bus-only
-            let should_include_bus_routes = transport_type.is_none()
-                || transport_type == Some(TransportType::Rail);
+            let should_include_bus_routes =
+                transport_type.is_none() || transport_type == Some(TransportType::Rail);
             if station.transport_type == TransportType::Rail && should_include_bus_routes {
                 let nearby_bus_lines = self.get_nearby_bus_lines(station.lat, station.lon).await?;
                 for bus_line in nearby_bus_lines {
