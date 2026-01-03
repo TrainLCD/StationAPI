@@ -642,6 +642,7 @@ mod tests {
             &self,
             stations: Vec<Station>,
             _line_group_id: Option<u32>,
+            _transport_type: Option<TransportType>,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(stations)
         }
