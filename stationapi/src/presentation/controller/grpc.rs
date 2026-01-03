@@ -18,13 +18,13 @@ use crate::{
 };
 use tonic::Response;
 
-/// Convert proto TransportType to domain TransportType
-/// Returns None if unspecified (no filter), Some(type) if specified
-fn convert_transport_type(proto_type: i32) -> Option<TransportType> {
-    match GrpcTransportType::try_from(proto_type) {
-        Ok(GrpcTransportType::Rail) => Some(TransportType::Rail),
-        Ok(GrpcTransportType::Bus) => Some(TransportType::Bus),
-        _ => None, // Unspecified or unknown = no filter
+/// Convert optional proto TransportType to domain TransportType
+fn convert_transport_type(proto_type: Option<i32>) -> Option<TransportType> {
+    match proto_type.and_then(|v| GrpcTransportType::try_from(v).ok()) {
+        Some(GrpcTransportType::Rail) => Some(TransportType::Rail),
+        Some(GrpcTransportType::Bus) => Some(TransportType::Bus),
+        Some(GrpcTransportType::RailAndBus) => None, // Rail + nearby bus stops
+        _ => Some(TransportType::Rail),              // Default: rail only
     }
 }
 
@@ -45,7 +45,7 @@ impl StationApi for MyApi {
     ) -> Result<tonic::Response<SingleStationResponse>, tonic::Status> {
         let request_ref = request.get_ref();
         let station_id = request_ref.id;
-        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
+        let transport_type = convert_transport_type(request_ref.transport_type);
 
         let station = match self
             .query_use_case
@@ -75,7 +75,7 @@ impl StationApi for MyApi {
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let request_ref = request.get_ref();
         let station_ids = &request_ref.ids;
-        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
+        let transport_type = convert_transport_type(request_ref.transport_type);
 
         let stations = match self
             .query_use_case
@@ -99,7 +99,7 @@ impl StationApi for MyApi {
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let request_ref = request.get_ref();
         let group_id = request_ref.group_id;
-        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
+        let transport_type = convert_transport_type(request_ref.transport_type);
 
         match self
             .query_use_case
@@ -122,7 +122,7 @@ impl StationApi for MyApi {
         let latitude = request_ref.latitude;
         let longitude = request_ref.longitude;
         let limit = request_ref.limit;
-        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
+        let transport_type = convert_transport_type(request_ref.transport_type);
         let stations = match self
             .query_use_case
             .get_stations_by_coordinates(latitude, longitude, limit, transport_type)
@@ -144,7 +144,7 @@ impl StationApi for MyApi {
         let line_id = request_ref.line_id;
         let station_id = request_ref.station_id;
         let direction_id = request_ref.direction_id;
-        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
+        let transport_type = convert_transport_type(request_ref.transport_type);
 
         match self
             .query_use_case
@@ -167,7 +167,7 @@ impl StationApi for MyApi {
         let query_station_name = &request_ref.station_name;
         let query_limit = request_ref.limit;
         let from_station_group_id = request_ref.from_station_group_id;
-        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
+        let transport_type = convert_transport_type(request_ref.transport_type);
         match self
             .query_use_case
             .get_stations_by_name(
@@ -193,7 +193,7 @@ impl StationApi for MyApi {
     ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
         let request_ref = request.get_ref();
         let query_line_group_id = request_ref.line_group_id;
-        let transport_type = request_ref.transport_type.and_then(convert_transport_type);
+        let transport_type = convert_transport_type(request_ref.transport_type);
 
         match self
             .query_use_case
@@ -404,39 +404,50 @@ mod tests {
 
     #[test]
     fn test_convert_transport_type_rail() {
-        let rail_value = GrpcTransportType::Rail as i32;
+        let rail_value = Some(GrpcTransportType::Rail as i32);
         let result = convert_transport_type(rail_value);
         assert_eq!(result, Some(TransportType::Rail));
     }
 
     #[test]
     fn test_convert_transport_type_bus() {
-        let bus_value = GrpcTransportType::Bus as i32;
+        let bus_value = Some(GrpcTransportType::Bus as i32);
         let result = convert_transport_type(bus_value);
         assert_eq!(result, Some(TransportType::Bus));
     }
 
     #[test]
     fn test_convert_transport_type_unspecified() {
-        let unspecified_value = GrpcTransportType::Unspecified as i32;
+        let unspecified_value = Some(GrpcTransportType::Unspecified as i32);
         let result = convert_transport_type(unspecified_value);
+        assert_eq!(result, Some(TransportType::Rail));
+    }
+
+    #[test]
+    fn test_convert_transport_type_rail_and_bus() {
+        let value = Some(GrpcTransportType::RailAndBus as i32);
+        let result = convert_transport_type(value);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_convert_transport_type_none() {
+        let result = convert_transport_type(None);
+        assert_eq!(result, Some(TransportType::Rail));
     }
 
     #[test]
     fn test_convert_transport_type_unknown_value() {
-        // Test with an unknown/invalid integer value
-        let unknown_value = 999;
+        let unknown_value = Some(999);
         let result = convert_transport_type(unknown_value);
-        assert_eq!(result, None);
+        assert_eq!(result, Some(TransportType::Rail));
     }
 
     #[test]
     fn test_convert_transport_type_negative_value() {
-        // Negative values should return None
-        let negative_value = -1;
+        let negative_value = Some(-1);
         let result = convert_transport_type(negative_value);
-        assert_eq!(result, None);
+        assert_eq!(result, Some(TransportType::Rail));
     }
 
     // ============================================
@@ -922,27 +933,24 @@ mod tests {
 
     #[test]
     fn test_convert_transport_type_integration_with_request_extraction() {
-        // Test that Option<i32>.and_then(convert_transport_type) works correctly
-        // This mirrors how it's used in the controller
-
         // Case 1: Some(Rail) -> Some(TransportType::Rail)
-        let request_transport_type: Option<i32> = Some(GrpcTransportType::Rail as i32);
-        let result = request_transport_type.and_then(convert_transport_type);
+        let result = convert_transport_type(Some(GrpcTransportType::Rail as i32));
         assert_eq!(result, Some(TransportType::Rail));
 
         // Case 2: Some(Bus) -> Some(TransportType::Bus)
-        let request_transport_type: Option<i32> = Some(GrpcTransportType::Bus as i32);
-        let result = request_transport_type.and_then(convert_transport_type);
+        let result = convert_transport_type(Some(GrpcTransportType::Bus as i32));
         assert_eq!(result, Some(TransportType::Bus));
 
-        // Case 3: Some(Unspecified) -> None
-        let request_transport_type: Option<i32> = Some(GrpcTransportType::Unspecified as i32);
-        let result = request_transport_type.and_then(convert_transport_type);
+        // Case 3: Some(Unspecified) -> Some(TransportType::Rail)
+        let result = convert_transport_type(Some(GrpcTransportType::Unspecified as i32));
+        assert_eq!(result, Some(TransportType::Rail));
+
+        // Case 4: Some(RailAndBus) -> None
+        let result = convert_transport_type(Some(GrpcTransportType::RailAndBus as i32));
         assert_eq!(result, None);
 
-        // Case 4: None -> None
-        let request_transport_type: Option<i32> = None;
-        let result = request_transport_type.and_then(convert_transport_type);
-        assert_eq!(result, None);
+        // Case 5: None -> Some(TransportType::Rail)
+        let result = convert_transport_type(None);
+        assert_eq!(result, Some(TransportType::Rail));
     }
 }
