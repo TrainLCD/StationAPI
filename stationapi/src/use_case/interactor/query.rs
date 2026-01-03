@@ -1,5 +1,8 @@
 use std::collections::{BTreeMap, HashSet};
 
+/// Maximum distance in meters to search for nearby bus stops from a rail station
+const NEARBY_BUS_STOP_RADIUS_METERS: f64 = 300.0;
+
 use crate::{
     domain::{
         entity::{
@@ -33,20 +36,24 @@ where
     TR: TrainTypeRepository,
     CR: CompanyRepository,
 {
-    async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
+    async fn find_station_by_id(
+        &self,
+        station_id: u32,
+        _transport_type: Option<TransportType>,
+    ) -> Result<Option<Station>, UseCaseError> {
         let Some(station) = self.station_repository.find_by_id(station_id).await? else {
             return Ok(None);
         };
         let stations = self
             .update_station_vec_with_attributes(vec![station], None)
             .await?;
-        let station = stations.into_iter().next();
 
-        Ok(station)
+        Ok(stations.into_iter().next())
     }
     async fn get_stations_by_id_vec(
         &self,
         station_ids: &[u32],
+        _transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self.station_repository.get_by_id_vec(station_ids).await?;
         let stations = self
@@ -58,6 +65,7 @@ where
     async fn get_stations_by_group_id(
         &self,
         station_group_id: u32,
+        _transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
@@ -115,7 +123,10 @@ where
         line_id: u32,
         station_id: Option<u32>,
         direction_id: Option<u32>,
+        _transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
+        // Note: transport_type is ignored for line-based queries
+        // as mixing bus stops with rail line stations doesn't make sense
         let stations = self
             .station_repository
             .get_by_line_id(line_id, station_id, direction_id)
@@ -234,6 +245,16 @@ where
                 .cloned()
                 .collect();
 
+            // For rail stations, add nearby bus routes to lines array
+            if station.transport_type == TransportType::Rail {
+                let nearby_bus_lines = self.get_nearby_bus_lines(station.lat, station.lon).await?;
+                for bus_line in nearby_bus_lines {
+                    if seen_line_cds.insert(bus_line.line_cd) {
+                        lines.push(bus_line);
+                    }
+                }
+            }
+
             for line in lines.iter_mut() {
                 line.company = companies
                     .iter()
@@ -281,7 +302,10 @@ where
     async fn get_stations_by_line_group_id(
         &self,
         line_group_id: u32,
+        _transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
+        // Note: transport_type is ignored for line-based queries
+        // as mixing bus stops with rail line stations doesn't make sense
         let stations = self
             .station_repository
             .get_by_line_group_id(line_group_id)
@@ -863,6 +887,63 @@ where
     TR: TrainTypeRepository,
     CR: CompanyRepository,
 {
+    /// Get bus lines (routes) within 300m radius of the given coordinates
+    async fn get_nearby_bus_lines(
+        &self,
+        ref_lat: f64,
+        ref_lon: f64,
+    ) -> Result<Vec<Line>, crate::use_case::error::UseCaseError> {
+        let nearby_candidates = self
+            .station_repository
+            .get_by_coordinates(ref_lat, ref_lon, Some(50), Some(TransportType::Bus))
+            .await?;
+
+        let nearby_bus_stops: Vec<Station> = nearby_candidates
+            .into_iter()
+            .filter(|bus_stop| {
+                let distance = haversine_distance(ref_lat, ref_lon, bus_stop.lat, bus_stop.lon);
+                distance <= NEARBY_BUS_STOP_RADIUS_METERS
+            })
+            .collect();
+
+        if nearby_bus_stops.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Get bus lines for nearby bus stops
+        let bus_station_group_ids: Vec<u32> = nearby_bus_stops
+            .iter()
+            .map(|s| s.station_g_cd as u32)
+            .collect();
+
+        let mut bus_lines = self
+            .line_repository
+            .get_by_station_group_id_vec(&bus_station_group_ids)
+            .await?;
+
+        // Add line symbols and filter to only bus lines
+        let mut seen_line_cds = std::collections::HashSet::new();
+        bus_lines.retain(|line| {
+            line.transport_type == TransportType::Bus && seen_line_cds.insert(line.line_cd)
+        });
+
+        for line in bus_lines.iter_mut() {
+            line.line_symbols = self.get_line_symbols(line);
+
+            // Find the matching bus stop for this line and embed it
+            if let Some(bus_stop) = nearby_bus_stops
+                .iter()
+                .find(|s| s.line_cd == line.line_cd)
+            {
+                let mut station_copy = bus_stop.clone();
+                station_copy.station_numbers = self.get_station_numbers(&station_copy);
+                line.station = Some(station_copy);
+            }
+        }
+
+        Ok(bus_lines)
+    }
+
     fn build_route_tree_map(&self, stops: &[Station]) -> BTreeMap<i32, Vec<Station>> {
         stops.iter().fold(
             BTreeMap::new(),
@@ -951,4 +1032,21 @@ where
             transport_type: row.transport_type,
         }
     }
+}
+
+/// Calculate the distance between two points on Earth using the Haversine formula.
+/// Returns the distance in meters.
+fn haversine_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+    const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
+
+    let lat1_rad = lat1.to_radians();
+    let lat2_rad = lat2.to_radians();
+    let delta_lat = (lat2 - lat1).to_radians();
+    let delta_lon = (lon2 - lon1).to_radians();
+
+    let a = (delta_lat / 2.0).sin().powi(2)
+        + lat1_rad.cos() * lat2_rad.cos() * (delta_lon / 2.0).sin().powi(2);
+    let c = 2.0 * a.sqrt().asin();
+
+    EARTH_RADIUS_METERS * c
 }
