@@ -39,13 +39,19 @@ where
     async fn find_station_by_id(
         &self,
         station_id: u32,
-        _transport_type: Option<TransportType>,
+        transport_type: Option<TransportType>,
     ) -> Result<Option<Station>, UseCaseError> {
         let Some(station) = self.station_repository.find_by_id(station_id).await? else {
             return Ok(None);
         };
+        // Filter by transport_type if specified
+        if let Some(requested_type) = transport_type {
+            if station.transport_type != requested_type {
+                return Ok(None);
+            }
+        }
         let stations = self
-            .update_station_vec_with_attributes(vec![station], None)
+            .update_station_vec_with_attributes(vec![station], None, transport_type)
             .await?;
 
         Ok(stations.into_iter().next())
@@ -53,11 +59,20 @@ where
     async fn get_stations_by_id_vec(
         &self,
         station_ids: &[u32],
-        _transport_type: Option<TransportType>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self.station_repository.get_by_id_vec(station_ids).await?;
+        // Filter by transport_type if specified
+        let stations = if let Some(requested_type) = transport_type {
+            stations
+                .into_iter()
+                .filter(|s| s.transport_type == requested_type)
+                .collect()
+        } else {
+            stations
+        };
         let stations = self
-            .update_station_vec_with_attributes(stations, None)
+            .update_station_vec_with_attributes(stations, None, transport_type)
             .await?;
 
         Ok(stations)
@@ -65,15 +80,25 @@ where
     async fn get_stations_by_group_id(
         &self,
         station_group_id: u32,
-        _transport_type: Option<TransportType>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
             .get_by_station_group_id(station_group_id)
             .await?;
 
+        // Filter by transport_type if specified
+        let stations = if let Some(requested_type) = transport_type {
+            stations
+                .into_iter()
+                .filter(|s| s.transport_type == requested_type)
+                .collect()
+        } else {
+            stations
+        };
+
         let stations = self
-            .update_station_vec_with_attributes(stations, Some(station_group_id))
+            .update_station_vec_with_attributes(stations, Some(station_group_id), transport_type)
             .await?;
 
         Ok(stations)
@@ -113,7 +138,7 @@ where
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(stations, None)
+            .update_station_vec_with_attributes(stations, None, transport_type)
             .await?;
 
         Ok(stations)
@@ -142,7 +167,7 @@ where
         };
 
         let stations = self
-            .update_station_vec_with_attributes(stations, line_group_id.map(|id| id as u32))
+            .update_station_vec_with_attributes(stations, line_group_id.map(|id| id as u32), None)
             .await?;
 
         Ok(stations)
@@ -165,7 +190,7 @@ where
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(stations, None)
+            .update_station_vec_with_attributes(stations, None, transport_type)
             .await?;
 
         Ok(stations)
@@ -185,6 +210,7 @@ where
         &self,
         mut stations: Vec<Station>,
         line_group_id: Option<u32>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let station_group_ids = stations
             .iter()
@@ -246,7 +272,10 @@ where
                 .collect();
 
             // For rail stations, add nearby bus routes to lines array
-            if station.transport_type == TransportType::Rail {
+            // Only add bus routes if transport_type is not specified or is not Bus-only
+            let should_include_bus_routes = transport_type.is_none()
+                || transport_type == Some(TransportType::Rail);
+            if station.transport_type == TransportType::Rail && should_include_bus_routes {
                 let nearby_bus_lines = self.get_nearby_bus_lines(station.lat, station.lon).await?;
                 for bus_line in nearby_bus_lines {
                     if seen_line_cds.insert(bus_line.line_cd) {
@@ -312,7 +341,7 @@ where
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(stations, Some(line_group_id))
+            .update_station_vec_with_attributes(stations, Some(line_group_id), None)
             .await?;
 
         Ok(stations)
