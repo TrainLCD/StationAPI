@@ -931,10 +931,7 @@ where
             line.line_symbols = self.get_line_symbols(line);
 
             // Find the matching bus stop for this line and embed it
-            if let Some(bus_stop) = nearby_bus_stops
-                .iter()
-                .find(|s| s.line_cd == line.line_cd)
-            {
+            if let Some(bus_stop) = nearby_bus_stops.iter().find(|s| s.line_cd == line.line_cd) {
                 let mut station_copy = bus_stop.clone();
                 station_copy.station_numbers = self.get_station_numbers(&station_copy);
                 line.station = Some(station_copy);
