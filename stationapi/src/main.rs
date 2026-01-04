@@ -1,6 +1,8 @@
-use csv::{ReaderBuilder, StringRecord};
+mod import;
+
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Connection, PgConnection};
+use stationapi::config::fetch_database_url;
 use stationapi::infrastructure::company_repository::MyCompanyRepository;
 use stationapi::infrastructure::line_repository::MyLineRepository;
 use stationapi::infrastructure::station_repository::MyStationRepository;
@@ -12,130 +14,12 @@ use stationapi::use_case::interactor::query::QueryInteractor;
 use tonic::transport::Server;
 use tonic_health::server::HealthReporter;
 
-use std::path::Path;
 use std::sync::Arc;
 use std::{
     env::{self, VarError},
-    fs,
     net::{AddrParseError, SocketAddr},
 };
 use tracing::{info, warn};
-
-async fn import_csv() -> Result<(), Box<dyn std::error::Error>> {
-    let db_url = fetch_database_url();
-    let mut conn = PgConnection::connect(&db_url).await?;
-    let data_path = Path::new("data");
-
-    // Ensure required extensions exist before running schema import
-    sqlx::query("CREATE EXTENSION IF NOT EXISTS pg_trgm")
-        .execute(&mut conn)
-        .await?;
-
-    sqlx::query("CREATE EXTENSION IF NOT EXISTS btree_gist")
-        .execute(&mut conn)
-        .await?;
-
-    let create_sql_path = data_path.join("create_table.sql");
-    let create_sql_content = fs::read(&create_sql_path).map_err(|e| {
-        tracing::error!("Failed to read create_table.sql: {}", e);
-        Box::new(e) as Box<dyn std::error::Error>
-    })?;
-    let create_sql: String = String::from_utf8_lossy(&create_sql_content).parse()?;
-    sqlx::raw_sql(&create_sql).execute(&mut conn).await?;
-    let entries = fs::read_dir(data_path).map_err(|e| {
-        tracing::error!("Failed to read data directory: {}", e);
-        Box::new(e) as Box<dyn std::error::Error>
-    })?;
-
-    let mut file_list: Vec<_> = entries
-        .filter_map(|entry| {
-            let path = entry.ok()?.path();
-            if path.is_file() && path.extension()? == "csv" && path.to_string_lossy().contains('!')
-            {
-                Some(path.file_name()?.to_string_lossy().into_owned())
-            } else {
-                None
-            }
-        })
-        .collect();
-    file_list.sort();
-
-    for file_name in &file_list {
-        let mut rdr = ReaderBuilder::new().from_path(data_path.join(file_name))?;
-
-        let headers_record = rdr.headers()?;
-        let headers: Vec<String> = headers_record
-            .into_iter()
-            .map(|row| row.to_string())
-            .collect();
-
-        let mut csv_data: Vec<StringRecord> = Vec::new();
-        let records: Vec<StringRecord> = rdr.records().filter_map(|row| row.ok()).collect();
-        csv_data.extend(records);
-
-        let table_name = match file_name.split('!').nth(1) {
-            Some(part) => match part.split('.').next() {
-                Some(name) if !name.is_empty() => name,
-                _ => {
-                    tracing::warn!("Invalid file name format: {}", file_name);
-                    continue;
-                }
-            },
-            None => {
-                tracing::warn!("Invalid file name format: {}", file_name);
-                continue;
-            }
-        };
-
-        let mut sql_lines_inner = Vec::new();
-        sql_lines_inner.push(format!("INSERT INTO public.{table_name} VALUES "));
-
-        for (idx, data) in csv_data.iter().enumerate() {
-            let cols: Vec<_> = data
-                .iter()
-                .enumerate()
-                .filter_map(|(col_idx, col)| {
-                    if headers
-                        .get(col_idx)
-                        .unwrap_or(&String::new())
-                        .starts_with('#')
-                    {
-                        return None;
-                    }
-
-                    if col.is_empty() {
-                        Some("NULL".to_string())
-                    } else if col == "DEFAULT" {
-                        Some("DEFAULT".to_string())
-                    } else {
-                        Some(format!(
-                            "'{}'",
-                            col.replace('\'', "''").replace('\\', "\\\\")
-                        ))
-                    }
-                })
-                .collect();
-
-            let values_part = cols.join(",");
-            let separator = if idx == csv_data.len() - 1 {
-                ");"
-            } else {
-                "),"
-            };
-            sql_lines_inner.push(format!("({values_part}{separator}"));
-        }
-
-        sqlx::query(&sql_lines_inner.concat())
-            .execute(&mut conn)
-            .await?;
-    }
-
-    sqlx::query("ANALYZE;").execute(&mut conn).await?;
-
-    info!("CSV import completed successfully.");
-
-    Ok(())
-}
 
 #[derive(sqlx::FromRow)]
 struct AliveRow {
@@ -148,7 +32,7 @@ async fn station_api_service_status(mut reporter: HealthReporter) {
         Ok(conn) => conn,
         Err(e) => {
             tracing::error!("Failed to connect to database: {}", e);
-            panic!("Failed to connect to database: {e}"); // または適切な回復戦略
+            panic!("Failed to connect to database: {e}");
         }
     };
     // NOTE: 今までの障害でDBのデータが一部だけ消えたという現象はなかったので駅数だけ見ればいい
@@ -179,8 +63,25 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
         warn!("Could not load .env.local");
     };
 
-    if let Err(e) = import_csv().await {
+    if let Err(e) = import::import_csv().await {
         return Err(anyhow::anyhow!("Failed to import CSV: {}", e));
+    }
+
+    // Import GTFS data (ToeiBus)
+    if let Err(e) = import::import_gtfs().await {
+        warn!(
+            "Failed to import GTFS data: {}. Continuing without GTFS data.",
+            e
+        );
+    }
+
+    // Integrate GTFS data into stations/lines tables
+    // This is wrapped in a transaction - if any step fails, all changes are rolled back
+    if let Err(e) = import::integrate_gtfs_to_stations().await {
+        return Err(anyhow::anyhow!(
+            "Failed to integrate GTFS to stations (transaction rolled back): {}",
+            e
+        ));
     }
 
     let db_url = &fetch_database_url();
@@ -193,7 +94,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
             Ok(conn) => conn,
             Err(e) => {
                 tracing::error!("Failed to connect to database: {}", e);
-                panic!("Failed to connect to database: {e}"); // または適切な回復戦略
+                panic!("Failed to connect to database: {e}");
             }
         },
     );
@@ -272,14 +173,6 @@ fn fetch_addr() -> Result<SocketAddr, AddrParseError> {
             fallback_host.parse()
         }
         Err(VarError::NotUnicode(_)) => panic!("$HOST should be written in Unicode."),
-    }
-}
-
-fn fetch_database_url() -> String {
-    match env::var("DATABASE_URL") {
-        Ok(s) => s,
-        Err(env::VarError::NotPresent) => panic!("$DATABASE_URL is not set."),
-        Err(VarError::NotUnicode(_)) => panic!("$DATABASE_URL should be written in Unicode."),
     }
 }
 

@@ -1,10 +1,13 @@
 use std::collections::{BTreeMap, HashSet};
 
+/// Maximum distance in meters to search for nearby bus stops from a rail station
+const NEARBY_BUS_STOP_RADIUS_METERS: f64 = 300.0;
+
 use crate::{
     domain::{
         entity::{
-            company::Company, line::Line, line_symbol::LineSymbol, station::Station,
-            station_number::StationNumber, train_type::TrainType,
+            company::Company, gtfs::TransportType, line::Line, line_symbol::LineSymbol,
+            station::Station, station_number::StationNumber, train_type::TrainType,
         },
         normalize::normalize_for_search,
         repository::{
@@ -33,24 +36,43 @@ where
     TR: TrainTypeRepository,
     CR: CompanyRepository,
 {
-    async fn find_station_by_id(&self, station_id: u32) -> Result<Option<Station>, UseCaseError> {
+    async fn find_station_by_id(
+        &self,
+        station_id: u32,
+        transport_type: Option<TransportType>,
+    ) -> Result<Option<Station>, UseCaseError> {
         let Some(station) = self.station_repository.find_by_id(station_id).await? else {
             return Ok(None);
         };
+        // Filter by transport_type if specified
+        if let Some(requested_type) = transport_type {
+            if station.transport_type != requested_type {
+                return Ok(None);
+            }
+        }
         let stations = self
-            .update_station_vec_with_attributes(vec![station], None)
+            .update_station_vec_with_attributes(vec![station], None, transport_type)
             .await?;
-        let station = stations.into_iter().next();
 
-        Ok(station)
+        Ok(stations.into_iter().next())
     }
     async fn get_stations_by_id_vec(
         &self,
         station_ids: &[u32],
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self.station_repository.get_by_id_vec(station_ids).await?;
+        // Filter by transport_type if specified
+        let stations = if let Some(requested_type) = transport_type {
+            stations
+                .into_iter()
+                .filter(|s| s.transport_type == requested_type)
+                .collect()
+        } else {
+            stations
+        };
         let stations = self
-            .update_station_vec_with_attributes(stations, None)
+            .update_station_vec_with_attributes(stations, None, transport_type)
             .await?;
 
         Ok(stations)
@@ -58,14 +80,25 @@ where
     async fn get_stations_by_group_id(
         &self,
         station_group_id: u32,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
             .get_by_station_group_id(station_group_id)
             .await?;
 
+        // Filter by transport_type if specified
+        let stations = if let Some(requested_type) = transport_type {
+            stations
+                .into_iter()
+                .filter(|s| s.transport_type == requested_type)
+                .collect()
+        } else {
+            stations
+        };
+
         let stations = self
-            .update_station_vec_with_attributes(stations, Some(station_group_id))
+            .update_station_vec_with_attributes(stations, Some(station_group_id), transport_type)
             .await?;
 
         Ok(stations)
@@ -97,14 +130,15 @@ where
         latitude: f64,
         longitude: f64,
         limit: Option<u32>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
-            .get_by_coordinates(latitude, longitude, limit)
+            .get_by_coordinates(latitude, longitude, limit, transport_type)
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(stations, None)
+            .update_station_vec_with_attributes(stations, None, transport_type)
             .await?;
 
         Ok(stations)
@@ -113,10 +147,14 @@ where
         &self,
         line_id: u32,
         station_id: Option<u32>,
+        direction_id: Option<u32>,
+        _transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
+        // Note: transport_type is ignored for line-based queries
+        // as mixing bus stops with rail line stations doesn't make sense
         let stations = self
             .station_repository
-            .get_by_line_id(line_id, station_id)
+            .get_by_line_id(line_id, station_id, direction_id)
             .await?;
 
         let line_group_id = if let Some(sta) = stations
@@ -129,7 +167,7 @@ where
         };
 
         let stations = self
-            .update_station_vec_with_attributes(stations, line_group_id.map(|id| id as u32))
+            .update_station_vec_with_attributes(stations, line_group_id.map(|id| id as u32), None)
             .await?;
 
         Ok(stations)
@@ -139,6 +177,7 @@ where
         station_name: String,
         limit: Option<u32>,
         from_station_group_id: Option<u32>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
@@ -146,11 +185,12 @@ where
                 normalize_for_search(&station_name),
                 limit,
                 from_station_group_id,
+                transport_type,
             )
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(stations, None)
+            .update_station_vec_with_attributes(stations, None, transport_type)
             .await?;
 
         Ok(stations)
@@ -170,6 +210,7 @@ where
         &self,
         mut stations: Vec<Station>,
         line_group_id: Option<u32>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let station_group_ids = stations
             .iter()
@@ -230,6 +271,19 @@ where
                 .cloned()
                 .collect();
 
+            // For rail stations, add nearby bus routes to lines array
+            // Only add bus routes if transport_type is not specified or is not Bus-only
+            let should_include_bus_routes =
+                transport_type.is_none() || transport_type == Some(TransportType::Rail);
+            if station.transport_type == TransportType::Rail && should_include_bus_routes {
+                let nearby_bus_lines = self.get_nearby_bus_lines(station.lat, station.lon).await?;
+                for bus_line in nearby_bus_lines {
+                    if seen_line_cds.insert(bus_line.line_cd) {
+                        lines.push(bus_line);
+                    }
+                }
+            }
+
             for line in lines.iter_mut() {
                 line.company = companies
                     .iter()
@@ -277,14 +331,17 @@ where
     async fn get_stations_by_line_group_id(
         &self,
         line_group_id: u32,
+        _transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, UseCaseError> {
+        // Note: transport_type is ignored for line-based queries
+        // as mixing bus stops with rail line stations doesn't make sense
         let stations = self
             .station_repository
             .get_by_line_group_id(line_group_id)
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(stations, Some(line_group_id))
+            .update_station_vec_with_attributes(stations, Some(line_group_id), None)
             .await?;
 
         Ok(stations)
@@ -393,6 +450,7 @@ where
             station_g_cd: Some(station.station_g_cd),
             average_distance: station.average_distance,
             type_cd: station.type_cd,
+            transport_type: station.transport_type,
         }
     }
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol> {
@@ -807,6 +865,7 @@ where
                     station_cd: line.station_cd,
                     station_g_cd: line.station_g_cd,
                     type_cd: line.type_cd,
+                    transport_type: line.transport_type,
                 })
                 .collect::<Vec<Line>>();
 
@@ -857,6 +916,60 @@ where
     TR: TrainTypeRepository,
     CR: CompanyRepository,
 {
+    /// Get bus lines (routes) within 300m radius of the given coordinates
+    async fn get_nearby_bus_lines(
+        &self,
+        ref_lat: f64,
+        ref_lon: f64,
+    ) -> Result<Vec<Line>, crate::use_case::error::UseCaseError> {
+        let nearby_candidates = self
+            .station_repository
+            .get_by_coordinates(ref_lat, ref_lon, Some(50), Some(TransportType::Bus))
+            .await?;
+
+        let nearby_bus_stops: Vec<Station> = nearby_candidates
+            .into_iter()
+            .filter(|bus_stop| {
+                let distance = haversine_distance(ref_lat, ref_lon, bus_stop.lat, bus_stop.lon);
+                distance <= NEARBY_BUS_STOP_RADIUS_METERS
+            })
+            .collect();
+
+        if nearby_bus_stops.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Get bus lines for nearby bus stops
+        let bus_station_group_ids: Vec<u32> = nearby_bus_stops
+            .iter()
+            .map(|s| s.station_g_cd as u32)
+            .collect();
+
+        let mut bus_lines = self
+            .line_repository
+            .get_by_station_group_id_vec(&bus_station_group_ids)
+            .await?;
+
+        // Add line symbols and filter to only bus lines
+        let mut seen_line_cds = std::collections::HashSet::new();
+        bus_lines.retain(|line| {
+            line.transport_type == TransportType::Bus && seen_line_cds.insert(line.line_cd)
+        });
+
+        for line in bus_lines.iter_mut() {
+            line.line_symbols = self.get_line_symbols(line);
+
+            // Find the matching bus stop for this line and embed it
+            if let Some(bus_stop) = nearby_bus_stops.iter().find(|s| s.line_cd == line.line_cd) {
+                let mut station_copy = bus_stop.clone();
+                station_copy.station_numbers = self.get_station_numbers(&station_copy);
+                line.station = Some(station_copy);
+            }
+        }
+
+        Ok(bus_lines)
+    }
+
     fn build_route_tree_map(&self, stops: &[Station]) -> BTreeMap<i32, Vec<Station>> {
         stops.iter().fold(
             BTreeMap::new(),
@@ -942,6 +1055,24 @@ where
             color: row.color.clone(),
             direction: row.direction,
             kind: row.kind,
+            transport_type: row.transport_type,
         }
     }
+}
+
+/// Calculate the distance between two points on Earth using the Haversine formula.
+/// Returns the distance in meters.
+fn haversine_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+    const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
+
+    let lat1_rad = lat1.to_radians();
+    let lat2_rad = lat2.to_radians();
+    let delta_lat = (lat2 - lat1).to_radians();
+    let delta_lon = (lon2 - lon1).to_radians();
+
+    let a = (delta_lat / 2.0).sin().powi(2)
+        + lat1_rad.cos() * lat2_rad.cos() * (delta_lon / 2.0).sin().powi(2);
+    let c = 2.0 * a.sqrt().asin();
+
+    EARTH_RADIUS_METERS * c
 }

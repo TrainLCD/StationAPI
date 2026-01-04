@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::proto::StopCondition;
 
-use super::{line::Line, station_number::StationNumber, train_type::TrainType as TrainTypeEntity};
+use super::{
+    gtfs::TransportType, line::Line, station_number::StationNumber,
+    train_type::TrainType as TrainTypeEntity,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Station {
@@ -73,6 +76,7 @@ pub struct Station {
     pub color: Option<String>,
     pub direction: Option<i32>,
     pub kind: Option<i32>,
+    pub transport_type: TransportType,
 }
 
 impl Station {
@@ -142,6 +146,7 @@ impl Station {
         color: Option<String>,
         direction: Option<i32>,
         kind: Option<i32>,
+        transport_type: TransportType,
     ) -> Self {
         Self {
             station_cd,
@@ -208,6 +213,7 @@ impl Station {
             color,
             direction,
             kind,
+            transport_type,
         }
     }
 }
@@ -261,6 +267,7 @@ mod tests {
             Some(1130201),                     // station_g_cd
             Some(0.97),                        // average_distance
             None,                              // type_cd
+            TransportType::Rail,               // transport_type
         )
     }
 
@@ -348,6 +355,7 @@ mod tests {
             Some("#0066CC".to_string()),              // color
             Some(0),                                  // direction
             Some(1),                                  // kind
+            TransportType::Rail,                      // transport_type
         )
     }
 
@@ -417,6 +425,7 @@ mod tests {
             None,                     // color
             None,                     // direction
             None,                     // kind
+            TransportType::Rail,      // transport_type
         )
     }
 
@@ -733,5 +742,84 @@ mod tests {
 
         assert_eq!(station.lines[0].line_cd, 11302);
         assert_eq!(station.lines[0].line_name, "山手線");
+    }
+
+    #[test]
+    fn test_station_with_bus_transport_type() {
+        let bus_stop = Station::new(
+            9000001,                           // station_cd
+            9000001,                           // station_g_cd
+            "新宿駅前".to_string(),            // station_name
+            "シンジュクエキマエ".to_string(),  // station_name_k
+            Some("Shinjuku Sta.".to_string()), // station_name_r
+            None,                              // station_name_zh
+            None,                              // station_name_ko
+            vec![],                            // station_numbers
+            None,                              // station_number1
+            None,                              // station_number2
+            None,                              // station_number3
+            None,                              // station_number4
+            None,                              // three_letter_code
+            99001,                             // line_cd
+            None,                              // line
+            vec![],                            // lines
+            13,                                // pref_cd (東京都)
+            "".to_string(),                    // post
+            "".to_string(),                    // address
+            139.700464,                        // lon
+            35.689738,                         // lat
+            "".to_string(),                    // open_ymd
+            "".to_string(),                    // close_ymd
+            0,                                 // e_status
+            1,                                 // e_sort
+            StopCondition::All,                // stop_condition
+            None,                              // distance
+            false,                             // has_train_types
+            None,                              // train_type
+            None,                              // company_cd
+            None,                              // line_name
+            None,                              // line_name_k
+            None,                              // line_name_h
+            None,                              // line_name_r
+            None,                              // line_name_zh
+            None,                              // line_name_ko
+            None,                              // line_color_c
+            None,                              // line_type
+            None,                              // line_symbol1
+            None,                              // line_symbol2
+            None,                              // line_symbol3
+            None,                              // line_symbol4
+            None,                              // line_symbol1_color
+            None,                              // line_symbol2_color
+            None,                              // line_symbol3_color
+            None,                              // line_symbol4_color
+            None,                              // line_symbol1_shape
+            None,                              // line_symbol2_shape
+            None,                              // line_symbol3_shape
+            None,                              // line_symbol4_shape
+            None,                              // line_group_cd
+            None,                              // average_distance
+            None,                              // pass
+            None,                              // type_id
+            None,                              // sst_id
+            None,                              // type_cd
+            None,                              // type_name
+            None,                              // type_name_k
+            None,                              // type_name_r
+            None,                              // type_name_zh
+            None,                              // type_name_ko
+            None,                              // color
+            None,                              // direction
+            None,                              // kind
+            TransportType::Bus,                // transport_type
+        );
+
+        assert_eq!(bus_stop.station_cd, 9000001);
+        assert_eq!(bus_stop.station_name, "新宿駅前");
+        assert_eq!(bus_stop.transport_type, TransportType::Bus);
+
+        // JSONシリアライゼーションでtransport_typeが正しく出力されることを確認
+        let json = serde_json::to_string(&bus_stop).expect("シリアライゼーションに失敗");
+        assert!(json.contains("\"transport_type\":\"Bus\"")); // Bus enum variant
     }
 }

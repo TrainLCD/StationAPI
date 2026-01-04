@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use crate::{
     domain::{
-        entity::station::Station, error::DomainError,
+        entity::{gtfs::TransportType, station::Station},
+        error::DomainError,
         repository::station_repository::StationRepository,
     },
     proto::StopCondition,
@@ -76,6 +77,7 @@ struct StationRow {
     pub color: Option<String>,
     pub direction: Option<i32>,
     pub kind: Option<i32>,
+    pub transport_type: Option<i32>,
 }
 
 impl From<StationRow> for Station {
@@ -155,6 +157,7 @@ impl From<StationRow> for Station {
             color: row.color,
             direction: row.direction,
             kind: row.kind,
+            transport_type: TransportType::from(row.transport_type.unwrap_or(0)),
         }
     }
 }
@@ -183,18 +186,26 @@ impl StationRepository for MyStationRepository {
         &self,
         line_id: u32,
         station_id: Option<u32>,
+        direction_id: Option<u32>,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         match station_id {
             Some(station_id) => {
                 InternalStationRepository::get_by_line_id_and_station_id(
-                    line_id, station_id, &mut conn,
+                    line_id,
+                    station_id,
+                    direction_id,
+                    &mut conn,
                 )
                 .await
             }
             None => {
-                InternalStationRepository::get_by_line_id_without_train_types(line_id, &mut conn)
-                    .await
+                InternalStationRepository::get_by_line_id_without_train_types(
+                    line_id,
+                    direction_id,
+                    &mut conn,
+                )
+                .await
             }
         }
     }
@@ -220,9 +231,17 @@ impl StationRepository for MyStationRepository {
         latitude: f64,
         longitude: f64,
         limit: Option<u32>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_by_coordinates(latitude, longitude, limit, &mut conn).await
+        InternalStationRepository::get_by_coordinates(
+            latitude,
+            longitude,
+            limit,
+            transport_type,
+            &mut conn,
+        )
+        .await
     }
 
     async fn get_by_name(
@@ -230,12 +249,14 @@ impl StationRepository for MyStationRepository {
         station_name: String,
         limit: Option<u32>,
         from_station_group_id: Option<u32>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::get_by_name(
             station_name,
             limit,
             from_station_group_id,
+            transport_type,
             &mut conn,
         )
         .await
@@ -348,7 +369,8 @@ impl InternalStationRepository {
             t.type_name_ko,
             t.color,
             t.direction,
-            t.kind
+            t.kind,
+            s.transport_type
           FROM stations AS s
           JOIN lines AS l ON l.line_cd = s.line_cd
           LEFT JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
@@ -452,7 +474,8 @@ impl InternalStationRepository {
                 NULL::text AS type_name_ko,
                 NULL::text AS color,
                 NULL::int AS direction,
-                NULL::int AS kind
+                NULL::int AS kind,
+                s.transport_type
             FROM stations AS s
             JOIN lines AS l ON l.line_cd = s.line_cd AND l.e_status = 0
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
@@ -465,7 +488,7 @@ impl InternalStationRepository {
                 s.station_name_r, s.station_name_rn, s.station_name_zh, s.station_name_ko,
                 s.station_number1, s.station_number2, s.station_number3, s.station_number4,
                 s.three_letter_code, s.line_cd, s.pref_cd, s.post, s.address, s.lon, s.lat,
-                s.open_ymd, s.close_ymd, s.e_status, s.e_sort, l.company_cd, l.line_type,
+                s.open_ymd, s.close_ymd, s.e_status, s.e_sort, s.transport_type, l.company_cd, l.line_type,
                 l.line_symbol1, l.line_symbol2, l.line_symbol3, l.line_symbol4,
                 l.line_symbol1_color, l.line_symbol2_color, l.line_symbol3_color, l.line_symbol4_color,
                 l.line_symbol1_shape, l.line_symbol2_shape, l.line_symbol3_shape, l.line_symbol4_shape,
@@ -492,11 +515,18 @@ impl InternalStationRepository {
 
     async fn get_by_line_id_without_train_types(
         line_id: u32,
+        direction_id: Option<u32>,
         conn: &mut PgConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let rows = sqlx::query_as!(
-            StationRow,
-            r#"SELECT 
+        // When direction_id = 1 (上り) or 2 (下り), reverse the order
+        let order_clause = if matches!(direction_id, Some(1) | Some(2)) {
+            "ORDER BY s.e_sort DESC, s.station_cd DESC"
+        } else {
+            "ORDER BY s.e_sort ASC, s.station_cd ASC"
+        };
+
+        let query_str = format!(
+            r#"SELECT
               s.station_cd,
               s.station_g_cd,
               s.station_name,
@@ -554,19 +584,22 @@ impl InternalStationRepository {
               NULL::text AS type_name_ko,
               NULL::text AS color,
               NULL::int AS direction,
-              NULL::int AS kind
-              FROM stations AS s
-              JOIN lines AS l ON l.line_cd = s.line_cd
-              LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
-              LEFT JOIN aliases AS a ON a.id = la.alias_cd
+              NULL::int AS kind,
+              s.transport_type
+            FROM stations AS s
+            JOIN lines AS l ON l.line_cd = s.line_cd
+            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+            LEFT JOIN aliases AS a ON a.id = la.alias_cd
             WHERE l.line_cd = $1
               AND s.e_status = 0
               AND l.e_status = 0
-            ORDER BY s.e_sort, s.station_cd ASC"#,
-            line_id as i32
-        )
-        .fetch_all(conn)
-        .await?;
+            {order_clause}"#
+        );
+
+        let rows = sqlx::query_as::<_, StationRow>(&query_str)
+            .bind(line_id as i32)
+            .fetch_all(conn)
+            .await?;
 
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
@@ -576,6 +609,7 @@ impl InternalStationRepository {
     async fn get_by_line_id_and_station_id(
         line_id: u32,
         station_id: u32,
+        direction_id: Option<u32>,
         conn: &mut PgConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let stations: Vec<Station> = match Self::fetch_has_local_train_types_by_station_id(
@@ -584,9 +618,15 @@ impl InternalStationRepository {
         .await?
         {
             true => {
-                let rows = sqlx::query_as!(
-                        StationRow,
-                        r#"WITH target_line_group AS (
+                // When direction_id = 1 (上り) or 2 (下り), reverse the order
+                let order_clause = if matches!(direction_id, Some(1) | Some(2)) {
+                    "ORDER BY sst.id DESC"
+                } else {
+                    "ORDER BY sst.id ASC"
+                };
+
+                let query_str = format!(
+                    r#"WITH target_line_group AS (
                             SELECT sst_inner.line_group_cd
                             FROM station_station_types AS sst_inner
                               LEFT JOIN types AS t_inner ON sst_inner.type_cd = t_inner.type_cd
@@ -655,7 +695,8 @@ impl InternalStationRepository {
                           t.kind,
                           sst.id AS sst_id,
                           sst.line_group_cd,
-                          sst.pass
+                          sst.pass,
+                          s.transport_type
                           FROM stations AS s
                           JOIN station_station_types AS sst ON sst.line_group_cd = (SELECT line_group_cd FROM target_line_group) AND sst.station_cd = s.station_cd
                           JOIN types AS t ON t.type_cd = sst.type_cd
@@ -664,14 +705,16 @@ impl InternalStationRepository {
                           LEFT JOIN aliases AS a ON a.id = la.alias_cd
                           WHERE s.e_status = 0
                             AND l.e_status = 0
-                          ORDER BY sst.id"#,
-                        station_id as i32
-                    )
+                          {order_clause}"#
+                );
+
+                let rows = sqlx::query_as::<_, StationRow>(&query_str)
+                    .bind(station_id as i32)
                     .fetch_all(conn)
                     .await?;
                 rows.into_iter().map(|row| row.into()).collect()
             }
-            false => Self::get_by_line_id_without_train_types(line_id, conn).await?,
+            false => Self::get_by_line_id_without_train_types(line_id, direction_id, conn).await?,
         };
 
         Ok(stations)
@@ -740,7 +783,8 @@ impl InternalStationRepository {
             t.type_name_ko,
             t.color,
             t.direction,
-            t.kind
+            t.kind,
+            s.transport_type
           FROM
             stations AS s
             JOIN lines AS l ON l.line_cd = s.line_cd
@@ -834,12 +878,13 @@ impl InternalStationRepository {
             t.type_name_ko,
             t.color,
             t.direction,
-            t.kind
+            t.kind,
+            s.transport_type
           FROM
             stations AS s
             JOIN lines AS l ON l.line_cd = s.line_cd AND l.e_status = 0
             LEFT JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
-            LEFT JOIN types AS t ON t.type_cd = sst.type_cd  
+            LEFT JOIN types AS t ON t.type_cd = sst.type_cd
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
             LEFT JOIN aliases AS a ON a.id = la.alias_cd
           WHERE
@@ -863,8 +908,11 @@ impl InternalStationRepository {
         latitude: f64,
         longitude: f64,
         limit: Option<u32>,
+        transport_type: Option<TransportType>,
         conn: &mut PgConnection,
     ) -> Result<Vec<Station>, DomainError> {
+        let transport_type_value: Option<i32> = transport_type.map(|t| t as i32);
+
         let rows = sqlx::query_as::<_, StationRow>(
             r#"SELECT
                 s.station_cd,
@@ -924,7 +972,8 @@ impl InternalStationRepository {
                 NULL::text AS type_name_ko,
                 NULL::text AS color,
                 NULL::int AS direction,
-                NULL::int AS kind
+                NULL::int AS kind,
+                s.transport_type
                 FROM stations AS s
                 JOIN lines AS l
                 ON s.line_cd = l.line_cd
@@ -933,12 +982,14 @@ impl InternalStationRepository {
                 LEFT JOIN aliases AS a
                 ON a.id = la.alias_cd
                 WHERE s.e_status = 0
+                AND ($4::int IS NULL OR COALESCE(s.transport_type, 0) = $4)
                 ORDER BY point(s.lat, s.lon) <-> point($1, $2)
                 LIMIT $3"#,
         )
         .bind(latitude)
         .bind(longitude)
         .bind(limit.unwrap_or(1) as i32)
+        .bind(transport_type_value)
         .fetch_all(&mut *conn)
         .await?;
 
@@ -951,11 +1002,13 @@ impl InternalStationRepository {
         station_name: String,
         limit: Option<u32>,
         from_station_group_id: Option<u32>,
+        transport_type: Option<TransportType>,
         conn: &mut PgConnection,
     ) -> Result<Vec<Station>, DomainError> {
         let station_name = &(format!("%{station_name}%"));
         let limit = limit.map(|v| v as i64);
         let from_station_group_id = from_station_group_id.map(|id| id as i32);
+        let transport_type_value: Option<i32> = transport_type.map(|t| t as i32);
 
         let rows = sqlx::query_as!(
             StationRow,
@@ -1026,7 +1079,8 @@ impl InternalStationRepository {
                     NULL::text AS type_name_ko,
                     NULL::text AS color,
                     NULL::int AS direction,
-                    NULL::int AS kind
+                    NULL::int AS kind,
+                s.transport_type
                 FROM stations AS s
                     LEFT JOIN from_stations AS fs
                         ON fs.station_cd IS NOT NULL
@@ -1052,6 +1106,7 @@ impl InternalStationRepository {
                         OR s.station_name_ko LIKE $6
                     )
                     AND s.e_status = 0
+                    AND ($8::int IS NULL OR COALESCE(s.transport_type, 0) = $8)
                     AND (
                         (
                             from_sst.id IS NOT NULL
@@ -1077,7 +1132,8 @@ impl InternalStationRepository {
             station_name,
             station_name,
             station_name,
-            limit
+            limit,
+            transport_type_value
         )
         .fetch_all(conn)
         .await?;
@@ -1151,7 +1207,8 @@ impl InternalStationRepository {
             t.type_name_ko,
             t.color,
             t.direction,
-            t.kind
+            t.kind,
+            s.transport_type
           FROM stations AS s
           JOIN lines AS l ON l.line_cd = s.line_cd AND l.e_status = 0
           LEFT JOIN station_station_types AS sst ON sst.line_group_cd = $1
@@ -1303,7 +1360,8 @@ impl InternalStationRepository {
             NULL::text AS type_name_ko,
             NULL::text AS color,
             NULL::int AS direction,
-            NULL::int AS kind
+            NULL::int AS kind,
+            sta.transport_type
             FROM
                 stations AS sta
 				JOIN common_lines AS cl ON sta.line_cd = cl.line_cd
@@ -1437,7 +1495,8 @@ impl InternalStationRepository {
                 tt.type_name_ko,
                 tt.color,
                 tt.direction,
-                tt.kind
+                tt.kind,
+                sta.transport_type
             FROM
                 stations AS sta
                 LEFT JOIN sst_cte AS sst ON sst.station_cd = sta.station_cd
@@ -1529,6 +1588,7 @@ mod tests {
             color: Some("#008000".to_string()),
             direction: Some(0),
             kind: Some(0),
+            transport_type: Some(0),
         };
 
         let station: Station = station_row.into();
@@ -1617,6 +1677,7 @@ mod tests {
                 color: None,
                 direction: None,
                 kind: None,
+                transport_type: None,
             };
 
             let station: Station = station_row.into();
