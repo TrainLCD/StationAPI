@@ -854,23 +854,27 @@ async fn insert_trips_batch(
         return Ok(());
     }
 
+    // Split into smaller chunks (500 rows) to reduce memory usage
     let mut sql = String::from(
         "INSERT INTO gtfs_trips (trip_id, route_id, service_id, trip_headsign, trip_short_name, direction_id, block_id, shape_id, wheelchair_accessible, bikes_allowed) VALUES ",
     );
-    let mut values: Vec<String> = Vec::with_capacity(batch.len());
+    let mut values: Vec<String> = Vec::new();
 
     for (
-        trip_id,
-        route_id,
-        service_id,
-        trip_headsign,
-        trip_short_name,
-        direction_id,
-        block_id,
-        shape_id,
-        wheelchair_accessible,
-        bikes_allowed,
-    ) in batch
+        i,
+        (
+            trip_id,
+            route_id,
+            service_id,
+            trip_headsign,
+            trip_short_name,
+            direction_id,
+            block_id,
+            shape_id,
+            wheelchair_accessible,
+            bikes_allowed,
+        ),
+    ) in batch.iter().enumerate()
     {
         let headsign_str = trip_headsign
             .as_ref()
@@ -911,12 +915,18 @@ async fn insert_trips_batch(
             wheelchair_str,
             bikes_str
         ));
+
+        // Execute every 500 rows to reduce memory usage
+        if (i + 1) % 500 == 0 || i == batch.len() - 1 {
+            sql.push_str(&values.join(","));
+            sql.push_str(" ON CONFLICT (trip_id) DO NOTHING");
+            sqlx::query(&sql).execute(&mut *conn).await?;
+            sql = String::from(
+                "INSERT INTO gtfs_trips (trip_id, route_id, service_id, trip_headsign, trip_short_name, direction_id, block_id, shape_id, wheelchair_accessible, bikes_allowed) VALUES ",
+            );
+            values.clear();
+        }
     }
-
-    sql.push_str(&values.join(","));
-    sql.push_str(" ON CONFLICT (trip_id) DO NOTHING");
-
-    sqlx::query(&sql).execute(&mut *conn).await?;
 
     Ok(())
 }
