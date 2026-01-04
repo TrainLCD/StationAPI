@@ -1,6 +1,6 @@
 # StationAPI 技術負債分析レポート
 
-> 最終更新: 2025年12月
+> 最終更新: 2026年1月
 
 ## 目次
 
@@ -109,27 +109,26 @@ let includes_requested_station = stops
 
 ### 3. 過度な clone() の使用
 
-- **ファイル**: `stationapi/src/use_case/interactor/query.rs`
-- **clone() 呼び出し回数**: 94回
+> **ステータス**: ✅ **対応済み** (2026年1月)
+>
+> 以下の最適化を実施しました。
 
-主な箇所:
+#### 対応済みの改善
 
-| 行番号 | 内容 |
-|--------|------|
-| 508, 578 | `line.clone()` |
-| 209, 244 | `station.clone()`, `station_ref.clone()` |
-| 230-231 | ベクタフィルタリング時の clone |
+| 改善内容 | 詳細 |
+|----------|------|
+| HashMap ベースの検索 | O(n) 線形検索を O(1) HashMap 検索に変更 (Company, TrainType, Station) |
+| `build_route_tree_map` の参照化 | `BTreeMap<i32, Vec<Station>>` → `BTreeMap<i32, Vec<&Station>>` で Station クローン回避 |
+| `train_types.clone()` 削除 | ベクター全体のクローンを回避し、必要な要素のみ HashMap に格納 |
+| バス停検索の最適化 | `get_nearby_bus_lines` で HashMap ベース検索に変更 |
 
-```rust
-// 行230-231: ベクタ操作時のクローン
-let mut lines: Vec<Line> = lines
-    .iter()
-    .filter(|&l| { ... })
-    .cloned()      // <-- 64フィールドの構造体を全てクローン
-    .collect();
-```
+#### 残存する clone()
 
-**影響**: Station が 64 フィールド × clone → メモリ使用量増加、不要なアロケーション
+一部の clone() は構造体フィールドへの所有権移動のため回避不可:
+
+- `line.station = Some(station.clone())` - Line 構造体が `Option<Station>` を所有
+- `line.company = ...` - Line 構造体が `Option<Company>` を所有
+- フィルタリング後の Vec 構築時の `.cloned()`
 
 ---
 
@@ -285,7 +284,7 @@ let station_numbers_raw = [
 ### 短期改善
 
 1. **SQL 最適化**: `get_route_stops` でのフィルタリングを SQL 側に移動
-2. **Clone 削減**: 参照ベースの処理を検討
+2. ~~**Clone 削減**: 参照ベースの処理を検討~~ ✅ 対応済み
 3. **命名改善**: `get_by_line_group_id_vec_for_routes()` をより明確な名前に変更
 4. **定数化**: ハードコードされた値を定数として定義
 
@@ -315,7 +314,7 @@ let station_numbers_raw = [
 |--------|------|---------|------|
 | **高** | Station 構造体の設計見直し | `src/domain/entity/station.rs` | 保守性、パフォーマンス |
 | **高** | SQL クエリの最適化 (TODO対応) | `src/use_case/interactor/query.rs:604,702` | パフォーマンス |
-| **高** | Clone の過度な使用削減 | `src/use_case/interactor/query.rs` | メモリ効率 |
+| ~~高~~ | ~~Clone の過度な使用削減~~ | ✅ 対応済み (HashMap検索、参照化) | メモリ効率 |
 | ~~高~~ | ~~アーキテクチャドキュメント作成~~ | ✅ 対応済み ([docs/architecture.md](./architecture.md)) | オンボーディング、保守性 |
 | **中** | Row 構造体のコード生成検討 | `src/infrastructure/*.rs` | メンテナンス性 |
 | **中** | メソッド命名の改善 | `src/domain/repository/line_repository.rs:23` | 可読性 |
