@@ -3,11 +3,34 @@ use std::collections::{BTreeMap, HashSet};
 /// Maximum distance in meters to search for nearby bus stops from a rail station
 const NEARBY_BUS_STOP_RADIUS_METERS: f64 = 300.0;
 
+/// Check if a station's transport type matches the filter
+fn matches_transport_filter(station_type: TransportType, filter: TransportTypeFilter) -> bool {
+    match filter {
+        TransportTypeFilter::Rail => station_type == TransportType::Rail,
+        TransportTypeFilter::Bus => station_type == TransportType::Bus,
+        TransportTypeFilter::RailAndBus => true,
+    }
+}
+
+/// Convert TransportTypeFilter to Option<TransportType> for repository queries
+fn filter_to_db_type(filter: TransportTypeFilter) -> Option<TransportType> {
+    match filter {
+        TransportTypeFilter::Rail => Some(TransportType::Rail),
+        TransportTypeFilter::Bus => Some(TransportType::Bus),
+        TransportTypeFilter::RailAndBus => None, // No filter - return all
+    }
+}
+
 use crate::{
     domain::{
         entity::{
-            company::Company, gtfs::TransportType, line::Line, line_symbol::LineSymbol,
-            station::Station, station_number::StationNumber, train_type::TrainType,
+            company::Company,
+            gtfs::{TransportType, TransportTypeFilter},
+            line::Line,
+            line_symbol::LineSymbol,
+            station::Station,
+            station_number::StationNumber,
+            train_type::TrainType,
         },
         normalize::normalize_for_search,
         repository::{
@@ -39,16 +62,14 @@ where
     async fn find_station_by_id(
         &self,
         station_id: u32,
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Option<Station>, UseCaseError> {
         let Some(station) = self.station_repository.find_by_id(station_id).await? else {
             return Ok(None);
         };
-        // Filter by transport_type if specified
-        if let Some(requested_type) = transport_type {
-            if station.transport_type != requested_type {
-                return Ok(None);
-            }
+        // Filter by transport_type
+        if !matches_transport_filter(station.transport_type, transport_type) {
+            return Ok(None);
         }
         let stations = self
             .update_station_vec_with_attributes(vec![station], None, transport_type)
@@ -59,18 +80,14 @@ where
     async fn get_stations_by_id_vec(
         &self,
         station_ids: &[u32],
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self.station_repository.get_by_id_vec(station_ids).await?;
-        // Filter by transport_type if specified
-        let stations = if let Some(requested_type) = transport_type {
-            stations
-                .into_iter()
-                .filter(|s| s.transport_type == requested_type)
-                .collect()
-        } else {
-            stations
-        };
+        // Filter by transport_type
+        let stations: Vec<Station> = stations
+            .into_iter()
+            .filter(|s| matches_transport_filter(s.transport_type, transport_type))
+            .collect();
         let stations = self
             .update_station_vec_with_attributes(stations, None, transport_type)
             .await?;
@@ -80,22 +97,18 @@ where
     async fn get_stations_by_group_id(
         &self,
         station_group_id: u32,
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
             .get_by_station_group_id(station_group_id)
             .await?;
 
-        // Filter by transport_type if specified
-        let stations = if let Some(requested_type) = transport_type {
-            stations
-                .into_iter()
-                .filter(|s| s.transport_type == requested_type)
-                .collect()
-        } else {
-            stations
-        };
+        // Filter by transport_type
+        let stations: Vec<Station> = stations
+            .into_iter()
+            .filter(|s| matches_transport_filter(s.transport_type, transport_type))
+            .collect();
 
         let stations = self
             .update_station_vec_with_attributes(stations, Some(station_group_id), transport_type)
@@ -130,11 +143,16 @@ where
         latitude: f64,
         longitude: f64,
         limit: Option<u32>,
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
-            .get_by_coordinates(latitude, longitude, limit, transport_type)
+            .get_by_coordinates(
+                latitude,
+                longitude,
+                limit,
+                filter_to_db_type(transport_type),
+            )
             .await?;
 
         let stations = self
@@ -148,10 +166,8 @@ where
         line_id: u32,
         station_id: Option<u32>,
         direction_id: Option<u32>,
-        _transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError> {
-        // Note: transport_type is ignored for line-based queries
-        // as mixing bus stops with rail line stations doesn't make sense
         let stations = self
             .station_repository
             .get_by_line_id(line_id, station_id, direction_id)
@@ -167,7 +183,11 @@ where
         };
 
         let stations = self
-            .update_station_vec_with_attributes(stations, line_group_id.map(|id| id as u32), None)
+            .update_station_vec_with_attributes(
+                stations,
+                line_group_id.map(|id| id as u32),
+                transport_type,
+            )
             .await?;
 
         Ok(stations)
@@ -177,7 +197,7 @@ where
         station_name: String,
         limit: Option<u32>,
         from_station_group_id: Option<u32>,
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError> {
         let stations = self
             .station_repository
@@ -185,7 +205,7 @@ where
                 normalize_for_search(&station_name),
                 limit,
                 from_station_group_id,
-                transport_type,
+                filter_to_db_type(transport_type),
             )
             .await?;
 
@@ -210,7 +230,7 @@ where
         &self,
         mut stations: Vec<Station>,
         line_group_id: Option<u32>,
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError> {
         let station_group_ids = stations
             .iter()
@@ -280,14 +300,14 @@ where
                 .filter(|&l| {
                     l.station_g_cd.unwrap_or(0) == station.station_g_cd
                         && seen_line_cds.insert(l.line_cd)
+                        && matches_transport_filter(l.transport_type, transport_type)
                 })
                 .cloned()
                 .collect();
 
             // For rail stations, add nearby bus routes to lines array
-            // Only add bus routes if transport_type is not specified or is not Bus-only
-            let should_include_bus_routes =
-                transport_type.is_none() || transport_type == Some(TransportType::Rail);
+            // Only add bus routes if transport_type is RailAndBus
+            let should_include_bus_routes = transport_type == TransportTypeFilter::RailAndBus;
             if station.transport_type == TransportType::Rail && should_include_bus_routes {
                 let nearby_bus_lines = self.get_nearby_bus_lines(station.lat, station.lon).await?;
                 for bus_line in nearby_bus_lines {
@@ -338,17 +358,19 @@ where
     async fn get_stations_by_line_group_id(
         &self,
         line_group_id: u32,
-        _transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError> {
-        // Note: transport_type is ignored for line-based queries
-        // as mixing bus stops with rail line stations doesn't make sense
         let stations = self
             .station_repository
             .get_by_line_group_id(line_group_id)
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(stations, Some(line_group_id), None)
+            .update_station_vec_with_attributes(
+                stations,
+                Some(line_group_id),
+                transport_type,
+            )
             .await?;
 
         Ok(stations)
@@ -1953,7 +1975,7 @@ mod tests {
 
             let stations = vec![station1, station2];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, None)
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
                 .await
                 .expect("Should succeed");
 
@@ -2002,7 +2024,7 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, None)
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
                 .await
                 .expect("Should succeed");
 
@@ -2034,7 +2056,7 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, None)
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
                 .await
                 .expect("Should succeed");
 
@@ -2086,8 +2108,9 @@ mod tests {
             );
 
             let stations = vec![rail_station];
+            // Bus routes are added only when transport_type is RailAndBus
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, None)
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::RailAndBus)
                 .await
                 .expect("Should succeed");
 
@@ -2104,18 +2127,20 @@ mod tests {
                 .any(|l| l.transport_type == TransportType::Bus);
             assert!(
                 has_bus_line,
-                "Rail station should have nearby bus routes added"
+                "Rail station should have nearby bus routes added when transport_type is RailAndBus"
             );
         }
 
         #[tokio::test]
-        async fn test_update_station_vec_with_attributes_no_bus_routes_when_transport_type_is_bus()
+        async fn test_update_station_vec_with_attributes_no_bus_routes_when_transport_type_is_rail()
         {
             let company = create_test_company(1, "JR東日本");
 
             // Rail station
             let mut rail_station = create_test_station(101, 1001, 100, Some(1000));
             rail_station.company_cd = Some(1);
+            rail_station.lat = 35.6812;
+            rail_station.lon = 139.7671;
             rail_station.transport_type = TransportType::Rail;
 
             // Bus stop nearby
@@ -2123,32 +2148,36 @@ mod tests {
 
             let rail_line = create_test_line_for_station_group(100, 1001);
 
+            let mut bus_line = create_test_line(500);
+            bus_line.station_g_cd = Some(201);
+            bus_line.transport_type = TransportType::Bus;
+
             let interactor = create_configurable_interactor(
                 vec![rail_station.clone()],
                 vec![bus_stop],
-                vec![rail_line],
+                vec![rail_line, bus_line],
                 vec![],
                 vec![company],
             );
 
-            // When transport_type is Bus, bus routes should NOT be added to rail stations
+            // When transport_type is Rail, bus routes should NOT be added
             let stations = vec![rail_station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, Some(TransportType::Bus))
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
                 .await
                 .expect("Should succeed");
 
             assert_eq!(result.len(), 1);
 
             let station_result = &result[0];
-            // Should NOT have bus lines when transport_type filter is Bus
+            // Should NOT have bus lines when transport_type is Rail
             let has_bus_line = station_result
                 .lines
                 .iter()
                 .any(|l| l.transport_type == TransportType::Bus);
             assert!(
                 !has_bus_line,
-                "Should not add bus routes when transport_type is Bus"
+                "Should not add bus routes when transport_type is Rail"
             );
         }
 
@@ -2171,7 +2200,7 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, None)
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
                 .await
                 .expect("Should succeed even with missing company");
 
@@ -2209,7 +2238,7 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, None)
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
                 .await
                 .expect("Should succeed even with missing train type");
 
@@ -2229,7 +2258,7 @@ mod tests {
 
             let stations: Vec<Station> = vec![];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, None)
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
                 .await
                 .expect("Should succeed with empty input");
 
@@ -2260,7 +2289,7 @@ mod tests {
 
             let stations = vec![station1, station2];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, None)
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
                 .await
                 .expect("Should succeed");
 
@@ -2308,7 +2337,7 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, None)
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
                 .await
                 .expect("Should succeed");
 
@@ -2345,7 +2374,7 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, None)
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
                 .await
                 .expect("Should succeed");
 
@@ -2368,6 +2397,91 @@ mod tests {
                 assert!(line.company.is_some());
                 assert!(!line.line_symbols.is_empty());
             }
+        }
+    }
+
+    // ========================================
+    // matches_transport_filter tests
+    // ========================================
+
+    mod matches_transport_filter_tests {
+        use super::*;
+
+        #[test]
+        fn test_rail_filter_matches_rail_station() {
+            assert!(matches_transport_filter(
+                TransportType::Rail,
+                TransportTypeFilter::Rail
+            ));
+        }
+
+        #[test]
+        fn test_rail_filter_rejects_bus_station() {
+            assert!(!matches_transport_filter(
+                TransportType::Bus,
+                TransportTypeFilter::Rail
+            ));
+        }
+
+        #[test]
+        fn test_bus_filter_matches_bus_station() {
+            assert!(matches_transport_filter(
+                TransportType::Bus,
+                TransportTypeFilter::Bus
+            ));
+        }
+
+        #[test]
+        fn test_bus_filter_rejects_rail_station() {
+            assert!(!matches_transport_filter(
+                TransportType::Rail,
+                TransportTypeFilter::Bus
+            ));
+        }
+
+        #[test]
+        fn test_rail_and_bus_filter_matches_rail_station() {
+            assert!(matches_transport_filter(
+                TransportType::Rail,
+                TransportTypeFilter::RailAndBus
+            ));
+        }
+
+        #[test]
+        fn test_rail_and_bus_filter_matches_bus_station() {
+            assert!(matches_transport_filter(
+                TransportType::Bus,
+                TransportTypeFilter::RailAndBus
+            ));
+        }
+    }
+
+    // ========================================
+    // filter_to_db_type tests
+    // ========================================
+
+    mod filter_to_db_type_tests {
+        use super::*;
+
+        #[test]
+        fn test_rail_filter_returns_some_rail() {
+            assert_eq!(
+                filter_to_db_type(TransportTypeFilter::Rail),
+                Some(TransportType::Rail)
+            );
+        }
+
+        #[test]
+        fn test_bus_filter_returns_some_bus() {
+            assert_eq!(
+                filter_to_db_type(TransportTypeFilter::Bus),
+                Some(TransportType::Bus)
+            );
+        }
+
+        #[test]
+        fn test_rail_and_bus_filter_returns_none() {
+            assert_eq!(filter_to_db_type(TransportTypeFilter::RailAndBus), None);
         }
     }
 }

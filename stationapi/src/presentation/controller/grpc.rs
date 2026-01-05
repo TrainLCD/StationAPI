@@ -1,5 +1,5 @@
 use crate::{
-    domain::entity::gtfs::TransportType,
+    domain::entity::gtfs::TransportTypeFilter,
     infrastructure::{
         company_repository::MyCompanyRepository, line_repository::MyLineRepository,
         station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
@@ -18,13 +18,13 @@ use crate::{
 };
 use tonic::Response;
 
-/// Convert optional proto TransportType to domain TransportType
-fn convert_transport_type(proto_type: Option<i32>) -> Option<TransportType> {
+/// Convert optional proto TransportType to domain TransportTypeFilter
+fn convert_transport_type(proto_type: Option<i32>) -> TransportTypeFilter {
     match proto_type.and_then(|v| GrpcTransportType::try_from(v).ok()) {
-        Some(GrpcTransportType::Rail) => Some(TransportType::Rail),
-        Some(GrpcTransportType::Bus) => Some(TransportType::Bus),
-        Some(GrpcTransportType::RailAndBus) => None, // Rail + nearby bus stops
-        _ => Some(TransportType::Rail),              // Default: rail only
+        Some(GrpcTransportType::Rail) => TransportTypeFilter::Rail,
+        Some(GrpcTransportType::Bus) => TransportTypeFilter::Bus,
+        Some(GrpcTransportType::RailAndBus) => TransportTypeFilter::RailAndBus,
+        _ => TransportTypeFilter::Rail, // Default: rail only
     }
 }
 
@@ -406,48 +406,48 @@ mod tests {
     fn test_convert_transport_type_rail() {
         let rail_value = Some(GrpcTransportType::Rail as i32);
         let result = convert_transport_type(rail_value);
-        assert_eq!(result, Some(TransportType::Rail));
+        assert_eq!(result, TransportTypeFilter::Rail);
     }
 
     #[test]
     fn test_convert_transport_type_bus() {
         let bus_value = Some(GrpcTransportType::Bus as i32);
         let result = convert_transport_type(bus_value);
-        assert_eq!(result, Some(TransportType::Bus));
+        assert_eq!(result, TransportTypeFilter::Bus);
     }
 
     #[test]
     fn test_convert_transport_type_unspecified() {
         let unspecified_value = Some(GrpcTransportType::Unspecified as i32);
         let result = convert_transport_type(unspecified_value);
-        assert_eq!(result, Some(TransportType::Rail));
+        assert_eq!(result, TransportTypeFilter::Rail);
     }
 
     #[test]
     fn test_convert_transport_type_rail_and_bus() {
         let value = Some(GrpcTransportType::RailAndBus as i32);
         let result = convert_transport_type(value);
-        assert_eq!(result, None);
+        assert_eq!(result, TransportTypeFilter::RailAndBus);
     }
 
     #[test]
     fn test_convert_transport_type_none() {
         let result = convert_transport_type(None);
-        assert_eq!(result, Some(TransportType::Rail));
+        assert_eq!(result, TransportTypeFilter::Rail);
     }
 
     #[test]
     fn test_convert_transport_type_unknown_value() {
         let unknown_value = Some(999);
         let result = convert_transport_type(unknown_value);
-        assert_eq!(result, Some(TransportType::Rail));
+        assert_eq!(result, TransportTypeFilter::Rail);
     }
 
     #[test]
     fn test_convert_transport_type_negative_value() {
         let negative_value = Some(-1);
         let result = convert_transport_type(negative_value);
-        assert_eq!(result, Some(TransportType::Rail));
+        assert_eq!(result, TransportTypeFilter::Rail);
     }
 
     // ============================================
@@ -458,9 +458,9 @@ mod tests {
     #[derive(Clone, Default)]
     struct MockQueryUseCase {
         /// Captured transport_type from get_stations_by_coordinates calls
-        captured_coordinates_transport_type: Arc<Mutex<Option<Option<TransportType>>>>,
+        captured_coordinates_transport_type: Arc<Mutex<Option<TransportTypeFilter>>>,
         /// Captured transport_type from get_stations_by_name calls
-        captured_name_transport_type: Arc<Mutex<Option<Option<TransportType>>>>,
+        captured_name_transport_type: Arc<Mutex<Option<TransportTypeFilter>>>,
         /// Stations to return (can be configured per test)
         stations_to_return: Arc<Mutex<Vec<Station>>>,
     }
@@ -473,14 +473,14 @@ mod tests {
             }
         }
 
-        fn get_captured_coordinates_transport_type(&self) -> Option<Option<TransportType>> {
+        fn get_captured_coordinates_transport_type(&self) -> Option<TransportTypeFilter> {
             self.captured_coordinates_transport_type
                 .lock()
                 .unwrap()
                 .clone()
         }
 
-        fn get_captured_name_transport_type(&self) -> Option<Option<TransportType>> {
+        fn get_captured_name_transport_type(&self) -> Option<TransportTypeFilter> {
             self.captured_name_transport_type.lock().unwrap().clone()
         }
     }
@@ -560,7 +560,7 @@ mod tests {
         async fn find_station_by_id(
             &self,
             _station_id: u32,
-            _transport_type: Option<TransportType>,
+            _transport_type: TransportTypeFilter,
         ) -> Result<Option<Station>, UseCaseError> {
             Ok(None)
         }
@@ -568,7 +568,7 @@ mod tests {
         async fn get_stations_by_id_vec(
             &self,
             _station_ids: &[u32],
-            _transport_type: Option<TransportType>,
+            _transport_type: TransportTypeFilter,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(vec![])
         }
@@ -576,7 +576,7 @@ mod tests {
         async fn get_stations_by_group_id(
             &self,
             _station_group_id: u32,
-            _transport_type: Option<TransportType>,
+            _transport_type: TransportTypeFilter,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(vec![])
         }
@@ -593,19 +593,23 @@ mod tests {
             _latitude: f64,
             _longitude: f64,
             _limit: Option<u32>,
-            transport_type: Option<TransportType>,
+            transport_type: TransportTypeFilter,
         ) -> Result<Vec<Station>, UseCaseError> {
             // Capture the transport_type that was passed
             *self.captured_coordinates_transport_type.lock().unwrap() = Some(transport_type);
 
-            // Return stations, filtering by transport_type if specified
+            // Return stations, filtering by transport_type
             let stations = self.stations_to_return.lock().unwrap().clone();
             let filtered: Vec<Station> = match transport_type {
-                Some(tt) => stations
+                TransportTypeFilter::Rail => stations
                     .into_iter()
-                    .filter(|s| s.transport_type == tt)
+                    .filter(|s| s.transport_type == TransportType::Rail)
                     .collect(),
-                None => stations,
+                TransportTypeFilter::Bus => stations
+                    .into_iter()
+                    .filter(|s| s.transport_type == TransportType::Bus)
+                    .collect(),
+                TransportTypeFilter::RailAndBus => stations,
             };
             Ok(filtered)
         }
@@ -615,7 +619,7 @@ mod tests {
             _line_id: u32,
             _station_id: Option<u32>,
             _direction_id: Option<u32>,
-            _transport_type: Option<TransportType>,
+            _transport_type: TransportTypeFilter,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(vec![])
         }
@@ -625,19 +629,23 @@ mod tests {
             _station_name: String,
             _limit: Option<u32>,
             _from_station_group_id: Option<u32>,
-            transport_type: Option<TransportType>,
+            transport_type: TransportTypeFilter,
         ) -> Result<Vec<Station>, UseCaseError> {
             // Capture the transport_type that was passed
             *self.captured_name_transport_type.lock().unwrap() = Some(transport_type);
 
-            // Return stations, filtering by transport_type if specified
+            // Return stations, filtering by transport_type
             let stations = self.stations_to_return.lock().unwrap().clone();
             let filtered: Vec<Station> = match transport_type {
-                Some(tt) => stations
+                TransportTypeFilter::Rail => stations
                     .into_iter()
-                    .filter(|s| s.transport_type == tt)
+                    .filter(|s| s.transport_type == TransportType::Rail)
                     .collect(),
-                None => stations,
+                TransportTypeFilter::Bus => stations
+                    .into_iter()
+                    .filter(|s| s.transport_type == TransportType::Bus)
+                    .collect(),
+                TransportTypeFilter::RailAndBus => stations,
             };
             Ok(filtered)
         }
@@ -653,7 +661,7 @@ mod tests {
             &self,
             stations: Vec<Station>,
             _line_group_id: Option<u32>,
-            _transport_type: Option<TransportType>,
+            _transport_type: TransportTypeFilter,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(stations)
         }
@@ -722,7 +730,7 @@ mod tests {
         async fn get_stations_by_line_group_id(
             &self,
             _line_group_id: u32,
-            _transport_type: Option<TransportType>,
+            _transport_type: TransportTypeFilter,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(vec![])
         }
@@ -809,14 +817,14 @@ mod tests {
         let mock = MockQueryUseCase::with_stations(vec![rail_station, bus_station]);
 
         let result = mock
-            .get_stations_by_coordinates(35.0, 139.0, Some(10), Some(TransportType::Rail))
+            .get_stations_by_coordinates(35.0, 139.0, Some(10), TransportTypeFilter::Rail)
             .await
             .unwrap();
 
         // Verify the transport_type was captured correctly
         assert_eq!(
             mock.get_captured_coordinates_transport_type(),
-            Some(Some(TransportType::Rail))
+            Some(TransportTypeFilter::Rail)
         );
 
         // Verify filtering works
@@ -831,14 +839,14 @@ mod tests {
         let mock = MockQueryUseCase::with_stations(vec![rail_station, bus_station]);
 
         let result = mock
-            .get_stations_by_coordinates(35.0, 139.0, Some(10), Some(TransportType::Bus))
+            .get_stations_by_coordinates(35.0, 139.0, Some(10), TransportTypeFilter::Bus)
             .await
             .unwrap();
 
         // Verify the transport_type was captured correctly
         assert_eq!(
             mock.get_captured_coordinates_transport_type(),
-            Some(Some(TransportType::Bus))
+            Some(TransportTypeFilter::Bus)
         );
 
         // Verify filtering works
@@ -847,18 +855,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_stations_by_coordinates_with_no_filter() {
+    async fn test_get_stations_by_coordinates_with_rail_and_bus_filter() {
         let rail_station = create_test_station(1, TransportType::Rail);
         let bus_station = create_test_station(2, TransportType::Bus);
         let mock = MockQueryUseCase::with_stations(vec![rail_station, bus_station]);
 
         let result = mock
-            .get_stations_by_coordinates(35.0, 139.0, Some(10), None)
+            .get_stations_by_coordinates(35.0, 139.0, Some(10), TransportTypeFilter::RailAndBus)
             .await
             .unwrap();
 
-        // Verify no filter was applied
-        assert_eq!(mock.get_captured_coordinates_transport_type(), Some(None));
+        // Verify the transport_type was captured correctly
+        assert_eq!(
+            mock.get_captured_coordinates_transport_type(),
+            Some(TransportTypeFilter::RailAndBus)
+        );
 
         // Verify all stations are returned
         assert_eq!(result.len(), 2);
@@ -875,7 +886,7 @@ mod tests {
                 "Test".to_string(),
                 Some(10),
                 None,
-                Some(TransportType::Rail),
+                TransportTypeFilter::Rail,
             )
             .await
             .unwrap();
@@ -883,7 +894,7 @@ mod tests {
         // Verify the transport_type was captured correctly
         assert_eq!(
             mock.get_captured_name_transport_type(),
-            Some(Some(TransportType::Rail))
+            Some(TransportTypeFilter::Rail)
         );
 
         // Verify filtering works
@@ -898,14 +909,14 @@ mod tests {
         let mock = MockQueryUseCase::with_stations(vec![rail_station, bus_station]);
 
         let result = mock
-            .get_stations_by_name("Test".to_string(), Some(10), None, Some(TransportType::Bus))
+            .get_stations_by_name("Test".to_string(), Some(10), None, TransportTypeFilter::Bus)
             .await
             .unwrap();
 
         // Verify the transport_type was captured correctly
         assert_eq!(
             mock.get_captured_name_transport_type(),
-            Some(Some(TransportType::Bus))
+            Some(TransportTypeFilter::Bus)
         );
 
         // Verify filtering works
@@ -914,18 +925,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_stations_by_name_with_no_filter() {
+    async fn test_get_stations_by_name_with_rail_and_bus_filter() {
         let rail_station = create_test_station(1, TransportType::Rail);
         let bus_station = create_test_station(2, TransportType::Bus);
         let mock = MockQueryUseCase::with_stations(vec![rail_station, bus_station]);
 
         let result = mock
-            .get_stations_by_name("Test".to_string(), Some(10), None, None)
+            .get_stations_by_name(
+                "Test".to_string(),
+                Some(10),
+                None,
+                TransportTypeFilter::RailAndBus,
+            )
             .await
             .unwrap();
 
-        // Verify no filter was applied
-        assert_eq!(mock.get_captured_name_transport_type(), Some(None));
+        // Verify the transport_type was captured correctly
+        assert_eq!(
+            mock.get_captured_name_transport_type(),
+            Some(TransportTypeFilter::RailAndBus)
+        );
 
         // Verify all stations are returned
         assert_eq!(result.len(), 2);
@@ -933,24 +952,24 @@ mod tests {
 
     #[test]
     fn test_convert_transport_type_integration_with_request_extraction() {
-        // Case 1: Some(Rail) -> Some(TransportType::Rail)
+        // Case 1: Some(Rail) -> TransportTypeFilter::Rail
         let result = convert_transport_type(Some(GrpcTransportType::Rail as i32));
-        assert_eq!(result, Some(TransportType::Rail));
+        assert_eq!(result, TransportTypeFilter::Rail);
 
-        // Case 2: Some(Bus) -> Some(TransportType::Bus)
+        // Case 2: Some(Bus) -> TransportTypeFilter::Bus
         let result = convert_transport_type(Some(GrpcTransportType::Bus as i32));
-        assert_eq!(result, Some(TransportType::Bus));
+        assert_eq!(result, TransportTypeFilter::Bus);
 
-        // Case 3: Some(Unspecified) -> Some(TransportType::Rail)
+        // Case 3: Some(Unspecified) -> TransportTypeFilter::Rail
         let result = convert_transport_type(Some(GrpcTransportType::Unspecified as i32));
-        assert_eq!(result, Some(TransportType::Rail));
+        assert_eq!(result, TransportTypeFilter::Rail);
 
-        // Case 4: Some(RailAndBus) -> None
+        // Case 4: Some(RailAndBus) -> TransportTypeFilter::RailAndBus
         let result = convert_transport_type(Some(GrpcTransportType::RailAndBus as i32));
-        assert_eq!(result, None);
+        assert_eq!(result, TransportTypeFilter::RailAndBus);
 
-        // Case 5: None -> Some(TransportType::Rail)
+        // Case 5: None -> TransportTypeFilter::Rail
         let result = convert_transport_type(None);
-        assert_eq!(result, Some(TransportType::Rail));
+        assert_eq!(result, TransportTypeFilter::Rail);
     }
 }
