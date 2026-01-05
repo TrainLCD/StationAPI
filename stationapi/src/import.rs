@@ -132,10 +132,7 @@ pub async fn import_csv() -> Result<(), Box<dyn std::error::Error>> {
                     } else if col == "DEFAULT" {
                         Some("DEFAULT".to_string())
                     } else {
-                        Some(format!(
-                            "'{}'",
-                            col.replace('\'', "''").replace('\\', "\\\\")
-                        ))
+                        Some(format!("'{}'", escape_sql_string(col)))
                     }
                 })
                 .collect();
@@ -667,10 +664,9 @@ async fn insert_stops_batch(
         platform_code,
     ) in batch
     {
-        let escape = |s: &str| s.replace('\\', "\\\\").replace('\'', "''");
         let opt_str = |o: &Option<String>| {
             o.as_ref()
-                .map(|s| format!("'{}'", escape(s)))
+                .map(|s| format!("'{}'", escape_sql_string(s)))
                 .unwrap_or_else(|| "NULL".to_string())
         };
         let opt_int = |o: &Option<i32>| {
@@ -680,9 +676,9 @@ async fn insert_stops_batch(
 
         values.push(format!(
             "('{}', {}, '{}', {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})",
-            escape(stop_id),
+            escape_sql_string(stop_id),
             opt_str(stop_code),
-            escape(stop_name),
+            escape_sql_string(stop_name),
             opt_str(stop_name_k),
             opt_str(stop_name_r),
             opt_str(stop_name_zh),
@@ -819,7 +815,7 @@ async fn insert_calendar_dates_batch(
         let parsed_date = chrono::NaiveDate::parse_from_str(date, "%Y%m%d")?;
         values.push(format!(
             "('{}', '{}', {})",
-            service_id.replace('\\', "\\\\").replace('\'', "''"),
+            escape_sql_string(service_id),
             parsed_date,
             exception_type
         ));
@@ -898,7 +894,7 @@ async fn insert_shapes_batch(
         let dist_str = dist.map_or("NULL".to_string(), |d| d.to_string());
         values.push(format!(
             "('{}', {}, {}, {}, {})",
-            shape_id.replace('\'', "''"),
+            escape_sql_string(shape_id),
             lat,
             lon,
             seq,
@@ -1035,22 +1031,22 @@ async fn insert_trips_batch(
     {
         let headsign_str = trip_headsign
             .as_ref()
-            .map(|s| format!("'{}'", s.replace('\'', "''")))
+            .map(|s| format!("'{}'", escape_sql_string(s)))
             .unwrap_or_else(|| "NULL".to_string());
         let short_name_str = trip_short_name
             .as_ref()
-            .map(|s| format!("'{}'", s.replace('\'', "''")))
+            .map(|s| format!("'{}'", escape_sql_string(s)))
             .unwrap_or_else(|| "NULL".to_string());
         let direction_str = direction_id
             .map(|v| v.to_string())
             .unwrap_or_else(|| "NULL".to_string());
         let block_str = block_id
             .as_ref()
-            .map(|s| format!("'{}'", s.replace('\'', "''")))
+            .map(|s| format!("'{}'", escape_sql_string(s)))
             .unwrap_or_else(|| "NULL".to_string());
         let shape_str = shape_id
             .as_ref()
-            .map(|s| format!("'{}'", s.replace('\'', "''")))
+            .map(|s| format!("'{}'", escape_sql_string(s)))
             .unwrap_or_else(|| "NULL".to_string());
         let wheelchair_str = wheelchair_accessible
             .map(|v| v.to_string())
@@ -1061,9 +1057,9 @@ async fn insert_trips_batch(
 
         values.push(format!(
             "('{}', '{}', '{}', {}, {}, {}, {}, {}, {}, {})",
-            trip_id.replace('\'', "''"),
-            route_id.replace('\'', "''"),
-            service_id.replace('\'', "''"),
+            escape_sql_string(trip_id),
+            escape_sql_string(route_id),
+            escape_sql_string(service_id),
             headsign_str,
             short_name_str,
             direction_str,
@@ -1231,7 +1227,7 @@ async fn insert_stop_times_batch(
             .unwrap_or_else(|| "NULL".to_string());
         let headsign_str = stop_headsign
             .as_ref()
-            .map(|s| format!("'{}'", s.replace('\'', "''")))
+            .map(|s| format!("'{}'", escape_sql_string(s)))
             .unwrap_or_else(|| "NULL".to_string());
         let pickup_str = pickup_type
             .map(|v| v.to_string())
@@ -1248,10 +1244,10 @@ async fn insert_stop_times_batch(
 
         values.push(format!(
             "('{}', {}, {}, '{}', {}, {}, {}, {}, {}, {})",
-            trip_id.replace('\'', "''"),
+            escape_sql_string(trip_id),
             arrival_str,
             departure_str,
-            stop_id.replace('\'', "''"),
+            escape_sql_string(stop_id),
             stop_sequence,
             headsign_str,
             pickup_str,
@@ -1333,6 +1329,12 @@ fn is_bus_feature_disabled() -> bool {
 // ============================================================
 // GTFS to Stations/Lines Integration
 // ============================================================
+
+/// Escape a string for safe inclusion in SQL queries.
+/// Escapes backslashes first, then single quotes, matching PostgreSQL string literal syntax.
+fn escape_sql_string(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('\'', "''")
+}
 
 /// Convert hiragana characters to katakana
 /// Hiragana range: U+3041 to U+3096
@@ -2083,5 +2085,50 @@ mod tests {
     fn test_is_bus_feature_disabled() {
         // This test depends on environment variable, so we just verify it doesn't panic
         let _ = is_bus_feature_disabled();
+    }
+
+    #[test]
+    fn test_escape_sql_string_single_quotes() {
+        // Single quotes should be doubled
+        assert_eq!(escape_sql_string("O'Brien"), "O''Brien");
+        assert_eq!(escape_sql_string("It's"), "It''s");
+        assert_eq!(escape_sql_string("''"), "''''");
+        assert_eq!(escape_sql_string("a'b'c"), "a''b''c");
+    }
+
+    #[test]
+    fn test_escape_sql_string_backslashes() {
+        // Backslashes should be doubled
+        assert_eq!(escape_sql_string(r"a\b"), r"a\\b");
+        assert_eq!(escape_sql_string(r"\\"), r"\\\\");
+        assert_eq!(escape_sql_string(r"path\to\file"), r"path\\to\\file");
+    }
+
+    #[test]
+    fn test_escape_sql_string_combined() {
+        // Both single quotes and backslashes
+        assert_eq!(escape_sql_string(r"O'Brien\path"), r"O''Brien\\path");
+        assert_eq!(escape_sql_string(r"\'"), r"\\''");
+        // Order matters: backslash first, then single quote
+        // Input: \' -> after backslash escape: \\' -> after quote escape: \\''
+        assert_eq!(escape_sql_string(r"test\'value"), r"test\\''value");
+    }
+
+    #[test]
+    fn test_escape_sql_string_no_escaping_needed() {
+        // Strings without special characters should remain unchanged
+        assert_eq!(escape_sql_string("hello"), "hello");
+        assert_eq!(escape_sql_string("東京駅"), "東京駅");
+        assert_eq!(escape_sql_string("abc123"), "abc123");
+        assert_eq!(escape_sql_string(""), "");
+    }
+
+    #[test]
+    fn test_escape_sql_string_unicode() {
+        // Unicode characters should pass through unchanged
+        assert_eq!(escape_sql_string("新宿駅"), "新宿駅");
+        assert_eq!(escape_sql_string("カタカナ"), "カタカナ");
+        // But special chars in unicode strings should still be escaped
+        assert_eq!(escape_sql_string("新宿'駅"), "新宿''駅");
     }
 }
