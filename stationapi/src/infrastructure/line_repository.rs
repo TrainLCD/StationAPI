@@ -218,9 +218,16 @@ impl InternalLineRepository {
         let station_id = station_id as i32;
         let rows: Option<LineRow> = sqlx::query_as!(
             LineRow,
-            "SELECT l.line_cd,
+            r#"SELECT l.line_cd,
             l.company_cd,
             l.line_type,
+            COALESCE(alias_data.line_name, l.line_name) AS line_name,
+            COALESCE(alias_data.line_name_k, l.line_name_k) AS line_name_k,
+            COALESCE(alias_data.line_name_h, l.line_name_h) AS line_name_h,
+            COALESCE(alias_data.line_name_r, l.line_name_r) AS line_name_r,
+            COALESCE(alias_data.line_name_zh, l.line_name_zh) AS line_name_zh,
+            COALESCE(alias_data.line_name_ko, l.line_name_ko) AS line_name_ko,
+            COALESCE(alias_data.line_color_c, l.line_color_c) AS line_color_c,
             l.line_symbol1,
             l.line_symbol2,
             l.line_symbol3,
@@ -236,17 +243,10 @@ impl InternalLineRepository {
             l.e_status,
             l.e_sort,
             COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
+            sst.line_group_cd AS "line_group_cd?",
             s.station_cd,
             s.station_g_cd,
-            sst.line_group_cd,
-            sst.type_cd,
-            COALESCE(alias_data.line_name, l.line_name) AS line_name,
-            COALESCE(alias_data.line_name_k, l.line_name_k) AS line_name_k,
-            COALESCE(alias_data.line_name_h, l.line_name_h) AS line_name_h,
-            COALESCE(alias_data.line_name_r, l.line_name_r) AS line_name_r,
-            COALESCE(alias_data.line_name_zh, l.line_name_zh) AS line_name_zh,
-            COALESCE(alias_data.line_name_ko, l.line_name_ko) AS line_name_ko,
-            COALESCE(alias_data.line_color_c, l.line_color_c) AS line_color_c,
+            sst.type_cd AS "type_cd?",
             l.transport_type
         FROM lines AS l
             JOIN stations AS s ON s.station_cd = $1
@@ -266,7 +266,7 @@ impl InternalLineRepository {
                 WHERE la.station_cd = $1
                 LIMIT 1
             ) AS alias_data ON alias_data.station_cd = s.station_cd
-        WHERE l.line_cd = s.line_cd",
+        WHERE l.line_cd = s.line_cd"#,
             station_id,
         )
         .fetch_optional(conn)
