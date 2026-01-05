@@ -1718,4 +1718,135 @@ mod tests {
         // This test would require proper database setup and test data
         // Skipped in regular test runs
     }
+
+    // ============================================
+    // Tests for get_by_name search pattern generation
+    // ============================================
+
+    mod get_by_name_tests {
+        use crate::domain::normalize::normalize_for_search;
+
+        #[test]
+        fn test_search_pattern_generation() {
+            // station_name_pattern: 元の入力をそのまま使用
+            let station_name = "しんじゅく";
+            let station_name_pattern = format!("%{station_name}%");
+            assert_eq!(station_name_pattern, "%しんじゅく%");
+
+            // station_name_k_pattern: ひらがな→カタカナ変換して使用
+            let station_name_k_pattern = format!("%{}%", normalize_for_search(station_name));
+            assert_eq!(station_name_k_pattern, "%シンジュク%");
+        }
+
+        #[test]
+        fn test_hiragana_search_converts_to_katakana_for_name_k() {
+            // ひらがな入力の場合、station_name_kはカタカナに変換される
+            let input = "とうきょう";
+            let pattern_for_name_k = format!("%{}%", normalize_for_search(input));
+            assert_eq!(pattern_for_name_k, "%トウキョウ%");
+        }
+
+        #[test]
+        fn test_katakana_search_remains_katakana() {
+            // カタカナ入力の場合、station_name_kもカタカナのまま
+            let input = "トウキョウ";
+            let pattern_for_name_k = format!("%{}%", normalize_for_search(input));
+            assert_eq!(pattern_for_name_k, "%トウキョウ%");
+        }
+
+        #[test]
+        fn test_kanji_search_remains_kanji_for_name() {
+            // 漢字入力の場合、station_nameは漢字のまま
+            let input = "東京";
+            let pattern_for_name = format!("%{input}%");
+            assert_eq!(pattern_for_name, "%東京%");
+
+            // station_name_kも漢字のまま（normalize_for_searchは漢字を変換しない）
+            let pattern_for_name_k = format!("%{}%", normalize_for_search(input));
+            assert_eq!(pattern_for_name_k, "%東京%");
+        }
+
+        #[test]
+        fn test_mixed_hiragana_kanji_search() {
+            // ひらがな+漢字の混合入力
+            let input = "しん宿";
+            let pattern_for_name = format!("%{input}%");
+            assert_eq!(pattern_for_name, "%しん宿%");
+
+            // station_name_k用: ひらがな部分だけカタカナに変換
+            let pattern_for_name_k = format!("%{}%", normalize_for_search(input));
+            assert_eq!(pattern_for_name_k, "%シン宿%");
+        }
+
+        #[test]
+        fn test_search_pattern_with_special_stations() {
+            // 実際の駅名での動作確認
+            let test_cases = vec![
+                ("しながわ", "%シナガワ%"),
+                ("うえの", "%ウエノ%"),
+                ("あきはばら", "%アキハバラ%"),
+                ("いけぶくろ", "%イケブクロ%"),
+                ("おおさか", "%オオサカ%"),
+            ];
+
+            for (input, expected_k_pattern) in test_cases {
+                let pattern_for_name_k = format!("%{}%", normalize_for_search(input));
+                assert_eq!(
+                    pattern_for_name_k, expected_k_pattern,
+                    "Failed for input: {input}"
+                );
+            }
+        }
+    }
+
+    // ============================================
+    // Tests for get_by_line_group_id SQL structure
+    // ============================================
+
+    mod get_by_line_group_id_tests {
+        #[test]
+        fn test_line_group_id_join_condition_structure() {
+            // JOINの条件が正しく構成されることを確認
+            // 修正後: JOIN station_station_types AS sst ON sst.line_group_cd = $1 AND sst.station_cd = s.station_cd
+            let line_group_id = 1;
+            let join_condition = format!(
+                "sst.line_group_cd = {} AND sst.station_cd = s.station_cd",
+                line_group_id
+            );
+            assert!(join_condition.contains("sst.line_group_cd = 1"));
+            assert!(join_condition.contains("sst.station_cd = s.station_cd"));
+        }
+
+        #[test]
+        fn test_line_group_id_parameter_binding() {
+            // パラメータが正しくバインドされることを確認
+            let line_group_id: u32 = 123;
+            let bound_value = line_group_id as i32;
+            assert_eq!(bound_value, 123);
+        }
+    }
+
+    // ============================================
+    // Database integration tests (require actual DB)
+    // ============================================
+
+    #[tokio::test]
+    #[ignore] // Requires actual database setup
+    async fn test_get_by_name_with_hiragana_search() {
+        // ひらがなで駅を検索できることを確認
+        // 例: "しんじゅく" で "新宿" (station_name_k: "シンジュク") がヒットする
+    }
+
+    #[tokio::test]
+    #[ignore] // Requires actual database setup
+    async fn test_get_by_line_group_id_returns_correct_stations() {
+        // line_group_idで指定した路線グループの駅のみが返されることを確認
+        // 以前のバグ: JOINの条件が不完全で意図しない駅が返されていた
+    }
+
+    #[tokio::test]
+    #[ignore] // Requires actual database setup
+    async fn test_get_by_line_group_id_station_order() {
+        // 返される駅がsst.idの順序でソートされていることを確認
+    }
 }

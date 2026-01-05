@@ -1522,4 +1522,131 @@ mod tests {
 
         cleanup_test_data(&repository.pool).await;
     }
+
+    // ============================================
+    // Tests for find_by_station_id optional fields
+    // (line_group_cd and type_cd are now optional)
+    // ============================================
+
+    #[tokio::test]
+    async fn test_line_row_with_optional_line_group_cd_none() {
+        // line_group_cdがNoneの場合（station_station_typesにマッチしない駅）
+        let line_row = LineRow {
+            line_cd: 1,
+            company_cd: 1,
+            line_type: Some(1),
+            line_name: Some("Test Line".to_string()),
+            line_name_k: Some("テストライン".to_string()),
+            line_name_h: Some("テストライン".to_string()),
+            line_name_r: Some("Test Line".to_string()),
+            line_name_zh: None,
+            line_name_ko: None,
+            line_color_c: Some("#FF0000".to_string()),
+            line_symbol1: None,
+            line_symbol2: None,
+            line_symbol3: None,
+            line_symbol4: None,
+            line_symbol1_color: None,
+            line_symbol2_color: None,
+            line_symbol3_color: None,
+            line_symbol4_color: None,
+            line_symbol1_shape: None,
+            line_symbol2_shape: None,
+            line_symbol3_shape: None,
+            line_symbol4_shape: None,
+            e_status: 0,
+            e_sort: 1,
+            average_distance: Some(1.5),
+            line_group_cd: None, // 重要: オプショナルでNone
+            station_cd: Some(101),
+            station_g_cd: Some(201),
+            type_cd: None, // 重要: オプショナルでNone
+            transport_type: Some(0),
+        };
+
+        let line: Line = line_row.into();
+
+        assert_eq!(line.line_cd, 1);
+        assert_eq!(line.station_cd, Some(101));
+        assert_eq!(line.station_g_cd, Some(201));
+        assert_eq!(line.line_group_cd, None);
+        assert_eq!(line.type_cd, None);
+    }
+
+    #[tokio::test]
+    async fn test_line_row_with_optional_line_group_cd_some() {
+        // line_group_cdがSomeの場合（station_station_typesにマッチする駅）
+        let line_row = LineRow {
+            line_cd: 1,
+            company_cd: 1,
+            line_type: Some(1),
+            line_name: Some("Test Line".to_string()),
+            line_name_k: Some("テストライン".to_string()),
+            line_name_h: Some("テストライン".to_string()),
+            line_name_r: Some("Test Line".to_string()),
+            line_name_zh: None,
+            line_name_ko: None,
+            line_color_c: Some("#FF0000".to_string()),
+            line_symbol1: None,
+            line_symbol2: None,
+            line_symbol3: None,
+            line_symbol4: None,
+            line_symbol1_color: None,
+            line_symbol2_color: None,
+            line_symbol3_color: None,
+            line_symbol4_color: None,
+            line_symbol1_shape: None,
+            line_symbol2_shape: None,
+            line_symbol3_shape: None,
+            line_symbol4_shape: None,
+            e_status: 0,
+            e_sort: 1,
+            average_distance: Some(1.5),
+            line_group_cd: Some(301), // 重要: オプショナルでSome
+            station_cd: Some(101),
+            station_g_cd: Some(201),
+            type_cd: Some(1), // 重要: オプショナルでSome
+            transport_type: Some(0),
+        };
+
+        let line: Line = line_row.into();
+
+        assert_eq!(line.line_cd, 1);
+        assert_eq!(line.station_cd, Some(101));
+        assert_eq!(line.station_g_cd, Some(201));
+        assert_eq!(line.line_group_cd, Some(301));
+        assert_eq!(line.type_cd, Some(1));
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_find_by_station_id_without_station_station_types() {
+        // station_station_typesにエントリがない駅でもfind_by_station_idが動作することを確認
+        let pool = setup_test_db().await;
+
+        // テストデータをセットアップ（station_station_typesにエントリがない駅を追加）
+        setup_test_data(&pool).await;
+
+        // station_station_typesにエントリがない駅を追加
+        sqlx::query(
+            "INSERT INTO stations (station_cd, station_g_cd, line_cd, e_status) VALUES (200, 300, 1, 0)"
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let mut conn = pool.acquire().await.unwrap();
+        let result = InternalLineRepository::find_by_station_id(200, &mut conn).await;
+
+        assert!(result.is_ok());
+        let line = result.unwrap();
+        // LEFT JOINなので駅は見つかるが、line_group_cdとtype_cdはNone
+        if let Some(line) = line {
+            assert_eq!(line.station_cd, Some(200));
+            assert_eq!(line.line_group_cd, None);
+            assert_eq!(line.type_cd, None);
+        }
+
+        cleanup_test_data(&pool).await;
+    }
 }
