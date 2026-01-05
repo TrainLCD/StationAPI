@@ -618,8 +618,7 @@ where
                 .map(|row| {
                     let extracted_line = self.extract_line_from_station(row);
 
-                    if let Some(tt_line) = tt_line_map.get(&row.line_cd).copied()
-                    {
+                    if let Some(tt_line) = tt_line_map.get(&row.line_cd).copied() {
                         let train_type = match row.type_id.is_some() {
                             true => {
                                 // Filter lines to only include those with matching line_group_cd
