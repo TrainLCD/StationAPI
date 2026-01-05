@@ -202,7 +202,7 @@ where
         let stations = self
             .station_repository
             .get_by_name(
-                normalize_for_search(&station_name),
+                station_name,
                 limit,
                 from_station_group_id,
                 filter_to_db_type(transport_type),

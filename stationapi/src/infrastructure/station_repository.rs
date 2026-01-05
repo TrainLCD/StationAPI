@@ -6,6 +6,7 @@ use crate::{
     domain::{
         entity::{gtfs::TransportType, station::Station},
         error::DomainError,
+        normalize::normalize_for_search,
         repository::station_repository::StationRepository,
     },
     proto::StopCondition,
@@ -1005,7 +1006,10 @@ impl InternalStationRepository {
         transport_type: Option<TransportType>,
         conn: &mut PgConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let station_name = &(format!("%{station_name}%"));
+        // 元の入力用パターン（漢字・その他）
+        let station_name_pattern = &(format!("%{station_name}%"));
+        // カタカナ検索用に正規化されたパターン（ひらがな→カタカナ変換）
+        let station_name_k_pattern = &(format!("%{}%", normalize_for_search(&station_name)));
         let limit = limit.map(|v| v as i64);
         let from_station_group_id = from_station_group_id.map(|id| id as i32);
         let transport_type_value: Option<i32> = transport_type.map(|t| t as i32);
@@ -1127,11 +1131,11 @@ impl InternalStationRepository {
             ORDER BY station_g_cd, station_name
             LIMIT $7"#,
             from_station_group_id,
-            station_name,
-            station_name,
-            station_name,
-            station_name,
-            station_name,
+            station_name_pattern,
+            station_name_pattern,
+            station_name_k_pattern, // station_name_k用には正規化されたパターンを使用
+            station_name_pattern,
+            station_name_pattern,
             limit,
             transport_type_value
         )
