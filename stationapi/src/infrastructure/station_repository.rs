@@ -1215,14 +1215,12 @@ impl InternalStationRepository {
             s.transport_type
           FROM stations AS s
           JOIN lines AS l ON l.line_cd = s.line_cd AND l.e_status = 0
-          LEFT JOIN station_station_types AS sst ON sst.line_group_cd = $1
-          LEFT JOIN types AS t ON t.type_cd = sst.type_cd
+          JOIN station_station_types AS sst ON sst.line_group_cd = $1 AND sst.station_cd = s.station_cd
+          JOIN types AS t ON t.type_cd = sst.type_cd
           LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
           LEFT JOIN aliases AS a ON a.id = la.alias_cd
           WHERE
-            s.line_cd = l.line_cd
-            AND s.station_cd = sst.station_cd
-            AND s.e_status = 0
+            s.e_status = 0
           ORDER BY sst.id"#,
             line_group_id as i32
         )
