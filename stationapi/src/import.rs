@@ -324,8 +324,6 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
     // Import feed_info
     import_gtfs_feed_info(&mut tx, gtfs_path).await?;
 
-    sqlx::query("ANALYZE;").execute(&mut *tx).await?;
-
     // Commit transaction - all changes are now permanent
     tx.commit().await?;
 
