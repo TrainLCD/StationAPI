@@ -67,22 +67,32 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("Failed to import CSV: {}", e));
     }
 
-    // Import GTFS data (ToeiBus)
-    if let Err(e) = import::import_gtfs().await {
-        warn!(
-            "Failed to import GTFS data: {}. Continuing without GTFS data.",
-            e
-        );
-    }
+    // GTFS import is now done in background after server starts
+    // This allows the server to pass health checks quickly
+    tokio::spawn(async {
+        info!("Starting GTFS import in background...");
 
-    // Integrate GTFS data into stations/lines tables
-    // This is wrapped in a transaction - if any step fails, all changes are rolled back
-    if let Err(e) = import::integrate_gtfs_to_stations().await {
-        return Err(anyhow::anyhow!(
-            "Failed to integrate GTFS to stations (transaction rolled back): {}",
-            e
-        ));
-    }
+        // Import GTFS data (ToeiBus)
+        if let Err(e) = import::import_gtfs().await {
+            warn!(
+                "Failed to import GTFS data: {}. Continuing without GTFS data.",
+                e
+            );
+            return;
+        }
+
+        // Integrate GTFS data into stations/lines tables
+        // This is wrapped in a transaction - if any step fails, all changes are rolled back
+        if let Err(e) = import::integrate_gtfs_to_stations().await {
+            tracing::error!(
+                "Failed to integrate GTFS to stations (transaction rolled back): {}",
+                e
+            );
+            return;
+        }
+
+        info!("GTFS import completed in background.");
+    });
 
     let db_url = &fetch_database_url();
     let pool = Arc::new(

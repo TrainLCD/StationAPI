@@ -132,10 +132,7 @@ pub async fn import_csv() -> Result<(), Box<dyn std::error::Error>> {
                     } else if col == "DEFAULT" {
                         Some("DEFAULT".to_string())
                     } else {
-                        Some(format!(
-                            "'{}'",
-                            col.replace('\'', "''").replace('\\', "\\\\")
-                        ))
+                        Some(format!("'{}'", escape_sql_string(col)))
                     }
                 })
                 .collect();
@@ -236,6 +233,7 @@ fn download_gtfs() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 
 /// Import GTFS data from ToeiBus-GTFS directory
+/// All imports are wrapped in a transaction - if any step fails, all changes are rolled back
 pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
     // Check if bus feature is disabled
     if is_bus_feature_disabled() {
@@ -256,73 +254,82 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    // Load translations for multi-language support (before transaction to avoid holding lock)
+    let translations = load_gtfs_translations(gtfs_path)?;
+
     let db_url = fetch_database_url();
     let mut conn = PgConnection::connect(&db_url).await?;
 
-    info!("Starting GTFS import from {:?}...", gtfs_path);
+    info!(
+        "Starting GTFS import from {:?} (using transaction)...",
+        gtfs_path
+    );
+
+    // Begin transaction - all changes will be rolled back if any step fails
+    let mut tx = conn.begin().await?;
 
     // First, clear existing GTFS data (in reverse order of dependencies)
     sqlx::query("DELETE FROM gtfs_stop_times")
-        .execute(&mut conn)
+        .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM gtfs_trips")
-        .execute(&mut conn)
+        .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM gtfs_shapes")
-        .execute(&mut conn)
+        .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM gtfs_calendar_dates")
-        .execute(&mut conn)
+        .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM gtfs_calendar")
-        .execute(&mut conn)
+        .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM gtfs_stops")
-        .execute(&mut conn)
+        .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM gtfs_routes")
-        .execute(&mut conn)
+        .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM gtfs_agencies")
-        .execute(&mut conn)
+        .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM gtfs_feed_info")
-        .execute(&mut conn)
+        .execute(&mut *tx)
         .await?;
 
-    // Load translations for multi-language support
-    let translations = load_gtfs_translations(gtfs_path)?;
-
     // Import agencies
-    import_gtfs_agencies(&mut conn, gtfs_path).await?;
+    import_gtfs_agencies(&mut tx, gtfs_path).await?;
 
     // Import routes
-    import_gtfs_routes(&mut conn, gtfs_path).await?;
+    import_gtfs_routes(&mut tx, gtfs_path).await?;
 
     // Import stops with translations
-    import_gtfs_stops(&mut conn, gtfs_path, &translations).await?;
+    import_gtfs_stops(&mut tx, gtfs_path, &translations).await?;
 
     // Import calendar
-    import_gtfs_calendar(&mut conn, gtfs_path).await?;
+    import_gtfs_calendar(&mut tx, gtfs_path).await?;
 
     // Import calendar_dates
-    import_gtfs_calendar_dates(&mut conn, gtfs_path).await?;
+    import_gtfs_calendar_dates(&mut tx, gtfs_path).await?;
 
     // Import shapes
-    import_gtfs_shapes(&mut conn, gtfs_path).await?;
+    import_gtfs_shapes(&mut tx, gtfs_path).await?;
 
     // Import trips
-    import_gtfs_trips(&mut conn, gtfs_path).await?;
+    import_gtfs_trips(&mut tx, gtfs_path).await?;
 
     // Import stop_times (largest file, needs batch processing)
-    import_gtfs_stop_times(&mut conn, gtfs_path).await?;
+    import_gtfs_stop_times(&mut tx, gtfs_path).await?;
 
     // Import feed_info
-    import_gtfs_feed_info(&mut conn, gtfs_path).await?;
+    import_gtfs_feed_info(&mut tx, gtfs_path).await?;
 
-    sqlx::query("ANALYZE;").execute(&mut conn).await?;
+    sqlx::query("ANALYZE;").execute(&mut *tx).await?;
 
-    info!("GTFS import completed successfully.");
+    // Commit transaction - all changes are now permanent
+    tx.commit().await?;
+
+    info!("GTFS import completed successfully (transaction committed).");
 
     Ok(())
 }
@@ -500,6 +507,27 @@ async fn import_gtfs_routes(
     Ok(())
 }
 
+/// Type alias for GTFS stops batch row
+type StopBatchRow = (
+    String,         // stop_id
+    Option<String>, // stop_code
+    String,         // stop_name
+    Option<String>, // stop_name_k
+    Option<String>, // stop_name_r
+    Option<String>, // stop_name_zh
+    Option<String>, // stop_name_ko
+    Option<String>, // stop_desc
+    f64,            // stop_lat
+    f64,            // stop_lon
+    Option<String>, // zone_id
+    Option<String>, // stop_url
+    i32,            // location_type
+    Option<String>, // parent_station
+    Option<String>, // stop_timezone
+    Option<i32>,    // wheelchair_boarding
+    Option<String>, // platform_code
+);
+
 /// Import stops from stops.txt with translations
 async fn import_gtfs_stops(
     conn: &mut PgConnection,
@@ -513,30 +541,52 @@ async fn import_gtfs_stops(
     }
 
     let mut rdr = ReaderBuilder::new().from_path(&stops_path)?;
+    let mut batch: Vec<StopBatchRow> = Vec::new();
+    let batch_size = 500;
     let mut count = 0;
 
     for result in rdr.records() {
         let record = result?;
-        // stop_id,stop_code,stop_name,stop_desc,stop_lat,stop_lon,zone_id,stop_url,location_type,parent_station,stop_timezone,wheelchair_boarding,platform_code,stop_access
-        let stop_id = record.get(0).unwrap_or("");
-        let stop_code = record.get(1).filter(|s| !s.is_empty());
-        let stop_name = record.get(2).unwrap_or("");
-        let stop_desc = record.get(3).filter(|s| !s.is_empty());
+        let stop_id = record.get(0).unwrap_or("").to_string();
+        let stop_code = record
+            .get(1)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+        let stop_name = record.get(2).unwrap_or("").to_string();
+        let stop_desc = record
+            .get(3)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
         let stop_lat: f64 = record.get(4).unwrap_or("0").parse().unwrap_or(0.0);
         let stop_lon: f64 = record.get(5).unwrap_or("0").parse().unwrap_or(0.0);
-        let zone_id = record.get(6).filter(|s| !s.is_empty());
-        let stop_url = record.get(7).filter(|s| !s.is_empty());
+        let zone_id = record
+            .get(6)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+        let stop_url = record
+            .get(7)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
         let location_type: i32 = record.get(8).unwrap_or("0").parse().unwrap_or(0);
-        let parent_station = record.get(9).filter(|s| !s.is_empty());
-        let stop_timezone = record.get(10).filter(|s| !s.is_empty());
+        let parent_station = record
+            .get(9)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+        let stop_timezone = record
+            .get(10)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
         let wheelchair_boarding: Option<i32> = record
             .get(11)
             .filter(|s| !s.is_empty())
             .and_then(|s| s.parse().ok());
-        let platform_code = record.get(12).filter(|s| !s.is_empty());
+        let platform_code = record
+            .get(12)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
 
-        // Get translations (keyed by both child stop ID and parent stop ID)
-        let key = ("stops".to_string(), stop_id.to_string());
+        // Get translations
+        let key = ("stops".to_string(), stop_id.clone());
         let translation = translations.get(&key);
 
         let stop_name_k = translation.and_then(|t| t.ja_hrkt.clone());
@@ -544,38 +594,112 @@ async fn import_gtfs_stops(
         let stop_name_zh = translation.and_then(|t| t.zh.clone());
         let stop_name_ko = translation.and_then(|t| t.ko.clone());
 
-        sqlx::query(
-            r#"INSERT INTO gtfs_stops
-               (stop_id, stop_code, stop_name, stop_name_k, stop_name_r, stop_name_zh, stop_name_ko,
-                stop_desc, stop_lat, stop_lon, zone_id, stop_url, location_type, parent_station,
-                stop_timezone, wheelchair_boarding, platform_code)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-               ON CONFLICT (stop_id) DO NOTHING"#,
-        )
-        .bind(stop_id)
-        .bind(stop_code)
-        .bind(stop_name)
-        .bind(stop_name_k)
-        .bind(stop_name_r)
-        .bind(stop_name_zh)
-        .bind(stop_name_ko)
-        .bind(stop_desc)
-        .bind(stop_lat)
-        .bind(stop_lon)
-        .bind(zone_id)
-        .bind(stop_url)
-        .bind(location_type)
-        .bind(parent_station)
-        .bind(stop_timezone)
-        .bind(wheelchair_boarding)
-        .bind(platform_code)
-        .execute(&mut *conn)
-        .await?;
+        batch.push((
+            stop_id,
+            stop_code,
+            stop_name,
+            stop_name_k,
+            stop_name_r,
+            stop_name_zh,
+            stop_name_ko,
+            stop_desc,
+            stop_lat,
+            stop_lon,
+            zone_id,
+            stop_url,
+            location_type,
+            parent_station,
+            stop_timezone,
+            wheelchair_boarding,
+            platform_code,
+        ));
 
-        count += 1;
+        if batch.len() >= batch_size {
+            insert_stops_batch(&mut *conn, &batch).await?;
+            count += batch.len();
+            batch.clear();
+        }
+    }
+
+    // Insert remaining
+    if !batch.is_empty() {
+        insert_stops_batch(&mut *conn, &batch).await?;
+        count += batch.len();
     }
 
     info!("Imported {} stops.", count);
+    Ok(())
+}
+
+async fn insert_stops_batch(
+    conn: &mut PgConnection,
+    batch: &[StopBatchRow],
+) -> Result<(), Box<dyn std::error::Error>> {
+    if batch.is_empty() {
+        return Ok(());
+    }
+
+    let mut sql = String::from(
+        "INSERT INTO gtfs_stops (stop_id, stop_code, stop_name, stop_name_k, stop_name_r, stop_name_zh, stop_name_ko, stop_desc, stop_lat, stop_lon, zone_id, stop_url, location_type, parent_station, stop_timezone, wheelchair_boarding, platform_code) VALUES ",
+    );
+    let mut values: Vec<String> = Vec::new();
+
+    for (
+        stop_id,
+        stop_code,
+        stop_name,
+        stop_name_k,
+        stop_name_r,
+        stop_name_zh,
+        stop_name_ko,
+        stop_desc,
+        stop_lat,
+        stop_lon,
+        zone_id,
+        stop_url,
+        location_type,
+        parent_station,
+        stop_timezone,
+        wheelchair_boarding,
+        platform_code,
+    ) in batch
+    {
+        let opt_str = |o: &Option<String>| {
+            o.as_ref()
+                .map(|s| format!("'{}'", escape_sql_string(s)))
+                .unwrap_or_else(|| "NULL".to_string())
+        };
+        let opt_int = |o: &Option<i32>| {
+            o.map(|v| v.to_string())
+                .unwrap_or_else(|| "NULL".to_string())
+        };
+
+        values.push(format!(
+            "('{}', {}, '{}', {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})",
+            escape_sql_string(stop_id),
+            opt_str(stop_code),
+            escape_sql_string(stop_name),
+            opt_str(stop_name_k),
+            opt_str(stop_name_r),
+            opt_str(stop_name_zh),
+            opt_str(stop_name_ko),
+            opt_str(stop_desc),
+            stop_lat,
+            stop_lon,
+            opt_str(zone_id),
+            opt_str(stop_url),
+            location_type,
+            opt_str(parent_station),
+            opt_str(stop_timezone),
+            opt_int(wheelchair_boarding),
+            opt_str(platform_code),
+        ));
+    }
+
+    sql.push_str(&values.join(","));
+    sql.push_str(" ON CONFLICT (stop_id) DO NOTHING");
+    sqlx::query(&sql).execute(&mut *conn).await?;
+
     Ok(())
 }
 
@@ -646,31 +770,60 @@ async fn import_gtfs_calendar_dates(
     }
 
     let mut rdr = ReaderBuilder::new().from_path(&calendar_dates_path)?;
+    let mut batch: Vec<(String, String, i32)> = Vec::new();
+    let batch_size = 1000;
     let mut count = 0;
 
     for result in rdr.records() {
         let record = result?;
-        // service_id,date,exception_type
-        let service_id = record.get(0).unwrap_or("");
-        let date = record.get(1).unwrap_or("");
+        let service_id = record.get(0).unwrap_or("").to_string();
+        let date = record.get(1).unwrap_or("").to_string();
         let exception_type: i32 = record.get(2).unwrap_or("1").parse().unwrap_or(1);
 
-        let date = chrono::NaiveDate::parse_from_str(date, "%Y%m%d")?;
+        batch.push((service_id, date, exception_type));
 
-        sqlx::query(
-            r#"INSERT INTO gtfs_calendar_dates (service_id, date, exception_type)
-               VALUES ($1, $2, $3)"#,
-        )
-        .bind(service_id)
-        .bind(date)
-        .bind(exception_type)
-        .execute(&mut *conn)
-        .await?;
+        if batch.len() >= batch_size {
+            insert_calendar_dates_batch(&mut *conn, &batch).await?;
+            count += batch.len();
+            batch.clear();
+        }
+    }
 
-        count += 1;
+    if !batch.is_empty() {
+        insert_calendar_dates_batch(&mut *conn, &batch).await?;
+        count += batch.len();
     }
 
     info!("Imported {} calendar_dates.", count);
+    Ok(())
+}
+
+async fn insert_calendar_dates_batch(
+    conn: &mut PgConnection,
+    batch: &[(String, String, i32)],
+) -> Result<(), Box<dyn std::error::Error>> {
+    if batch.is_empty() {
+        return Ok(());
+    }
+
+    let mut sql =
+        String::from("INSERT INTO gtfs_calendar_dates (service_id, date, exception_type) VALUES ");
+    let mut values: Vec<String> = Vec::new();
+
+    for (service_id, date, exception_type) in batch {
+        // Parse and format date
+        let parsed_date = chrono::NaiveDate::parse_from_str(date, "%Y%m%d")?;
+        values.push(format!(
+            "('{}', '{}', {})",
+            escape_sql_string(service_id),
+            parsed_date,
+            exception_type
+        ));
+    }
+
+    sql.push_str(&values.join(","));
+    sqlx::query(&sql).execute(&mut *conn).await?;
+
     Ok(())
 }
 
@@ -741,7 +894,7 @@ async fn insert_shapes_batch(
         let dist_str = dist.map_or("NULL".to_string(), |d| d.to_string());
         values.push(format!(
             "('{}', {}, {}, {}, {})",
-            shape_id.replace('\'', "''"),
+            escape_sql_string(shape_id),
             lat,
             lon,
             seq,
@@ -878,22 +1031,22 @@ async fn insert_trips_batch(
     {
         let headsign_str = trip_headsign
             .as_ref()
-            .map(|s| format!("'{}'", s.replace('\'', "''")))
+            .map(|s| format!("'{}'", escape_sql_string(s)))
             .unwrap_or_else(|| "NULL".to_string());
         let short_name_str = trip_short_name
             .as_ref()
-            .map(|s| format!("'{}'", s.replace('\'', "''")))
+            .map(|s| format!("'{}'", escape_sql_string(s)))
             .unwrap_or_else(|| "NULL".to_string());
         let direction_str = direction_id
             .map(|v| v.to_string())
             .unwrap_or_else(|| "NULL".to_string());
         let block_str = block_id
             .as_ref()
-            .map(|s| format!("'{}'", s.replace('\'', "''")))
+            .map(|s| format!("'{}'", escape_sql_string(s)))
             .unwrap_or_else(|| "NULL".to_string());
         let shape_str = shape_id
             .as_ref()
-            .map(|s| format!("'{}'", s.replace('\'', "''")))
+            .map(|s| format!("'{}'", escape_sql_string(s)))
             .unwrap_or_else(|| "NULL".to_string());
         let wheelchair_str = wheelchair_accessible
             .map(|v| v.to_string())
@@ -904,9 +1057,9 @@ async fn insert_trips_batch(
 
         values.push(format!(
             "('{}', '{}', '{}', {}, {}, {}, {}, {}, {}, {})",
-            trip_id.replace('\'', "''"),
-            route_id.replace('\'', "''"),
-            service_id.replace('\'', "''"),
+            escape_sql_string(trip_id),
+            escape_sql_string(route_id),
+            escape_sql_string(service_id),
             headsign_str,
             short_name_str,
             direction_str,
@@ -1074,7 +1227,7 @@ async fn insert_stop_times_batch(
             .unwrap_or_else(|| "NULL".to_string());
         let headsign_str = stop_headsign
             .as_ref()
-            .map(|s| format!("'{}'", s.replace('\'', "''")))
+            .map(|s| format!("'{}'", escape_sql_string(s)))
             .unwrap_or_else(|| "NULL".to_string());
         let pickup_str = pickup_type
             .map(|v| v.to_string())
@@ -1091,10 +1244,10 @@ async fn insert_stop_times_batch(
 
         values.push(format!(
             "('{}', {}, {}, '{}', {}, {}, {}, {}, {}, {})",
-            trip_id.replace('\'', "''"),
+            escape_sql_string(trip_id),
             arrival_str,
             departure_str,
-            stop_id.replace('\'', "''"),
+            escape_sql_string(stop_id),
             stop_sequence,
             headsign_str,
             pickup_str,
@@ -1176,6 +1329,12 @@ fn is_bus_feature_disabled() -> bool {
 // ============================================================
 // GTFS to Stations/Lines Integration
 // ============================================================
+
+/// Escape a string for safe inclusion in SQL queries.
+/// Escapes backslashes first, then single quotes, matching PostgreSQL string literal syntax.
+fn escape_sql_string(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('\'', "''")
+}
 
 /// Convert hiragana characters to katakana
 /// Hiragana range: U+3041 to U+3096
@@ -1807,4 +1966,169 @@ async fn update_gtfs_crossreferences(
 
     info!("Updated GTFS cross-references.");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_gtfs_time_valid() {
+        assert_eq!(parse_gtfs_time("08:30:00"), Some("08:30:00".to_string()));
+        assert_eq!(parse_gtfs_time("23:59:59"), Some("23:59:59".to_string()));
+        // GTFS allows times > 24:00:00 for trips past midnight
+        assert_eq!(parse_gtfs_time("25:30:00"), Some("25:30:00".to_string()));
+        assert_eq!(parse_gtfs_time("00:00:00"), Some("00:00:00".to_string()));
+    }
+
+    #[test]
+    fn test_parse_gtfs_time_invalid() {
+        assert_eq!(parse_gtfs_time(""), None);
+        assert_eq!(parse_gtfs_time("invalid"), None);
+        assert_eq!(parse_gtfs_time("08:30"), None);
+        assert_eq!(parse_gtfs_time("08:30:00:00"), None);
+        assert_eq!(parse_gtfs_time("aa:bb:cc"), None);
+    }
+
+    #[test]
+    fn test_hiragana_to_katakana() {
+        assert_eq!(hiragana_to_katakana("あいうえお"), "アイウエオ");
+        assert_eq!(hiragana_to_katakana("かきくけこ"), "カキクケコ");
+        assert_eq!(hiragana_to_katakana("しんじゅく"), "シンジュク");
+        // Mixed content
+        assert_eq!(hiragana_to_katakana("東京えき"), "東京エキ");
+        // Already katakana - should remain unchanged
+        assert_eq!(hiragana_to_katakana("アイウエオ"), "アイウエオ");
+        // ASCII - should remain unchanged
+        assert_eq!(hiragana_to_katakana("abc123"), "abc123");
+    }
+
+    #[test]
+    fn test_fnv1a_hash_deterministic() {
+        // Same input should always produce same output
+        let hash1 = fnv1a_hash(b"test");
+        let hash2 = fnv1a_hash(b"test");
+        assert_eq!(hash1, hash2);
+
+        // Different inputs should produce different outputs
+        let hash3 = fnv1a_hash(b"test2");
+        assert_ne!(hash1, hash3);
+    }
+
+    #[test]
+    fn test_fnv1a_hash_known_values() {
+        // Empty string
+        assert_eq!(fnv1a_hash(b""), 0xcbf29ce484222325);
+        // Known FNV-1a test vectors
+        assert_eq!(fnv1a_hash(b"a"), 0xaf63dc4c8601ec8c);
+    }
+
+    #[test]
+    fn test_generate_bus_line_cd() {
+        let line_cd = generate_bus_line_cd("route_001");
+        // Should be in range 100,000,000 to 109,999,999
+        assert!(line_cd >= 100_000_000);
+        assert!(line_cd < 110_000_000);
+
+        // Should be deterministic
+        let line_cd2 = generate_bus_line_cd("route_001");
+        assert_eq!(line_cd, line_cd2);
+
+        // Different route_id should produce different line_cd
+        let line_cd3 = generate_bus_line_cd("route_002");
+        assert_ne!(line_cd, line_cd3);
+    }
+
+    #[test]
+    fn test_generate_bus_station_cd() {
+        let station_cd = generate_bus_station_cd("stop_001", "route_001");
+        // Should be in range 200,000,000 to 299,999,999
+        assert!(station_cd >= 200_000_000);
+        assert!(station_cd < 300_000_000);
+
+        // Should be deterministic
+        let station_cd2 = generate_bus_station_cd("stop_001", "route_001");
+        assert_eq!(station_cd, station_cd2);
+
+        // Different stop_id or route_id should produce different station_cd
+        let station_cd3 = generate_bus_station_cd("stop_002", "route_001");
+        assert_ne!(station_cd, station_cd3);
+
+        let station_cd4 = generate_bus_station_cd("stop_001", "route_002");
+        assert_ne!(station_cd, station_cd4);
+    }
+
+    #[test]
+    fn test_generate_bus_station_g_cd() {
+        let station_g_cd = generate_bus_station_g_cd("stop_001");
+        // Should be in range 200,000,000 to 299,999,999
+        assert!(station_g_cd >= 200_000_000);
+        assert!(station_g_cd < 300_000_000);
+
+        // Should be deterministic
+        let station_g_cd2 = generate_bus_station_g_cd("stop_001");
+        assert_eq!(station_g_cd, station_g_cd2);
+
+        // Same stop_id on different routes should have same station_g_cd
+        // (station_g_cd is only based on stop_id, not route_id)
+        let station_cd_route1 = generate_bus_station_cd("stop_001", "route_001");
+        let station_cd_route2 = generate_bus_station_cd("stop_001", "route_002");
+        assert_ne!(station_cd_route1, station_cd_route2); // station_cd differs
+                                                          // but station_g_cd is the same for both
+        assert_eq!(
+            generate_bus_station_g_cd("stop_001"),
+            generate_bus_station_g_cd("stop_001")
+        );
+    }
+
+    #[test]
+    fn test_is_bus_feature_disabled() {
+        // This test depends on environment variable, so we just verify it doesn't panic
+        let _ = is_bus_feature_disabled();
+    }
+
+    #[test]
+    fn test_escape_sql_string_single_quotes() {
+        // Single quotes should be doubled
+        assert_eq!(escape_sql_string("O'Brien"), "O''Brien");
+        assert_eq!(escape_sql_string("It's"), "It''s");
+        assert_eq!(escape_sql_string("''"), "''''");
+        assert_eq!(escape_sql_string("a'b'c"), "a''b''c");
+    }
+
+    #[test]
+    fn test_escape_sql_string_backslashes() {
+        // Backslashes should be doubled
+        assert_eq!(escape_sql_string(r"a\b"), r"a\\b");
+        assert_eq!(escape_sql_string(r"\\"), r"\\\\");
+        assert_eq!(escape_sql_string(r"path\to\file"), r"path\\to\\file");
+    }
+
+    #[test]
+    fn test_escape_sql_string_combined() {
+        // Both single quotes and backslashes
+        assert_eq!(escape_sql_string(r"O'Brien\path"), r"O''Brien\\path");
+        assert_eq!(escape_sql_string(r"\'"), r"\\''");
+        // Order matters: backslash first, then single quote
+        // Input: \' -> after backslash escape: \\' -> after quote escape: \\''
+        assert_eq!(escape_sql_string(r"test\'value"), r"test\\''value");
+    }
+
+    #[test]
+    fn test_escape_sql_string_no_escaping_needed() {
+        // Strings without special characters should remain unchanged
+        assert_eq!(escape_sql_string("hello"), "hello");
+        assert_eq!(escape_sql_string("東京駅"), "東京駅");
+        assert_eq!(escape_sql_string("abc123"), "abc123");
+        assert_eq!(escape_sql_string(""), "");
+    }
+
+    #[test]
+    fn test_escape_sql_string_unicode() {
+        // Unicode characters should pass through unchanged
+        assert_eq!(escape_sql_string("新宿駅"), "新宿駅");
+        assert_eq!(escape_sql_string("カタカナ"), "カタカナ");
+        // But special chars in unicode strings should still be escaped
+        assert_eq!(escape_sql_string("新宿'駅"), "新宿''駅");
+    }
 }
