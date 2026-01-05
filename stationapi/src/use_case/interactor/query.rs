@@ -974,8 +974,13 @@ where
         });
 
         // Build HashMap for O(1) bus stop lookup by line_cd
-        let bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> =
-            nearby_bus_stops.iter().map(|s| (s.line_cd, s)).collect();
+        // Deduplicate by line_cd, keeping the first (closest) bus stop for each line
+        let mut seen_bus_line_cds = std::collections::HashSet::new();
+        let bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> = nearby_bus_stops
+            .iter()
+            .filter(|s| seen_bus_line_cds.insert(s.line_cd))
+            .map(|s| (s.line_cd, s))
+            .collect();
 
         for line in bus_lines.iter_mut() {
             line.line_symbols = self.get_line_symbols(line);
