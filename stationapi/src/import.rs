@@ -301,31 +301,31 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Import agencies
-    import_gtfs_agencies(&mut *tx, gtfs_path).await?;
+    import_gtfs_agencies(&mut tx, gtfs_path).await?;
 
     // Import routes
-    import_gtfs_routes(&mut *tx, gtfs_path).await?;
+    import_gtfs_routes(&mut tx, gtfs_path).await?;
 
     // Import stops with translations
-    import_gtfs_stops(&mut *tx, gtfs_path, &translations).await?;
+    import_gtfs_stops(&mut tx, gtfs_path, &translations).await?;
 
     // Import calendar
-    import_gtfs_calendar(&mut *tx, gtfs_path).await?;
+    import_gtfs_calendar(&mut tx, gtfs_path).await?;
 
     // Import calendar_dates
-    import_gtfs_calendar_dates(&mut *tx, gtfs_path).await?;
+    import_gtfs_calendar_dates(&mut tx, gtfs_path).await?;
 
     // Import shapes
-    import_gtfs_shapes(&mut *tx, gtfs_path).await?;
+    import_gtfs_shapes(&mut tx, gtfs_path).await?;
 
     // Import trips
-    import_gtfs_trips(&mut *tx, gtfs_path).await?;
+    import_gtfs_trips(&mut tx, gtfs_path).await?;
 
     // Import stop_times (largest file, needs batch processing)
-    import_gtfs_stop_times(&mut *tx, gtfs_path).await?;
+    import_gtfs_stop_times(&mut tx, gtfs_path).await?;
 
     // Import feed_info
-    import_gtfs_feed_info(&mut *tx, gtfs_path).await?;
+    import_gtfs_feed_info(&mut tx, gtfs_path).await?;
 
     sqlx::query("ANALYZE;").execute(&mut *tx).await?;
 
