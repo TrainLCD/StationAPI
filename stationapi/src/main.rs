@@ -91,6 +91,21 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
             return;
         }
 
+        // Run ANALYZE after all GTFS imports are complete
+        let db_url = fetch_database_url();
+        match sqlx::PgConnection::connect(&db_url).await {
+            Ok(mut conn) => {
+                if let Err(e) = sqlx::query("ANALYZE;").execute(&mut conn).await {
+                    warn!("Failed to run ANALYZE: {}", e);
+                } else {
+                    info!("ANALYZE completed after GTFS import.");
+                }
+            }
+            Err(e) => {
+                warn!("Failed to connect for ANALYZE: {}", e);
+            }
+        }
+
         info!("GTFS import completed in background.");
     });
 
