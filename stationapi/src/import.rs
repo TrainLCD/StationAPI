@@ -1965,3 +1965,123 @@ async fn update_gtfs_crossreferences(
     info!("Updated GTFS cross-references.");
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_gtfs_time_valid() {
+        assert_eq!(parse_gtfs_time("08:30:00"), Some("08:30:00".to_string()));
+        assert_eq!(parse_gtfs_time("23:59:59"), Some("23:59:59".to_string()));
+        // GTFS allows times > 24:00:00 for trips past midnight
+        assert_eq!(parse_gtfs_time("25:30:00"), Some("25:30:00".to_string()));
+        assert_eq!(parse_gtfs_time("00:00:00"), Some("00:00:00".to_string()));
+    }
+
+    #[test]
+    fn test_parse_gtfs_time_invalid() {
+        assert_eq!(parse_gtfs_time(""), None);
+        assert_eq!(parse_gtfs_time("invalid"), None);
+        assert_eq!(parse_gtfs_time("08:30"), None);
+        assert_eq!(parse_gtfs_time("08:30:00:00"), None);
+        assert_eq!(parse_gtfs_time("aa:bb:cc"), None);
+    }
+
+    #[test]
+    fn test_hiragana_to_katakana() {
+        assert_eq!(hiragana_to_katakana("あいうえお"), "アイウエオ");
+        assert_eq!(hiragana_to_katakana("かきくけこ"), "カキクケコ");
+        assert_eq!(hiragana_to_katakana("しんじゅく"), "シンジュク");
+        // Mixed content
+        assert_eq!(hiragana_to_katakana("東京えき"), "東京エキ");
+        // Already katakana - should remain unchanged
+        assert_eq!(hiragana_to_katakana("アイウエオ"), "アイウエオ");
+        // ASCII - should remain unchanged
+        assert_eq!(hiragana_to_katakana("abc123"), "abc123");
+    }
+
+    #[test]
+    fn test_fnv1a_hash_deterministic() {
+        // Same input should always produce same output
+        let hash1 = fnv1a_hash(b"test");
+        let hash2 = fnv1a_hash(b"test");
+        assert_eq!(hash1, hash2);
+
+        // Different inputs should produce different outputs
+        let hash3 = fnv1a_hash(b"test2");
+        assert_ne!(hash1, hash3);
+    }
+
+    #[test]
+    fn test_fnv1a_hash_known_values() {
+        // Empty string
+        assert_eq!(fnv1a_hash(b""), 0xcbf29ce484222325);
+        // Known FNV-1a test vectors
+        assert_eq!(fnv1a_hash(b"a"), 0xaf63dc4c8601ec8c);
+    }
+
+    #[test]
+    fn test_generate_bus_line_cd() {
+        let line_cd = generate_bus_line_cd("route_001");
+        // Should be in range 100,000,000 to 109,999,999
+        assert!(line_cd >= 100_000_000);
+        assert!(line_cd < 110_000_000);
+
+        // Should be deterministic
+        let line_cd2 = generate_bus_line_cd("route_001");
+        assert_eq!(line_cd, line_cd2);
+
+        // Different route_id should produce different line_cd
+        let line_cd3 = generate_bus_line_cd("route_002");
+        assert_ne!(line_cd, line_cd3);
+    }
+
+    #[test]
+    fn test_generate_bus_station_cd() {
+        let station_cd = generate_bus_station_cd("stop_001", "route_001");
+        // Should be in range 200,000,000 to 299,999,999
+        assert!(station_cd >= 200_000_000);
+        assert!(station_cd < 300_000_000);
+
+        // Should be deterministic
+        let station_cd2 = generate_bus_station_cd("stop_001", "route_001");
+        assert_eq!(station_cd, station_cd2);
+
+        // Different stop_id or route_id should produce different station_cd
+        let station_cd3 = generate_bus_station_cd("stop_002", "route_001");
+        assert_ne!(station_cd, station_cd3);
+
+        let station_cd4 = generate_bus_station_cd("stop_001", "route_002");
+        assert_ne!(station_cd, station_cd4);
+    }
+
+    #[test]
+    fn test_generate_bus_station_g_cd() {
+        let station_g_cd = generate_bus_station_g_cd("stop_001");
+        // Should be in range 200,000,000 to 299,999,999
+        assert!(station_g_cd >= 200_000_000);
+        assert!(station_g_cd < 300_000_000);
+
+        // Should be deterministic
+        let station_g_cd2 = generate_bus_station_g_cd("stop_001");
+        assert_eq!(station_g_cd, station_g_cd2);
+
+        // Same stop_id on different routes should have same station_g_cd
+        // (station_g_cd is only based on stop_id, not route_id)
+        let station_cd_route1 = generate_bus_station_cd("stop_001", "route_001");
+        let station_cd_route2 = generate_bus_station_cd("stop_001", "route_002");
+        assert_ne!(station_cd_route1, station_cd_route2); // station_cd differs
+                                                          // but station_g_cd is the same for both
+        assert_eq!(
+            generate_bus_station_g_cd("stop_001"),
+            generate_bus_station_g_cd("stop_001")
+        );
+    }
+
+    #[test]
+    fn test_is_bus_feature_disabled() {
+        // This test depends on environment variable, so we just verify it doesn't panic
+        let _ = is_bus_feature_disabled();
+    }
+}
