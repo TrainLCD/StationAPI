@@ -1493,9 +1493,8 @@ pub async fn integrate_gtfs_to_stations() -> Result<(), Box<dyn std::error::Erro
     // Step 5: Update cross-references in GTFS tables
     update_gtfs_crossreferences(&mut tx, &stop_route_map).await?;
 
-    sqlx::query("ANALYZE;").execute(&mut *tx).await?;
-
     // Commit the transaction - all changes are now permanent
+    // ANALYZE is run separately in main.rs after all GTFS imports complete
     tx.commit().await?;
 
     info!("GTFS integration completed successfully (transaction committed).");
@@ -2190,7 +2189,8 @@ mod tests {
         assert!(chrono::NaiveDate::parse_from_str("", "%Y%m%d").is_err());
         // Invalid date values
         assert!(chrono::NaiveDate::parse_from_str("20241301", "%Y%m%d").is_err()); // month 13
-        assert!(chrono::NaiveDate::parse_from_str("20240132", "%Y%m%d").is_err()); // day 32
+        assert!(chrono::NaiveDate::parse_from_str("20240132", "%Y%m%d").is_err());
+        // day 32
     }
 
     #[test]
@@ -2198,12 +2198,22 @@ mod tests {
         // Test that different route IDs produce different line_cds
         let mut line_cds = std::collections::HashSet::new();
         let route_ids = vec![
-            "route_001", "route_002", "route_003", "route_100",
-            "Toei_Bus_01", "Toei_Bus_02", "AB01", "AB02",
+            "route_001",
+            "route_002",
+            "route_003",
+            "route_100",
+            "Toei_Bus_01",
+            "Toei_Bus_02",
+            "AB01",
+            "AB02",
         ];
         for route_id in route_ids {
             let line_cd = generate_bus_line_cd(route_id);
-            assert!(line_cds.insert(line_cd), "Collision detected for {}", route_id);
+            assert!(
+                line_cds.insert(line_cd),
+                "Collision detected for {}",
+                route_id
+            );
         }
     }
 
