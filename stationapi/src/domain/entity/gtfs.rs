@@ -437,7 +437,7 @@ impl GtfsFeedInfo {
     }
 }
 
-/// Transport type enum for distinguishing rail and bus
+/// Transport type enum for distinguishing rail and bus (stored in database)
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[repr(i32)]
 pub enum TransportType {
@@ -453,6 +453,15 @@ impl From<i32> for TransportType {
             _ => TransportType::Rail,
         }
     }
+}
+
+/// Transport type filter for API requests
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum TransportTypeFilter {
+    #[default]
+    Rail,
+    Bus,
+    RailAndBus,
 }
 
 #[cfg(test)]

@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::{
     domain::entity::{
-        company::Company, gtfs::TransportType, line::Line, line_symbol::LineSymbol,
+        company::Company, gtfs::TransportTypeFilter, line::Line, line_symbol::LineSymbol,
         station::Station, station_number::StationNumber, train_type::TrainType,
     },
     proto::{Route, RouteMinimalResponse},
@@ -14,17 +14,17 @@ pub trait QueryUseCase: Send + Sync + 'static {
     async fn find_station_by_id(
         &self,
         station_id: u32,
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Option<Station>, UseCaseError>;
     async fn get_stations_by_id_vec(
         &self,
         station_ids: &[u32],
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_group_id(
         &self,
         station_group_id: u32,
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_group_id_vec(
         &self,
@@ -35,21 +35,21 @@ pub trait QueryUseCase: Send + Sync + 'static {
         latitude: f64,
         longitude: f64,
         limit: Option<u32>,
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_line_id(
         &self,
         line_id: u32,
         station_id: Option<u32>,
         direction_id: Option<u32>,
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_name(
         &self,
         station_name: String,
         limit: Option<u32>,
         from_station_group_id: Option<u32>,
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn find_company_by_id_vec(
         &self,
@@ -59,7 +59,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
         &self,
         stations: Vec<Station>,
         line_group_id: Option<u32>,
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_lines_by_station_group_id(
         &self,
@@ -75,7 +75,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
     async fn get_stations_by_line_group_id(
         &self,
         line_group_id: u32,
-        transport_type: Option<TransportType>,
+        transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_train_types_by_station_id(
         &self,
