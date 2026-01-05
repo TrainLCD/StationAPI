@@ -69,7 +69,10 @@ mod tests {
         // 漢字+ひらがな+全角数字の混合
         assert_eq!(normalize_for_search("東京駅１番線"), "東京駅1番線");
         // ひらがな+漢字+全角英字
-        assert_eq!(normalize_for_search("しんじゅく駅ＷＥＳＴ"), "シンジュク駅WEST");
+        assert_eq!(
+            normalize_for_search("しんじゅく駅ＷＥＳＴ"),
+            "シンジュク駅WEST"
+        );
         // 複合パターン
         assert_eq!(
             normalize_for_search("とうきょう１２３ＡＢＣ"),
