@@ -366,11 +366,7 @@ where
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(
-                stations,
-                Some(line_group_id),
-                transport_type,
-            )
+            .update_station_vec_with_attributes(stations, Some(line_group_id), transport_type)
             .await?;
 
         Ok(stations)
