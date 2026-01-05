@@ -1969,6 +1969,7 @@ async fn update_gtfs_crossreferences(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Datelike;
 
     #[test]
     fn test_parse_gtfs_time_valid() {
@@ -2128,5 +2129,171 @@ mod tests {
         assert_eq!(escape_sql_string("カタカナ"), "カタカナ");
         // But special chars in unicode strings should still be escaped
         assert_eq!(escape_sql_string("新宿'駅"), "新宿''駅");
+    }
+
+    #[test]
+    fn test_translation_struct_default() {
+        // Test Translation struct initialization
+        let translation = Translation {
+            ja: Some("日本語".to_string()),
+            ja_hrkt: Some("にほんご".to_string()),
+            en: Some("Japanese".to_string()),
+            zh: None,
+            ko: None,
+        };
+        assert_eq!(translation.ja, Some("日本語".to_string()));
+        assert_eq!(translation.ja_hrkt, Some("にほんご".to_string()));
+        assert_eq!(translation.en, Some("Japanese".to_string()));
+        assert!(translation.zh.is_none());
+        assert!(translation.ko.is_none());
+    }
+
+    #[test]
+    fn test_translation_all_none() {
+        let translation = Translation {
+            ja: None,
+            ja_hrkt: None,
+            en: None,
+            zh: None,
+            ko: None,
+        };
+        assert!(translation.ja.is_none());
+        assert!(translation.ja_hrkt.is_none());
+        assert!(translation.en.is_none());
+        assert!(translation.zh.is_none());
+        assert!(translation.ko.is_none());
+    }
+
+    #[test]
+    fn test_date_parse_valid() {
+        // Test GTFS date format (YYYYMMDD)
+        let date = chrono::NaiveDate::parse_from_str("20240101", "%Y%m%d");
+        assert!(date.is_ok());
+        let date = date.unwrap();
+        assert_eq!(date.year(), 2024);
+        assert_eq!(date.month(), 1);
+        assert_eq!(date.day(), 1);
+
+        // End of year
+        let date = chrono::NaiveDate::parse_from_str("20231231", "%Y%m%d").unwrap();
+        assert_eq!(date.year(), 2023);
+        assert_eq!(date.month(), 12);
+        assert_eq!(date.day(), 31);
+    }
+
+    #[test]
+    fn test_date_parse_invalid() {
+        // Invalid formats
+        assert!(chrono::NaiveDate::parse_from_str("2024-01-01", "%Y%m%d").is_err());
+        assert!(chrono::NaiveDate::parse_from_str("01/01/2024", "%Y%m%d").is_err());
+        assert!(chrono::NaiveDate::parse_from_str("invalid", "%Y%m%d").is_err());
+        assert!(chrono::NaiveDate::parse_from_str("", "%Y%m%d").is_err());
+        // Invalid date values
+        assert!(chrono::NaiveDate::parse_from_str("20241301", "%Y%m%d").is_err()); // month 13
+        assert!(chrono::NaiveDate::parse_from_str("20240132", "%Y%m%d").is_err()); // day 32
+    }
+
+    #[test]
+    fn test_generate_bus_line_cd_no_collision() {
+        // Test that different route IDs produce different line_cds
+        let mut line_cds = std::collections::HashSet::new();
+        let route_ids = vec![
+            "route_001", "route_002", "route_003", "route_100",
+            "Toei_Bus_01", "Toei_Bus_02", "AB01", "AB02",
+        ];
+        for route_id in route_ids {
+            let line_cd = generate_bus_line_cd(route_id);
+            assert!(line_cds.insert(line_cd), "Collision detected for {}", route_id);
+        }
+    }
+
+    #[test]
+    fn test_generate_bus_station_cd_no_collision() {
+        // Test that different stop_id/route_id combinations produce different station_cds
+        let mut station_cds = std::collections::HashSet::new();
+        let combinations = vec![
+            ("stop_001", "route_001"),
+            ("stop_001", "route_002"),
+            ("stop_002", "route_001"),
+            ("stop_002", "route_002"),
+            ("Toei_Stop_A", "Toei_Bus_01"),
+            ("Toei_Stop_B", "Toei_Bus_01"),
+        ];
+        for (stop_id, route_id) in combinations {
+            let station_cd = generate_bus_station_cd(stop_id, route_id);
+            assert!(
+                station_cds.insert(station_cd),
+                "Collision detected for ({}, {})",
+                stop_id,
+                route_id
+            );
+        }
+    }
+
+    #[test]
+    fn test_hiragana_to_katakana_edge_cases() {
+        // Empty string
+        assert_eq!(hiragana_to_katakana(""), "");
+        // Only punctuation
+        assert_eq!(hiragana_to_katakana("。、"), "。、");
+        // Mixed hiragana, katakana, kanji, ascii
+        assert_eq!(
+            hiragana_to_katakana("あいうアイウ漢字abc"),
+            "アイウアイウ漢字abc"
+        );
+        // Small hiragana characters
+        assert_eq!(hiragana_to_katakana("ぁぃぅぇぉ"), "ァィゥェォ");
+        // Voiced/semi-voiced marks
+        assert_eq!(hiragana_to_katakana("がぎぐげご"), "ガギグゲゴ");
+        assert_eq!(hiragana_to_katakana("ぱぴぷぺぽ"), "パピプペポ");
+    }
+
+    #[test]
+    fn test_fnv1a_hash_different_lengths() {
+        // Different length inputs should produce different hashes
+        let hash1 = fnv1a_hash(b"a");
+        let hash2 = fnv1a_hash(b"aa");
+        let hash3 = fnv1a_hash(b"aaa");
+        assert_ne!(hash1, hash2);
+        assert_ne!(hash2, hash3);
+        assert_ne!(hash1, hash3);
+    }
+
+    #[test]
+    fn test_fnv1a_hash_unicode() {
+        // Unicode strings should hash correctly
+        let hash1 = fnv1a_hash("新宿".as_bytes());
+        let hash2 = fnv1a_hash("渋谷".as_bytes());
+        assert_ne!(hash1, hash2);
+        // Same string should produce same hash
+        assert_eq!(fnv1a_hash("新宿".as_bytes()), fnv1a_hash("新宿".as_bytes()));
+    }
+
+    #[test]
+    fn test_escape_sql_string_special_sequences() {
+        // Test various special sequences that might cause issues
+        assert_eq!(escape_sql_string("\\n"), "\\\\n");
+        assert_eq!(escape_sql_string("\\t"), "\\\\t");
+        assert_eq!(escape_sql_string("\\r"), "\\\\r");
+        // Multiple consecutive special chars
+        assert_eq!(escape_sql_string("'''"), "''''''");
+        assert_eq!(escape_sql_string("\\\\\\"), "\\\\\\\\\\\\");
+    }
+
+    #[test]
+    fn test_parse_gtfs_time_boundary() {
+        // Test boundary values for GTFS time
+        assert_eq!(parse_gtfs_time("00:00:00"), Some("00:00:00".to_string()));
+        assert_eq!(parse_gtfs_time("23:59:59"), Some("23:59:59".to_string()));
+        // GTFS allows times past midnight for overnight trips
+        assert_eq!(parse_gtfs_time("24:00:00"), Some("24:00:00".to_string()));
+        assert_eq!(parse_gtfs_time("25:30:00"), Some("25:30:00".to_string()));
+        assert_eq!(parse_gtfs_time("48:00:00"), Some("48:00:00".to_string()));
+    }
+
+    #[test]
+    fn test_parse_gtfs_time_with_leading_zeros() {
+        assert_eq!(parse_gtfs_time("01:02:03"), Some("01:02:03".to_string()));
+        assert_eq!(parse_gtfs_time("00:00:01"), Some("00:00:01".to_string()));
     }
 }
