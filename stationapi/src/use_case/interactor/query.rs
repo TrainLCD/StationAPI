@@ -609,12 +609,16 @@ where
                 line.line_symbols = self.get_line_symbols(line);
             }
 
+            // Build HashMap for O(1) line lookup by line_cd instead of O(n) linear search
+            let tt_line_map: std::collections::HashMap<i32, &Line> =
+                tt_lines.iter().map(|line| (line.line_cd, line)).collect();
+
             let stops = stops
                 .iter()
                 .map(|row| {
                     let extracted_line = self.extract_line_from_station(row);
 
-                    if let Some(tt_line) = tt_lines.iter().find(|line| line.line_cd == row.line_cd)
+                    if let Some(tt_line) = tt_line_map.get(&row.line_cd).copied()
                     {
                         let train_type = match row.type_id.is_some() {
                             true => {
