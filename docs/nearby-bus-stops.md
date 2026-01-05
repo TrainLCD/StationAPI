@@ -1,10 +1,10 @@
 # 近傍バス停検索機能
 
-鉄道駅から半径300m以内のバス停を同一グループとして返す機能の仕様。
+鉄道駅から半径300m以内のバス停・バス路線を取得する機能の仕様。
 
 ## 概要
 
-各APIで`transport_type`パラメータを使用して、鉄道駅に加えて近くのバス停を含めるかどうかを制御できる。
+各APIで`transport_type`パラメータを使用して、鉄道駅・バス停のフィルタリングを制御できる。デフォルトでは後方互換性のため鉄道駅のみを返す。
 
 ## パラメータ
 
@@ -12,9 +12,10 @@
 
 ```protobuf
 enum TransportType {
-  TransportTypeUnspecified = 0;  // 鉄道駅 + 近くのバス停を含める
+  TransportTypeUnspecified = 0;  // 鉄道駅のみ（デフォルト）
   Rail = 1;                       // 鉄道駅のみ
   Bus = 2;                        // バス停のみ
+  RailAndBus = 3;                 // 鉄道駅 + バス停
 }
 ```
 
@@ -22,9 +23,10 @@ enum TransportType {
 
 | transport_type | 動作 |
 |----------------|------|
-| **未指定 / Unspecified** | 鉄道駅を取得し、最初の鉄道駅から半径300m以内のバス停も追加して返す |
+| **未指定 / Unspecified** | 鉄道駅のみを返す（デフォルト） |
 | **Rail** | 鉄道駅のみを返す |
-| **Bus** | 最初の鉄道駅から半径300m以内のバス停のみを返す |
+| **Bus** | バス停のみを返す |
+| **RailAndBus** | 鉄道駅とバス停の両方を返す。`lines`配列にも近傍バス路線を含める |
 
 ## 対象API
 
@@ -44,34 +46,40 @@ enum TransportType {
 
 - **アルゴリズム**: Haversine公式（地球の曲率を考慮）
 - **半径**: 300メートル（定数 `NEARBY_BUS_STOP_RADIUS_METERS`）
-- **基準点**: 取得した鉄道駅の最初の1件の座標
+- **基準点**: 取得した鉄道駅の座標
 
 ## 使用例
 
-### 鉄道駅 + 近くのバス停を取得
+### 鉄道駅のみを取得（デフォルト）
 
 ```protobuf
-// transport_type未指定で鉄道駅と近くのバス停を両方取得
+// transport_type未指定で鉄道駅のみを取得
 GetStationByGroupIdRequest {
   group_id: 1130201
 }
-```
 
-### 鉄道駅のみを取得
-
-```protobuf
+// または明示的にRailを指定
 GetStationByGroupIdRequest {
   group_id: 1130201
   transport_type: Rail
 }
 ```
 
-### 近くのバス停のみを取得
+### バス停のみを取得
 
 ```protobuf
 GetStationByGroupIdRequest {
   group_id: 1130201
   transport_type: Bus
+}
+```
+
+### 鉄道駅とバス停の両方を取得
+
+```protobuf
+GetStationByGroupIdRequest {
+  group_id: 1130201
+  transport_type: RailAndBus
 }
 ```
 
@@ -93,12 +101,11 @@ const NEARBY_BUS_STOP_RADIUS_METERS: f64 = 300.0;
 ### ヘルパーメソッド
 
 ```rust
-/// 指定座標から半径300m以内のバス停を取得
-async fn get_nearby_bus_stops(&self, ref_lat: f64, ref_lon: f64) -> Result<Vec<Station>, UseCaseError>
+/// 指定座標から半径300m以内のバス路線を取得
+async fn get_nearby_bus_lines(&self, ref_lat: f64, ref_lon: f64) -> Result<Vec<Line>, UseCaseError>
 ```
 
 ## 注意事項
 
-- バス停検索は最大50件の候補を取得し、その中から300m以内のものをフィルタリング
-- 鉄道駅が存在しない場合、`transport_type: Bus`は空の結果を返す
-- 複数の鉄道駅がある場合、最初の1件の座標を基準点として使用
+- バス路線検索は最大50件のバス停候補を取得し、その中から300m以内のものをフィルタリング
+- 鉄道駅の`lines`配列に近傍バス路線が追加されるのは`transport_type: RailAndBus`を指定した場合のみ

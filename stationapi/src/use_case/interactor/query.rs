@@ -236,25 +236,38 @@ where
             .collect::<Vec<u32>>();
         let companies = self.find_company_by_id_vec(company_ids).await?;
 
+        // Build HashMap for O(1) company lookup instead of O(n) linear search
+        let company_map: std::collections::HashMap<i32, &Company> =
+            companies.iter().map(|c| (c.company_cd, c)).collect();
+
         let train_types = self
             .get_train_types_by_station_id_vec(&station_ids, line_group_id)
             .await?;
 
+        // Build HashMap for O(1) train_type lookup by station_cd
+        let train_type_map: std::collections::HashMap<i32, &TrainType> = train_types
+            .iter()
+            .filter_map(|tt| tt.station_cd.map(|cd| (cd, tt)))
+            .collect();
+
+        // Build lookup map for stations_by_group_ids: (line_cd, station_g_cd) -> Station
+        let station_lookup: std::collections::HashMap<(i32, i32), &Station> = stations_by_group_ids
+            .iter()
+            .map(|s| ((s.line_cd, s.station_g_cd), s))
+            .collect();
+
         for station in stations.iter_mut() {
             let mut line = self.extract_line_from_station(station);
             line.line_symbols = self.get_line_symbols(&line);
-            line.company = companies
-                .iter()
-                .find(|c| c.company_cd == line.company_cd)
-                .cloned();
+            line.company = company_map.get(&line.company_cd).cloned().cloned();
             line.station = Some(station.clone());
 
             let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
             station.station_numbers = station_numbers;
             station.line = Some(Box::new(line));
-            if let Some(tt) = train_types
-                .iter()
-                .find(|tt| tt.station_cd == Some(station.station_cd))
+            if let Some(tt) = train_type_map
+                .get(&station.station_cd)
+                .cloned()
                 .cloned()
                 .map(Box::new)
             {
@@ -285,23 +298,17 @@ where
             }
 
             for line in lines.iter_mut() {
-                line.company = companies
-                    .iter()
-                    .find(|c| c.company_cd == line.company_cd)
-                    .cloned();
+                line.company = company_map.get(&line.company_cd).cloned().cloned();
                 line.line_symbols = self.get_line_symbols(line);
-                if let Some(station_ref) = stations_by_group_ids
-                    .iter()
-                    .filter(|s| s.line_cd == line.line_cd)
-                    .find(|s| s.station_g_cd == station.station_g_cd)
+                if let Some(station_ref) = station_lookup.get(&(line.line_cd, station.station_g_cd))
                 {
-                    let mut station_copy = station_ref.clone();
+                    let mut station_copy = (*station_ref).clone();
                     let station_numbers: Vec<StationNumber> =
                         self.get_station_numbers(&station_copy);
                     station_copy.station_numbers = station_numbers;
-                    if let Some(tt) = train_types
-                        .iter()
-                        .find(|tt| tt.station_cd == Some(station_copy.station_cd))
+                    if let Some(tt) = train_type_map
+                        .get(&station_copy.station_cd)
+                        .cloned()
                         .cloned()
                         .map(Box::new)
                     {
@@ -516,6 +523,10 @@ where
 
         let companies = self.company_repository.find_by_id_vec(&company_ids).await?;
 
+        // Build HashMap for O(1) company lookup
+        let company_map: std::collections::HashMap<i32, &Company> =
+            companies.iter().map(|c| (c.company_cd, c)).collect();
+
         let line = self.line_repository.find_by_station_id(station_id).await?;
         let Some(mut line) = line else {
             return Ok(vec![]);
@@ -525,16 +536,12 @@ where
             if let Some(line_group_cd) = tt.line_group_cd {
                 let mut lines: Vec<Line> = lines
                     .iter()
-                    .filter(|l| l.line_group_cd.is_some())
-                    .filter(|l| l.line_group_cd.unwrap() == line_group_cd)
+                    .filter(|l| l.line_group_cd == Some(line_group_cd))
                     .cloned()
                     .collect::<Vec<Line>>();
 
                 for line in lines.iter_mut() {
-                    line.company = companies
-                        .iter()
-                        .find(|c| c.company_cd == line.company_cd)
-                        .cloned();
+                    line.company = company_map.get(&line.company_cd).cloned().cloned();
                     line.line_symbols = self.get_line_symbols(line);
 
                     let train_type: Option<TrainType> = self
@@ -547,10 +554,7 @@ where
                     line.train_type = train_type;
                 }
 
-                line.company = companies
-                    .iter()
-                    .find(|c| c.company_cd == line.company_cd)
-                    .cloned();
+                line.company = company_map.get(&line.company_cd).cloned().cloned();
                 line.line_symbols = self.get_line_symbols(&line);
 
                 tt.lines = lines;
@@ -605,13 +609,16 @@ where
                 line.line_symbols = self.get_line_symbols(line);
             }
 
+            // Build HashMap for O(1) line lookup by line_cd instead of O(n) linear search
+            let tt_line_map: std::collections::HashMap<i32, &Line> =
+                tt_lines.iter().map(|line| (line.line_cd, line)).collect();
+
             let stops = stops
                 .iter()
                 .map(|row| {
                     let extracted_line = self.extract_line_from_station(row);
 
-                    if let Some(tt_line) = tt_lines.iter().find(|line| line.line_cd == row.line_cd)
-                    {
+                    if let Some(tt_line) = tt_line_map.get(&row.line_cd).copied() {
                         let train_type = match row.type_id.is_some() {
                             true => {
                                 // Filter lines to only include those with matching line_group_cd
@@ -813,11 +820,22 @@ where
             line.line_symbols = self.get_line_symbols(line);
         }
 
-        for mut train_type in train_types.clone() {
-            if result
-                .iter()
-                .any(|t| t.line_group_cd == train_type.line_group_cd)
-            {
+        // Pre-build a map from type_cd to TrainType for O(1) lookup
+        // This clones only the TrainTypes needed for embedding in Lines
+        let train_type_by_type_cd: std::collections::HashMap<i32, TrainType> = train_types
+            .iter()
+            .filter_map(|tt| tt.type_cd.map(|cd| (cd, tt.clone())))
+            .collect();
+
+        // Track seen line_group_cds to avoid duplicates
+        let mut seen_line_group_cds = HashSet::new();
+
+        for mut train_type in train_types {
+            if let Some(lgc) = train_type.line_group_cd {
+                if !seen_line_group_cds.insert(lgc) {
+                    continue;
+                }
+            } else {
                 continue;
             }
 
@@ -857,10 +875,9 @@ where
                     e_sort: line.e_sort,
                     average_distance: line.average_distance,
                     station: None,
-                    train_type: train_types
-                        .iter()
-                        .find(|tt| tt.type_cd == line.type_cd)
-                        .cloned(),
+                    train_type: line
+                        .type_cd
+                        .and_then(|cd| train_type_by_type_cd.get(&cd).cloned()),
                     line_group_cd: line.line_group_cd,
                     station_cd: line.station_cd,
                     station_g_cd: line.station_g_cd,
@@ -870,7 +887,7 @@ where
                 .collect::<Vec<Line>>();
 
             // Set the line field to the first line in the lines vector
-            train_type.line = train_type.lines.first().map(|l| Box::new(l.clone()));
+            train_type.line = train_type.lines.first().cloned().map(Box::new);
 
             result.push(train_type);
         }
@@ -956,11 +973,20 @@ where
             line.transport_type == TransportType::Bus && seen_line_cds.insert(line.line_cd)
         });
 
+        // Build HashMap for O(1) bus stop lookup by line_cd
+        // Deduplicate by line_cd, keeping the first (closest) bus stop for each line
+        let mut seen_bus_line_cds = std::collections::HashSet::new();
+        let bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> = nearby_bus_stops
+            .iter()
+            .filter(|s| seen_bus_line_cds.insert(s.line_cd))
+            .map(|s| (s.line_cd, s))
+            .collect();
+
         for line in bus_lines.iter_mut() {
             line.line_symbols = self.get_line_symbols(line);
 
             // Find the matching bus stop for this line and embed it
-            if let Some(bus_stop) = nearby_bus_stops.iter().find(|s| s.line_cd == line.line_cd) {
+            if let Some(&bus_stop) = bus_stop_by_line_cd.get(&line.line_cd) {
                 let mut station_copy = bus_stop.clone();
                 station_copy.station_numbers = self.get_station_numbers(&station_copy);
                 line.station = Some(station_copy);
@@ -970,14 +996,14 @@ where
         Ok(bus_lines)
     }
 
-    fn build_route_tree_map(&self, stops: &[Station]) -> BTreeMap<i32, Vec<Station>> {
+    fn build_route_tree_map<'a>(&self, stops: &'a [Station]) -> BTreeMap<i32, Vec<&'a Station>> {
         stops.iter().fold(
             BTreeMap::new(),
-            |mut acc: BTreeMap<i32, Vec<Station>>, value| {
+            |mut acc: BTreeMap<i32, Vec<&'a Station>>, value| {
                 if let Some(line_group_cd) = value.line_group_cd {
-                    acc.entry(line_group_cd).or_default().push(value.clone());
+                    acc.entry(line_group_cd).or_default().push(value);
                 } else {
-                    acc.entry(value.line_cd).or_default().push(value.clone());
+                    acc.entry(value.line_cd).or_default().push(value);
                 };
                 acc
             },
@@ -1075,4 +1101,1273 @@ fn haversine_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
     let c = 2.0 * a.sqrt().asin();
 
     EARTH_RADIUS_METERS * c
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::entity::gtfs::TransportType;
+    use crate::proto::StopCondition;
+
+    /// Helper to create a minimal Station for testing
+    fn create_test_station(
+        station_cd: i32,
+        station_g_cd: i32,
+        line_cd: i32,
+        line_group_cd: Option<i32>,
+    ) -> Station {
+        Station {
+            station_cd,
+            station_g_cd,
+            station_name: format!("テスト駅{}", station_cd),
+            station_name_k: format!("テストエキ{}", station_cd),
+            station_name_r: Some(format!("Test Station {}", station_cd)),
+            station_name_zh: None,
+            station_name_ko: None,
+            station_numbers: vec![],
+            station_number1: Some("01".to_string()),
+            station_number2: None,
+            station_number3: None,
+            station_number4: None,
+            three_letter_code: None,
+            line_cd,
+            line: None,
+            lines: vec![],
+            pref_cd: 13,
+            post: "100-0001".to_string(),
+            address: "東京都千代田区".to_string(),
+            lon: 139.7671,
+            lat: 35.6812,
+            open_ymd: "19000101".to_string(),
+            close_ymd: "99991231".to_string(),
+            e_status: 0,
+            e_sort: 1,
+            stop_condition: StopCondition::All,
+            distance: None,
+            has_train_types: false,
+            train_type: None,
+            company_cd: Some(1),
+            line_name: Some("テスト線".to_string()),
+            line_name_k: Some("テストセン".to_string()),
+            line_name_h: Some("てすとせん".to_string()),
+            line_name_r: Some("Test Line".to_string()),
+            line_name_zh: None,
+            line_name_ko: None,
+            line_color_c: Some("FF0000".to_string()),
+            line_type: Some(1),
+            line_symbol1: Some("T".to_string()),
+            line_symbol2: None,
+            line_symbol3: None,
+            line_symbol4: None,
+            line_symbol1_color: Some("FF0000".to_string()),
+            line_symbol2_color: None,
+            line_symbol3_color: None,
+            line_symbol4_color: None,
+            line_symbol1_shape: Some("round".to_string()),
+            line_symbol2_shape: None,
+            line_symbol3_shape: None,
+            line_symbol4_shape: None,
+            average_distance: None,
+            type_id: None,
+            sst_id: None,
+            type_cd: None,
+            line_group_cd,
+            pass: None,
+            type_name: None,
+            type_name_k: None,
+            type_name_r: None,
+            type_name_zh: None,
+            type_name_ko: None,
+            color: None,
+            direction: None,
+            kind: None,
+            transport_type: TransportType::Rail,
+        }
+    }
+
+    /// Helper to create a minimal Line for testing
+    fn create_test_line(line_cd: i32) -> Line {
+        Line {
+            line_cd,
+            company_cd: 1,
+            company: None,
+            line_name: format!("テスト線{}", line_cd),
+            line_name_k: format!("テストセン{}", line_cd),
+            line_name_h: format!("てすとせん{}", line_cd),
+            line_name_r: Some(format!("Test Line {}", line_cd)),
+            line_name_zh: None,
+            line_name_ko: None,
+            line_color_c: Some("0000FF".to_string()),
+            line_type: Some(1),
+            line_symbols: vec![],
+            line_symbol1: Some("L".to_string()),
+            line_symbol2: Some("M".to_string()),
+            line_symbol3: None,
+            line_symbol4: None,
+            line_symbol1_color: Some("0000FF".to_string()),
+            line_symbol2_color: Some("00FF00".to_string()),
+            line_symbol3_color: None,
+            line_symbol4_color: None,
+            line_symbol1_shape: Some("square".to_string()),
+            line_symbol2_shape: Some("circle".to_string()),
+            line_symbol3_shape: None,
+            line_symbol4_shape: None,
+            e_status: 0,
+            e_sort: 1,
+            average_distance: None,
+            station: None,
+            train_type: None,
+            line_group_cd: None,
+            station_cd: None,
+            station_g_cd: None,
+            type_cd: None,
+            transport_type: TransportType::Rail,
+        }
+    }
+
+    // ========================================
+    // haversine_distance tests
+    // ========================================
+
+    #[test]
+    fn test_haversine_distance_same_point() {
+        let distance = haversine_distance(35.6812, 139.7671, 35.6812, 139.7671);
+        assert!((distance - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_haversine_distance_tokyo_to_osaka() {
+        // Tokyo Station: 35.6812, 139.7671
+        // Osaka Station: 34.7024, 135.4959
+        let distance = haversine_distance(35.6812, 139.7671, 34.7024, 135.4959);
+        // Expected: approximately 400km
+        assert!(distance > 390_000.0 && distance < 410_000.0);
+    }
+
+    #[test]
+    fn test_haversine_distance_short_distance() {
+        // Two points ~100m apart
+        let distance = haversine_distance(35.6812, 139.7671, 35.6820, 139.7671);
+        assert!(distance > 80.0 && distance < 120.0);
+    }
+
+    #[test]
+    fn test_haversine_distance_within_bus_stop_radius() {
+        // Points within 300m radius
+        let distance = haversine_distance(35.6812, 139.7671, 35.6835, 139.7671);
+        assert!(distance <= NEARBY_BUS_STOP_RADIUS_METERS);
+    }
+
+    #[test]
+    fn test_haversine_distance_outside_bus_stop_radius() {
+        // Points outside 300m radius
+        let distance = haversine_distance(35.6812, 139.7671, 35.6900, 139.7671);
+        assert!(distance > NEARBY_BUS_STOP_RADIUS_METERS);
+    }
+
+    // ========================================
+    // build_route_tree_map tests
+    // ========================================
+
+    mod build_route_tree_map_tests {
+        use super::*;
+        use crate::domain::{
+            error::DomainError,
+            repository::{
+                company_repository::CompanyRepository, line_repository::LineRepository,
+                station_repository::StationRepository, train_type_repository::TrainTypeRepository,
+            },
+        };
+
+        // Mock repositories for testing
+        struct MockStationRepository;
+        struct MockLineRepository;
+        struct MockTrainTypeRepository;
+        struct MockCompanyRepository;
+
+        #[async_trait::async_trait]
+        impl StationRepository for MockStationRepository {
+            async fn find_by_id(&self, _: u32) -> Result<Option<Station>, DomainError> {
+                Ok(None)
+            }
+            async fn get_by_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_id(
+                &self,
+                _: u32,
+                _: Option<u32>,
+                _: Option<u32>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_coordinates(
+                &self,
+                _: f64,
+                _: f64,
+                _: Option<u32>,
+                _: Option<TransportType>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_name(
+                &self,
+                _: String,
+                _: Option<u32>,
+                _: Option<u32>,
+                _: Option<TransportType>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_route_stops(
+                &self,
+                _: u32,
+                _: u32,
+                _: Option<u32>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl LineRepository for MockLineRepository {
+            async fn find_by_id(&self, _: u32) -> Result<Option<Line>, DomainError> {
+                Ok(None)
+            }
+            async fn find_by_station_id(&self, _: u32) -> Result<Option<Line>, DomainError> {
+                Ok(None)
+            }
+            async fn get_by_ids(&self, _: &[u32]) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_name(
+                &self,
+                _: String,
+                _: Option<u32>,
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id_vec(&self, _: &[u32]) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id_vec_for_routes(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl TrainTypeRepository for MockTrainTypeRepository {
+            async fn find_by_line_group_id_and_line_id(
+                &self,
+                _: u32,
+                _: u32,
+            ) -> Result<Option<TrainType>, DomainError> {
+                Ok(None)
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_id(&self, _: u32) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_id_vec(
+                &self,
+                _: &[u32],
+                _: Option<u32>,
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_types_by_station_id_vec(
+                &self,
+                _: &[u32],
+                _: Option<u32>,
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl CompanyRepository for MockCompanyRepository {
+            async fn find_by_id_vec(&self, _: &[u32]) -> Result<Vec<Company>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        fn create_interactor() -> QueryInteractor<
+            MockStationRepository,
+            MockLineRepository,
+            MockTrainTypeRepository,
+            MockCompanyRepository,
+        > {
+            QueryInteractor {
+                station_repository: MockStationRepository,
+                line_repository: MockLineRepository,
+                train_type_repository: MockTrainTypeRepository,
+                company_repository: MockCompanyRepository,
+            }
+        }
+
+        #[test]
+        fn test_build_route_tree_map_empty() {
+            let interactor = create_interactor();
+            let stops: Vec<Station> = vec![];
+            let result = interactor.build_route_tree_map(&stops);
+            assert!(result.is_empty());
+        }
+
+        #[test]
+        fn test_build_route_tree_map_groups_by_line_group_cd() {
+            let interactor = create_interactor();
+            let stops = vec![
+                create_test_station(1, 1, 100, Some(1000)),
+                create_test_station(2, 2, 100, Some(1000)),
+                create_test_station(3, 3, 200, Some(2000)),
+            ];
+            let result = interactor.build_route_tree_map(&stops);
+
+            assert_eq!(result.len(), 2);
+            assert_eq!(result.get(&1000).unwrap().len(), 2);
+            assert_eq!(result.get(&2000).unwrap().len(), 1);
+        }
+
+        #[test]
+        fn test_build_route_tree_map_groups_by_line_cd_when_no_line_group() {
+            let interactor = create_interactor();
+            let stops = vec![
+                create_test_station(1, 1, 100, None),
+                create_test_station(2, 2, 100, None),
+                create_test_station(3, 3, 200, None),
+            ];
+            let result = interactor.build_route_tree_map(&stops);
+
+            assert_eq!(result.len(), 2);
+            assert_eq!(result.get(&100).unwrap().len(), 2);
+            assert_eq!(result.get(&200).unwrap().len(), 1);
+        }
+
+        #[test]
+        fn test_build_route_tree_map_returns_references() {
+            let interactor = create_interactor();
+            let stops = vec![create_test_station(1, 1, 100, Some(1000))];
+            let result = interactor.build_route_tree_map(&stops);
+
+            // Verify that the result contains references to the original stations
+            let grouped_stops = result.get(&1000).unwrap();
+            assert_eq!(grouped_stops[0].station_cd, 1);
+            // Verify it's a reference by checking pointer equality
+            assert!(std::ptr::eq(grouped_stops[0], &stops[0]));
+        }
+
+        // ========================================
+        // get_station_numbers tests
+        // ========================================
+
+        #[test]
+        fn test_get_station_numbers_single_number() {
+            let interactor = create_interactor();
+            let station = create_test_station(1, 1, 100, None);
+            let numbers = interactor.get_station_numbers(&station);
+
+            assert_eq!(numbers.len(), 1);
+            assert_eq!(numbers[0].station_number, "T-01");
+            assert_eq!(numbers[0].line_symbol, "T");
+            assert_eq!(numbers[0].line_symbol_color, "FF0000");
+            assert_eq!(numbers[0].line_symbol_shape, "round");
+        }
+
+        #[test]
+        fn test_get_station_numbers_multiple_numbers() {
+            let interactor = create_interactor();
+            let mut station = create_test_station(1, 1, 100, None);
+            station.station_number2 = Some("02".to_string());
+            station.line_symbol2 = Some("M".to_string());
+            station.line_symbol2_color = Some("00FF00".to_string());
+            station.line_symbol2_shape = Some("square".to_string());
+
+            let numbers = interactor.get_station_numbers(&station);
+
+            assert_eq!(numbers.len(), 2);
+            assert_eq!(numbers[0].station_number, "T-01");
+            assert_eq!(numbers[1].station_number, "M-02");
+        }
+
+        #[test]
+        fn test_get_station_numbers_empty_when_no_numbers() {
+            let interactor = create_interactor();
+            let mut station = create_test_station(1, 1, 100, None);
+            station.station_number1 = None;
+
+            let numbers = interactor.get_station_numbers(&station);
+            assert!(numbers.is_empty());
+        }
+
+        #[test]
+        fn test_get_station_numbers_without_symbol() {
+            let interactor = create_interactor();
+            let mut station = create_test_station(1, 1, 100, None);
+            station.line_symbol1 = None;
+
+            let numbers = interactor.get_station_numbers(&station);
+
+            assert_eq!(numbers.len(), 1);
+            assert_eq!(numbers[0].station_number, "01");
+            assert_eq!(numbers[0].line_symbol, "");
+        }
+
+        // ========================================
+        // get_line_symbols tests
+        // ========================================
+
+        #[test]
+        fn test_get_line_symbols_multiple_symbols() {
+            let interactor = create_interactor();
+            let line = create_test_line(100);
+            let symbols = interactor.get_line_symbols(&line);
+
+            assert_eq!(symbols.len(), 2);
+            assert_eq!(symbols[0].symbol, "L");
+            assert_eq!(symbols[0].color, "0000FF");
+            assert_eq!(symbols[0].shape, "square");
+            assert_eq!(symbols[1].symbol, "M");
+            assert_eq!(symbols[1].color, "00FF00");
+            assert_eq!(symbols[1].shape, "circle");
+        }
+
+        #[test]
+        fn test_get_line_symbols_uses_line_color_as_fallback() {
+            let interactor = create_interactor();
+            let mut line = create_test_line(100);
+            line.line_symbol1_color = None;
+
+            let symbols = interactor.get_line_symbols(&line);
+
+            // First symbol should use line_color_c as fallback
+            assert_eq!(symbols[0].color, "0000FF");
+        }
+
+        #[test]
+        fn test_get_line_symbols_empty_when_no_symbols() {
+            let interactor = create_interactor();
+            let mut line = create_test_line(100);
+            line.line_symbol1 = None;
+            line.line_symbol2 = None;
+            line.line_symbol3 = None;
+
+            let symbols = interactor.get_line_symbols(&line);
+            assert!(symbols.is_empty());
+        }
+
+        // ========================================
+        // extract_line_from_station tests
+        // ========================================
+
+        #[test]
+        fn test_extract_line_from_station() {
+            let interactor = create_interactor();
+            let station = create_test_station(1, 1, 100, Some(1000));
+            let line = interactor.extract_line_from_station(&station);
+
+            assert_eq!(line.line_cd, 100);
+            assert_eq!(line.company_cd, 1);
+            assert_eq!(line.line_name, "テスト線");
+            assert_eq!(line.line_name_k, "テストセン");
+            assert_eq!(line.line_color_c, Some("FF0000".to_string()));
+            assert_eq!(line.line_symbol1, Some("T".to_string()));
+            assert!(line.line_symbols.is_empty()); // symbols are added separately
+            assert!(line.company.is_none());
+            assert!(line.station.is_none());
+        }
+
+        #[test]
+        fn test_extract_line_from_station_preserves_station_cd() {
+            let interactor = create_interactor();
+            let station = create_test_station(42, 42, 100, None);
+            let line = interactor.extract_line_from_station(&station);
+
+            assert_eq!(line.station_cd, Some(42));
+            assert_eq!(line.station_g_cd, Some(42));
+        }
+
+        #[test]
+        fn test_extract_line_from_station_handles_missing_optional_fields() {
+            let interactor = create_interactor();
+            let mut station = create_test_station(1, 1, 100, None);
+            station.line_name = None;
+            station.line_name_k = None;
+            station.line_name_h = None;
+            station.company_cd = None;
+
+            let line = interactor.extract_line_from_station(&station);
+
+            assert_eq!(line.line_name, "");
+            assert_eq!(line.line_name_k, "");
+            assert_eq!(line.line_name_h, "");
+            assert_eq!(line.company_cd, 0);
+        }
+    }
+
+    // ========================================
+    // update_station_vec_with_attributes tests
+    // ========================================
+
+    mod update_station_vec_with_attributes_tests {
+        use super::*;
+        use crate::domain::{
+            entity::company::Company,
+            error::DomainError,
+            repository::{
+                company_repository::CompanyRepository, line_repository::LineRepository,
+                station_repository::StationRepository, train_type_repository::TrainTypeRepository,
+            },
+        };
+
+        /// Configurable mock station repository for testing
+        struct ConfigurableMockStationRepository {
+            stations_by_group: Vec<Station>,
+            bus_stops: Vec<Station>,
+        }
+
+        impl ConfigurableMockStationRepository {
+            fn new(stations_by_group: Vec<Station>, bus_stops: Vec<Station>) -> Self {
+                Self {
+                    stations_by_group,
+                    bus_stops,
+                }
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl StationRepository for ConfigurableMockStationRepository {
+            async fn find_by_id(&self, _: u32) -> Result<Option<Station>, DomainError> {
+                Ok(None)
+            }
+            async fn get_by_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_id(
+                &self,
+                _: u32,
+                _: Option<u32>,
+                _: Option<u32>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(self.stations_by_group.clone())
+            }
+            async fn get_by_coordinates(
+                &self,
+                _: f64,
+                _: f64,
+                _: Option<u32>,
+                transport_type: Option<TransportType>,
+            ) -> Result<Vec<Station>, DomainError> {
+                // Return bus stops only when searching for Bus transport type
+                if transport_type == Some(TransportType::Bus) {
+                    Ok(self.bus_stops.clone())
+                } else {
+                    Ok(vec![])
+                }
+            }
+            async fn get_by_name(
+                &self,
+                _: String,
+                _: Option<u32>,
+                _: Option<u32>,
+                _: Option<TransportType>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_route_stops(
+                &self,
+                _: u32,
+                _: u32,
+                _: Option<u32>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        /// Configurable mock line repository for testing
+        struct ConfigurableMockLineRepository {
+            lines_by_station_group: Vec<Line>,
+        }
+
+        impl ConfigurableMockLineRepository {
+            fn new(lines_by_station_group: Vec<Line>) -> Self {
+                Self {
+                    lines_by_station_group,
+                }
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl LineRepository for ConfigurableMockLineRepository {
+            async fn find_by_id(&self, _: u32) -> Result<Option<Line>, DomainError> {
+                Ok(None)
+            }
+            async fn find_by_station_id(&self, _: u32) -> Result<Option<Line>, DomainError> {
+                Ok(None)
+            }
+            async fn get_by_ids(&self, _: &[u32]) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_name(
+                &self,
+                _: String,
+                _: Option<u32>,
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id_vec(&self, _: &[u32]) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id_vec_for_routes(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(self.lines_by_station_group.clone())
+            }
+        }
+
+        /// Configurable mock train type repository for testing
+        struct ConfigurableMockTrainTypeRepository {
+            train_types: Vec<TrainType>,
+        }
+
+        impl ConfigurableMockTrainTypeRepository {
+            fn new(train_types: Vec<TrainType>) -> Self {
+                Self { train_types }
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl TrainTypeRepository for ConfigurableMockTrainTypeRepository {
+            async fn find_by_line_group_id_and_line_id(
+                &self,
+                _: u32,
+                _: u32,
+            ) -> Result<Option<TrainType>, DomainError> {
+                Ok(None)
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_id(&self, _: u32) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_id_vec(
+                &self,
+                _: &[u32],
+                _: Option<u32>,
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_types_by_station_id_vec(
+                &self,
+                _: &[u32],
+                _: Option<u32>,
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(self.train_types.clone())
+            }
+            async fn get_by_line_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        /// Configurable mock company repository for testing
+        struct ConfigurableMockCompanyRepository {
+            companies: Vec<Company>,
+        }
+
+        impl ConfigurableMockCompanyRepository {
+            fn new(companies: Vec<Company>) -> Self {
+                Self { companies }
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl CompanyRepository for ConfigurableMockCompanyRepository {
+            async fn find_by_id_vec(&self, _: &[u32]) -> Result<Vec<Company>, DomainError> {
+                Ok(self.companies.clone())
+            }
+        }
+
+        /// Helper to create a test company
+        fn create_test_company(company_cd: i32, name: &str) -> Company {
+            Company::new(
+                company_cd,
+                1,
+                name.to_string(),
+                format!("{name}カナ"),
+                format!("{name}ひらがな"),
+                format!("{name} Romaji"),
+                format!("{name} EN"),
+                format!("{name} Full EN"),
+                Some(format!("https://{}.example.com", name.to_lowercase())),
+                1,
+                0,
+                1,
+            )
+        }
+
+        /// Helper to create a test train type
+        fn create_test_train_type_for_station(station_cd: i32, type_name: &str) -> TrainType {
+            TrainType::new(
+                Some(station_cd * 10), // id
+                Some(station_cd),      // station_cd
+                Some(1),               // type_cd
+                Some(1000),            // line_group_cd
+                Some(0),               // pass (not passing)
+                type_name.to_string(),
+                format!("{type_name}カナ"),
+                Some(format!("{type_name} EN")),
+                None,
+                None,
+                "#FF0000".to_string(),
+                Some(0),
+                Some(1),
+            )
+        }
+
+        /// Helper to create a test line for station group
+        fn create_test_line_for_station_group(line_cd: i32, station_g_cd: i32) -> Line {
+            let mut line = create_test_line(line_cd);
+            line.station_g_cd = Some(station_g_cd);
+            line
+        }
+
+        /// Helper to create a bus stop station
+        fn create_bus_stop(station_cd: i32, lat: f64, lon: f64, line_cd: i32) -> Station {
+            let mut station = create_test_station(station_cd, station_cd, line_cd, None);
+            station.lat = lat;
+            station.lon = lon;
+            station.transport_type = TransportType::Bus;
+            station.line_name = Some("テストバス路線".to_string());
+            station.line_type = Some(3); // bus type
+            station
+        }
+
+        fn create_configurable_interactor(
+            stations_by_group: Vec<Station>,
+            bus_stops: Vec<Station>,
+            lines: Vec<Line>,
+            train_types: Vec<TrainType>,
+            companies: Vec<Company>,
+        ) -> QueryInteractor<
+            ConfigurableMockStationRepository,
+            ConfigurableMockLineRepository,
+            ConfigurableMockTrainTypeRepository,
+            ConfigurableMockCompanyRepository,
+        > {
+            QueryInteractor {
+                station_repository: ConfigurableMockStationRepository::new(
+                    stations_by_group,
+                    bus_stops,
+                ),
+                line_repository: ConfigurableMockLineRepository::new(lines),
+                train_type_repository: ConfigurableMockTrainTypeRepository::new(train_types),
+                company_repository: ConfigurableMockCompanyRepository::new(companies),
+            }
+        }
+
+        #[tokio::test]
+        async fn test_update_station_vec_with_attributes_enriches_company_info() {
+            // Create test data
+            let company1 = create_test_company(1, "JR東日本");
+            let company2 = create_test_company(2, "東京メトロ");
+
+            let mut station1 = create_test_station(101, 1001, 100, Some(1000));
+            station1.company_cd = Some(1);
+
+            let mut station2 = create_test_station(102, 1002, 200, Some(2000));
+            station2.company_cd = Some(2);
+
+            let line1 = create_test_line_for_station_group(100, 1001);
+            let line2 = create_test_line_for_station_group(200, 1002);
+
+            let interactor = create_configurable_interactor(
+                vec![station1.clone(), station2.clone()],
+                vec![],
+                vec![line1, line2],
+                vec![],
+                vec![company1.clone(), company2.clone()],
+            );
+
+            let stations = vec![station1, station2];
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, None)
+                .await
+                .expect("Should succeed");
+
+            assert_eq!(result.len(), 2);
+
+            // Check that station1's line has the correct company
+            let station1_result = &result[0];
+            assert!(station1_result.line.is_some());
+            let line1_result = station1_result.line.as_ref().unwrap();
+            assert!(line1_result.company.is_some());
+            assert_eq!(line1_result.company.as_ref().unwrap().company_cd, 1);
+            assert_eq!(
+                line1_result.company.as_ref().unwrap().company_name,
+                "JR東日本"
+            );
+
+            // Check that station2's line has the correct company
+            let station2_result = &result[1];
+            assert!(station2_result.line.is_some());
+            let line2_result = station2_result.line.as_ref().unwrap();
+            assert!(line2_result.company.is_some());
+            assert_eq!(line2_result.company.as_ref().unwrap().company_cd, 2);
+            assert_eq!(
+                line2_result.company.as_ref().unwrap().company_name,
+                "東京メトロ"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_update_station_vec_with_attributes_enriches_train_type_info() {
+            let company = create_test_company(1, "JR東日本");
+            let train_type = create_test_train_type_for_station(101, "快速");
+
+            let mut station = create_test_station(101, 1001, 100, Some(1000));
+            station.company_cd = Some(1);
+
+            let line = create_test_line_for_station_group(100, 1001);
+
+            let interactor = create_configurable_interactor(
+                vec![station.clone()],
+                vec![],
+                vec![line],
+                vec![train_type.clone()],
+                vec![company],
+            );
+
+            let stations = vec![station];
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, None)
+                .await
+                .expect("Should succeed");
+
+            assert_eq!(result.len(), 1);
+
+            let station_result = &result[0];
+            assert!(station_result.train_type.is_some());
+            let train_type_result = station_result.train_type.as_ref().unwrap();
+            assert_eq!(train_type_result.type_name, "快速");
+            assert_eq!(train_type_result.station_cd, Some(101));
+        }
+
+        #[tokio::test]
+        async fn test_update_station_vec_with_attributes_adds_line_symbols() {
+            let company = create_test_company(1, "JR東日本");
+
+            let mut station = create_test_station(101, 1001, 100, Some(1000));
+            station.company_cd = Some(1);
+
+            let line = create_test_line_for_station_group(100, 1001);
+
+            let interactor = create_configurable_interactor(
+                vec![station.clone()],
+                vec![],
+                vec![line],
+                vec![],
+                vec![company],
+            );
+
+            let stations = vec![station];
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, None)
+                .await
+                .expect("Should succeed");
+
+            assert_eq!(result.len(), 1);
+
+            let station_result = &result[0];
+            assert!(station_result.line.is_some());
+            let line_result = station_result.line.as_ref().unwrap();
+
+            // Line symbols should be populated via get_line_symbols
+            assert!(!line_result.line_symbols.is_empty());
+            assert_eq!(line_result.line_symbols[0].symbol, "T");
+            assert_eq!(line_result.line_symbols[0].color, "FF0000");
+            assert_eq!(line_result.line_symbols[0].shape, "round");
+        }
+
+        #[tokio::test]
+        async fn test_update_station_vec_with_attributes_adds_nearby_bus_routes_for_rail() {
+            let company = create_test_company(1, "JR東日本");
+            let bus_company = create_test_company(100, "都営バス");
+
+            // Rail station at Tokyo Station coordinates
+            let mut rail_station = create_test_station(101, 1001, 100, Some(1000));
+            rail_station.company_cd = Some(1);
+            rail_station.lat = 35.6812;
+            rail_station.lon = 139.7671;
+            rail_station.transport_type = TransportType::Rail;
+
+            // Bus stop within 300m radius (approximately 200m north)
+            let bus_stop = create_bus_stop(
+                201, 35.6830, // ~200m north of rail station
+                139.7671, 500,
+            );
+
+            let rail_line = create_test_line_for_station_group(100, 1001);
+
+            // Create a bus line that matches the bus stop's station_g_cd
+            let mut bus_line = create_test_line(500);
+            bus_line.station_g_cd = Some(201); // Matches bus_stop.station_g_cd
+            bus_line.transport_type = TransportType::Bus;
+            bus_line.line_name = "テストバス路線".to_string();
+
+            let interactor = create_configurable_interactor(
+                vec![rail_station.clone()],
+                vec![bus_stop],
+                vec![rail_line, bus_line], // Include both rail and bus lines
+                vec![],
+                vec![company, bus_company],
+            );
+
+            let stations = vec![rail_station];
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, None)
+                .await
+                .expect("Should succeed");
+
+            assert_eq!(result.len(), 1);
+
+            let station_result = &result[0];
+            // Should have the rail line plus nearby bus routes in lines array
+            assert!(!station_result.lines.is_empty());
+
+            // Check that bus line was added (line_cd 500 from the bus stop)
+            let has_bus_line = station_result
+                .lines
+                .iter()
+                .any(|l| l.transport_type == TransportType::Bus);
+            assert!(
+                has_bus_line,
+                "Rail station should have nearby bus routes added"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_update_station_vec_with_attributes_no_bus_routes_when_transport_type_is_bus()
+        {
+            let company = create_test_company(1, "JR東日本");
+
+            // Rail station
+            let mut rail_station = create_test_station(101, 1001, 100, Some(1000));
+            rail_station.company_cd = Some(1);
+            rail_station.transport_type = TransportType::Rail;
+
+            // Bus stop nearby
+            let bus_stop = create_bus_stop(201, 35.6830, 139.7671, 500);
+
+            let rail_line = create_test_line_for_station_group(100, 1001);
+
+            let interactor = create_configurable_interactor(
+                vec![rail_station.clone()],
+                vec![bus_stop],
+                vec![rail_line],
+                vec![],
+                vec![company],
+            );
+
+            // When transport_type is Bus, bus routes should NOT be added to rail stations
+            let stations = vec![rail_station];
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, Some(TransportType::Bus))
+                .await
+                .expect("Should succeed");
+
+            assert_eq!(result.len(), 1);
+
+            let station_result = &result[0];
+            // Should NOT have bus lines when transport_type filter is Bus
+            let has_bus_line = station_result
+                .lines
+                .iter()
+                .any(|l| l.transport_type == TransportType::Bus);
+            assert!(
+                !has_bus_line,
+                "Should not add bus routes when transport_type is Bus"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_update_station_vec_with_attributes_missing_company_key_no_panic() {
+            // Station references company_cd that doesn't exist in the map
+            let mut station = create_test_station(101, 1001, 100, Some(1000));
+            station.company_cd = Some(999); // Company ID that doesn't exist
+
+            let line = create_test_line_for_station_group(100, 1001);
+
+            // Empty companies list - company_cd 999 won't be found
+            let interactor = create_configurable_interactor(
+                vec![station.clone()],
+                vec![],
+                vec![line],
+                vec![],
+                vec![], // No companies
+            );
+
+            let stations = vec![station];
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, None)
+                .await
+                .expect("Should succeed even with missing company");
+
+            assert_eq!(result.len(), 1);
+
+            // Company should be None (default) when not found in map
+            let station_result = &result[0];
+            assert!(station_result.line.is_some());
+            let line_result = station_result.line.as_ref().unwrap();
+            assert!(
+                line_result.company.is_none(),
+                "Company should be None when not found in map"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_update_station_vec_with_attributes_missing_train_type_key_no_panic() {
+            let company = create_test_company(1, "JR東日本");
+
+            let mut station = create_test_station(101, 1001, 100, Some(1000));
+            station.company_cd = Some(1);
+
+            let line = create_test_line_for_station_group(100, 1001);
+
+            // Train type for a different station_cd
+            let train_type = create_test_train_type_for_station(999, "快速"); // Different station_cd
+
+            let interactor = create_configurable_interactor(
+                vec![station.clone()],
+                vec![],
+                vec![line],
+                vec![train_type],
+                vec![company],
+            );
+
+            let stations = vec![station];
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, None)
+                .await
+                .expect("Should succeed even with missing train type");
+
+            assert_eq!(result.len(), 1);
+
+            // Train type should be None (default) when station_cd doesn't match
+            let station_result = &result[0];
+            assert!(
+                station_result.train_type.is_none(),
+                "Train type should be None when station_cd doesn't match"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_update_station_vec_with_attributes_empty_input() {
+            let interactor = create_configurable_interactor(vec![], vec![], vec![], vec![], vec![]);
+
+            let stations: Vec<Station> = vec![];
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, None)
+                .await
+                .expect("Should succeed with empty input");
+
+            assert!(result.is_empty());
+        }
+
+        #[tokio::test]
+        async fn test_update_station_vec_with_attributes_multiple_stations_same_line() {
+            let company = create_test_company(1, "JR東日本");
+            let train_type1 = create_test_train_type_for_station(101, "快速");
+            let train_type2 = create_test_train_type_for_station(102, "各停");
+
+            let mut station1 = create_test_station(101, 1001, 100, Some(1000));
+            station1.company_cd = Some(1);
+
+            let mut station2 = create_test_station(102, 1001, 100, Some(1000)); // Same station_g_cd
+            station2.company_cd = Some(1);
+
+            let line = create_test_line_for_station_group(100, 1001);
+
+            let interactor = create_configurable_interactor(
+                vec![station1.clone(), station2.clone()],
+                vec![],
+                vec![line],
+                vec![train_type1, train_type2],
+                vec![company.clone()],
+            );
+
+            let stations = vec![station1, station2];
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, None)
+                .await
+                .expect("Should succeed");
+
+            assert_eq!(result.len(), 2);
+
+            // Both stations should have the same company
+            for station_result in &result {
+                assert!(station_result.line.is_some());
+                let line_result = station_result.line.as_ref().unwrap();
+                assert!(line_result.company.is_some());
+                assert_eq!(line_result.company.as_ref().unwrap().company_cd, 1);
+            }
+
+            // Each station should have its own train type
+            assert!(result[0].train_type.is_some());
+            assert_eq!(result[0].train_type.as_ref().unwrap().type_name, "快速");
+            assert!(result[1].train_type.is_some());
+            assert_eq!(result[1].train_type.as_ref().unwrap().type_name, "各停");
+        }
+
+        #[tokio::test]
+        async fn test_update_station_vec_with_attributes_station_numbers_populated() {
+            let company = create_test_company(1, "JR東日本");
+
+            let mut station = create_test_station(101, 1001, 100, Some(1000));
+            station.company_cd = Some(1);
+            station.station_number1 = Some("01".to_string());
+            station.station_number2 = Some("02".to_string());
+            station.line_symbol1 = Some("JY".to_string());
+            station.line_symbol2 = Some("JK".to_string());
+            station.line_symbol1_color = Some("00B261".to_string());
+            station.line_symbol2_color = Some("0078BA".to_string());
+            station.line_symbol1_shape = Some("round".to_string());
+            station.line_symbol2_shape = Some("round".to_string());
+
+            let line = create_test_line_for_station_group(100, 1001);
+
+            let interactor = create_configurable_interactor(
+                vec![station.clone()],
+                vec![],
+                vec![line],
+                vec![],
+                vec![company],
+            );
+
+            let stations = vec![station];
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, None)
+                .await
+                .expect("Should succeed");
+
+            assert_eq!(result.len(), 1);
+
+            let station_result = &result[0];
+            assert_eq!(station_result.station_numbers.len(), 2);
+            assert_eq!(station_result.station_numbers[0].station_number, "JY-01");
+            assert_eq!(station_result.station_numbers[0].line_symbol, "JY");
+            assert_eq!(station_result.station_numbers[1].station_number, "JK-02");
+            assert_eq!(station_result.station_numbers[1].line_symbol, "JK");
+        }
+
+        #[tokio::test]
+        async fn test_update_station_vec_with_attributes_lines_array_populated() {
+            let company = create_test_company(1, "JR東日本");
+
+            let mut station = create_test_station(101, 1001, 100, Some(1000));
+            station.company_cd = Some(1);
+
+            // Multiple lines associated with the same station group
+            let mut line1 = create_test_line_for_station_group(100, 1001);
+            line1.line_name = "山手線".to_string();
+            let mut line2 = create_test_line_for_station_group(200, 1001);
+            line2.line_name = "京浜東北線".to_string();
+
+            let interactor = create_configurable_interactor(
+                vec![station.clone()],
+                vec![],
+                vec![line1, line2],
+                vec![],
+                vec![company],
+            );
+
+            let stations = vec![station];
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, None)
+                .await
+                .expect("Should succeed");
+
+            assert_eq!(result.len(), 1);
+
+            let station_result = &result[0];
+            // Should have both lines in the lines array
+            assert_eq!(station_result.lines.len(), 2);
+
+            let line_names: Vec<&str> = station_result
+                .lines
+                .iter()
+                .map(|l| l.line_name.as_str())
+                .collect();
+            assert!(line_names.contains(&"山手線"));
+            assert!(line_names.contains(&"京浜東北線"));
+
+            // Each line in the array should have company and line_symbols populated
+            for line in &station_result.lines {
+                assert!(line.company.is_some());
+                assert!(!line.line_symbols.is_empty());
+            }
+        }
+    }
 }
