@@ -667,7 +667,7 @@ async fn insert_stops_batch(
         platform_code,
     ) in batch
     {
-        let escape = |s: &str| s.replace('\'', "''");
+        let escape = |s: &str| s.replace('\\', "\\\\").replace('\'', "''");
         let opt_str = |o: &Option<String>| {
             o.as_ref()
                 .map(|s| format!("'{}'", escape(s)))
@@ -819,7 +819,7 @@ async fn insert_calendar_dates_batch(
         let parsed_date = chrono::NaiveDate::parse_from_str(date, "%Y%m%d")?;
         values.push(format!(
             "('{}', '{}', {})",
-            service_id.replace('\'', "''"),
+            service_id.replace('\\', "\\\\").replace('\'', "''"),
             parsed_date,
             exception_type
         ));
