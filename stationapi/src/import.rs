@@ -1636,7 +1636,6 @@ async fn build_stop_route_mapping(
                )
            ),
            -- Find variant-only stops (not on main trip) with their neighbor info
-           -- Exclude stops that ONLY appear on NULL direction_id trips (loop routes)
            variant_only_with_neighbors AS (
                SELECT DISTINCT ON (vts.parent_stop_id, vts.route_id)
                    vts.parent_stop_id,
@@ -1649,15 +1648,6 @@ async fn build_stop_route_mapping(
                    SELECT 1 FROM main_trip_stops mts
                    WHERE mts.parent_stop_id = vts.parent_stop_id
                      AND mts.route_id = vts.route_id
-               )
-               -- Only include stops that appear on at least one non-NULL direction_id trip
-               AND EXISTS (
-                   SELECT 1 FROM gtfs_trips gt2
-                   JOIN gtfs_stop_times gst2 ON gt2.trip_id = gst2.trip_id
-                   JOIN gtfs_stops gs2 ON gst2.stop_id = gs2.stop_id
-                   WHERE gt2.route_id = vts.route_id
-                     AND COALESCE(gs2.parent_station, gs2.stop_id) = vts.parent_stop_id
-                     AND gt2.direction_id IS NOT NULL
                )
                ORDER BY vts.parent_stop_id, vts.route_id, vts.stop_sequence
            ),
