@@ -1636,7 +1636,7 @@ async fn build_stop_route_mapping(
                )
            ),
            -- Find variant-only stops (not on main trip) with their neighbor info
-           -- Exclude stops that ONLY appear on NULL direction_id trips (loop routes)
+           -- Prioritize records where neighbors exist on main trip for better position estimation
            variant_only_with_neighbors AS (
                SELECT DISTINCT ON (vts.parent_stop_id, vts.route_id)
                    vts.parent_stop_id,
@@ -1645,21 +1645,25 @@ async fn build_stop_route_mapping(
                    vts.prev_stop_id,
                    vts.next_stop_id
                FROM variant_trip_stops_with_neighbors vts
+               LEFT JOIN main_trip_stops mts_prev
+                   ON vts.prev_stop_id = mts_prev.parent_stop_id
+                   AND vts.route_id = mts_prev.route_id
+               LEFT JOIN main_trip_stops mts_next
+                   ON vts.next_stop_id = mts_next.parent_stop_id
+                   AND vts.route_id = mts_next.route_id
                WHERE NOT EXISTS (
                    SELECT 1 FROM main_trip_stops mts
                    WHERE mts.parent_stop_id = vts.parent_stop_id
                      AND mts.route_id = vts.route_id
                )
-               -- Only include stops that appear on at least one non-NULL direction_id trip
-               AND EXISTS (
-                   SELECT 1 FROM gtfs_trips gt2
-                   JOIN gtfs_stop_times gst2 ON gt2.trip_id = gst2.trip_id
-                   JOIN gtfs_stops gs2 ON gst2.stop_id = gs2.stop_id
-                   WHERE gt2.route_id = vts.route_id
-                     AND COALESCE(gs2.parent_station, gs2.stop_id) = vts.parent_stop_id
-                     AND gt2.direction_id IS NOT NULL
-               )
-               ORDER BY vts.parent_stop_id, vts.route_id, vts.stop_sequence
+               ORDER BY vts.parent_stop_id, vts.route_id,
+                        -- Prioritize records where neighbors exist on main trip
+                        CASE
+                            WHEN mts_prev.parent_stop_id IS NOT NULL AND mts_next.parent_stop_id IS NOT NULL THEN 0
+                            WHEN mts_prev.parent_stop_id IS NOT NULL OR mts_next.parent_stop_id IS NOT NULL THEN 1
+                            ELSE 2
+                        END,
+                        vts.stop_sequence
            ),
            -- Recursive CTE to find the nearest main-trip stop by following prev chain
            prev_chain AS (
