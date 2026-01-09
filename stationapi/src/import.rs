@@ -2,7 +2,9 @@
 
 use csv::{ReaderBuilder, StringRecord};
 use sqlx::{Connection, PgConnection};
-use stationapi::config::{fetch_database_url, fetch_odpt_api_key, is_gtfs_source_enabled, is_rail_gtfs_enabled};
+use stationapi::config::{
+    fetch_database_url, fetch_odpt_api_key, is_gtfs_source_enabled, is_rail_gtfs_enabled,
+};
 use std::collections::HashMap;
 use std::io::{Cursor, Read as _};
 use std::path::Path;
@@ -250,12 +252,17 @@ struct Translation {
 }
 
 /// Download and extract GTFS data for a specific source
-fn download_gtfs_source(source: &GtfsSource) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn download_gtfs_source(
+    source: &GtfsSource,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let gtfs_path = Path::new("data").join(format!("gtfs-{}", source.id));
 
     // Skip if directory already exists
     if gtfs_path.exists() {
-        info!("[{}] GTFS directory already exists, skipping download.", source.name);
+        info!(
+            "[{}] GTFS directory already exists, skipping download.",
+            source.name
+        );
         return Ok(());
     }
 
@@ -269,11 +276,16 @@ fn download_gtfs_source(source: &GtfsSource) -> Result<(), Box<dyn std::error::E
             "[{}] Failed to download GTFS: HTTP {}",
             source.name,
             response.status()
-        ).into());
+        )
+        .into());
     }
 
     let bytes = response.bytes()?;
-    info!("[{}] Downloaded {} bytes, extracting...", source.name, bytes.len());
+    info!(
+        "[{}] Downloaded {} bytes, extracting...",
+        source.name,
+        bytes.len()
+    );
 
     // Create the target directory
     fs::create_dir_all(&gtfs_path)?;
@@ -312,7 +324,9 @@ fn download_gtfs_source(source: &GtfsSource) -> Result<(), Box<dyn std::error::E
 }
 
 /// Download all GTFS sources (blocking, for use with spawn_blocking)
-fn download_all_gtfs_sources(sources: Vec<GtfsSource>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn download_all_gtfs_sources(
+    sources: Vec<GtfsSource>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     for source in &sources {
         if let Err(e) = download_gtfs_source(source) {
             warn!("[{}] Failed to download GTFS: {}", source.name, e);
@@ -612,7 +626,10 @@ async fn import_gtfs_routes_with_source(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let routes_path = gtfs_path.join("routes.txt");
     if !routes_path.exists() {
-        warn!("[{}] routes.txt not found, skipping routes import.", source.name);
+        warn!(
+            "[{}] routes.txt not found, skipping routes import.",
+            source.name
+        );
         return Ok(());
     }
 
@@ -1703,9 +1720,9 @@ async fn integrate_gtfs_routes_to_lines(
         // Determine line_type based on GTFS route_type
         // GTFS route_type: 0=Tram, 1=Subway, 2=Rail, 3=Bus
         let line_type = match route.route_type {
-            0 => 4, // Tram -> line_type 4 (路面電車)
-            1 => 3, // Subway -> line_type 3 (地下鉄)
-            2 => 2, // Rail -> line_type 2 (JR在来線相当)
+            0 => 4,  // Tram -> line_type 4 (路面電車)
+            1 => 3,  // Subway -> line_type 3 (地下鉄)
+            2 => 2,  // Rail -> line_type 2 (JR在来線相当)
             _ => 99, // Bus/Others -> line_type 99 (その他)
         };
 
