@@ -568,55 +568,6 @@ async fn import_gtfs_agencies(
     Ok(())
 }
 
-/// Import routes from routes.txt
-async fn import_gtfs_routes(
-    conn: &mut PgConnection,
-    gtfs_path: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let routes_path = gtfs_path.join("routes.txt");
-    if !routes_path.exists() {
-        warn!("routes.txt not found, skipping routes import.");
-        return Ok(());
-    }
-
-    let mut rdr = ReaderBuilder::new().from_path(&routes_path)?;
-
-    for result in rdr.records() {
-        let record = result?;
-        // route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_color,route_text_color,jp_parent_route_id
-        let route_id = record.get(0).unwrap_or("");
-        let agency_id = record.get(1).filter(|s| !s.is_empty());
-        let route_short_name = record.get(2).filter(|s| !s.is_empty());
-        let route_long_name = record.get(3).filter(|s| !s.is_empty());
-        let route_desc = record.get(4).filter(|s| !s.is_empty());
-        let route_type: i32 = record.get(5).unwrap_or("3").parse().unwrap_or(3);
-        let route_url = record.get(6).filter(|s| !s.is_empty());
-        let route_color = record.get(7).filter(|s| !s.is_empty());
-        let route_text_color = record.get(8).filter(|s| !s.is_empty());
-
-        sqlx::query(
-            r#"INSERT INTO gtfs_routes
-               (route_id, agency_id, route_short_name, route_long_name, route_desc, route_type, route_url, route_color, route_text_color)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-               ON CONFLICT (route_id) DO NOTHING"#,
-        )
-        .bind(route_id)
-        .bind(agency_id)
-        .bind(route_short_name)
-        .bind(route_long_name)
-        .bind(route_desc)
-        .bind(route_type)
-        .bind(route_url)
-        .bind(route_color)
-        .bind(route_text_color)
-        .execute(&mut *conn)
-        .await?;
-    }
-
-    info!("Imported routes.");
-    Ok(())
-}
-
 /// Import routes from routes.txt with source information
 /// Routes are prefixed with source_id to allow multiple sources
 async fn import_gtfs_routes_with_source(
