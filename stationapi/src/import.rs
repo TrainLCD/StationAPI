@@ -425,7 +425,7 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
         import_gtfs_shapes(&mut tx, &gtfs_path).await?;
 
         // Import trips
-        import_gtfs_trips(&mut tx, &gtfs_path).await?;
+        import_gtfs_trips(&mut tx, &gtfs_path, source).await?;
 
         // Import stop_times (largest file, needs batch processing)
         import_gtfs_stop_times(&mut tx, &gtfs_path).await?;
@@ -1050,13 +1050,18 @@ async fn insert_shapes_batch(
 }
 
 /// Import trips from trips.txt
+/// Routes are prefixed with source_id to match gtfs_routes
 async fn import_gtfs_trips(
     conn: &mut PgConnection,
     gtfs_path: &Path,
+    source: &GtfsSource,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let trips_path = gtfs_path.join("trips.txt");
     if !trips_path.exists() {
-        warn!("trips.txt not found, skipping trips import.");
+        warn!(
+            "[{}] trips.txt not found, skipping trips import.",
+            source.name
+        );
         return Ok(());
     }
 
@@ -1067,7 +1072,9 @@ async fn import_gtfs_trips(
 
     for result in rdr.records() {
         let record = result?;
-        let route_id = record.get(0).unwrap_or("").to_string();
+        let original_route_id = record.get(0).unwrap_or("");
+        // Prefix route_id with source_id to match gtfs_routes
+        let route_id = format!("{}:{}", source.id, original_route_id);
         let service_id = record.get(1).unwrap_or("").to_string();
         let trip_id = record.get(2).unwrap_or("").to_string();
         let trip_headsign = record
@@ -1118,7 +1125,7 @@ async fn import_gtfs_trips(
             batch.clear();
 
             if count % 50000 == 0 {
-                info!("Imported {} trips...", count);
+                info!("[{}] Imported {} trips...", source.name, count);
             }
         }
     }
@@ -1129,7 +1136,7 @@ async fn import_gtfs_trips(
         count += batch.len();
     }
 
-    info!("Imported {} trips.", count);
+    info!("[{}] Imported {} trips.", source.name, count);
     Ok(())
 }
 
