@@ -2,13 +2,94 @@
 
 use csv::{ReaderBuilder, StringRecord};
 use sqlx::{Connection, PgConnection};
-use stationapi::config::fetch_database_url;
+use stationapi::config::{fetch_database_url, fetch_odpt_api_key, is_gtfs_source_enabled, is_rail_gtfs_enabled};
 use std::collections::HashMap;
 use std::io::{Cursor, Read as _};
 use std::path::Path;
 use std::{env, fs};
 use tracing::{info, warn};
 use zip::ZipArchive;
+
+/// GTFSデータソースの設定
+#[derive(Debug, Clone)]
+pub struct GtfsSource {
+    /// ソース識別子（例: "toei_bus", "tokyo_metro"）
+    pub id: String,
+    /// 表示名
+    pub name: String,
+    /// ダウンロードURL
+    pub url: String,
+    /// TransportType (1: バス, 2: 鉄道GTFS)
+    pub transport_type: i32,
+    /// 会社コード (companies テーブルの company_cd)
+    pub company_cd: i32,
+    /// 有効/無効
+    pub enabled: bool,
+}
+
+/// GTFSデータの出典情報
+pub const ODPT_ATTRIBUTION: &str = "データ提供: 公共交通オープンデータセンター";
+
+/// 利用可能なGTFSソースの一覧を取得
+pub fn get_gtfs_sources() -> Vec<GtfsSource> {
+    let api_key = fetch_odpt_api_key();
+    let mut sources = Vec::new();
+
+    // 都営バス（公開API - APIキー不要）
+    if !is_bus_feature_disabled() {
+        sources.push(GtfsSource {
+            id: "toei_bus".into(),
+            name: "都営バス".into(),
+            url: "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip".into(),
+            transport_type: 1,
+            company_cd: 119,
+            enabled: is_gtfs_source_enabled("toei_bus"),
+        });
+    }
+
+    // APIキーがある場合は鉄道GTFSを追加
+    if let Some(key) = api_key {
+        if is_rail_gtfs_enabled() {
+            // 東京メトロ
+            if is_gtfs_source_enabled("tokyo_metro") {
+                sources.push(GtfsSource {
+                    id: "tokyo_metro".into(),
+                    name: "東京メトロ".into(),
+                    url: format!(
+                        "https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-GTFS.zip?acl:consumerKey={}",
+                        key
+                    ),
+                    transport_type: 2,
+                    company_cd: 28,
+                    enabled: true,
+                });
+            }
+
+            // 都営地下鉄
+            if is_gtfs_source_enabled("toei_subway") {
+                sources.push(GtfsSource {
+                    id: "toei_subway".into(),
+                    name: "都営地下鉄".into(),
+                    url: format!(
+                        "https://api.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip?acl:consumerKey={}",
+                        key
+                    ),
+                    transport_type: 2,
+                    company_cd: 119,
+                    enabled: true,
+                });
+            }
+
+            // TODO: 将来追加予定
+            // - JR東日本（関東エリア）
+            // - 東武鉄道
+            // - 相模鉄道
+            // - 東京臨海高速鉄道
+        }
+    }
+
+    sources.into_iter().filter(|s| s.enabled).collect()
+}
 
 /// Type alias for GTFS trips batch row
 type TripBatchRow = (
@@ -168,34 +249,34 @@ struct Translation {
     ko: Option<String>,      // Korean
 }
 
-/// GTFS download URL for Toei Bus
-const TOEI_BUS_GTFS_URL: &str =
-    "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip";
-
-/// Download and extract GTFS data from ODPT API
-fn download_gtfs() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let gtfs_path = Path::new("data/ToeiBus-GTFS");
+/// Download and extract GTFS data for a specific source
+fn download_gtfs_source(source: &GtfsSource) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let gtfs_path = Path::new("data").join(format!("gtfs-{}", source.id));
 
     // Skip if directory already exists
     if gtfs_path.exists() {
-        info!("GTFS directory already exists, skipping download.");
+        info!("[{}] GTFS directory already exists, skipping download.", source.name);
         return Ok(());
     }
 
-    info!("Downloading GTFS data from ODPT API...");
+    info!("[{}] Downloading GTFS data from ODPT API...", source.name);
 
     // Download the ZIP file
-    let response = reqwest::blocking::get(TOEI_BUS_GTFS_URL)?;
+    let response = reqwest::blocking::get(&source.url)?;
 
     if !response.status().is_success() {
-        return Err(format!("Failed to download GTFS: HTTP {}", response.status()).into());
+        return Err(format!(
+            "[{}] Failed to download GTFS: HTTP {}",
+            source.name,
+            response.status()
+        ).into());
     }
 
     let bytes = response.bytes()?;
-    info!("Downloaded {} bytes, extracting...", bytes.len());
+    info!("[{}] Downloaded {} bytes, extracting...", source.name, bytes.len());
 
     // Create the target directory
-    fs::create_dir_all(gtfs_path)?;
+    fs::create_dir_all(&gtfs_path)?;
 
     // Extract the ZIP file
     let cursor = Cursor::new(bytes);
@@ -224,46 +305,46 @@ fn download_gtfs() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut contents = Vec::new();
         file.read_to_end(&mut contents)?;
         fs::write(&output_path, &contents)?;
-
-        info!("Extracted: {}", output_name);
     }
 
-    info!("GTFS extraction completed.");
+    info!("[{}] GTFS extraction completed.", source.name);
     Ok(())
 }
 
-/// Import GTFS data from ToeiBus-GTFS directory
+/// Download all GTFS sources (blocking, for use with spawn_blocking)
+fn download_all_gtfs_sources(sources: Vec<GtfsSource>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    for source in &sources {
+        if let Err(e) = download_gtfs_source(source) {
+            warn!("[{}] Failed to download GTFS: {}", source.name, e);
+            // Continue with other sources even if one fails
+        }
+    }
+    Ok(())
+}
+
+/// Import all GTFS data from multiple sources
 /// All imports are wrapped in a transaction - if any step fails, all changes are rolled back
 pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
-    // Check if bus feature is disabled
-    if is_bus_feature_disabled() {
-        info!("Bus feature is disabled, skipping GTFS import.");
+    let sources = get_gtfs_sources();
+
+    if sources.is_empty() {
+        info!("No GTFS sources enabled, skipping GTFS import.");
         return Ok(());
     }
 
-    // Download GTFS data if not present (use spawn_blocking to avoid blocking async runtime)
-    tokio::task::spawn_blocking(download_gtfs)
+    info!("Found {} GTFS sources to import", sources.len());
+
+    // Download all GTFS data (use spawn_blocking to avoid blocking async runtime)
+    let sources_for_download = sources.clone();
+    tokio::task::spawn_blocking(move || download_all_gtfs_sources(sources_for_download))
         .await
         .map_err(|e| format!("Failed to spawn blocking task: {}", e))?
         .map_err(|e| -> Box<dyn std::error::Error> { e })?;
 
-    let gtfs_path = Path::new("data/ToeiBus-GTFS");
-
-    if !gtfs_path.exists() {
-        info!("GTFS directory not found, skipping GTFS import.");
-        return Ok(());
-    }
-
-    // Load translations for multi-language support (before transaction to avoid holding lock)
-    let translations = load_gtfs_translations(gtfs_path)?;
-
     let db_url = fetch_database_url();
     let mut conn = PgConnection::connect(&db_url).await?;
 
-    info!(
-        "Starting GTFS import from {:?} (using transaction)...",
-        gtfs_path
-    );
+    info!("Starting GTFS import (using transaction)...");
 
     // Begin transaction - all changes will be rolled back if any step fails
     let mut tx = conn.begin().await?;
@@ -297,32 +378,49 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
         .execute(&mut *tx)
         .await?;
 
-    // Import agencies
-    import_gtfs_agencies(&mut tx, gtfs_path).await?;
+    // Import each source
+    for source in &sources {
+        let gtfs_path = Path::new("data").join(format!("gtfs-{}", source.id));
 
-    // Import routes
-    import_gtfs_routes(&mut tx, gtfs_path).await?;
+        if !gtfs_path.exists() {
+            warn!("[{}] GTFS directory not found, skipping.", source.name);
+            continue;
+        }
 
-    // Import stops with translations
-    import_gtfs_stops(&mut tx, gtfs_path, &translations).await?;
+        info!("[{}] Starting import from {:?}...", source.name, gtfs_path);
 
-    // Import calendar
-    import_gtfs_calendar(&mut tx, gtfs_path).await?;
+        // Load translations for multi-language support
+        let translations = load_gtfs_translations(&gtfs_path)?;
 
-    // Import calendar_dates
-    import_gtfs_calendar_dates(&mut tx, gtfs_path).await?;
+        // Import agencies
+        import_gtfs_agencies(&mut tx, &gtfs_path).await?;
 
-    // Import shapes
-    import_gtfs_shapes(&mut tx, gtfs_path).await?;
+        // Import routes with source info
+        import_gtfs_routes_with_source(&mut tx, &gtfs_path, source).await?;
 
-    // Import trips
-    import_gtfs_trips(&mut tx, gtfs_path).await?;
+        // Import stops with translations
+        import_gtfs_stops(&mut tx, &gtfs_path, &translations).await?;
 
-    // Import stop_times (largest file, needs batch processing)
-    import_gtfs_stop_times(&mut tx, gtfs_path).await?;
+        // Import calendar
+        import_gtfs_calendar(&mut tx, &gtfs_path).await?;
 
-    // Import feed_info
-    import_gtfs_feed_info(&mut tx, gtfs_path).await?;
+        // Import calendar_dates
+        import_gtfs_calendar_dates(&mut tx, &gtfs_path).await?;
+
+        // Import shapes
+        import_gtfs_shapes(&mut tx, &gtfs_path).await?;
+
+        // Import trips
+        import_gtfs_trips(&mut tx, &gtfs_path).await?;
+
+        // Import stop_times (largest file, needs batch processing)
+        import_gtfs_stop_times(&mut tx, &gtfs_path).await?;
+
+        // Import feed_info
+        import_gtfs_feed_info(&mut tx, &gtfs_path).await?;
+
+        info!("[{}] Import completed.", source.name);
+    }
 
     // Commit transaction - all changes are now permanent
     tx.commit().await?;
@@ -502,6 +600,76 @@ async fn import_gtfs_routes(
     }
 
     info!("Imported routes.");
+    Ok(())
+}
+
+/// Import routes from routes.txt with source information
+/// Routes are prefixed with source_id to allow multiple sources
+async fn import_gtfs_routes_with_source(
+    conn: &mut PgConnection,
+    gtfs_path: &Path,
+    source: &GtfsSource,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let routes_path = gtfs_path.join("routes.txt");
+    if !routes_path.exists() {
+        warn!("[{}] routes.txt not found, skipping routes import.", source.name);
+        return Ok(());
+    }
+
+    let mut rdr = ReaderBuilder::new().from_path(&routes_path)?;
+    let mut count = 0;
+
+    for result in rdr.records() {
+        let record = result?;
+        // route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_color,route_text_color
+        let original_route_id = record.get(0).unwrap_or("");
+        // Prefix route_id with source_id to make it unique across sources
+        let route_id = format!("{}:{}", source.id, original_route_id);
+        let agency_id = record.get(1).filter(|s| !s.is_empty());
+        let route_short_name = record.get(2).filter(|s| !s.is_empty());
+        let route_long_name = record.get(3).filter(|s| !s.is_empty());
+        let route_desc = record.get(4).filter(|s| !s.is_empty());
+        let route_type: i32 = record.get(5).unwrap_or("3").parse().unwrap_or(3);
+        let route_url = record.get(6).filter(|s| !s.is_empty());
+        let route_color = record.get(7).filter(|s| !s.is_empty());
+        let route_text_color = record.get(8).filter(|s| !s.is_empty());
+
+        sqlx::query(
+            r#"INSERT INTO gtfs_routes
+               (route_id, agency_id, route_short_name, route_long_name, route_desc, route_type, route_url, route_color, route_text_color, transport_type, company_cd, source_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+               ON CONFLICT (route_id) DO UPDATE SET
+                   agency_id = EXCLUDED.agency_id,
+                   route_short_name = EXCLUDED.route_short_name,
+                   route_long_name = EXCLUDED.route_long_name,
+                   route_desc = EXCLUDED.route_desc,
+                   route_type = EXCLUDED.route_type,
+                   route_url = EXCLUDED.route_url,
+                   route_color = EXCLUDED.route_color,
+                   route_text_color = EXCLUDED.route_text_color,
+                   transport_type = EXCLUDED.transport_type,
+                   company_cd = EXCLUDED.company_cd,
+                   source_id = EXCLUDED.source_id"#,
+        )
+        .bind(&route_id)
+        .bind(agency_id)
+        .bind(route_short_name)
+        .bind(route_long_name)
+        .bind(route_desc)
+        .bind(route_type)
+        .bind(route_url)
+        .bind(route_color)
+        .bind(route_text_color)
+        .bind(source.transport_type)
+        .bind(source.company_cd)
+        .bind(&source.id)
+        .execute(&mut *conn)
+        .await?;
+
+        count += 1;
+    }
+
+    info!("[{}] Imported {} routes.", source.name, count);
     Ok(())
 }
 
@@ -1411,6 +1579,10 @@ struct GtfsRouteRow {
     route_text_color: Option<String>,
     #[allow(dead_code)]
     route_sort_order: Option<i32>,
+    transport_type: Option<i32>,
+    company_cd: Option<i32>,
+    #[allow(dead_code)]
+    source_id: Option<String>,
 }
 
 /// Row type for reading gtfs_stops
@@ -1444,16 +1616,11 @@ struct GtfsStopRow {
     platform_code: Option<String>,
 }
 
-/// Integrate GTFS bus data into stations/lines tables
+/// Integrate GTFS data (bus and rail) into stations/lines tables
 ///
 /// This function wraps all integration operations in a single database transaction.
 /// If any step fails, all changes are rolled back to maintain database consistency.
 pub async fn integrate_gtfs_to_stations() -> Result<(), Box<dyn std::error::Error>> {
-    if is_bus_feature_disabled() {
-        info!("Bus feature is disabled, skipping GTFS integration.");
-        return Ok(());
-    }
-
     let db_url = fetch_database_url();
     let mut conn = PgConnection::connect(&db_url).await?;
 
@@ -1472,14 +1639,14 @@ pub async fn integrate_gtfs_to_stations() -> Result<(), Box<dyn std::error::Erro
     // Begin transaction - all changes will be rolled back if any step fails
     let mut tx = conn.begin().await?;
 
-    // Step 1: Clear existing bus data from stations/lines
-    sqlx::query("DELETE FROM stations WHERE transport_type = 1")
+    // Step 1: Clear existing GTFS data from stations/lines (bus: transport_type=1, rail_gtfs: transport_type=2)
+    sqlx::query("DELETE FROM stations WHERE transport_type IN (1, 2)")
         .execute(&mut *tx)
         .await?;
-    sqlx::query("DELETE FROM lines WHERE transport_type = 1")
+    sqlx::query("DELETE FROM lines WHERE transport_type IN (1, 2)")
         .execute(&mut *tx)
         .await?;
-    info!("Cleared existing bus data from stations/lines tables.");
+    info!("Cleared existing GTFS data (bus and rail) from stations/lines tables.");
 
     // Step 2: Insert bus routes as lines
     integrate_gtfs_routes_to_lines(&mut tx).await?;
@@ -1502,6 +1669,7 @@ pub async fn integrate_gtfs_to_stations() -> Result<(), Box<dyn std::error::Erro
 }
 
 /// Integrate gtfs_routes into lines table
+/// Supports both bus (transport_type=1) and rail GTFS (transport_type=2) routes
 async fn integrate_gtfs_routes_to_lines(
     conn: &mut PgConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -1509,9 +1677,14 @@ async fn integrate_gtfs_routes_to_lines(
         .fetch_all(&mut *conn)
         .await?;
 
-    let company_cd = 119; // Tokyo Metropolitan Bureau of Transportation (東京都交通局)
+    let mut bus_count = 0;
+    let mut rail_count = 0;
 
     for route in &routes {
+        // Use transport_type and company_cd from gtfs_routes if available, otherwise default to bus (1) and 119
+        let transport_type = route.transport_type.unwrap_or(1);
+        let company_cd = route.company_cd.unwrap_or(119);
+
         let line_cd = generate_bus_line_cd(&route.route_id);
         let line_name = route
             .route_short_name
@@ -1527,12 +1700,21 @@ async fn integrate_gtfs_routes_to_lines(
 
         let line_name_r = route.route_long_name.clone().unwrap_or_default();
 
+        // Determine line_type based on GTFS route_type
+        // GTFS route_type: 0=Tram, 1=Subway, 2=Rail, 3=Bus
+        let line_type = match route.route_type {
+            0 => 4, // Tram -> line_type 4 (路面電車)
+            1 => 3, // Subway -> line_type 3 (地下鉄)
+            2 => 2, // Rail -> line_type 2 (JR在来線相当)
+            _ => 99, // Bus/Others -> line_type 99 (その他)
+        };
+
         sqlx::query(
             r#"INSERT INTO lines (
                 line_cd, company_cd, line_name, line_name_k, line_name_h,
                 line_name_r, line_color_c, line_type, e_status, e_sort, transport_type
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, 0, $1, 1
+                $1, $2, $3, $4, $5, $6, $7, $8, 0, $1, $9
             )
             ON CONFLICT (line_cd) DO NOTHING"#,
         )
@@ -1543,7 +1725,8 @@ async fn integrate_gtfs_routes_to_lines(
         .bind(&line_name) // line_name_h
         .bind(&line_name_r) // line_name_r
         .bind(&line_color)
-        .bind(route.route_type)
+        .bind(line_type)
+        .bind(transport_type)
         .execute(&mut *conn)
         .await?;
 
@@ -1553,9 +1736,20 @@ async fn integrate_gtfs_routes_to_lines(
             .bind(&route.route_id)
             .execute(&mut *conn)
             .await?;
+
+        if transport_type == 1 {
+            bus_count += 1;
+        } else {
+            rail_count += 1;
+        }
     }
 
-    info!("Integrated {} routes as lines.", routes.len());
+    info!(
+        "Integrated {} routes as lines (bus: {}, rail: {}).",
+        routes.len(),
+        bus_count,
+        rail_count
+    );
     Ok(())
 }
 

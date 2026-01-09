@@ -643,7 +643,7 @@ ALTER TABLE public.gtfs_agencies OWNER TO stationapi;
 
 --
 -- Name: gtfs_routes; Type: TABLE; Schema: public
--- GTFS route information (bus lines)
+-- GTFS route information (bus lines and rail lines from GTFS sources)
 --
 
 CREATE UNLOGGED TABLE public.gtfs_routes (
@@ -656,18 +656,23 @@ CREATE UNLOGGED TABLE public.gtfs_routes (
     route_long_name_zh TEXT,
     route_long_name_ko TEXT,
     route_desc TEXT,
-    route_type INTEGER NOT NULL DEFAULT 3,  -- 3 = Bus
+    route_type INTEGER NOT NULL DEFAULT 3,  -- 3 = Bus, 1 = Subway, 2 = Rail
     route_url TEXT,
     route_color VARCHAR(6),
     route_text_color VARCHAR(6),
     route_sort_order INTEGER,
-    line_cd INTEGER REFERENCES public.lines(line_cd)
+    line_cd INTEGER REFERENCES public.lines(line_cd),
+    transport_type INTEGER DEFAULT 1,  -- 1: Bus, 2: Rail (GTFS)
+    company_cd INTEGER REFERENCES public.companies(company_cd),
+    source_id VARCHAR(50)  -- GTFS source identifier (e.g., "toei_bus", "tokyo_metro")
 );
 
 ALTER TABLE public.gtfs_routes OWNER TO stationapi;
 
 CREATE INDEX idx_gtfs_routes_agency_id ON public.gtfs_routes USING btree (agency_id);
 CREATE INDEX idx_gtfs_routes_line_cd ON public.gtfs_routes USING btree (line_cd);
+CREATE INDEX idx_gtfs_routes_transport_type ON public.gtfs_routes USING btree (transport_type);
+CREATE INDEX idx_gtfs_routes_source_id ON public.gtfs_routes USING btree (source_id);
 
 --
 -- Name: gtfs_stops; Type: TABLE; Schema: public
