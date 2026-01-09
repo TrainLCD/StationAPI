@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
     rm -rf /var/lib/apt/lists/*
 
 ENV HOST=0.0.0.0
-# PORT is configured via docker-compose environment
-EXPOSE 50051 50052
+ENV PORT=50051
+EXPOSE $PORT
 
 CMD ["stationapi"]
