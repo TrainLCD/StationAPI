@@ -29,9 +29,6 @@ pub struct GtfsSource {
     pub enabled: bool,
 }
 
-/// GTFSデータの出典情報
-pub const ODPT_ATTRIBUTION: &str = "データ提供: 公共交通オープンデータセンター";
-
 /// 利用可能なGTFSソースの一覧を取得
 pub fn get_gtfs_sources() -> Vec<GtfsSource> {
     let api_key = fetch_odpt_api_key();

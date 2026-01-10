@@ -67,12 +67,8 @@ impl StopPatternDetector {
             operators.len()
         );
 
-        // Fetch current patterns from ODPT API (blocking call in spawn_blocking)
-        let ops = operators.to_vec();
-        let client = OdptClient::new(self.client.api_key.clone());
-
-        let current_patterns =
-            tokio::task::spawn_blocking(move || client.extract_all_stop_patterns(&ops)).await??;
+        // Fetch current patterns from ODPT API
+        let current_patterns = self.client.extract_all_stop_patterns(operators).await?;
 
         info!("Fetched {} current patterns", current_patterns.len());
 
@@ -228,9 +224,9 @@ impl StopPatternDetector {
             sqlx::query(
                 r#"
                 INSERT INTO stop_pattern_snapshots
-                    (operator_id, railway_id, train_type_id, train_type_name, station_ids, station_names)
-                VALUES ($1, $2, $3, $4, $5, $6)
-                ON CONFLICT (railway_id, train_type_id, (captured_at::date))
+                    (operator_id, railway_id, train_type_id, train_type_name, station_ids, station_names, captured_date)
+                VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE)
+                ON CONFLICT (railway_id, train_type_id, captured_date)
                 DO UPDATE SET
                     station_ids = EXCLUDED.station_ids,
                     station_names = EXCLUDED.station_names,

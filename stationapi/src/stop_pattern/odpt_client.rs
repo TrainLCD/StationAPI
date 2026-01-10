@@ -217,19 +217,19 @@ pub struct StopPattern {
 /// ODPT API Client
 pub struct OdptClient {
     pub(crate) api_key: String,
-    client: reqwest::blocking::Client,
+    client: reqwest::Client,
 }
 
 impl OdptClient {
     pub fn new(api_key: String) -> Self {
         Self {
             api_key,
-            client: reqwest::blocking::Client::new(),
+            client: reqwest::Client::new(),
         }
     }
 
     /// Fetch train timetables for an operator
-    pub fn fetch_train_timetables(
+    pub async fn fetch_train_timetables(
         &self,
         operator: OdptOperator,
     ) -> Result<Vec<TrainTimetable>, Box<dyn std::error::Error + Send + Sync>> {
@@ -246,7 +246,7 @@ impl OdptClient {
             operator.id()
         );
 
-        let response = self.client.get(&url).send()?;
+        let response = self.client.get(&url).send().await?;
 
         if !response.status().is_success() {
             return Err(format!(
@@ -257,7 +257,7 @@ impl OdptClient {
             .into());
         }
 
-        let timetables: Vec<TrainTimetable> = response.json()?;
+        let timetables: Vec<TrainTimetable> = response.json().await?;
         info!(
             "Fetched {} timetables for {}",
             timetables.len(),
@@ -268,7 +268,7 @@ impl OdptClient {
     }
 
     /// Fetch railways for an operator
-    pub fn fetch_railways(
+    pub async fn fetch_railways(
         &self,
         operator: OdptOperator,
     ) -> Result<Vec<Railway>, Box<dyn std::error::Error + Send + Sync>> {
@@ -279,7 +279,7 @@ impl OdptClient {
             self.api_key
         );
 
-        let response = self.client.get(&url).send()?;
+        let response = self.client.get(&url).send().await?;
 
         if !response.status().is_success() {
             return Err(format!(
@@ -290,12 +290,12 @@ impl OdptClient {
             .into());
         }
 
-        let railways: Vec<Railway> = response.json()?;
+        let railways: Vec<Railway> = response.json().await?;
         Ok(railways)
     }
 
     /// Fetch train types for an operator
-    pub fn fetch_train_types(
+    pub async fn fetch_train_types(
         &self,
         operator: OdptOperator,
     ) -> Result<Vec<TrainType>, Box<dyn std::error::Error + Send + Sync>> {
@@ -306,7 +306,7 @@ impl OdptClient {
             self.api_key
         );
 
-        let response = self.client.get(&url).send()?;
+        let response = self.client.get(&url).send().await?;
 
         if !response.status().is_success() {
             return Err(format!(
@@ -317,12 +317,12 @@ impl OdptClient {
             .into());
         }
 
-        let train_types: Vec<TrainType> = response.json()?;
+        let train_types: Vec<TrainType> = response.json().await?;
         Ok(train_types)
     }
 
     /// Fetch stations for an operator
-    pub fn fetch_stations(
+    pub async fn fetch_stations(
         &self,
         operator: OdptOperator,
     ) -> Result<Vec<Station>, Box<dyn std::error::Error + Send + Sync>> {
@@ -333,7 +333,7 @@ impl OdptClient {
             self.api_key
         );
 
-        let response = self.client.get(&url).send()?;
+        let response = self.client.get(&url).send().await?;
 
         if !response.status().is_success() {
             return Err(format!(
@@ -344,20 +344,20 @@ impl OdptClient {
             .into());
         }
 
-        let stations: Vec<Station> = response.json()?;
+        let stations: Vec<Station> = response.json().await?;
         Ok(stations)
     }
 
     /// Extract stop patterns from train timetables
-    pub fn extract_stop_patterns(
+    pub async fn extract_stop_patterns(
         &self,
         operator: OdptOperator,
     ) -> Result<Vec<StopPattern>, Box<dyn std::error::Error + Send + Sync>> {
         // Fetch all required data
-        let timetables = self.fetch_train_timetables(operator)?;
-        let railways = self.fetch_railways(operator)?;
-        let train_types = self.fetch_train_types(operator)?;
-        let stations = self.fetch_stations(operator)?;
+        let timetables = self.fetch_train_timetables(operator).await?;
+        let railways = self.fetch_railways(operator).await?;
+        let train_types = self.fetch_train_types(operator).await?;
+        let stations = self.fetch_stations(operator).await?;
 
         // Build lookup maps
         let railway_names: HashMap<String, String> = railways
@@ -443,14 +443,14 @@ impl OdptClient {
     }
 
     /// Extract stop patterns for multiple operators
-    pub fn extract_all_stop_patterns(
+    pub async fn extract_all_stop_patterns(
         &self,
         operators: &[OdptOperator],
     ) -> Result<Vec<StopPattern>, Box<dyn std::error::Error + Send + Sync>> {
         let mut all_patterns: Vec<StopPattern> = Vec::new();
 
         for operator in operators {
-            match self.extract_stop_patterns(*operator) {
+            match self.extract_stop_patterns(*operator).await {
                 Ok(patterns) => {
                     all_patterns.extend(patterns);
                 }

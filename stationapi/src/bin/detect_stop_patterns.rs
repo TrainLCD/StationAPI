@@ -81,10 +81,9 @@ fn parse_operators() -> Vec<OdptOperator> {
 
     // Check for --operators argument
     for i in 0..args.len() {
-        if (args[i] == "--operators" || args[i] == "-o")
-            && i + 1 < args.len() {
-                return parse_operator_list(&args[i + 1]);
-            }
+        if (args[i] == "--operators" || args[i] == "-o") && i + 1 < args.len() {
+            return parse_operator_list(&args[i + 1]);
+        }
     }
 
     // Default: Tokyo Metro and Toei only (for faster initial testing)

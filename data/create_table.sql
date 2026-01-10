@@ -881,7 +881,8 @@ CREATE TABLE public.stop_pattern_snapshots (
     station_ids TEXT[] NOT NULL,           -- Array of station IDs
     station_names TEXT[],                  -- Array of station names (for reference)
     captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(railway_id, train_type_id, (captured_at::date))
+    captured_date DATE DEFAULT CURRENT_DATE,
+    UNIQUE(railway_id, train_type_id, captured_date)
 );
 
 ALTER TABLE public.stop_pattern_snapshots OWNER TO stationapi;
