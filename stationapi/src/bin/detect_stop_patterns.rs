@@ -14,7 +14,7 @@ use std::env;
 use tracing::{error, info};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing_subscriber::fmt::init();
 
     // Load .env.local if available
@@ -81,11 +81,10 @@ fn parse_operators() -> Vec<OdptOperator> {
 
     // Check for --operators argument
     for i in 0..args.len() {
-        if args[i] == "--operators" || args[i] == "-o" {
-            if i + 1 < args.len() {
+        if (args[i] == "--operators" || args[i] == "-o")
+            && i + 1 < args.len() {
                 return parse_operator_list(&args[i + 1]);
             }
-        }
     }
 
     // Default: Tokyo Metro and Toei only (for faster initial testing)

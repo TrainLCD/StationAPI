@@ -5,7 +5,7 @@
 use super::odpt_client::{OdptClient, OdptOperator, StopPattern};
 use sqlx::PgPool;
 use std::collections::HashSet;
-use tracing::{info, warn};
+use tracing::info;
 
 /// Represents a detected change in stop pattern
 #[derive(Debug, Clone)]
@@ -295,7 +295,7 @@ impl StopPatternDetector {
                     StopPatternChange {
                         operator_id,
                         railway_id,
-                        railway_name: railway_name,
+                        railway_name,
                         train_type_id,
                         train_type_name,
                         change_type: if change_type == "added" {

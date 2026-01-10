@@ -232,7 +232,7 @@ impl OdptClient {
     pub fn fetch_train_timetables(
         &self,
         operator: OdptOperator,
-    ) -> Result<Vec<TrainTimetable>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<TrainTimetable>, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!(
             "{}/odpt:TrainTimetable?odpt:operator=odpt.Operator:{}&acl:consumerKey={}",
             ODPT_API_BASE_URL,
@@ -271,7 +271,7 @@ impl OdptClient {
     pub fn fetch_railways(
         &self,
         operator: OdptOperator,
-    ) -> Result<Vec<Railway>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<Railway>, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!(
             "{}/odpt:Railway?odpt:operator=odpt.Operator:{}&acl:consumerKey={}",
             ODPT_API_BASE_URL,
@@ -298,7 +298,7 @@ impl OdptClient {
     pub fn fetch_train_types(
         &self,
         operator: OdptOperator,
-    ) -> Result<Vec<TrainType>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<TrainType>, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!(
             "{}/odpt:TrainType?odpt:operator=odpt.Operator:{}&acl:consumerKey={}",
             ODPT_API_BASE_URL,
@@ -325,7 +325,7 @@ impl OdptClient {
     pub fn fetch_stations(
         &self,
         operator: OdptOperator,
-    ) -> Result<Vec<Station>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<Station>, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!(
             "{}/odpt:Station?odpt:operator=odpt.Operator:{}&acl:consumerKey={}",
             ODPT_API_BASE_URL,
@@ -352,7 +352,7 @@ impl OdptClient {
     pub fn extract_stop_patterns(
         &self,
         operator: OdptOperator,
-    ) -> Result<Vec<StopPattern>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<StopPattern>, Box<dyn std::error::Error + Send + Sync>> {
         // Fetch all required data
         let timetables = self.fetch_train_timetables(operator)?;
         let railways = self.fetch_railways(operator)?;
@@ -446,7 +446,7 @@ impl OdptClient {
     pub fn extract_all_stop_patterns(
         &self,
         operators: &[OdptOperator],
-    ) -> Result<Vec<StopPattern>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<StopPattern>, Box<dyn std::error::Error + Send + Sync>> {
         let mut all_patterns: Vec<StopPattern> = Vec::new();
 
         for operator in operators {
