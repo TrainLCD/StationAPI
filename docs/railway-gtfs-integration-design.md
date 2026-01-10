@@ -1,272 +1,324 @@
-# 鉄道GTFSインテグレーション設計書
+# 鉄道データ自動更新設計書
 
 ## 概要
 
-ダイヤ改正への迅速な対応を実現するため、ODPT（公共交通オープンデータセンター）の鉄道GTFSデータを自動インポートする機能を追加する。
+ダイヤ改正への迅速な対応を実現するため、ODPT（公共交通オープンデータセンター）のAPIを活用した**停車パターン差分検知システム**を構築する。
 
-## 現状
+## 課題の整理
 
-- バスGTFS（都営バス）のみ対応
-- URLがハードコード (`TOEI_BUS_GTFS_URL`)
-- 単一ソースのみ
+### 本当の課題
+- **駅マスタデータ**: ほぼ変わらない（新駅追加、駅名変更は稀）
+- **種別停車パターン**: 頻繁に変わる（ダイヤ改正のたびに変更される）
 
-## 目標
+### GTFSの限界
+- GTFSは「時刻表データ」であり、「列車種別」という概念がない
+- `odpt:TrainTimetable`（時刻表API）で個別列車の停車駅は取得可能
+- しかし「快速はこの駅に停車する」というマスタデータは存在しない
 
-1. 複数のGTFSソースに対応
-2. 鉄道GTFSデータの自動インポート
-3. APIキー認証への対応
-4. ライセンス準拠の仕組み
+### 解決アプローチ
+時刻表データから停車パターンを**集計・推論**し、前回との**差分を検知**する。
 
-## 対象事業者（首都圏スモールスタート）
+## システム設計
 
-| 事業者 | transport_type | 優先度 | 備考 |
-|--------|---------------|--------|------|
-| 東京メトロ | 2 (rail_gtfs) | 高 | 全線対応 |
-| 都営地下鉄 | 2 (rail_gtfs) | 高 | 全線対応 |
-| JR東日本 | 2 (rail_gtfs) | 中 | 関東エリア在来線のみ |
-| 東武鉄道 | 2 (rail_gtfs) | 中 | 全線対応 |
-| 相模鉄道 | 2 (rail_gtfs) | 低 | 全線対応 |
-| 東京臨海高速鉄道 | 2 (rail_gtfs) | 低 | りんかい線 |
-
-## 設計
-
-### 1. TransportType の拡張
-
-```rust
-// 現状
-// 0: 鉄道（CSVデータ）
-// 1: バス（GTFS）
-
-// 新規追加
-// 2: 鉄道GTFS（ODPT等のGTFSデータ）
-```
-
-### 2. GTFSソース設定
-
-```rust
-/// GTFSデータソースの設定
-#[derive(Debug, Clone)]
-pub struct GtfsSource {
-    /// ソース識別子（例: "toei_bus", "tokyo_metro"）
-    pub id: String,
-    /// 表示名
-    pub name: String,
-    /// ダウンロードURL
-    pub url: String,
-    /// TransportType (1: バス, 2: 鉄道GTFS)
-    pub transport_type: i32,
-    /// 会社コード (companies テーブルの company_cd)
-    pub company_cd: i32,
-    /// APIキーが必要か
-    pub requires_api_key: bool,
-    /// 有効/無効
-    pub enabled: bool,
-}
-```
-
-### 3. 環境変数
-
-```bash
-# 既存
-DISABLE_BUS_FEATURE=false
-
-# 新規追加
-ODPT_API_KEY=your_api_key_here
-ENABLE_RAIL_GTFS=true
-
-# オプション: 個別ソースの有効/無効
-GTFS_ENABLE_TOKYO_METRO=true
-GTFS_ENABLE_TOEI_SUBWAY=true
-GTFS_ENABLE_JR_EAST=false
-GTFS_ENABLE_TOBU=false
-```
-
-### 4. データフロー
+### アーキテクチャ
 
 ```
-┌─────────────────────────────────────────────────┐
-│ アプリケーション起動                              │
-│                                                  │
-│ Phase 1: CSV初期化（同期）                       │
-│  └─ import_csv() - 駅データ.jp のCSV            │
-│                                                  │
-│ Phase 2: GTFS更新（バックグラウンド非同期）      │
-│  ├─ get_gtfs_sources() - 有効なソース一覧取得   │
-│  ├─ for source in sources:                       │
-│  │   ├─ download_gtfs_source(&source)           │
-│  │   ├─ import_gtfs_source(&source)             │
-│  │   └─ integrate_gtfs_source(&source)          │
-│  └─ ANALYZE                                      │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  ODPT API (TrainTimetable)                              │
+│  定期的に時刻表データを取得                               │
+└─────────────────┬───────────────────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────────────────┐
+│  停車パターン抽出エンジン                                │
+│  種別×路線ごとに「どの駅に停車する便があるか」を集計      │
+│  例: 中央線快速 → {東京, 神田, 御茶ノ水, 四ツ谷, ...}    │
+└─────────────────┬───────────────────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────────────────┐
+│  差分検知エンジン                                        │
+│  前回スナップショットと比較                              │
+│  → 新規停車駅、停車取りやめ駅を検出                      │
+└─────────────────┬───────────────────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────────────────┐
+│  通知/ログ出力                                          │
+│  変更があれば管理者に通知                                │
+│  将来的にはSlack/Discord連携も可能                       │
+└─────────────────┬───────────────────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────────────────┐
+│  人間が確認                                             │
+│  station_station_types.csv を手動更新                   │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### 5. ダウンロードURL形式
-
-```rust
-// 公開API（APIキー不要）
-const TOEI_BUS_GTFS_URL: &str =
-    "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip";
-
-// 認証API（APIキー必要）
-// 実際のURLは https://api.odpt.org/api/v4/files/{組織}/data/{ファイル名}.zip?acl:consumerKey={APIキー}
-fn build_odpt_url(org: &str, file: &str, api_key: &str) -> String {
-    format!(
-        "https://api.odpt.org/api/v4/files/{}/data/{}.zip?acl:consumerKey={}",
-        org, file, api_key
-    )
-}
-```
-
-### 6. GTFSソース定義（ハードコード版）
-
-```rust
-fn get_default_gtfs_sources(api_key: Option<&str>) -> Vec<GtfsSource> {
-    let mut sources = vec![
-        // 都営バス（公開API）
-        GtfsSource {
-            id: "toei_bus".into(),
-            name: "都営バス".into(),
-            url: "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip".into(),
-            transport_type: 1,
-            company_cd: 119,
-            requires_api_key: false,
-            enabled: true,
-        },
-    ];
-
-    // APIキーがある場合は鉄道GTFSを追加
-    if let Some(key) = api_key {
-        sources.extend(vec![
-            GtfsSource {
-                id: "tokyo_metro".into(),
-                name: "東京メトロ".into(),
-                url: format!(
-                    "https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-GTFS.zip?acl:consumerKey={}",
-                    key
-                ),
-                transport_type: 2,
-                company_cd: 28,  // 東京メトロの company_cd
-                requires_api_key: true,
-                enabled: env_bool("GTFS_ENABLE_TOKYO_METRO", true),
-            },
-            GtfsSource {
-                id: "toei_subway".into(),
-                name: "都営地下鉄".into(),
-                url: format!(
-                    "https://api.odpt.org/api/v4/files/Toei/data/ToeiSubway-GTFS.zip?acl:consumerKey={}",
-                    key
-                ),
-                transport_type: 2,
-                company_cd: 119, // 都営地下鉄の company_cd
-                requires_api_key: true,
-                enabled: env_bool("GTFS_ENABLE_TOEI_SUBWAY", true),
-            },
-            // JR東日本、東武鉄道等は後続フェーズで追加
-        ]);
-    }
-
-    sources
-}
-```
-
-### 7. データベース変更
+### データベーススキーマ
 
 ```sql
--- transport_type の値の拡張
--- 0: 鉄道（CSVデータ - 駅データ.jp）
--- 1: バス（GTFS）
--- 2: 鉄道GTFS（ODPT等）
+-- 停車パターンのスナップショット
+CREATE TABLE stop_pattern_snapshots (
+    id SERIAL PRIMARY KEY,
+    railway_id VARCHAR(100) NOT NULL,      -- odpt.Railway:JR-East.ChuoRapid
+    train_type_id VARCHAR(100) NOT NULL,   -- odpt.TrainType:JR-East.Rapid
+    train_type_name VARCHAR(100),          -- 快速
+    station_ids TEXT[] NOT NULL,           -- 停車駅IDの配列
+    station_names TEXT[],                  -- 停車駅名の配列（参照用）
+    captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(railway_id, train_type_id, captured_at::date)
+);
 
--- gtfs_feed_info にソースID追加
-ALTER TABLE gtfs_feed_info ADD COLUMN IF NOT EXISTS source_id VARCHAR(50);
+-- 停車パターン変更ログ
+CREATE TABLE stop_pattern_changes (
+    id SERIAL PRIMARY KEY,
+    railway_id VARCHAR(100) NOT NULL,
+    train_type_id VARCHAR(100) NOT NULL,
+    train_type_name VARCHAR(100),
+    change_type VARCHAR(20) NOT NULL,      -- 'added' or 'removed'
+    station_id VARCHAR(100) NOT NULL,
+    station_name VARCHAR(100),
+    detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    acknowledged BOOLEAN DEFAULT FALSE,    -- 確認済みフラグ
+    acknowledged_at TIMESTAMP
+);
 
--- stations/lines にソースIDを追加（どのGTFSソースから来たか）
-ALTER TABLE stations ADD COLUMN IF NOT EXISTS gtfs_source_id VARCHAR(50);
-ALTER TABLE lines ADD COLUMN IF NOT EXISTS gtfs_source_id VARCHAR(50);
+-- インデックス
+CREATE INDEX idx_stop_pattern_snapshots_railway ON stop_pattern_snapshots(railway_id, train_type_id);
+CREATE INDEX idx_stop_pattern_changes_detected ON stop_pattern_changes(detected_at DESC);
+CREATE INDEX idx_stop_pattern_changes_unack ON stop_pattern_changes(acknowledged) WHERE acknowledged = FALSE;
 ```
 
-### 8. 重複データの処理（GTFS優先方針）
-
-駅データ.jpのCSVデータとGTFS鉄道データには重複がある（同じ駅が両方に存在）。
-**GTFSデータを正として扱い、ダイヤ改正への迅速な対応を実現する。**
-
-#### 基本方針
-
-1. **GTFS鉄道データを stations/lines に統合**
-   - transport_type = 2 として既存テーブルに追加
-   - 時刻表データ（stop_times）と駅・路線データを一元管理
-
-2. **既存CSVデータとの共存**
-   - GTFSで提供されない事業者は引き続きCSVを使用
-   - 同一駅の重複は station_g_cd で紐付け
-
-3. **station_cd の生成**
-   - GTFS stop_id からハッシュ生成（バスと同様）
-   - 既存の station_cd 体系との衝突を避ける
-
-#### マージ戦略
+### ODPT API エンドポイント
 
 ```
-┌─────────────────────────────────────────────────┐
-│ GTFS鉄道データがある事業者                        │
-│  → GTFSを正として stations/lines に統合         │
-│  → 既存CSVの同一駅は station_g_cd で紐付け      │
-│                                                  │
-│ GTFSデータがない事業者                           │
-│  → 従来通りCSVデータを使用                      │
-│                                                  │
-│ station_g_cd による名寄せ                        │
-│  → 同一物理駅をグループ化                       │
-│  → 位置情報（緯度経度）で近接駅を検出           │
-└─────────────────────────────────────────────────┘
+# 列車時刻表（メイン）
+GET https://api.odpt.org/api/v4/odpt:TrainTimetable
+    ?odpt:operator=odpt.Operator:TokyoMetro
+    &acl:consumerKey={API_KEY}
+
+# 路線マスタ
+GET https://api.odpt.org/api/v4/odpt:Railway
+    ?odpt:operator=odpt.Operator:TokyoMetro
+    &acl:consumerKey={API_KEY}
+
+# 列車種別マスタ
+GET https://api.odpt.org/api/v4/odpt:TrainType
+    ?odpt:operator=odpt.Operator:TokyoMetro
+    &acl:consumerKey={API_KEY}
+
+# 駅マスタ
+GET https://api.odpt.org/api/v4/odpt:Station
+    ?odpt:operator=odpt.Operator:TokyoMetro
+    &acl:consumerKey={API_KEY}
 ```
 
-#### 段階的移行
+### TrainTimetable レスポンス例
 
-| フェーズ | 対象 | 備考 |
-|---------|------|------|
-| Phase 1 | 東京メトロ、都営地下鉄 | GTFSで完全置き換え |
-| Phase 2 | JR東日本（関東） | 部分的なGTFS置き換え |
-| Phase 3 | その他私鉄 | GTFSが利用可能になり次第 |
+```json
+{
+  "@id": "urn:ucode:_00001C000000000000010000030E9A5F",
+  "@type": "odpt:TrainTimetable",
+  "odpt:railway": "odpt.Railway:TokyoMetro.Marunouchi",
+  "odpt:trainNumber": "A0601",
+  "odpt:trainType": "odpt.TrainType:TokyoMetro.Local",
+  "odpt:trainTimetableObject": [
+    {
+      "odpt:departureTime": "05:00",
+      "odpt:departureStation": "odpt.Station:TokyoMetro.Marunouchi.Ogikubo"
+    },
+    {
+      "odpt:departureTime": "05:02",
+      "odpt:departureStation": "odpt.Station:TokyoMetro.Marunouchi.Minami-asagaya"
+    },
+    ...
+  ]
+}
+```
 
-#### 注意事項
+### 停車パターン抽出ロジック
 
-- **既存APIの互換性**: station_cd が変わるため、クライアント側の対応が必要
-- **station_g_cd の維持**: 同一物理駅のグループ化は維持
-- **CSVデータの段階的廃止**: GTFSで完全カバーできる事業者から順次CSVを削除
+```rust
+/// 時刻表データから停車パターンを抽出
+async fn extract_stop_patterns(
+    timetables: &[TrainTimetable],
+) -> HashMap<(RailwayId, TrainTypeId), HashSet<StationId>> {
+    let mut patterns: HashMap<(RailwayId, TrainTypeId), HashSet<StationId>> = HashMap::new();
+
+    for timetable in timetables {
+        let key = (timetable.railway.clone(), timetable.train_type.clone());
+        let stations = patterns.entry(key).or_insert_with(HashSet::new);
+
+        for stop in &timetable.train_timetable_object {
+            // 出発駅または到着駅を停車駅として記録
+            if let Some(station) = &stop.departure_station {
+                stations.insert(station.clone());
+            }
+            if let Some(station) = &stop.arrival_station {
+                stations.insert(station.clone());
+            }
+        }
+    }
+
+    patterns
+}
+```
+
+### 差分検知ロジック
+
+```rust
+/// 前回のパターンと比較して差分を検出
+fn detect_changes(
+    previous: &HashMap<(RailwayId, TrainTypeId), HashSet<StationId>>,
+    current: &HashMap<(RailwayId, TrainTypeId), HashSet<StationId>>,
+) -> Vec<StopPatternChange> {
+    let mut changes = Vec::new();
+
+    for (key, current_stations) in current {
+        if let Some(prev_stations) = previous.get(key) {
+            // 新規停車駅
+            for station in current_stations.difference(prev_stations) {
+                changes.push(StopPatternChange {
+                    railway_id: key.0.clone(),
+                    train_type_id: key.1.clone(),
+                    change_type: ChangeType::Added,
+                    station_id: station.clone(),
+                });
+            }
+            // 停車取りやめ駅
+            for station in prev_stations.difference(current_stations) {
+                changes.push(StopPatternChange {
+                    railway_id: key.0.clone(),
+                    train_type_id: key.1.clone(),
+                    change_type: ChangeType::Removed,
+                    station_id: station.clone(),
+                });
+            }
+        } else {
+            // 新規種別
+            for station in current_stations {
+                changes.push(StopPatternChange {
+                    railway_id: key.0.clone(),
+                    train_type_id: key.1.clone(),
+                    change_type: ChangeType::Added,
+                    station_id: station.clone(),
+                });
+            }
+        }
+    }
+
+    changes
+}
+```
+
+## 対応事業者
+
+ODPT TrainTimetable API で取得可能な事業者：
+
+| 事業者 | Operator ID | 優先度 | 備考 |
+|--------|-------------|--------|------|
+| 東京メトロ | TokyoMetro | 高 | 全線対応 |
+| 都営地下鉄 | Toei | 高 | 全線対応 |
+| JR東日本 | JR-East | 高 | 関東在来線（新幹線除く） |
+| 東武鉄道 | Tobu | 中 | 全線対応 |
+| 西武鉄道 | Seibu | 中 | 全線対応 |
+| 京王電鉄 | Keio | 中 | 全線対応 |
+| 小田急電鉄 | Odakyu | 中 | 全線対応 |
+| 東急電鉄 | Tokyu | 中 | 全線対応 |
+| 京急電鉄 | Keikyu | 中 | 全線対応 |
+| 京成電鉄 | Keisei | 低 | 全線対応 |
+| 相鉄 | Sotetsu | 低 | 全線対応 |
+
+## 環境変数
+
+```bash
+# ODPT APIキー（必須）
+ODPT_API_KEY=your_api_key_here
+
+# 差分検知の有効化
+ENABLE_STOP_PATTERN_DETECTION=true
+
+# 検知間隔（時間）
+STOP_PATTERN_CHECK_INTERVAL_HOURS=24
+
+# 通知設定（将来）
+# SLACK_WEBHOOK_URL=https://hooks.slack.com/...
+# DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
 
 ## 実装計画
 
-### Phase 1（今回実装）
-- [ ] config.rs に ODPT_API_KEY 取得関数追加
-- [ ] GtfsSource 構造体の定義
-- [ ] 複数ソース対応の download_gtfs() 実装
-- [ ] transport_type = 2 の鉄道GTFS統合
+### Phase 1: 基本機能（今回）
+- [x] 複数GTFSソース対応（バス用）
+- [ ] ODPT TrainTimetable API クライアント実装
+- [ ] 停車パターン抽出ロジック
+- [ ] 差分検知ロジック
+- [ ] DBスキーマ追加
+- [ ] CLIコマンド追加（手動実行用）
 
-### Phase 2（将来）
-- [ ] feed_info のバージョン比較による差分更新
-- [ ] 定期更新スケジューラ
-- [ ] JR東日本、東武鉄道等の追加
+### Phase 2: 自動化
+- [ ] 定期実行スケジューラ
+- [ ] 通知機能（ログ → Slack/Discord）
+- [ ] Webダッシュボード（変更一覧表示）
 
-### Phase 3（将来）
-- [ ] GTFS-RT（リアルタイム情報）対応
-- [ ] 時刻表API公開
+### Phase 3: 自動適用
+- [ ] station_station_types との自動マッピング
+- [ ] 変更の自動適用（要承認フロー）
 
-## ライセンス・帰属表示
+## 検出例
 
-ODPT データの利用にはライセンス準拠が必要:
-
-1. 出典表示: 「公共交通オープンデータセンター」の表示
-2. 各事業者のライセンス条項に準拠
-3. APIアクセスキーの適切な管理
-
-```rust
-/// GTFSデータの出典情報
-pub const ODPT_ATTRIBUTION: &str = "データ提供: 公共交通オープンデータセンター";
 ```
+[2025-03-15] 停車パターン変更を検出しました:
+
+路線: JR東日本 中央線快速
+種別: 通勤快速
+
+新規停車:
+  + 中野駅 (odpt.Station:JR-East.Nakano)
+
+停車取りやめ:
+  - なし
+
+---
+路線: 東京メトロ 副都心線
+種別: 急行
+
+新規停車:
+  + 雑司が谷駅 (odpt.Station:TokyoMetro.Zoshigaya)
+
+停車取りやめ:
+  - なし
+```
+
+## 制限事項
+
+1. **完全な自動化は困難**
+   - ODPT の種別ID と StationAPI の type_cd のマッピングが必要
+   - 同じ「快速」でも事業者によってIDが異なる
+
+2. **データの鮮度**
+   - ODPT データは毎日更新されるわけではない
+   - ダイヤ改正直後は反映に時間がかかる可能性
+
+3. **新幹線非対応**
+   - JR東日本の新幹線はODPT対象外
+   - 引き続き手動管理が必要
+
+## 既存GTFS機能との関係
+
+### 現在のGTFS機能（バス用）
+- 都営バスのGTFSデータをインポート
+- gtfs_routes, gtfs_trips, gtfs_stops 等のテーブルに保存
+- transport_type = 1 として stations/lines に統合
+
+### 停車パターン検知（新規）
+- GTFS とは別系統
+- TrainTimetable API を直接利用
+- 差分検知・通知が目的（データ統合ではない）
+
+両者は独立して動作し、干渉しない。
 
 ## 参考URL
 
 - ODPT 公式: https://www.odpt.org/
 - 開発者登録: https://developer.odpt.org/
 - データカタログ: https://ckan.odpt.org/
+- API仕様: https://developer.odpt.org/documents
