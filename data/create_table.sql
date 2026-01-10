@@ -861,3 +861,61 @@ ALTER TABLE public.gtfs_feed_info OWNER TO stationapi;
 -- ============================================================
 -- End of GTFS Bus Integration Schema
 -- ============================================================
+
+-- ============================================================
+-- Stop Pattern Detection Schema
+-- For detecting train type stop pattern changes from ODPT API
+-- ============================================================
+
+--
+-- Name: stop_pattern_snapshots; Type: TABLE; Schema: public
+-- Snapshots of stop patterns extracted from ODPT TrainTimetable
+--
+
+CREATE TABLE public.stop_pattern_snapshots (
+    id SERIAL PRIMARY KEY,
+    operator_id VARCHAR(100) NOT NULL,     -- odpt.Operator:TokyoMetro
+    railway_id VARCHAR(100) NOT NULL,      -- odpt.Railway:TokyoMetro.Marunouchi
+    train_type_id VARCHAR(100) NOT NULL,   -- odpt.TrainType:TokyoMetro.Local
+    train_type_name VARCHAR(100),          -- 各停
+    station_ids TEXT[] NOT NULL,           -- Array of station IDs
+    station_names TEXT[],                  -- Array of station names (for reference)
+    captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(railway_id, train_type_id, (captured_at::date))
+);
+
+ALTER TABLE public.stop_pattern_snapshots OWNER TO stationapi;
+
+CREATE INDEX idx_stop_pattern_snapshots_railway ON public.stop_pattern_snapshots USING btree (railway_id, train_type_id);
+CREATE INDEX idx_stop_pattern_snapshots_operator ON public.stop_pattern_snapshots USING btree (operator_id);
+CREATE INDEX idx_stop_pattern_snapshots_captured ON public.stop_pattern_snapshots USING btree (captured_at DESC);
+
+--
+-- Name: stop_pattern_changes; Type: TABLE; Schema: public
+-- Log of detected stop pattern changes
+--
+
+CREATE TABLE public.stop_pattern_changes (
+    id SERIAL PRIMARY KEY,
+    operator_id VARCHAR(100) NOT NULL,
+    railway_id VARCHAR(100) NOT NULL,
+    railway_name VARCHAR(100),             -- 丸ノ内線
+    train_type_id VARCHAR(100) NOT NULL,
+    train_type_name VARCHAR(100),          -- 各停
+    change_type VARCHAR(20) NOT NULL,      -- 'added' or 'removed'
+    station_id VARCHAR(100) NOT NULL,
+    station_name VARCHAR(100),
+    detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    acknowledged BOOLEAN DEFAULT FALSE,
+    acknowledged_at TIMESTAMP
+);
+
+ALTER TABLE public.stop_pattern_changes OWNER TO stationapi;
+
+CREATE INDEX idx_stop_pattern_changes_detected ON public.stop_pattern_changes USING btree (detected_at DESC);
+CREATE INDEX idx_stop_pattern_changes_unack ON public.stop_pattern_changes (acknowledged) WHERE acknowledged = FALSE;
+CREATE INDEX idx_stop_pattern_changes_railway ON public.stop_pattern_changes USING btree (railway_id, train_type_id);
+
+-- ============================================================
+-- End of Stop Pattern Detection Schema
+-- ============================================================

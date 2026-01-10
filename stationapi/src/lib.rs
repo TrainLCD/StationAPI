@@ -2,6 +2,7 @@ pub mod config;
 pub mod domain;
 pub mod infrastructure;
 pub mod presentation;
+pub mod stop_pattern;
 pub mod use_case;
 
 pub mod proto {
