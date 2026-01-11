@@ -1,4 +1,4 @@
-name: stationapi
+name: stationapi-dev
 
 services:
   api:
@@ -14,8 +14,9 @@ services:
       DISABLE_GRPC_WEB: false
       DISABLE_BUS_FEATURE: false
       HOST: 0.0.0.0
+      PORT: 50052
     ports:
-      - 50051:50051
+      - 50052:50052
     restart: always
 
   psql:
