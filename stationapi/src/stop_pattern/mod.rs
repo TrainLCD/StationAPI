@@ -5,7 +5,9 @@
 //! and comparing it with previously stored snapshots.
 
 pub mod detector;
+pub mod github_issue;
 pub mod odpt_client;
 
-pub use detector::StopPatternDetector;
+pub use detector::{RotationConfig, RotationResult, StopPatternDetector};
+pub use github_issue::GitHubIssueCreator;
 pub use odpt_client::OdptClient;

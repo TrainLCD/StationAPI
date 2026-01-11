@@ -7,6 +7,36 @@ use sqlx::PgPool;
 use std::collections::HashSet;
 use tracing::info;
 
+/// Configuration for log rotation
+#[derive(Debug, Clone)]
+pub struct RotationConfig {
+    /// Days to retain acknowledged changes (default: 90)
+    pub changes_retention_days: i32,
+    /// Number of snapshot generations to keep per railway/train_type (default: 30)
+    pub snapshots_retention_days: i32,
+    /// Whether to run rotation automatically after detection (default: true)
+    pub auto_rotate: bool,
+}
+
+impl Default for RotationConfig {
+    fn default() -> Self {
+        Self {
+            changes_retention_days: 90,
+            snapshots_retention_days: 30,
+            auto_rotate: true,
+        }
+    }
+}
+
+/// Result of log rotation
+#[derive(Debug, Clone, Default)]
+pub struct RotationResult {
+    /// Number of deleted change records
+    pub deleted_changes: i64,
+    /// Number of deleted snapshot records
+    pub deleted_snapshots: i64,
+}
+
 /// Represents a detected change in stop pattern
 #[derive(Debug, Clone)]
 pub struct StopPatternChange {
@@ -47,6 +77,7 @@ struct StoredSnapshot {
 pub struct StopPatternDetector {
     client: OdptClient,
     pool: PgPool,
+    rotation_config: RotationConfig,
 }
 
 impl StopPatternDetector {
@@ -54,7 +85,13 @@ impl StopPatternDetector {
         Self {
             client: OdptClient::new(api_key),
             pool,
+            rotation_config: RotationConfig::default(),
         }
+    }
+
+    pub fn with_rotation_config(mut self, config: RotationConfig) -> Self {
+        self.rotation_config = config;
+        self
     }
 
     /// Run detection for specified operators
@@ -91,7 +128,67 @@ impl StopPatternDetector {
         // Save current patterns as new snapshots
         self.save_snapshots(&current_patterns).await?;
 
+        // Run automatic rotation if enabled
+        if self.rotation_config.auto_rotate {
+            self.rotate_old_records().await?;
+        }
+
         Ok(changes)
+    }
+
+    /// Rotate old records to prevent unbounded growth
+    ///
+    /// Deletes:
+    /// - Acknowledged changes older than changes_retention_days
+    /// - Snapshots older than snapshots_retention_days
+    pub async fn rotate_old_records(
+        &self,
+    ) -> Result<RotationResult, Box<dyn std::error::Error + Send + Sync>> {
+        let mut result = RotationResult::default();
+
+        // Delete old acknowledged changes
+        let deleted_changes = sqlx::query_scalar::<_, i64>(
+            r#"
+            WITH deleted AS (
+                DELETE FROM stop_pattern_changes
+                WHERE acknowledged = TRUE
+                  AND detected_at < CURRENT_TIMESTAMP - ($1 || ' days')::INTERVAL
+                RETURNING 1
+            )
+            SELECT COUNT(*) FROM deleted
+            "#,
+        )
+        .bind(self.rotation_config.changes_retention_days)
+        .fetch_one(&self.pool)
+        .await?;
+
+        result.deleted_changes = deleted_changes;
+
+        // Delete old snapshots (keep only recent ones)
+        let deleted_snapshots = sqlx::query_scalar::<_, i64>(
+            r#"
+            WITH deleted AS (
+                DELETE FROM stop_pattern_snapshots
+                WHERE captured_at < CURRENT_TIMESTAMP - ($1 || ' days')::INTERVAL
+                RETURNING 1
+            )
+            SELECT COUNT(*) FROM deleted
+            "#,
+        )
+        .bind(self.rotation_config.snapshots_retention_days)
+        .fetch_one(&self.pool)
+        .await?;
+
+        result.deleted_snapshots = deleted_snapshots;
+
+        if result.deleted_changes > 0 || result.deleted_snapshots > 0 {
+            info!(
+                "Rotation: deleted {} old changes, {} old snapshots",
+                result.deleted_changes, result.deleted_snapshots
+            );
+        }
+
+        Ok(result)
     }
 
     /// Get the latest snapshot for each railway/train_type combination

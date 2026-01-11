@@ -1,0 +1,109 @@
+name: Detect Stop Pattern Changes
+
+on:
+  # schedule:
+  #   # 毎日 09:00 JST (00:00 UTC) に実行
+  #   - cron: '0 0 * * *'
+  workflow_dispatch:
+    # 手動実行も可能
+    inputs:
+      operators:
+        description: 'Operators to check (comma-separated, or "all")'
+        required: false
+        default: 'TokyoMetro,Toei'
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+
+      - name: Run ECS Task
+        id: run-task
+        run: |
+          # ECSタスクを実行
+          TASK_ARN=$(aws ecs run-task \
+            --cluster ${{ vars.ECS_CLUSTER }} \
+            --task-definition ${{ vars.ECS_TASK_DEFINITION }} \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ vars.ECS_SUBNETS }}],securityGroups=[${{ vars.ECS_SECURITY_GROUPS }}],assignPublicIp=ENABLED}" \
+            --overrides '{
+              "containerOverrides": [{
+                "name": "detect-stop-patterns",
+                "command": ["./detect_stop_patterns", "-o", "${{ github.event.inputs.operators || 'TokyoMetro,Toei' }}"]
+              }]
+            }' \
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          echo "task_arn=$TASK_ARN" >> $GITHUB_OUTPUT
+          echo "Started ECS task: $TASK_ARN"
+
+      - name: Wait for ECS Task
+        id: wait-task
+        run: |
+          echo "Waiting for task to complete..."
+          aws ecs wait tasks-stopped \
+            --cluster ${{ vars.ECS_CLUSTER }} \
+            --tasks ${{ steps.run-task.outputs.task_arn }}
+
+          # タスクの終了コードを確認
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster ${{ vars.ECS_CLUSTER }} \
+            --tasks ${{ steps.run-task.outputs.task_arn }} \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+
+          echo "Task completed with exit code: $EXIT_CODE"
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+      - name: Get task logs
+        id: logs
+        run: |
+          # CloudWatch Logsからログを取得
+          TASK_ID=$(echo "${{ steps.run-task.outputs.task_arn }}" | rev | cut -d'/' -f1 | rev)
+
+          # ログストリーム名を構築（タスク定義の設定に依存）
+          LOG_STREAM="detect-stop-patterns/$TASK_ID"
+
+          OUTPUT=$(aws logs get-log-events \
+            --log-group-name ${{ vars.ECS_LOG_GROUP }} \
+            --log-stream-name "$LOG_STREAM" \
+            --query 'events[*].message' \
+            --output text 2>/dev/null || echo "")
+
+          echo "$OUTPUT"
+
+          # 結果を保存
+          echo "result<<EOF" >> $GITHUB_OUTPUT
+          echo "$OUTPUT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          # 変更があったかチェック
+          if echo "$OUTPUT" | grep -q "検出された変更"; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create issue if changes detected
+        if: steps.logs.outputs.has_changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const result = `${{ steps.logs.outputs.result }}`;
+            const today = new Date().toISOString().split('T')[0];
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[自動検出] 停車パターン変更 ${today}`,
+              body: `## 停車パターン変更が検出されました\n\n\`\`\`\n${result}\n\`\`\`\n\n---\nこのIssueは GitHub Actions により自動作成されました。\n変更を確認したら、DBで \`acknowledged = TRUE\` に更新してください。`,
+              labels: ['stop-pattern-change', 'automated']
+            });

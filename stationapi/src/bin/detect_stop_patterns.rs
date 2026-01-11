@@ -9,7 +9,9 @@
 
 use sqlx::postgres::PgPoolOptions;
 use stationapi::config::fetch_database_url;
-use stationapi::stop_pattern::{odpt_client::OdptOperator, StopPatternDetector};
+use stationapi::stop_pattern::{
+    odpt_client::OdptOperator, GitHubIssueCreator, RotationConfig, StopPatternDetector,
+};
 use std::env;
 use tracing::{error, info};
 
@@ -46,16 +48,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     info!("Connected to database");
 
-    // Parse operators from command line or use defaults
+    // Parse operators and rotation config from command line
     let operators = parse_operators();
+    let rotation_config = parse_rotation_config();
 
     info!("Detecting stop patterns for {} operators", operators.len());
     for op in &operators {
         info!("  - {} ({})", op.name(), op.id());
     }
 
+    info!(
+        "Rotation: changes_retention={}d, snapshots_retention={}d, auto={}",
+        rotation_config.changes_retention_days,
+        rotation_config.snapshots_retention_days,
+        rotation_config.auto_rotate
+    );
+
     // Create detector and run
-    let detector = StopPatternDetector::new(api_key, pool);
+    let detector =
+        StopPatternDetector::new(api_key, pool).with_rotation_config(rotation_config.clone());
     let changes = detector.detect_changes(&operators).await?;
 
     // Output results
@@ -65,9 +76,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if !changes.is_empty() {
         info!("Changes have been saved to the database");
         info!("Review with: SELECT * FROM stop_pattern_changes WHERE acknowledged = FALSE;");
+
+        // Create GitHub issue if configured
+        if let Some((token, repo)) = get_github_config() {
+            info!("Creating GitHub issue for detected changes...");
+            let creator = GitHubIssueCreator::new(token, repo);
+            match creator.create_issue(&changes).await {
+                Ok(url) => info!("GitHub issue created: {}", url),
+                Err(e) => error!("Failed to create GitHub issue: {}", e),
+            }
+        }
     }
 
     Ok(())
+}
+
+fn get_github_config() -> Option<(String, String)> {
+    let args: Vec<String> = env::args().collect();
+
+    // Check for --github-issue flag
+    if !args.iter().any(|a| a == "--github-issue") {
+        return None;
+    }
+
+    // Get token and repo from environment variables
+    let token = env::var("GITHUB_TOKEN").ok()?;
+    let repo = env::var("GITHUB_REPO").ok()?;
+
+    Some((token, repo))
 }
 
 fn parse_operators() -> Vec<OdptOperator> {
@@ -116,6 +152,29 @@ fn parse_operator_list(list: &str) -> Vec<OdptOperator> {
         .collect()
 }
 
+fn parse_rotation_config() -> RotationConfig {
+    let args: Vec<String> = env::args().collect();
+    let mut config = RotationConfig::default();
+
+    for i in 0..args.len() {
+        if args[i] == "--changes-retention" && i + 1 < args.len() {
+            if let Ok(days) = args[i + 1].parse() {
+                config.changes_retention_days = days;
+            }
+        }
+        if args[i] == "--snapshots-retention" && i + 1 < args.len() {
+            if let Ok(days) = args[i + 1].parse() {
+                config.snapshots_retention_days = days;
+            }
+        }
+        if args[i] == "--no-rotate" {
+            config.auto_rotate = false;
+        }
+    }
+
+    config
+}
+
 fn print_help() {
     println!("detect_stop_patterns - Detect train stop pattern changes from ODPT API");
     println!();
@@ -125,6 +184,13 @@ fn print_help() {
     println!("OPTIONS:");
     println!("    -o, --operators <LIST>  Comma-separated list of operators, or 'all'");
     println!("                            Default: TokyoMetro,Toei");
+    println!("    --changes-retention <DAYS>");
+    println!("                            Days to keep acknowledged changes (default: 90)");
+    println!("    --snapshots-retention <DAYS>");
+    println!("                            Days to keep snapshots (default: 30)");
+    println!("    --no-rotate             Disable automatic log rotation");
+    println!("    --github-issue          Create GitHub issue when changes detected");
+    println!("                            Requires GITHUB_TOKEN and GITHUB_REPO env vars");
     println!("    -h, --help              Print this help message");
     println!();
     println!("OPERATORS:");
@@ -153,6 +219,8 @@ fn print_help() {
     println!("ENVIRONMENT VARIABLES:");
     println!("    ODPT_API_KEY   Required. API key for ODPT API.");
     println!("    DATABASE_URL   Required. PostgreSQL connection string.");
+    println!("    GITHUB_TOKEN   Required for --github-issue. Personal access token with repo scope.");
+    println!("    GITHUB_REPO    Required for --github-issue. Repository in 'owner/repo' format.");
     println!();
     println!("To get an ODPT API key, register at: https://developer.odpt.org/");
 }
