@@ -27,19 +27,29 @@ jobs:
 
       - name: Run ECS Task
         id: run-task
+        env:
+          OPERATORS: ${{ github.event.inputs.operators || 'TokyoMetro,Toei' }}
         run: |
+          # jqを使って安全にJSONを構築（JSONインジェクション対策）
+          OVERRIDES=$(jq -n \
+            --arg operators "$OPERATORS" \
+            '{
+              containerOverrides: [{
+                name: "detect-stop-patterns",
+                command: ["./detect_stop_patterns"],
+                environment: [
+                  {name: "OPERATORS", value: $operators}
+                ]
+              }]
+            }')
+
           # ECSタスクを実行
           TASK_ARN=$(aws ecs run-task \
             --cluster ${{ vars.ECS_CLUSTER }} \
             --task-definition ${{ vars.ECS_TASK_DEFINITION }} \
             --launch-type FARGATE \
             --network-configuration "awsvpcConfiguration={subnets=[${{ vars.ECS_SUBNETS }}],securityGroups=[${{ vars.ECS_SECURITY_GROUPS }}],assignPublicIp=ENABLED}" \
-            --overrides '{
-              "containerOverrides": [{
-                "name": "detect-stop-patterns",
-                "command": ["./detect_stop_patterns", "-o", "${{ github.event.inputs.operators || 'TokyoMetro,Toei' }}"]
-              }]
-            }' \
+            --overrides "$OVERRIDES" \
             --query 'tasks[0].taskArn' \
             --output text)
 
@@ -55,6 +65,7 @@ jobs:
             --tasks ${{ steps.run-task.outputs.task_arn }}
 
           # タスクの終了コードを確認
+          # 0 = 変更なし, 10 = 変更あり, 1 = エラー
           EXIT_CODE=$(aws ecs describe-tasks \
             --cluster ${{ vars.ECS_CLUSTER }} \
             --tasks ${{ steps.run-task.outputs.task_arn }} \
@@ -64,8 +75,16 @@ jobs:
           echo "Task completed with exit code: $EXIT_CODE"
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
 
-          if [ "$EXIT_CODE" != "0" ]; then
+          # 終了コードで変更検出を判定
+          if [ "$EXIT_CODE" = "10" ]; then
+            echo "Changes detected (exit code 10)"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          elif [ "$EXIT_CODE" = "0" ]; then
+            echo "No changes detected (exit code 0)"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
             echo "Error: ECS task failed with exit code $EXIT_CODE"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
             exit 1
           fi
 
@@ -127,15 +146,8 @@ jobs:
           echo "$SANITIZED" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-          # 変更があったかチェック（複数パターン/言語に対応）
-          if echo "$SANITIZED" | grep -qE '(検出された変更|Changes detected|変更あり|changes_detected|has_changes)'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: Create issue if changes detected
-        if: steps.logs.outputs.has_changes == 'true'
+        if: steps.wait-task.outputs.has_changes == 'true'
         uses: actions/github-script@v8
         env:
           LOG_RESULT: ${{ steps.logs.outputs.result }}

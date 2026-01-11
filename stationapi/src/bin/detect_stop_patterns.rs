@@ -15,8 +15,32 @@ use stationapi::stop_pattern::{
 use std::env;
 use tracing::{error, info};
 
+/// Exit codes:
+/// - 0: No changes detected
+/// - 1: Error occurred
+/// - 10: Changes detected
+const EXIT_NO_CHANGES: i32 = 0;
+const EXIT_ERROR: i32 = 1;
+const EXIT_CHANGES_DETECTED: i32 = 10;
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn main() {
+    match run().await {
+        Ok(has_changes) => {
+            if has_changes {
+                std::process::exit(EXIT_CHANGES_DETECTED);
+            } else {
+                std::process::exit(EXIT_NO_CHANGES);
+            }
+        }
+        Err(e) => {
+            error!("Error: {}", e);
+            std::process::exit(EXIT_ERROR);
+        }
+    }
+}
+
+async fn run() -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
     tracing_subscriber::fmt::init();
 
     // Load .env.local if available
@@ -73,7 +97,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let output = StopPatternDetector::format_changes(&changes);
     println!("{}", output);
 
-    if !changes.is_empty() {
+    let has_changes = !changes.is_empty();
+
+    if has_changes {
         info!("Changes have been saved to the database");
         info!("Review with: SELECT * FROM stop_pattern_changes WHERE acknowledged = FALSE;");
 
@@ -88,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     }
 
-    Ok(())
+    Ok(has_changes)
 }
 
 fn get_github_config() -> Option<(String, String)> {
@@ -119,6 +145,14 @@ fn parse_operators() -> Vec<OdptOperator> {
     for i in 0..args.len() {
         if (args[i] == "--operators" || args[i] == "-o") && i + 1 < args.len() {
             return parse_operator_list(&args[i + 1]);
+        }
+    }
+
+    // Check for OPERATORS environment variable
+    if let Ok(operators_env) = env::var("OPERATORS") {
+        if !operators_env.is_empty() {
+            info!("Using OPERATORS from environment variable");
+            return parse_operator_list(&operators_env);
         }
     }
 
@@ -219,6 +253,8 @@ fn print_help() {
     println!("ENVIRONMENT VARIABLES:");
     println!("    ODPT_API_KEY   Required. API key for ODPT API.");
     println!("    DATABASE_URL   Required. PostgreSQL connection string.");
+    println!("    OPERATORS      Optional. Comma-separated list of operators or 'all'.");
+    println!("                   Used if -o/--operators is not provided.");
     println!(
         "    GITHUB_TOKEN   Required for --github-issue. Personal access token with repo scope."
     );
