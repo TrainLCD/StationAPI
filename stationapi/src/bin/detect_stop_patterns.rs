@@ -70,7 +70,9 @@ async fn run() -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
             eprintln!("Error: DATABASE_URL environment variable is required");
             eprintln!();
             eprintln!("Usage:");
-            eprintln!("  DATABASE_URL=postgres://user:pass@host/db cargo run --bin detect_stop_patterns");
+            eprintln!(
+                "  DATABASE_URL=postgres://user:pass@host/db cargo run --bin detect_stop_patterns"
+            );
             eprintln!();
             eprintln!("The DATABASE_URL should be a valid PostgreSQL connection string.");
             std::process::exit(1);
