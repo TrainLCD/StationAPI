@@ -51,14 +51,13 @@ async fn run() -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
     let api_key = match env::var("ODPT_API_KEY") {
         Ok(key) => key,
         Err(_) => {
-            error!("ODPT_API_KEY environment variable is required");
             eprintln!("Error: ODPT_API_KEY environment variable is required");
             eprintln!();
             eprintln!("Usage:");
             eprintln!("  ODPT_API_KEY=your_key cargo run --bin detect_stop_patterns");
             eprintln!();
             eprintln!("To get an API key, register at: https://developer.odpt.org/");
-            std::process::exit(1);
+            return Err("ODPT_API_KEY environment variable is required".into());
         }
     };
 
@@ -66,7 +65,6 @@ async fn run() -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
     let db_url = match env::var("DATABASE_URL") {
         Ok(url) => url,
         Err(_) => {
-            error!("DATABASE_URL environment variable is required");
             eprintln!("Error: DATABASE_URL environment variable is required");
             eprintln!();
             eprintln!("Usage:");
@@ -75,7 +73,7 @@ async fn run() -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
             );
             eprintln!();
             eprintln!("The DATABASE_URL should be a valid PostgreSQL connection string.");
-            std::process::exit(1);
+            return Err("DATABASE_URL environment variable is required".into());
         }
     };
 
