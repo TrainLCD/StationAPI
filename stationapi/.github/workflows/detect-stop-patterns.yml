@@ -95,15 +95,29 @@ jobs:
       - name: Create issue if changes detected
         if: steps.logs.outputs.has_changes == 'true'
         uses: actions/github-script@v7
+        env:
+          LOG_RESULT: ${{ steps.logs.outputs.result }}
         with:
           script: |
-            const result = `${{ steps.logs.outputs.result }}`;
+            const result = process.env.LOG_RESULT || '';
             const today = new Date().toISOString().split('T')[0];
+
+            const body = [
+              '## 停車パターン変更が検出されました',
+              '',
+              '```',
+              result,
+              '```',
+              '',
+              '---',
+              'このIssueは GitHub Actions により自動作成されました。',
+              '変更を確認したら、DBで `acknowledged = TRUE` に更新してください。'
+            ].join('\n');
 
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `[自動検出] 停車パターン変更 ${today}`,
-              body: `## 停車パターン変更が検出されました\n\n\`\`\`\n${result}\n\`\`\`\n\n---\nこのIssueは GitHub Actions により自動作成されました。\n変更を確認したら、DBで \`acknowledged = TRUE\` に更新してください。`,
+              body: body,
               labels: ['stop-pattern-change', 'automated']
             });
