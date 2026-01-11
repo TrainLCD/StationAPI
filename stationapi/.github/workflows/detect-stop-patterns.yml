@@ -175,7 +175,10 @@ jobs:
         with:
           script: |
             const result = process.env.LOG_RESULT || '';
-            const today = new Date().toISOString().split('T')[0];
+            // JSTで日付を計算（UTC+9時間）
+            const now = new Date();
+            const jstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+            const today = jstDate.toISOString().split('T')[0];
 
             const body = [
               '## 停車パターン変更が検出されました',
@@ -189,10 +192,60 @@ jobs:
               '変更を確認したら、DBで `acknowledged = TRUE` に更新してください。'
             ].join('\n');
 
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `[自動検出] 停車パターン変更 ${today}`,
-              body: body,
-              labels: ['stop-pattern-change', 'automated']
-            });
+            const requiredLabels = ['stop-pattern-change', 'automated'];
+
+            // ラベルが存在しない場合に作成する関数
+            async function ensureLabelsExist(labels) {
+              for (const labelName of labels) {
+                try {
+                  await github.rest.issues.getLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: labelName
+                  });
+                } catch (error) {
+                  if (error.status === 404) {
+                    console.log(`Creating missing label: ${labelName}`);
+                    await github.rest.issues.createLabel({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      name: labelName,
+                      color: labelName === 'stop-pattern-change' ? 'fbca04' : '0e8a16',
+                      description: labelName === 'stop-pattern-change'
+                        ? '停車パターンの変更検出'
+                        : '自動生成されたIssue'
+                    });
+                  } else {
+                    throw error;
+                  }
+                }
+              }
+            }
+
+            // Issueを作成する関数（422エラー時にラベル作成してリトライ）
+            async function createIssueWithRetry() {
+              try {
+                return await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: `[自動検出] 停車パターン変更 ${today}`,
+                  body: body,
+                  labels: requiredLabels
+                });
+              } catch (error) {
+                if (error.status === 422) {
+                  console.log('Got 422 error, ensuring labels exist and retrying...');
+                  await ensureLabelsExist(requiredLabels);
+                  return await github.rest.issues.create({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    title: `[自動検出] 停車パターン変更 ${today}`,
+                    body: body,
+                    labels: requiredLabels
+                  });
+                }
+                throw error;
+              }
+            }
+
+            await createIssueWithRetry();

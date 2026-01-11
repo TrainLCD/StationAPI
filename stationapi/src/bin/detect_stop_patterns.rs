@@ -139,11 +139,30 @@ fn get_github_config() -> Option<(String, String)> {
         return None;
     }
 
-    // Get token and repo from environment variables
-    let token = env::var("GITHUB_TOKEN").ok()?;
-    let repo = env::var("GITHUB_REPO").ok()?;
+    // Get token and repo from environment variables, tracking which are missing
+    let token_result = env::var("GITHUB_TOKEN");
+    let repo_result = env::var("GITHUB_REPO");
 
-    Some((token, repo))
+    let token_missing = token_result.is_err();
+    let repo_missing = repo_result.is_err();
+
+    if token_missing || repo_missing {
+        let mut missing_vars = Vec::new();
+        if token_missing {
+            missing_vars.push("GITHUB_TOKEN");
+        }
+        if repo_missing {
+            missing_vars.push("GITHUB_REPO");
+        }
+        eprintln!(
+            "Warning: --github-issue was specified but {} {} not set. GitHub issue creation will be skipped.",
+            missing_vars.join(" and "),
+            if missing_vars.len() > 1 { "are" } else { "is" }
+        );
+        return None;
+    }
+
+    Some((token_result.unwrap(), repo_result.unwrap()))
 }
 
 fn parse_operators() -> Vec<OdptOperator> {
@@ -179,7 +198,8 @@ fn parse_operator_list(list: &str) -> Vec<OdptOperator> {
         return OdptOperator::all();
     }
 
-    list.split(',')
+    let result: Vec<OdptOperator> = list
+        .split(',')
         .filter_map(|s| match s.trim().to_lowercase().as_str() {
             "tokyometro" | "tokyo-metro" | "metro" => Some(OdptOperator::TokyoMetro),
             "toei" => Some(OdptOperator::Toei),
@@ -197,7 +217,17 @@ fn parse_operator_list(list: &str) -> Vec<OdptOperator> {
                 None
             }
         })
-        .collect()
+        .collect();
+
+    if result.is_empty() {
+        eprintln!(
+            "Warning: No valid operators found in '{}'. Using all operators as default.",
+            list
+        );
+        return OdptOperator::all();
+    }
+
+    result
 }
 
 fn parse_rotation_config() -> RotationConfig {
