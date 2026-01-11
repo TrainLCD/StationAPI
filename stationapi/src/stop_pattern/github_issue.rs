@@ -51,10 +51,7 @@ impl GitHubIssueCreator {
         let request = CreateIssueRequest {
             title,
             body,
-            labels: vec![
-                "stop-pattern-change".to_string(),
-                "automated".to_string(),
-            ],
+            labels: vec!["stop-pattern-change".to_string(), "automated".to_string()],
         };
 
         let url = format!("https://api.github.com/repos/{}/issues", self.repo);
@@ -100,10 +97,7 @@ impl GitHubIssueCreator {
 
         for ((railway_id, _), changes) in grouped {
             let first = changes.first().unwrap();
-            body.push_str(&format!(
-                "### {} ({})\n",
-                first.railway_name, railway_id
-            ));
+            body.push_str(&format!("### {} ({})\n", first.railway_name, railway_id));
             body.push_str(&format!("種別: {}\n\n", first.train_type_name));
 
             let added: Vec<_> = changes
@@ -142,7 +136,9 @@ impl GitHubIssueCreator {
         body.push_str("このIssueは自動作成されました。\n");
         body.push_str("変更を確認したら、DBで `acknowledged = TRUE` に更新してください。\n\n");
         body.push_str("```sql\n");
-        body.push_str("UPDATE stop_pattern_changes SET acknowledged = TRUE, acknowledged_at = NOW()\n");
+        body.push_str(
+            "UPDATE stop_pattern_changes SET acknowledged = TRUE, acknowledged_at = NOW()\n",
+        );
         body.push_str("WHERE acknowledged = FALSE;\n");
         body.push_str("```\n");
 

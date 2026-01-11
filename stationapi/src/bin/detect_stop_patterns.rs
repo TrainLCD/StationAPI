@@ -219,7 +219,9 @@ fn print_help() {
     println!("ENVIRONMENT VARIABLES:");
     println!("    ODPT_API_KEY   Required. API key for ODPT API.");
     println!("    DATABASE_URL   Required. PostgreSQL connection string.");
-    println!("    GITHUB_TOKEN   Required for --github-issue. Personal access token with repo scope.");
+    println!(
+        "    GITHUB_TOKEN   Required for --github-issue. Personal access token with repo scope."
+    );
     println!("    GITHUB_REPO    Required for --github-issue. Repository in 'owner/repo' format.");
     println!();
     println!("To get an ODPT API key, register at: https://developer.odpt.org/");
