@@ -72,21 +72,57 @@ jobs:
           # ログストリーム名を構築（タスク定義の設定に依存）
           LOG_STREAM="detect-stop-patterns/$TASK_ID"
 
-          OUTPUT=$(aws logs get-log-events \
-            --log-group-name ${{ vars.ECS_LOG_GROUP }} \
-            --log-stream-name "$LOG_STREAM" \
-            --query 'events[*].message' \
-            --output text 2>/dev/null || echo "")
+          # リトライループでログを取得（CloudWatch Logsへの配信遅延対策）
+          MAX_RETRIES=5
+          RETRY_DELAY=10
+          OUTPUT=""
 
-          echo "$OUTPUT"
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempting to fetch logs (attempt $i/$MAX_RETRIES)..."
+
+            if RESULT=$(aws logs get-log-events \
+              --log-group-name ${{ vars.ECS_LOG_GROUP }} \
+              --log-stream-name "$LOG_STREAM" \
+              --query 'events[*].message' \
+              --output text 2>&1); then
+              if [ -n "$RESULT" ] && [ "$RESULT" != "None" ]; then
+                OUTPUT="$RESULT"
+                echo "Successfully fetched logs"
+                break
+              fi
+            else
+              echo "AWS CLI error: $RESULT"
+            fi
+
+            if [ $i -lt $MAX_RETRIES ]; then
+              echo "Waiting ${RETRY_DELAY}s before retry..."
+              sleep $RETRY_DELAY
+            fi
+          done
+
+          if [ -z "$OUTPUT" ]; then
+            echo "Warning: Could not fetch logs after $MAX_RETRIES attempts"
+            OUTPUT="(ログの取得に失敗しました)"
+          fi
+
+          # シークレットパターンをマスク
+          SANITIZED=$(echo "$OUTPUT" | \
+            sed -E 's/ODPT_API_KEY=[^ ]*/ODPT_API_KEY=***REDACTED***/g' | \
+            sed -E 's/DATABASE_URL=[^ ]*/DATABASE_URL=***REDACTED***/g' | \
+            sed -E 's/postgres:\/\/[^@]*@/postgres:\/\/***:***@/g' | \
+            sed -E 's/GITHUB_TOKEN=[^ ]*/GITHUB_TOKEN=***REDACTED***/g' | \
+            sed -E 's/Bearer [A-Za-z0-9_-]+/Bearer ***REDACTED***/g' | \
+            sed -E 's/[a-zA-Z0-9]{20,}/***POSSIBLE_SECRET***/g')
+
+          echo "$SANITIZED"
 
           # 結果を保存
           echo "result<<EOF" >> $GITHUB_OUTPUT
-          echo "$OUTPUT" >> $GITHUB_OUTPUT
+          echo "$SANITIZED" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
           # 変更があったかチェック
-          if echo "$OUTPUT" | grep -q "検出された変更"; then
+          if echo "$SANITIZED" | grep -q "検出された変更"; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
