@@ -44,6 +44,7 @@ jobs:
             }')
 
           # ECSタスクを実行
+          set +e
           TASK_ARN=$(aws ecs run-task \
             --cluster ${{ vars.ECS_CLUSTER }} \
             --task-definition ${{ vars.ECS_TASK_DEFINITION }} \
@@ -51,7 +52,22 @@ jobs:
             --network-configuration "awsvpcConfiguration={subnets=[${{ vars.ECS_SUBNETS }}],securityGroups=[${{ vars.ECS_SECURITY_GROUPS }}],assignPublicIp=ENABLED}" \
             --overrides "$OVERRIDES" \
             --query 'tasks[0].taskArn' \
-            --output text)
+            --output text 2>&1)
+          AWS_EXIT_CODE=$?
+          set -e
+
+          # エラーチェック
+          if [ $AWS_EXIT_CODE -ne 0 ]; then
+            echo "Error: aws ecs run-task failed with exit code $AWS_EXIT_CODE"
+            echo "AWS CLI output: $TASK_ARN"
+            exit 1
+          fi
+
+          if [ -z "$TASK_ARN" ] || [ "$TASK_ARN" = "None" ] || [ "$TASK_ARN" = "null" ]; then
+            echo "Error: aws ecs run-task returned empty or invalid task ARN"
+            echo "Received: '$TASK_ARN'"
+            exit 1
+          fi
 
           echo "task_arn=$TASK_ARN" >> $GITHUB_OUTPUT
           echo "Started ECS task: $TASK_ARN"
@@ -130,14 +146,19 @@ jobs:
             OUTPUT="(ログの取得に失敗しました)"
           fi
 
-          # シークレットパターンをマスク
+          # シークレットパターンをマスク（UUIDやODPT IDは保持）
           SANITIZED=$(echo "$OUTPUT" | \
             sed -E 's/ODPT_API_KEY=[^ ]*/ODPT_API_KEY=***REDACTED***/g' | \
             sed -E 's/DATABASE_URL=[^ ]*/DATABASE_URL=***REDACTED***/g' | \
             sed -E 's/postgres:\/\/[^@]*@/postgres:\/\/***:***@/g' | \
             sed -E 's/GITHUB_TOKEN=[^ ]*/GITHUB_TOKEN=***REDACTED***/g' | \
             sed -E 's/Bearer [A-Za-z0-9_-]+/Bearer ***REDACTED***/g' | \
-            sed -E 's/[a-zA-Z0-9]{20,}/***POSSIBLE_SECRET***/g')
+            sed -E 's/AKIA[0-9A-Z]{16}/***AWS_ACCESS_KEY***/g' | \
+            sed -E 's/[A-Za-z0-9+\/]{40}/***AWS_SECRET_KEY***/g' | \
+            sed -E 's/ghp_[A-Za-z0-9]{36}/***GITHUB_PAT***/g' | \
+            sed -E 's/gho_[A-Za-z0-9]{36}/***GITHUB_OAUTH***/g' | \
+            sed -E 's/sk-[A-Za-z0-9]{48}/***OPENAI_KEY***/g' | \
+            sed -E 's/xox[baprs]-[A-Za-z0-9-]+/***SLACK_TOKEN***/g')
 
           echo "$SANITIZED"
 

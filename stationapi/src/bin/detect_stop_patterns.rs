@@ -8,7 +8,6 @@
 //!   DATABASE_URL: Required. PostgreSQL connection string.
 
 use sqlx::postgres::PgPoolOptions;
-use stationapi::config::fetch_database_url;
 use stationapi::stop_pattern::{
     odpt_client::OdptOperator, GitHubIssueCreator, RotationConfig, StopPatternDetector,
 };
@@ -64,7 +63,20 @@ async fn run() -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
     };
 
     // Connect to database
-    let db_url = fetch_database_url();
+    let db_url = match env::var("DATABASE_URL") {
+        Ok(url) => url,
+        Err(_) => {
+            error!("DATABASE_URL environment variable is required");
+            eprintln!("Error: DATABASE_URL environment variable is required");
+            eprintln!();
+            eprintln!("Usage:");
+            eprintln!("  DATABASE_URL=postgres://user:pass@host/db cargo run --bin detect_stop_patterns");
+            eprintln!();
+            eprintln!("The DATABASE_URL should be a valid PostgreSQL connection string.");
+            std::process::exit(1);
+        }
+    };
+
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&db_url)
@@ -187,18 +199,48 @@ fn parse_operator_list(list: &str) -> Vec<OdptOperator> {
 }
 
 fn parse_rotation_config() -> RotationConfig {
+    use tracing::warn;
+
     let args: Vec<String> = env::args().collect();
     let mut config = RotationConfig::default();
 
     for i in 0..args.len() {
         if args[i] == "--changes-retention" && i + 1 < args.len() {
-            if let Ok(days) = args[i + 1].parse() {
-                config.changes_retention_days = days;
+            match args[i + 1].parse::<i32>() {
+                Ok(days) if days > 0 => {
+                    config.changes_retention_days = days;
+                }
+                Ok(days) => {
+                    warn!(
+                        "Invalid --changes-retention value '{}': must be positive, using default {}",
+                        days, config.changes_retention_days
+                    );
+                }
+                Err(_) => {
+                    warn!(
+                        "Failed to parse --changes-retention value '{}': not a valid integer, using default {}",
+                        args[i + 1], config.changes_retention_days
+                    );
+                }
             }
         }
         if args[i] == "--snapshots-retention" && i + 1 < args.len() {
-            if let Ok(days) = args[i + 1].parse() {
-                config.snapshots_retention_days = days;
+            match args[i + 1].parse::<i32>() {
+                Ok(days) if days > 0 => {
+                    config.snapshots_retention_days = days;
+                }
+                Ok(days) => {
+                    warn!(
+                        "Invalid --snapshots-retention value '{}': must be positive, using default {}",
+                        days, config.snapshots_retention_days
+                    );
+                }
+                Err(_) => {
+                    warn!(
+                        "Failed to parse --snapshots-retention value '{}': not a valid integer, using default {}",
+                        args[i + 1], config.snapshots_retention_days
+                    );
+                }
             }
         }
         if args[i] == "--no-rotate" {
