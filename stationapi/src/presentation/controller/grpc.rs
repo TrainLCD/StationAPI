@@ -1,5 +1,5 @@
 use crate::{
-    domain::entity::gtfs::TransportTypeFilter,
+    domain::entity::gtfs::{TransportType, TransportTypeFilter},
     infrastructure::{
         company_repository::MyCompanyRepository, line_repository::MyLineRepository,
         station_repository::MyStationRepository, train_type_repository::MyTrainTypeRepository,
@@ -123,7 +123,7 @@ impl StationApi for MyApi {
         let longitude = request_ref.longitude;
         let limit = request_ref.limit;
         let transport_type = convert_transport_type(request_ref.transport_type);
-        let stations = match self
+        let mut stations = match self
             .query_use_case
             .get_stations_by_coordinates(latitude, longitude, limit, transport_type)
             .await
@@ -131,6 +131,15 @@ impl StationApi for MyApi {
             Ok(stations) => stations,
             Err(err) => return Err(PresentationalError::from(err).into()),
         };
+
+        // RailAndBusが指定された場合は、Railを先頭にソート（stable sortで距離順を維持）
+        if transport_type == TransportTypeFilter::RailAndBus {
+            stations.sort_by(|a, b| match (a.transport_type, b.transport_type) {
+                (TransportType::Rail, TransportType::Bus) => std::cmp::Ordering::Less,
+                (TransportType::Bus, TransportType::Rail) => std::cmp::Ordering::Greater,
+                _ => std::cmp::Ordering::Equal,
+            });
+        }
 
         Ok(tonic::Response::new(MultipleStationResponse {
             stations: stations.into_iter().map(|station| station.into()).collect(),
