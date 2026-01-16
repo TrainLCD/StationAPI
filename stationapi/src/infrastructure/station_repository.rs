@@ -984,7 +984,9 @@ impl InternalStationRepository {
                 ON a.id = la.alias_cd
                 WHERE s.e_status = 0
                 AND ($4::int IS NULL OR COALESCE(s.transport_type, 0) = $4)
-                ORDER BY point(s.lat, s.lon) <-> point($1, $2)
+                ORDER BY
+                    CASE WHEN $4 IS NULL THEN COALESCE(s.transport_type, 0) ELSE 0 END,
+                    point(s.lat, s.lon) <-> point($1, $2)
                 LIMIT $3"#,
         )
         .bind(latitude)
