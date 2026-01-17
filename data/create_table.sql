@@ -605,6 +605,22 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_stations_transport_type ON public.stations USING btree (transport_type);
 CREATE INDEX IF NOT EXISTS idx_lines_transport_type ON public.lines USING btree (transport_type);
 
+--
+-- Add gtfs_stop_id to stations table for bus timetable filtering
+--
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'stations' AND column_name = 'gtfs_stop_id'
+    ) THEN
+        ALTER TABLE public.stations ADD COLUMN gtfs_stop_id TEXT;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_stations_gtfs_stop_id ON public.stations USING btree (gtfs_stop_id);
+
 -- ============================================================
 -- GTFS Tables
 -- ============================================================

@@ -1906,10 +1906,10 @@ async fn integrate_gtfs_stops_to_stations(
                     station_cd, station_g_cd, station_name, station_name_k,
                     station_name_r, station_name_zh, station_name_ko,
                     line_cd, pref_cd, post, address, lon, lat,
-                    open_ymd, close_ymd, e_status, e_sort, transport_type
+                    open_ymd, close_ymd, e_status, e_sort, transport_type, gtfs_stop_id
                 ) VALUES (
                     $1, $2, $3, $4, $5, $6, $7, $8, 13, '', '', $9, $10,
-                    '', '', 0, $11, 1
+                    '', '', 0, $11, 1, $12
                 )
                 ON CONFLICT (station_cd) DO NOTHING"#,
             )
@@ -1929,6 +1929,7 @@ async fn integrate_gtfs_stops_to_stations(
             .bind(stop.stop_lon)
             .bind(stop.stop_lat)
             .bind(stop_sequence)
+            .bind(&stop.stop_id)
             .execute(&mut *conn)
             .await?;
 

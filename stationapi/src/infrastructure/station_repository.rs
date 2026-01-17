@@ -1587,7 +1587,8 @@ impl InternalStationRepository {
         // 1. Find service_ids that are active today based on gtfs_calendar and gtfs_calendar_dates
         // 2. Find trips with those service_ids
         // 3. Find stop_times within the time window
-        // 4. Map stop_ids to station_cds via gtfs_stops
+        // 4. Map stop_ids to station_cds via stations.gtfs_stop_id
+        //    (handles parent/child stop relationships)
         let query = format!(
             r#"
             WITH active_services AS (
@@ -1618,11 +1619,16 @@ impl InternalStationRepository {
                 WHERE gst.departure_time >= $2
                   AND gst.departure_time <= $3
             )
-            SELECT DISTINCT gs.station_cd
-            FROM gtfs_stops gs
-            JOIN active_stop_times ast ON ast.stop_id = gs.stop_id
-            WHERE gs.station_cd = ANY($4)
-              AND gs.station_cd IS NOT NULL
+            SELECT DISTINCT s.station_cd
+            FROM stations s
+            WHERE s.station_cd = ANY($4)
+              AND s.gtfs_stop_id IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM gtfs_stops gs
+                JOIN active_stop_times ast ON ast.stop_id = gs.stop_id
+                WHERE gs.stop_id = s.gtfs_stop_id OR gs.parent_station = s.gtfs_stop_id
+              )
             "#,
             day_column = day_column
         );
