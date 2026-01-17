@@ -354,6 +354,22 @@ where
             HashSet::new()
         };
 
+        // Debug: log sample station_cds for comparison
+        if !active_bus_stops.is_empty() {
+            let sample_active: Vec<_> = active_bus_stops.iter().take(5).collect();
+            let sample_stations: Vec<_> = stations
+                .iter()
+                .filter(|s| s.transport_type == TransportType::Bus)
+                .take(5)
+                .map(|s| s.station_cd)
+                .collect();
+            tracing::info!(
+                "active_bus_stops sample: {:?}, stations sample: {:?}",
+                sample_active,
+                sample_stations
+            );
+        }
+
         for station in stations.iter_mut() {
             // Apply bus timetable filtering: set stop_condition to Not for inactive bus stops
             // Only apply if there are active bus stops (i.e., buses are running)
