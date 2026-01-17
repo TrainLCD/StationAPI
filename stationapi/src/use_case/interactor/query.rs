@@ -317,10 +317,20 @@ where
         // Get active bus stops based on current JST time
         let active_bus_stops = if !bus_station_cds.is_empty() {
             let (current_date, current_time) = get_current_jst();
-            self.station_repository
+            match self
+                .station_repository
                 .get_active_bus_stop_station_cds(&bus_station_cds, &current_time, &current_date)
                 .await
-                .unwrap_or_default()
+            {
+                Ok(stops) => stops,
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to get active bus stop station_cds: {}. Using empty set as fallback.",
+                        e
+                    );
+                    HashSet::new()
+                }
+            }
         } else {
             HashSet::new()
         };
@@ -681,10 +691,20 @@ where
         // Get active bus stops based on current JST time
         let active_bus_stops = if !bus_station_cds.is_empty() {
             let (current_date, current_time) = get_current_jst();
-            self.station_repository
+            match self
+                .station_repository
                 .get_active_bus_stop_station_cds(&bus_station_cds, &current_time, &current_date)
                 .await
-                .unwrap_or_default()
+            {
+                Ok(stops) => stops,
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to get active bus stop station_cds: {}. Using empty set as fallback.",
+                        e
+                    );
+                    HashSet::new()
+                }
+            }
         } else {
             HashSet::new()
         };
@@ -812,10 +832,20 @@ where
         // Get active bus stops based on current JST time
         let active_bus_stops = if !bus_station_cds.is_empty() {
             let (current_date, current_time) = get_current_jst();
-            self.station_repository
+            match self
+                .station_repository
                 .get_active_bus_stop_station_cds(&bus_station_cds, &current_time, &current_date)
                 .await
-                .unwrap_or_default()
+            {
+                Ok(stops) => stops,
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to get active bus stop station_cds: {}. Using empty set as fallback.",
+                        e
+                    );
+                    HashSet::new()
+                }
+            }
         } else {
             HashSet::new()
         };
@@ -875,12 +905,12 @@ where
                         .collect();
 
                     // Determine stop_condition: for inactive bus stops, set to Not (1)
-                    let stop_condition = if row.transport_type == TransportType::Bus
+                    let stop_condition: i32 = if row.transport_type == TransportType::Bus
                         && !active_bus_stops.contains(&row.station_cd)
                     {
-                        proto::StopCondition::Not as i32
+                        proto::StopCondition::Not.into()
                     } else {
-                        row.pass.unwrap_or(0)
+                        row.stop_condition.into()
                     };
 
                     proto::StationMinimal {
