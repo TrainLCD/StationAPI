@@ -434,6 +434,7 @@ mod tests {
             None,
             None,
             None,
+            None, // kind
             TransportType::Bus,
         )
     }
@@ -526,7 +527,7 @@ mod tests {
     async fn test_get_by_line_group_id() {
         let repo = MockStationRepository::new();
         let result = repo.get_by_line_group_id(1000).await.unwrap();
-        assert_eq!(result.len(), 4); // すべての駅がline_group_cd = 1000に設定されている
+        assert_eq!(result.len(), 6); // すべての駅・バス停がline_group_cd = 1000に設定されている
     }
 
     #[tokio::test]
