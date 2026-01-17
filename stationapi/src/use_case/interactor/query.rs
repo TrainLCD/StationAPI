@@ -6,8 +6,9 @@ const NEARBY_BUS_STOP_RADIUS_METERS: f64 = 300.0;
 /// Get current JST (Japan Standard Time) as date and time strings.
 /// Returns (date_string in YYYYMMDD format, time_string in HH:MM:SS format)
 fn get_current_jst() -> (String, String) {
-    use chrono::{TimeDelta, Utc};
-    let jst_now = Utc::now() + TimeDelta::hours(9);
+    use chrono::{FixedOffset, Utc};
+    let jst_offset = FixedOffset::east_opt(9 * 3600).expect("JST offset is valid");
+    let jst_now = Utc::now().with_timezone(&jst_offset);
     let date_str = jst_now.format("%Y%m%d").to_string();
     let time_str = jst_now.format("%H:%M:%S").to_string();
     (date_str, time_str)
