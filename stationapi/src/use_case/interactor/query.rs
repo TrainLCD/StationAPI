@@ -286,7 +286,32 @@ where
             .map(|s| ((s.line_cd, s.station_g_cd), s))
             .collect();
 
+        // Collect all bus stop station_cds for timetable filtering
+        let bus_station_cds: Vec<i32> = stations
+            .iter()
+            .filter(|s| s.transport_type == TransportType::Bus)
+            .map(|s| s.station_cd)
+            .collect();
+
+        // Get active bus stops based on current JST time
+        let active_bus_stops = if !bus_station_cds.is_empty() {
+            let (current_date, current_time) = get_current_jst();
+            self.station_repository
+                .get_active_bus_stop_station_cds(&bus_station_cds, &current_time, &current_date)
+                .await
+                .unwrap_or_default()
+        } else {
+            HashSet::new()
+        };
+
         for station in stations.iter_mut() {
+            // Apply bus timetable filtering: set stop_condition to Not for inactive bus stops
+            if station.transport_type == TransportType::Bus
+                && !active_bus_stops.contains(&station.station_cd)
+            {
+                station.stop_condition = crate::proto::StopCondition::Not;
+            }
+
             let mut line = self.extract_line_from_station(station);
             line.line_symbols = self.get_line_symbols(&line);
             line.company = company_map.get(&line.company_cd).cloned().cloned();
