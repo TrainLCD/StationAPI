@@ -1638,6 +1638,14 @@ impl InternalStationRepository {
             station_cd: Option<i32>,
         }
 
+        tracing::debug!(
+            "get_active_bus_stop_station_cds: date={}, start_time={}, end_time={}, station_cds_count={}",
+            current_date_jst,
+            start_time,
+            end_time,
+            station_cds.len()
+        );
+
         let rows: Vec<StationCdRow> = sqlx::query_as(&query)
             .bind(date)
             .bind(&start_time)
@@ -1645,6 +1653,11 @@ impl InternalStationRepository {
             .bind(station_cds)
             .fetch_all(conn)
             .await?;
+
+        tracing::debug!(
+            "get_active_bus_stop_station_cds: found {} active bus stops",
+            rows.len()
+        );
 
         let result: std::collections::HashSet<i32> =
             rows.into_iter().filter_map(|r| r.station_cd).collect();

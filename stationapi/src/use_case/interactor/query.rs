@@ -318,12 +318,24 @@ where
         // Get active bus stops based on current JST time
         let active_bus_stops = if !bus_station_cds.is_empty() {
             let (current_date, current_time) = get_current_jst();
+            tracing::debug!(
+                "update_station_vec_with_attributes: bus_station_cds.len()={}, date={}, time={}",
+                bus_station_cds.len(),
+                current_date,
+                current_time
+            );
             match self
                 .station_repository
                 .get_active_bus_stop_station_cds(&bus_station_cds, &current_time, &current_date)
                 .await
             {
-                Ok(stops) => stops,
+                Ok(stops) => {
+                    tracing::debug!(
+                        "update_station_vec_with_attributes: active_bus_stops.len()={}",
+                        stops.len()
+                    );
+                    stops
+                }
                 Err(e) => {
                     tracing::warn!(
                         "Failed to get active bus stop station_cds: {}. Using empty set as fallback.",
