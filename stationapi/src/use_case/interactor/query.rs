@@ -407,6 +407,12 @@ where
                     {
                         station_copy.train_type = Some(tt);
                     };
+                    // Apply bus timetable filtering to nested station copy
+                    if station_copy.transport_type == TransportType::Bus
+                        && !active_bus_stops.contains(&station_copy.station_cd)
+                    {
+                        station_copy.stop_condition = crate::proto::StopCondition::Not;
+                    }
                     line.station = Some(station_copy);
                 }
             }
