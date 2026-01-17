@@ -338,7 +338,9 @@ where
 
         for station in stations.iter_mut() {
             // Apply bus timetable filtering: set stop_condition to Not for inactive bus stops
-            if station.transport_type == TransportType::Bus
+            // Only apply if there are active bus stops (i.e., buses are running)
+            if !active_bus_stops.is_empty()
+                && station.transport_type == TransportType::Bus
                 && !active_bus_stops.contains(&station.station_cd)
             {
                 station.stop_condition = crate::proto::StopCondition::Not;
@@ -379,9 +381,12 @@ where
                     for mut bus_line in nearby_bus_lines {
                         if seen_line_cds.insert(bus_line.line_cd) {
                             // Apply bus timetable filtering to nearby bus stops
-                            if let Some(ref mut bus_stop) = bus_line.station {
-                                if !active_bus_stops.contains(&bus_stop.station_cd) {
-                                    bus_stop.stop_condition = crate::proto::StopCondition::Not;
+                            // Only apply if there are active bus stops (i.e., buses are running)
+                            if !active_bus_stops.is_empty() {
+                                if let Some(ref mut bus_stop) = bus_line.station {
+                                    if !active_bus_stops.contains(&bus_stop.station_cd) {
+                                        bus_stop.stop_condition = crate::proto::StopCondition::Not;
+                                    }
                                 }
                             }
                             lines.push(bus_line);
@@ -408,7 +413,9 @@ where
                         station_copy.train_type = Some(tt);
                     };
                     // Apply bus timetable filtering to nested station copy
-                    if station_copy.transport_type == TransportType::Bus
+                    // Only apply if there are active bus stops (i.e., buses are running)
+                    if !active_bus_stops.is_empty()
+                        && station_copy.transport_type == TransportType::Bus
                         && !active_bus_stops.contains(&station_copy.station_cd)
                     {
                         station_copy.stop_condition = crate::proto::StopCondition::Not;
@@ -790,7 +797,9 @@ where
                     };
 
                     // Apply bus timetable filtering: set stop_condition to Not for inactive bus stops
-                    if row.transport_type == TransportType::Bus
+                    // Only apply if there are active bus stops (i.e., buses are running)
+                    if !active_bus_stops.is_empty()
+                        && row.transport_type == TransportType::Bus
                         && !active_bus_stops.contains(&row.station_cd)
                     {
                         proto_station.stop_condition = proto::StopCondition::Not.into();
@@ -912,7 +921,9 @@ where
                         .collect();
 
                     // Determine stop_condition: for inactive bus stops, set to Not (1)
-                    let stop_condition: i32 = if row.transport_type == TransportType::Bus
+                    // Only apply if there are active bus stops (i.e., buses are running)
+                    let stop_condition: i32 = if !active_bus_stops.is_empty()
+                        && row.transport_type == TransportType::Bus
                         && !active_bus_stops.contains(&row.station_cd)
                     {
                         proto::StopCondition::Not.into()
