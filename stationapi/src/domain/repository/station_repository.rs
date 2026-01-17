@@ -88,8 +88,10 @@ mod tests {
             stations.insert(4, station4);
 
             // Add bus stops for testing
-            let bus_stop1 = create_test_bus_stop(100, "新宿駅前バス停", 2001, 35.690500, 139.700100);
-            let bus_stop2 = create_test_bus_stop(101, "渋谷駅前バス停", 2001, 35.659200, 139.700200);
+            let bus_stop1 =
+                create_test_bus_stop(100, "新宿駅前バス停", 2001, 35.690500, 139.700100);
+            let bus_stop2 =
+                create_test_bus_stop(101, "渋谷駅前バス停", 2001, 35.659200, 139.700200);
             stations.insert(100, bus_stop1);
             stations.insert(101, bus_stop2);
 

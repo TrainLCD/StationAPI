@@ -716,51 +716,51 @@ where
                 .map(|row| {
                     let extracted_line = self.extract_line_from_station(row);
 
-                    let mut proto_station: proto::Station =
-                        if let Some(tt_line) = tt_line_map.get(&row.line_cd).copied() {
-                            let train_type = match row.type_id.is_some() {
-                                true => {
-                                    // Filter lines to only include those with matching line_group_cd
-                                    // and remove duplicates by line_cd
-                                    let mut seen_line_cds = std::collections::HashSet::new();
-                                    let filtered_lines: Vec<Line> = tt_lines
-                                        .iter()
-                                        .filter(|line| {
-                                            row.line_group_cd.is_some()
-                                                && line.line_group_cd == row.line_group_cd
-                                                && seen_line_cds.insert(line.line_cd)
-                                        })
-                                        .cloned()
-                                        .collect();
+                    let mut proto_station: proto::Station = if let Some(tt_line) =
+                        tt_line_map.get(&row.line_cd).copied()
+                    {
+                        let train_type = match row.type_id.is_some() {
+                            true => {
+                                // Filter lines to only include those with matching line_group_cd
+                                // and remove duplicates by line_cd
+                                let mut seen_line_cds = std::collections::HashSet::new();
+                                let filtered_lines: Vec<Line> = tt_lines
+                                    .iter()
+                                    .filter(|line| {
+                                        row.line_group_cd.is_some()
+                                            && line.line_group_cd == row.line_group_cd
+                                            && seen_line_cds.insert(line.line_cd)
+                                    })
+                                    .cloned()
+                                    .collect();
 
-                                    Some(Box::new(TrainType {
-                                        id: row.type_id,
-                                        station_cd: Some(row.station_cd),
-                                        type_cd: row.type_cd,
-                                        line_group_cd: row.line_group_cd,
-                                        pass: row.pass,
-                                        type_name: row.type_name.clone().unwrap_or_default(),
-                                        type_name_k: row.type_name_k.clone().unwrap_or_default(),
-                                        type_name_r: row.type_name_r.clone(),
-                                        type_name_zh: row.type_name_zh.clone(),
-                                        type_name_ko: row.type_name_ko.clone(),
-                                        color: row.color.clone().unwrap_or_default(),
-                                        direction: row.direction,
-                                        kind: row.kind,
-                                        line: Some(Box::new(tt_line.clone())),
-                                        lines: filtered_lines,
-                                    }))
-                                }
-                                false => None,
-                            };
-
-                            let stop =
-                                self.build_station_from_row(row, &extracted_line, train_type);
-                            stop.into()
-                        } else {
-                            let stop = self.build_station_from_row(row, &extracted_line, None);
-                            stop.into()
+                                Some(Box::new(TrainType {
+                                    id: row.type_id,
+                                    station_cd: Some(row.station_cd),
+                                    type_cd: row.type_cd,
+                                    line_group_cd: row.line_group_cd,
+                                    pass: row.pass,
+                                    type_name: row.type_name.clone().unwrap_or_default(),
+                                    type_name_k: row.type_name_k.clone().unwrap_or_default(),
+                                    type_name_r: row.type_name_r.clone(),
+                                    type_name_zh: row.type_name_zh.clone(),
+                                    type_name_ko: row.type_name_ko.clone(),
+                                    color: row.color.clone().unwrap_or_default(),
+                                    direction: row.direction,
+                                    kind: row.kind,
+                                    line: Some(Box::new(tt_line.clone())),
+                                    lines: filtered_lines,
+                                }))
+                            }
+                            false => None,
                         };
+
+                        let stop = self.build_station_from_row(row, &extracted_line, train_type);
+                        stop.into()
+                    } else {
+                        let stop = self.build_station_from_row(row, &extracted_line, None);
+                        stop.into()
+                    };
 
                     // Apply bus timetable filtering: set stop_condition to Not for inactive bus stops
                     if row.transport_type == TransportType::Bus

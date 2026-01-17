@@ -1571,32 +1571,16 @@ impl InternalStationRepository {
 
         // Calculate time window (±30 minutes)
         let time_parts: Vec<&str> = current_time_jst.split(':').collect();
-        let hours: i32 = time_parts
-            .first()
-            .unwrap_or(&"0")
-            .parse()
-            .unwrap_or(0);
-        let minutes: i32 = time_parts
-            .get(1)
-            .unwrap_or(&"0")
-            .parse()
-            .unwrap_or(0);
+        let hours: i32 = time_parts.first().unwrap_or(&"0").parse().unwrap_or(0);
+        let minutes: i32 = time_parts.get(1).unwrap_or(&"0").parse().unwrap_or(0);
 
         // Calculate start and end times for the 30-minute window
         let total_minutes = hours * 60 + minutes;
         let start_minutes = (total_minutes - 30).max(0);
         let end_minutes = total_minutes + 30;
 
-        let start_time = format!(
-            "{:02}:{:02}:00",
-            start_minutes / 60,
-            start_minutes % 60
-        );
-        let end_time = format!(
-            "{:02}:{:02}:00",
-            end_minutes / 60,
-            end_minutes % 60
-        );
+        let start_time = format!("{:02}:{:02}:00", start_minutes / 60, start_minutes % 60);
+        let end_time = format!("{:02}:{:02}:00", end_minutes / 60, end_minutes % 60);
 
         // Query to find active bus stops:
         // 1. Find service_ids that are active today based on gtfs_calendar and gtfs_calendar_dates
@@ -1655,10 +1639,8 @@ impl InternalStationRepository {
             .fetch_all(conn)
             .await?;
 
-        let result: std::collections::HashSet<i32> = rows
-            .into_iter()
-            .filter_map(|r| r.station_cd)
-            .collect();
+        let result: std::collections::HashSet<i32> =
+            rows.into_iter().filter_map(|r| r.station_cd).collect();
 
         Ok(result)
     }
