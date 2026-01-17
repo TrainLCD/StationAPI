@@ -316,11 +316,16 @@ where
         }
 
         // Get active bus stops based on current JST time
+        tracing::info!(
+            "update_station_vec_with_attributes: stations.len()={}, bus_station_cds.len()={}, transport_type={:?}",
+            stations.len(),
+            bus_station_cds.len(),
+            transport_type
+        );
         let active_bus_stops = if !bus_station_cds.is_empty() {
             let (current_date, current_time) = get_current_jst();
-            tracing::debug!(
-                "update_station_vec_with_attributes: bus_station_cds.len()={}, date={}, time={}",
-                bus_station_cds.len(),
+            tracing::info!(
+                "update_station_vec_with_attributes: calling get_active_bus_stop_station_cds with date={}, time={}",
                 current_date,
                 current_time
             );
@@ -330,7 +335,7 @@ where
                 .await
             {
                 Ok(stops) => {
-                    tracing::debug!(
+                    tracing::info!(
                         "update_station_vec_with_attributes: active_bus_stops.len()={}",
                         stops.len()
                     );
@@ -345,6 +350,7 @@ where
                 }
             }
         } else {
+            tracing::info!("update_station_vec_with_attributes: bus_station_cds is empty, skipping filtering");
             HashSet::new()
         };
 
