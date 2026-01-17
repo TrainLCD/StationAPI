@@ -1585,7 +1585,7 @@ impl InternalStationRepository {
 
         // Query to find active bus stops:
         // 1. Find service_ids that are active today based on gtfs_calendar and gtfs_calendar_dates
-        // 2. Find trips with those service_ids
+        // 2. Find trips with those service_ids AND matching route (via line_cd)
         // 3. Find stop_times within the time window
         // 4. Map stop_ids to station_cds via stations.gtfs_stop_id
         //    (handles parent/child stop relationships)
@@ -1610,25 +1610,19 @@ impl InternalStationRepository {
                 FROM gtfs_calendar_dates gcd
                 WHERE gcd.date = $1
                   AND gcd.exception_type = 2
-            ),
-            active_stop_times AS (
-                SELECT DISTINCT gst.stop_id
-                FROM gtfs_stop_times gst
-                JOIN gtfs_trips gt ON gt.trip_id = gst.trip_id
-                JOIN active_services ase ON ase.service_id = gt.service_id
-                WHERE gst.departure_time >= $2
-                  AND gst.departure_time <= $3
             )
             SELECT DISTINCT s.station_cd
             FROM stations s
+            JOIN gtfs_routes gr ON gr.line_cd = s.line_cd
+            JOIN gtfs_trips gt ON gt.route_id = gr.route_id
+            JOIN active_services ase ON ase.service_id = gt.service_id
+            JOIN gtfs_stop_times gst ON gst.trip_id = gt.trip_id
+            JOIN gtfs_stops gs ON gs.stop_id = gst.stop_id
             WHERE s.station_cd = ANY($4)
               AND s.gtfs_stop_id IS NOT NULL
-              AND EXISTS (
-                SELECT 1
-                FROM gtfs_stops gs
-                JOIN active_stop_times ast ON ast.stop_id = gs.stop_id
-                WHERE gs.stop_id = s.gtfs_stop_id OR gs.parent_station = s.gtfs_stop_id
-              )
+              AND (gs.stop_id = s.gtfs_stop_id OR gs.parent_station = s.gtfs_stop_id)
+              AND gst.departure_time >= $2
+              AND gst.departure_time <= $3
             "#,
             day_column = day_column
         );
