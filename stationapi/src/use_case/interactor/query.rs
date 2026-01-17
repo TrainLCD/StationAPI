@@ -3,6 +3,16 @@ use std::collections::{BTreeMap, HashSet};
 /// Maximum distance in meters to search for nearby bus stops from a rail station
 const NEARBY_BUS_STOP_RADIUS_METERS: f64 = 300.0;
 
+/// Get current JST (Japan Standard Time) as date and time strings.
+/// Returns (date_string in YYYYMMDD format, time_string in HH:MM:SS format)
+fn get_current_jst() -> (String, String) {
+    use chrono::{Duration, Utc};
+    let jst_now = Utc::now() + Duration::hours(9);
+    let date_str = jst_now.format("%Y%m%d").to_string();
+    let time_str = jst_now.format("%H:%M:%S").to_string();
+    (date_str, time_str)
+}
+
 /// Check if a station's transport type matches the filter
 fn matches_transport_filter(station_type: TransportType, filter: TransportTypeFilter) -> bool {
     match filter {
@@ -609,6 +619,24 @@ where
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
 
+        // Collect all bus stop station_cds for timetable filtering
+        let bus_station_cds: Vec<i32> = stops
+            .iter()
+            .filter(|s| s.transport_type == TransportType::Bus)
+            .map(|s| s.station_cd)
+            .collect();
+
+        // Get active bus stops based on current JST time
+        let active_bus_stops = if !bus_station_cds.is_empty() {
+            let (current_date, current_time) = get_current_jst();
+            self.station_repository
+                .get_active_bus_stop_station_cds(&bus_station_cds, &current_time, &current_date)
+                .await
+                .unwrap_or_default()
+        } else {
+            HashSet::new()
+        };
+
         let mut routes: Vec<Route> = Vec::new();
 
         for (id, stops) in route_row_tree_map.iter() {
@@ -636,51 +664,60 @@ where
                 .map(|row| {
                     let extracted_line = self.extract_line_from_station(row);
 
-                    if let Some(tt_line) = tt_line_map.get(&row.line_cd).copied() {
-                        let train_type = match row.type_id.is_some() {
-                            true => {
-                                // Filter lines to only include those with matching line_group_cd
-                                // and remove duplicates by line_cd
-                                let mut seen_line_cds = std::collections::HashSet::new();
-                                let filtered_lines: Vec<Line> = tt_lines
-                                    .iter()
-                                    .filter(|line| {
-                                        row.line_group_cd.is_some()
-                                            && line.line_group_cd == row.line_group_cd
-                                            && seen_line_cds.insert(line.line_cd)
-                                    })
-                                    .cloned()
-                                    .collect();
+                    let mut proto_station: proto::Station =
+                        if let Some(tt_line) = tt_line_map.get(&row.line_cd).copied() {
+                            let train_type = match row.type_id.is_some() {
+                                true => {
+                                    // Filter lines to only include those with matching line_group_cd
+                                    // and remove duplicates by line_cd
+                                    let mut seen_line_cds = std::collections::HashSet::new();
+                                    let filtered_lines: Vec<Line> = tt_lines
+                                        .iter()
+                                        .filter(|line| {
+                                            row.line_group_cd.is_some()
+                                                && line.line_group_cd == row.line_group_cd
+                                                && seen_line_cds.insert(line.line_cd)
+                                        })
+                                        .cloned()
+                                        .collect();
 
-                                Some(Box::new(TrainType {
-                                    id: row.type_id,
-                                    station_cd: Some(row.station_cd),
-                                    type_cd: row.type_cd,
-                                    line_group_cd: row.line_group_cd,
-                                    pass: row.pass,
-                                    type_name: row.type_name.clone().unwrap_or_default(),
-                                    type_name_k: row.type_name_k.clone().unwrap_or_default(),
-                                    type_name_r: row.type_name_r.clone(),
-                                    type_name_zh: row.type_name_zh.clone(),
-                                    type_name_ko: row.type_name_ko.clone(),
-                                    color: row.color.clone().unwrap_or_default(),
-                                    direction: row.direction,
-                                    kind: row.kind,
-                                    line: Some(Box::new(tt_line.clone())),
-                                    lines: filtered_lines,
-                                }))
-                            }
-                            false => None,
+                                    Some(Box::new(TrainType {
+                                        id: row.type_id,
+                                        station_cd: Some(row.station_cd),
+                                        type_cd: row.type_cd,
+                                        line_group_cd: row.line_group_cd,
+                                        pass: row.pass,
+                                        type_name: row.type_name.clone().unwrap_or_default(),
+                                        type_name_k: row.type_name_k.clone().unwrap_or_default(),
+                                        type_name_r: row.type_name_r.clone(),
+                                        type_name_zh: row.type_name_zh.clone(),
+                                        type_name_ko: row.type_name_ko.clone(),
+                                        color: row.color.clone().unwrap_or_default(),
+                                        direction: row.direction,
+                                        kind: row.kind,
+                                        line: Some(Box::new(tt_line.clone())),
+                                        lines: filtered_lines,
+                                    }))
+                                }
+                                false => None,
+                            };
+
+                            let stop =
+                                self.build_station_from_row(row, &extracted_line, train_type);
+                            stop.into()
+                        } else {
+                            let stop = self.build_station_from_row(row, &extracted_line, None);
+                            stop.into()
                         };
 
-                        let stop = self.build_station_from_row(row, &extracted_line, train_type);
-
-                        return stop.into();
+                    // Apply bus timetable filtering: set stop_condition to Not for inactive bus stops
+                    if row.transport_type == TransportType::Bus
+                        && !active_bus_stops.contains(&row.station_cd)
+                    {
+                        proto_station.stop_condition = proto::StopCondition::Not.into();
                     }
 
-                    let stop = self.build_station_from_row(row, &extracted_line, None);
-
-                    stop.into()
+                    proto_station
                 })
                 .collect::<Vec<proto::Station>>();
 
@@ -712,6 +749,24 @@ where
             .await?;
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
+
+        // Collect all bus stop station_cds for timetable filtering
+        let bus_station_cds: Vec<i32> = stops
+            .iter()
+            .filter(|s| s.transport_type == TransportType::Bus)
+            .map(|s| s.station_cd)
+            .collect();
+
+        // Get active bus stops based on current JST time
+        let active_bus_stops = if !bus_station_cds.is_empty() {
+            let (current_date, current_time) = get_current_jst();
+            self.station_repository
+                .get_active_bus_stop_station_cds(&bus_station_cds, &current_time, &current_date)
+                .await
+                .unwrap_or_default()
+        } else {
+            HashSet::new()
+        };
 
         let mut routes: Vec<proto::RouteMinimal> = Vec::new();
         let mut all_lines: std::collections::HashMap<u32, proto::LineMinimal> =
@@ -767,6 +822,15 @@ where
                         })
                         .collect();
 
+                    // Determine stop_condition: for inactive bus stops, set to Not (1)
+                    let stop_condition = if row.transport_type == TransportType::Bus
+                        && !active_bus_stops.contains(&row.station_cd)
+                    {
+                        proto::StopCondition::Not as i32
+                    } else {
+                        row.pass.unwrap_or(0)
+                    };
+
                     proto::StationMinimal {
                         id: row.station_cd as u32,
                         group_id: row.station_g_cd as u32,
@@ -775,7 +839,7 @@ where
                         name_roman: row.station_name_r.clone(),
                         line_ids: vec![extracted_line.line_cd as u32],
                         station_numbers,
-                        stop_condition: row.pass.unwrap_or(0),
+                        stop_condition,
                         has_train_types: Some(row.type_id.is_some()),
                         train_type_id: row.type_id.map(|id| id as u32),
                     }
@@ -1357,6 +1421,14 @@ mod tests {
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
+            async fn get_active_bus_stop_station_cds(
+                &self,
+                _: &[i32],
+                _: &str,
+                _: &str,
+            ) -> Result<std::collections::HashSet<i32>, DomainError> {
+                Ok(std::collections::HashSet::new())
+            }
         }
 
         #[async_trait::async_trait]
@@ -1745,6 +1817,14 @@ mod tests {
                 _: Option<u32>,
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
+            }
+            async fn get_active_bus_stop_station_cds(
+                &self,
+                _: &[i32],
+                _: &str,
+                _: &str,
+            ) -> Result<std::collections::HashSet<i32>, DomainError> {
+                Ok(std::collections::HashSet::new())
             }
         }
 
@@ -2478,6 +2558,81 @@ mod tests {
         #[test]
         fn test_rail_and_bus_filter_returns_none() {
             assert_eq!(filter_to_db_type(TransportTypeFilter::RailAndBus), None);
+        }
+    }
+
+    // ========================================
+    // get_current_jst tests
+    // ========================================
+
+    mod get_current_jst_tests {
+        use super::*;
+
+        #[test]
+        fn test_get_current_jst_returns_valid_date_format() {
+            let (date, _time) = get_current_jst();
+
+            // Date should be in YYYYMMDD format (8 digits)
+            assert_eq!(date.len(), 8);
+            assert!(date.chars().all(|c| c.is_ascii_digit()));
+
+            // Year should be reasonable (2020-2100)
+            let year: i32 = date[0..4].parse().unwrap();
+            assert!(year >= 2020 && year <= 2100);
+
+            // Month should be 01-12
+            let month: i32 = date[4..6].parse().unwrap();
+            assert!(month >= 1 && month <= 12);
+
+            // Day should be 01-31
+            let day: i32 = date[6..8].parse().unwrap();
+            assert!(day >= 1 && day <= 31);
+        }
+
+        #[test]
+        fn test_get_current_jst_returns_valid_time_format() {
+            let (_date, time) = get_current_jst();
+
+            // Time should be in HH:MM:SS format
+            assert_eq!(time.len(), 8);
+
+            let parts: Vec<&str> = time.split(':').collect();
+            assert_eq!(parts.len(), 3);
+
+            // Hours should be 00-23
+            let hours: i32 = parts[0].parse().unwrap();
+            assert!(hours >= 0 && hours <= 23);
+
+            // Minutes should be 00-59
+            let minutes: i32 = parts[1].parse().unwrap();
+            assert!(minutes >= 0 && minutes <= 59);
+
+            // Seconds should be 00-59
+            let seconds: i32 = parts[2].parse().unwrap();
+            assert!(seconds >= 0 && seconds <= 59);
+        }
+
+        #[test]
+        fn test_get_current_jst_time_is_jst() {
+            use chrono::Utc;
+
+            let (_, time_str) = get_current_jst();
+            let utc_now = Utc::now();
+            let utc_hour = utc_now.format("%H").to_string().parse::<i32>().unwrap();
+
+            let jst_hour: i32 = time_str[0..2].parse().unwrap();
+
+            // JST should be UTC + 9 (with wraparound)
+            let expected_jst_hour = (utc_hour + 9) % 24;
+
+            // Allow 1 hour difference due to timing
+            let hour_diff = (jst_hour - expected_jst_hour).abs();
+            assert!(
+                hour_diff <= 1 || hour_diff >= 23,
+                "JST hour {} should be approximately UTC hour {} + 9",
+                jst_hour,
+                utc_hour
+            );
         }
     }
 }

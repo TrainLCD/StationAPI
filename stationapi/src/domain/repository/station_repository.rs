@@ -44,6 +44,21 @@ pub trait StationRepository: Send + Sync + 'static {
         to_station_id: u32,
         via_line_id: Option<u32>,
     ) -> Result<Vec<Station>, DomainError>;
+
+    /// Get bus stops that have active service around the current JST time.
+    /// Returns a set of station_cd values for bus stops that have scheduled departures
+    /// within a time window around the specified time.
+    ///
+    /// # Arguments
+    /// * `station_cds` - List of station_cd values to check
+    /// * `current_time_jst` - Current time in JST (HH:MM:SS format)
+    /// * `current_date_jst` - Current date in JST (YYYYMMDD format)
+    async fn get_active_bus_stop_station_cds(
+        &self,
+        station_cds: &[i32],
+        current_time_jst: &str,
+        current_date_jst: &str,
+    ) -> Result<std::collections::HashSet<i32>, DomainError>;
 }
 
 #[cfg(test)]
@@ -71,6 +86,12 @@ mod tests {
             stations.insert(2, station2);
             stations.insert(3, station3);
             stations.insert(4, station4);
+
+            // Add bus stops for testing
+            let bus_stop1 = create_test_bus_stop(100, "新宿駅前バス停", 2001, 35.690500, 139.700100);
+            let bus_stop2 = create_test_bus_stop(101, "渋谷駅前バス停", 2001, 35.659200, 139.700200);
+            stations.insert(100, bus_stop1);
+            stations.insert(101, bus_stop2);
 
             Self { stations }
         }
@@ -241,6 +262,25 @@ mod tests {
 
             Ok(result)
         }
+
+        async fn get_active_bus_stop_station_cds(
+            &self,
+            station_cds: &[i32],
+            _current_time_jst: &str,
+            _current_date_jst: &str,
+        ) -> Result<std::collections::HashSet<i32>, DomainError> {
+            // Mock implementation: returns all bus stops as active
+            let result: std::collections::HashSet<i32> = self
+                .stations
+                .values()
+                .filter(|s| {
+                    station_cds.contains(&s.station_cd)
+                        && s.transport_type == crate::domain::entity::gtfs::TransportType::Bus
+                })
+                .map(|s| s.station_cd)
+                .collect();
+            Ok(result)
+        }
     }
 
     // テスト用のStation作成ヘルパー関数
@@ -317,6 +357,82 @@ mod tests {
             Some(0),
             Some(1),
             TransportType::Rail,
+        )
+    }
+
+    // テスト用のバス停作成ヘルパー関数
+    fn create_test_bus_stop(
+        station_cd: i32,
+        station_name: &str,
+        line_cd: i32,
+        lat: f64,
+        lon: f64,
+    ) -> Station {
+        Station::new(
+            station_cd,
+            station_cd, // station_g_cd
+            station_name.to_string(),
+            format!("{station_name}_k"),
+            Some(format!("{station_name}_r")),
+            Some(format!("{station_name}_zh")),
+            Some(format!("{station_name}_ko")),
+            vec![],
+            None,
+            None,
+            None,
+            None,
+            None,
+            line_cd,
+            None,
+            vec![],
+            13, // 東京都
+            "100-0000".to_string(),
+            "東京都".to_string(),
+            lon,
+            lat,
+            "20000101".to_string(),
+            "99991231".to_string(),
+            0,
+            0,
+            StopCondition::All,
+            None,
+            false,
+            None,
+            Some(1),
+            Some("都営バス".to_string()),
+            Some("とえいばす".to_string()),
+            Some("Toei Bus".to_string()),
+            Some("Toei Bus".to_string()),
+            Some("都营巴士".to_string()),
+            Some("도에이 버스".to_string()),
+            Some("#009944".to_string()),
+            Some(99), // OtherLineType for bus
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(1000),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            TransportType::Bus,
         )
     }
 
@@ -451,5 +567,71 @@ mod tests {
         // line_cd が一致しないためルートは返さない
         let result = repo.get_route_stops(1, 2, Some(1001)).await.unwrap();
         assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_active_bus_stop_station_cds_returns_bus_stops() {
+        let repo = MockStationRepository::new();
+        // Query for bus stops (100 and 101 are bus stops)
+        let result = repo
+            .get_active_bus_stop_station_cds(&[100, 101], "12:00:00", "20250117")
+            .await
+            .unwrap();
+
+        // Mock implementation returns all bus stops as active
+        assert!(result.contains(&100));
+        assert!(result.contains(&101));
+    }
+
+    #[tokio::test]
+    async fn test_get_active_bus_stop_station_cds_excludes_rail_stations() {
+        let repo = MockStationRepository::new();
+        // Query for rail stations (1, 2 are rail stations)
+        let result = repo
+            .get_active_bus_stop_station_cds(&[1, 2], "12:00:00", "20250117")
+            .await
+            .unwrap();
+
+        // Rail stations should not be returned
+        assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_active_bus_stop_station_cds_mixed_input() {
+        let repo = MockStationRepository::new();
+        // Query for both rail and bus stations
+        let result = repo
+            .get_active_bus_stop_station_cds(&[1, 100, 2, 101], "12:00:00", "20250117")
+            .await
+            .unwrap();
+
+        // Only bus stops should be returned
+        assert_eq!(result.len(), 2);
+        assert!(result.contains(&100));
+        assert!(result.contains(&101));
+        assert!(!result.contains(&1));
+        assert!(!result.contains(&2));
+    }
+
+    #[tokio::test]
+    async fn test_get_active_bus_stop_station_cds_empty_input() {
+        let repo = MockStationRepository::new();
+        let result = repo
+            .get_active_bus_stop_station_cds(&[], "12:00:00", "20250117")
+            .await
+            .unwrap();
+
+        assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_find_by_id_bus_stop() {
+        let repo = MockStationRepository::new();
+        let result = repo.find_by_id(100).await.unwrap();
+        assert!(result.is_some());
+        let station = result.unwrap();
+        assert_eq!(station.station_cd, 100);
+        assert_eq!(station.station_name, "新宿駅前バス停");
+        assert_eq!(station.transport_type, TransportType::Bus);
     }
 }

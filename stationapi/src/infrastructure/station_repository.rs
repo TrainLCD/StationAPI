@@ -283,6 +283,22 @@ impl StationRepository for MyStationRepository {
         )
         .await
     }
+
+    async fn get_active_bus_stop_station_cds(
+        &self,
+        station_cds: &[i32],
+        current_time_jst: &str,
+        current_date_jst: &str,
+    ) -> Result<std::collections::HashSet<i32>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalStationRepository::get_active_bus_stop_station_cds(
+            station_cds,
+            current_time_jst,
+            current_date_jst,
+            &mut conn,
+        )
+        .await
+    }
 }
 
 struct InternalStationRepository {}
@@ -1523,6 +1539,128 @@ impl InternalStationRepository {
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(stations)
+    }
+
+    /// Get active bus stop station_cds based on current JST time.
+    /// Returns station_cd values for bus stops that have scheduled departures
+    /// within a time window (±30 minutes) around the specified time.
+    async fn get_active_bus_stop_station_cds(
+        station_cds: &[i32],
+        current_time_jst: &str,
+        current_date_jst: &str,
+        conn: &mut PgConnection,
+    ) -> Result<std::collections::HashSet<i32>, DomainError> {
+        if station_cds.is_empty() {
+            return Ok(std::collections::HashSet::new());
+        }
+
+        // Parse the date to determine the day of week
+        let date = chrono::NaiveDate::parse_from_str(current_date_jst, "%Y%m%d")
+            .map_err(|e| DomainError::Unexpected(format!("Invalid date format: {}", e)))?;
+
+        let weekday = date.weekday();
+        let day_column = match weekday {
+            chrono::Weekday::Mon => "monday",
+            chrono::Weekday::Tue => "tuesday",
+            chrono::Weekday::Wed => "wednesday",
+            chrono::Weekday::Thu => "thursday",
+            chrono::Weekday::Fri => "friday",
+            chrono::Weekday::Sat => "saturday",
+            chrono::Weekday::Sun => "sunday",
+        };
+
+        // Calculate time window (±30 minutes)
+        let time_parts: Vec<&str> = current_time_jst.split(':').collect();
+        let hours: i32 = time_parts
+            .first()
+            .unwrap_or(&"0")
+            .parse()
+            .unwrap_or(0);
+        let minutes: i32 = time_parts
+            .get(1)
+            .unwrap_or(&"0")
+            .parse()
+            .unwrap_or(0);
+
+        // Calculate start and end times for the 30-minute window
+        let total_minutes = hours * 60 + minutes;
+        let start_minutes = (total_minutes - 30).max(0);
+        let end_minutes = total_minutes + 30;
+
+        let start_time = format!(
+            "{:02}:{:02}:00",
+            start_minutes / 60,
+            start_minutes % 60
+        );
+        let end_time = format!(
+            "{:02}:{:02}:00",
+            end_minutes / 60,
+            end_minutes % 60
+        );
+
+        // Query to find active bus stops:
+        // 1. Find service_ids that are active today based on gtfs_calendar and gtfs_calendar_dates
+        // 2. Find trips with those service_ids
+        // 3. Find stop_times within the time window
+        // 4. Map stop_ids to station_cds via gtfs_stops
+        let query = format!(
+            r#"
+            WITH active_services AS (
+                -- Services that run on this day of week
+                SELECT gc.service_id
+                FROM gtfs_calendar gc
+                WHERE gc.{day_column} = true
+                  AND gc.start_date <= $1
+                  AND gc.end_date >= $1
+                -- Add exceptions (service added)
+                UNION
+                SELECT gcd.service_id
+                FROM gtfs_calendar_dates gcd
+                WHERE gcd.date = $1
+                  AND gcd.exception_type = 1
+                -- Remove exceptions (service removed)
+                EXCEPT
+                SELECT gcd.service_id
+                FROM gtfs_calendar_dates gcd
+                WHERE gcd.date = $1
+                  AND gcd.exception_type = 2
+            ),
+            active_stop_times AS (
+                SELECT DISTINCT gst.stop_id
+                FROM gtfs_stop_times gst
+                JOIN gtfs_trips gt ON gt.trip_id = gst.trip_id
+                JOIN active_services ase ON ase.service_id = gt.service_id
+                WHERE gst.departure_time >= $2
+                  AND gst.departure_time <= $3
+            )
+            SELECT DISTINCT gs.station_cd
+            FROM gtfs_stops gs
+            JOIN active_stop_times ast ON ast.stop_id = gs.stop_id
+            WHERE gs.station_cd = ANY($4)
+              AND gs.station_cd IS NOT NULL
+            "#,
+            day_column = day_column
+        );
+
+        #[derive(sqlx::FromRow)]
+        struct StationCdRow {
+            station_cd: Option<i32>,
+        }
+
+        let rows: Vec<StationCdRow> = sqlx::query_as(&query)
+            .bind(date)
+            .bind(&start_time)
+            .bind(&end_time)
+            .bind(station_cds)
+            .fetch_all(conn)
+            .await?;
+
+        let result: std::collections::HashSet<i32> = rows
+            .into_iter()
+            .filter_map(|r| r.station_cd)
+            .collect();
+
+        Ok(result)
     }
 }
 
