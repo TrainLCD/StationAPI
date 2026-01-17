@@ -287,11 +287,32 @@ where
             .collect();
 
         // Collect all bus stop station_cds for timetable filtering
-        let bus_station_cds: Vec<i32> = stations
+        let mut bus_station_cds: Vec<i32> = stations
             .iter()
             .filter(|s| s.transport_type == TransportType::Bus)
             .map(|s| s.station_cd)
             .collect();
+
+        // For RailAndBus, also collect nearby bus stops from rail stations
+        let should_include_bus_routes = transport_type == TransportTypeFilter::RailAndBus;
+        let mut nearby_bus_lines_map: std::collections::HashMap<i32, Vec<Line>> =
+            std::collections::HashMap::new();
+
+        if should_include_bus_routes {
+            for station in stations.iter() {
+                if station.transport_type == TransportType::Rail {
+                    let nearby_bus_lines =
+                        self.get_nearby_bus_lines(station.lat, station.lon).await?;
+                    // Collect bus stop station_cds from nearby bus lines
+                    for bus_line in &nearby_bus_lines {
+                        if let Some(ref bus_stop) = bus_line.station {
+                            bus_station_cds.push(bus_stop.station_cd);
+                        }
+                    }
+                    nearby_bus_lines_map.insert(station.station_cd, nearby_bus_lines);
+                }
+            }
+        }
 
         // Get active bus stops based on current JST time
         let active_bus_stops = if !bus_station_cds.is_empty() {
@@ -342,12 +363,18 @@ where
 
             // For rail stations, add nearby bus routes to lines array
             // Only add bus routes if transport_type is RailAndBus
-            let should_include_bus_routes = transport_type == TransportTypeFilter::RailAndBus;
             if station.transport_type == TransportType::Rail && should_include_bus_routes {
-                let nearby_bus_lines = self.get_nearby_bus_lines(station.lat, station.lon).await?;
-                for bus_line in nearby_bus_lines {
-                    if seen_line_cds.insert(bus_line.line_cd) {
-                        lines.push(bus_line);
+                if let Some(nearby_bus_lines) = nearby_bus_lines_map.remove(&station.station_cd) {
+                    for mut bus_line in nearby_bus_lines {
+                        if seen_line_cds.insert(bus_line.line_cd) {
+                            // Apply bus timetable filtering to nearby bus stops
+                            if let Some(ref mut bus_stop) = bus_line.station {
+                                if !active_bus_stops.contains(&bus_stop.station_cd) {
+                                    bus_stop.stop_condition = crate::proto::StopCondition::Not;
+                                }
+                            }
+                            lines.push(bus_line);
+                        }
                     }
                 }
             }
