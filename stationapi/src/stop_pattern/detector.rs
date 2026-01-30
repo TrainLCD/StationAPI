@@ -95,7 +95,36 @@ impl StopPatternDetector {
         // Save current patterns as new snapshots
         self.save_snapshots(&current_patterns).await?;
 
+        // Clean up old snapshots (keep only last 7 days)
+        self.cleanup_old_snapshots(7).await?;
+
         Ok(changes)
+    }
+
+    /// Delete snapshots older than the specified number of days
+    async fn cleanup_old_snapshots(
+        &self,
+        retention_days: i32,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM stop_pattern_snapshots
+            WHERE captured_at < NOW() - make_interval(days => $1)
+            "#,
+        )
+        .bind(retention_days)
+        .execute(&self.pool)
+        .await?;
+
+        let deleted = result.rows_affected();
+        if deleted > 0 {
+            info!(
+                "Cleaned up {} old snapshots (retention: {} days)",
+                deleted, retention_days
+            );
+        }
+
+        Ok(())
     }
 
     /// Get the latest snapshot for each railway/train_type combination
