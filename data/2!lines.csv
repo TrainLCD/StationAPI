@@ -258,8 +258,8 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 23001,13,京成本線,ケイセイホンセン,京成本線,Keisei Main Line,Keisei Main Line,京成本线,게이세이 본선,#005AAA,2,KS,,,,#005AAA,,,,KEISEI,,,,0,23001,1572.632183
 23002,13,京成押上線,ケイセイオシアゲセン,京成押上線,Keisei Oshiage Line,Keisei Oshiage Line,京成押上线,게이세이 오시아게선,#005AAA,2,KS,A,,,#005AAA,#E85298,,,KEISEI,ROUND,,,0,23002,1120.50642
 23003,13,京成金町線,ケイセイカナマチセン,京成金町線,Keisei Kanamachi Line,Keisei Kanamachi Line,京成金町线,게이세이 가나마치선,#005AAA,2,KS,,,,#005AAA,,,,KEISEI,,,,0,23003,1188.422928
-23004,13,京成千葉線,ケイセイチバセン,京成千葉線,Keisei Chiba Line,Keisei Chiba Line,京成千叶线,게이세이 지바선,#AA5E51,2,KS,,,,#005AAA,,,,KEISEI,,,,0,23004,1344.972602
-23005,13,京成千原線,ケイセイチハラセン,京成千原線,Keisei Chihara Line,Keisei Chihara Line,京成千原线,게이세이 지하라선,#AA5E51,2,KS,,,,#005AAA,,,,KEISEI,,,,0,23005,1984.473409
+23004,13,京成千葉線,ケイセイチバセン,京成千葉線,Keisei Chiba Line,Keisei Chiba Line,京成千叶线,게이세이 지바선,#005AAA,2,KS,,,,#005AAA,,,,KEISEI,,,,0,23004,1344.972602
+23005,13,京成千原線,ケイセイチハラセン,京成千原線,Keisei Chihara Line,Keisei Chihara Line,京成千原线,게이세이 지하라선,#005AAA,2,KS,,,,#005AAA,,,,KEISEI,,,,0,23005,1984.473409
 23006,13,成田スカイアクセス線,ナリタスカイアクセスセン,京成成田空港線,Keisei Narita Airport Line,Keisei Narita Airport Line,京成成田机场线,게이세이 나리타 공항선,#FF6600,2,KS,HS,,,#005AAA,#3333FF,,,KEISEI,KEISEI,,,0,23006,6040.235349
 24001,14,京王線,ケイオウセン,京王線,Keio Line,Keio Line,京王线,게이오선,#CA0073,2,KO,,,,#CA0073,,,,KEIO,,,,0,24001,1173.85607
 24002,14,京王相模原線,ケイオウサガミハラセン,京王相模原線,Keio Sagamihara Line,Keio Sagamihara Line,京王相模原线,게이오 사가미하라선,#CA0073,2,KO,,,,#CA0073,,,,KEIO,,,,0,24002,1952.492639
@@ -323,7 +323,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 31002,21,近鉄橿原線,キンテツカシハラセン,近鉄橿原線,Kintetsu Kashihara Line,Kintetsu Kashihara Line,,,#DEA83F,2,B,,,,#FAB202,,,,KINTETSU,,,,0,31002,1465.804214
 31003,21,近鉄南大阪線,キンテツミナミオオサカセン,近鉄南大阪線,Kintetsu Minami-Osaka Line,Kintetsu Minami-Osaka Line,,,#FF1493,2,F,,,,#028E46,,,,KINTETSU,,,,0,31003,1412.223426
 31004,21,近鉄養老線,キンテツヨウロウセン,近鉄養老線,Kintetsu Yoro Line,Kintetsu Yoro Line,,,#228B22,2,,,,,,,,,,,,,2,31004,2083.545351
-31005,21,近鉄大阪線,キンテツオオサカセン,近鉄大阪線,Kintetsu Osaka Line,Kintetsu Osaka Line,,,#4694D1,2,D,,,,#4694D1,,,,KINTETSU,,,,0,31005,2229.645393
+31005,21,近鉄大阪線,キンテツオオサカセン,近鉄大阪線,Kintetsu Osaka Line,Kintetsu Osaka Line,,,#B33249,2,D,,,,#4694D1,,,,KINTETSU,,,,0,31005,2229.645393
 31006,21,近鉄伊賀線,キンテツイガセン,近鉄伊賀線,Kintetsu Iga Line,Kintetsu Iga Line,,,#808080,2,,,,,,,,,,,,,2,31006,1174.039572
 31007,21,近鉄吉野線,キンテツヨシノセン,近鉄吉野線,Kintetsu Yoshino Line,Kintetsu Yoshino Line,,,#339932,2,F,,,,#028E46,,,,KINTETSU,,,,0,31007,1576.778603
 31008,21,近鉄湯の山線,キンテツユノヤマセン,近鉄湯の山線,Kintetsu Yunoyama Line,Kintetsu Yunoyama Line,,,#339932,2,K,,,,#153F97,,,,KINTETSU,,,,0,31008,1636.894425
@@ -399,7 +399,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99210,111,鳥海山ろく線,チョウカイサンロクセン,由利高原鉄道鳥海山ろく線,Chokai Sanroku Line,Chokai Sanroku Line,,,#B5E61D,2,,,,,,,,,,,,,0,99210,1906.946781
 99211,112,フラワー長井線,ヤマガタテツドウフラワーナガイセン,山形鉄道フラワー長井線,Flower Nagai Line,Flower Nagai Line,,,#F892F4,2,,,,,,,,,,,,,0,99211,1821.305787
 99212,113,くりはら田園鉄道線,クリハラデンエンテツドウセン,くりはら田園鉄道線,Kurihara Den'en Railway Line,Kurihara Den'en Railway Line,,,#8E2229,2,,,,,,,,,,,,,2,99212,1661.011168
-99213,114,阿武隈急行線,アブクマキュウコウセン,阿武隈急行線,Abukuma Express Line,Abukuma Express Line,,,#37CB7F,2,,,,,,,,,,,,,0,99213,2275.16124
+99213,114,阿武隈急行線,アブクマキュウコウセン,阿武隈急行線,Abukuma Kyūkō Line,Abukuma Kyūkō Line,,,#37CB7F,2,,,,,,,,,,,,,0,99213,2275.16124
 99214,115,仙台市地下鉄南北線,センダイシチカテツナンボクセン,仙台市地下鉄南北線,Sendai Subway Namboku Line,Sendai Subway Namboku Line,,,#339966,3,N,,,,#339966,,,,ROUND,,,,0,99214,864.0913804
 99218,115,仙台市地下鉄東西線,センダイシチカテツトウザイセン,仙台市地下鉄東西線,Sendai Subway Tozai Line,Sendai Subway Tozai Line,,,#00B1DD,3,T,,,,#00B1DD,,,,ROUND,,,,0,99214,1021.556907
 99215,116,福島交通飯坂線,フクシマシエイコウツウイイザカセン,福島交通飯坂線,Fukushima Kotsu Iizaka Line,Fukushima Kotsu Iizaka Line,,,#BFBFFF,2,,,,,,,,,,,,,0,99215,835.8891618
