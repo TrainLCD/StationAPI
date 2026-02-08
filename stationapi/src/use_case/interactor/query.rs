@@ -404,9 +404,43 @@ where
             .filter(|s| matches_transport_filter(s.transport_type, transport_type))
             .collect();
 
-        let stations = self
+        // lines, companies, station_numbers等を付与（train_typeはNoneで空になる）
+        let mut stations = self
             .update_station_vec_with_attributes(stations, None, transport_type)
             .await?;
+
+        // 複数line_group_idの列車種別を一括取得してセット
+        let train_types = self
+            .train_type_repository
+            .get_by_line_group_id_vec(line_group_ids)
+            .await?;
+        let train_type_map: std::collections::HashMap<i32, &TrainType> = train_types
+            .iter()
+            .filter_map(|tt| tt.station_cd.map(|cd| (cd, tt)))
+            .collect();
+
+        for station in stations.iter_mut() {
+            if let Some(tt) = train_type_map
+                .get(&station.station_cd)
+                .cloned()
+                .cloned()
+                .map(Box::new)
+            {
+                station.train_type = Some(tt);
+            }
+            for line in station.lines.iter_mut() {
+                if let Some(ref mut nested_station) = line.station {
+                    if let Some(tt) = train_type_map
+                        .get(&nested_station.station_cd)
+                        .cloned()
+                        .cloned()
+                        .map(Box::new)
+                    {
+                        nested_station.train_type = Some(tt);
+                    }
+                }
+            }
+        }
 
         Ok(stations)
     }
