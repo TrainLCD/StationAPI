@@ -231,7 +231,10 @@ mod tests {
                 .stations
                 .values()
                 .filter(|station| {
-                    line_group_ids.contains(&(station.line_group_cd.unwrap_or(0) as u32))
+                    station
+                        .line_group_cd
+                        .map(|v| line_group_ids.contains(&(v as u32)))
+                        .unwrap_or(false)
                 })
                 .cloned()
                 .collect();
