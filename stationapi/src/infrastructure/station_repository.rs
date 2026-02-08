@@ -624,6 +624,13 @@ impl InternalStationRepository {
             .collect::<Vec<_>>()
             .join(", ");
 
+        let order_case = line_ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("WHEN ${} THEN {}", i + 1 + line_ids.len(), i))
+            .collect::<Vec<_>>()
+            .join(" ");
+
         let query_str = format!(
             r#"SELECT
               s.station_cd,
@@ -692,10 +699,13 @@ impl InternalStationRepository {
             WHERE l.line_cd IN ( {params} )
               AND s.e_status = 0
               AND l.e_status = 0
-            ORDER BY s.line_cd, s.e_sort ASC, s.station_cd ASC"#
+            ORDER BY CASE l.line_cd {order_case} END, s.e_sort ASC, s.station_cd ASC"#
         );
 
         let mut query = sqlx::query_as::<_, StationRow>(&query_str);
+        for id in line_ids {
+            query = query.bind(*id as i32);
+        }
         for id in line_ids {
             query = query.bind(*id as i32);
         }
