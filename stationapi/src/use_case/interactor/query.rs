@@ -2605,9 +2605,15 @@ mod tests {
             // nested stations in lines[] should also have train_type
             for line in &station_result.lines {
                 if let Some(ref nested_station) = line.station {
-                    if let Some(ref tt) = nested_station.train_type {
-                        assert_eq!(tt.type_name, "快速");
-                    }
+                    assert!(
+                        nested_station.train_type.is_some(),
+                        "nested station (station_cd={}) should have train_type",
+                        nested_station.station_cd
+                    );
+                    assert_eq!(
+                        nested_station.train_type.as_ref().unwrap().type_name,
+                        "快速"
+                    );
                 }
             }
         }
