@@ -1758,6 +1758,7 @@ mod tests {
         struct ConfigurableMockStationRepository {
             stations_by_group: Vec<Station>,
             bus_stops: Vec<Station>,
+            stations_by_line_group: Vec<Station>,
         }
 
         impl ConfigurableMockStationRepository {
@@ -1765,7 +1766,13 @@ mod tests {
                 Self {
                     stations_by_group,
                     bus_stops,
+                    stations_by_line_group: vec![],
                 }
+            }
+
+            fn with_line_group_stations(mut self, stations: Vec<Station>) -> Self {
+                self.stations_by_line_group = stations;
+                self
             }
         }
 
@@ -1827,7 +1834,7 @@ mod tests {
                 &self,
                 _: &[u32],
             ) -> Result<Vec<Station>, DomainError> {
-                Ok(vec![])
+                Ok(self.stations_by_line_group.clone())
             }
             async fn get_route_stops(
                 &self,
@@ -1937,7 +1944,7 @@ mod tests {
                 &self,
                 _: &[u32],
             ) -> Result<Vec<TrainType>, DomainError> {
-                Ok(vec![])
+                Ok(self.train_types.clone())
             }
         }
 
@@ -2484,6 +2491,137 @@ mod tests {
                 assert!(line.company.is_some());
                 assert!(!line.line_symbols.is_empty());
             }
+        }
+
+        #[tokio::test]
+        async fn test_get_stations_by_line_group_id_vec_populates_train_type() {
+            let company = create_test_company(1, "JR東日本");
+
+            let mut station1 = create_test_station(101, 1001, 100, Some(1000));
+            station1.company_cd = Some(1);
+
+            let mut station2 = create_test_station(201, 2001, 200, Some(2000));
+            station2.company_cd = Some(1);
+
+            let train_type1 = create_test_train_type_for_station(101, "快速");
+            let mut train_type2 = create_test_train_type_for_station(201, "特急");
+            train_type2.line_group_cd = Some(2000);
+
+            let line1 = create_test_line_for_station_group(100, 1001);
+            let line2 = create_test_line_for_station_group(200, 2001);
+
+            let station_repo = ConfigurableMockStationRepository::new(
+                vec![station1.clone(), station2.clone()],
+                vec![],
+            )
+            .with_line_group_stations(vec![station1.clone(), station2.clone()]);
+
+            let interactor = QueryInteractor {
+                station_repository: station_repo,
+                line_repository: ConfigurableMockLineRepository::new(vec![line1, line2]),
+                train_type_repository: ConfigurableMockTrainTypeRepository::new(vec![
+                    train_type1.clone(),
+                    train_type2.clone(),
+                ]),
+                company_repository: ConfigurableMockCompanyRepository::new(vec![company]),
+            };
+
+            let result = interactor
+                .get_stations_by_line_group_id_vec(&[1000, 2000], TransportTypeFilter::Rail)
+                .await
+                .expect("Should succeed");
+
+            assert_eq!(result.len(), 2);
+
+            // top-level train_type が設定されていること
+            let s1 = result.iter().find(|s| s.station_cd == 101).unwrap();
+            assert!(
+                s1.train_type.is_some(),
+                "station 101 should have train_type"
+            );
+            assert_eq!(s1.train_type.as_ref().unwrap().type_name, "快速");
+            assert_eq!(s1.train_type.as_ref().unwrap().station_cd, Some(101));
+
+            let s2 = result.iter().find(|s| s.station_cd == 201).unwrap();
+            assert!(
+                s2.train_type.is_some(),
+                "station 201 should have train_type"
+            );
+            assert_eq!(s2.train_type.as_ref().unwrap().type_name, "特急");
+            assert_eq!(s2.train_type.as_ref().unwrap().station_cd, Some(201));
+        }
+
+        #[tokio::test]
+        async fn test_get_stations_by_line_group_id_vec_populates_nested_train_type() {
+            let company = create_test_company(1, "JR東日本");
+
+            let mut station = create_test_station(101, 1001, 100, Some(1000));
+            station.company_cd = Some(1);
+
+            // 同じstation_g_cdで別路線のstation（lines配列内のネスト先になる）
+            let mut station_other_line = create_test_station(102, 1001, 200, Some(1000));
+            station_other_line.company_cd = Some(1);
+
+            let train_type1 = create_test_train_type_for_station(101, "快速");
+            let train_type2 = create_test_train_type_for_station(102, "快速");
+
+            let line1 = create_test_line_for_station_group(100, 1001);
+            let line2 = create_test_line_for_station_group(200, 1001);
+
+            let station_repo = ConfigurableMockStationRepository::new(
+                vec![station.clone(), station_other_line.clone()],
+                vec![],
+            )
+            .with_line_group_stations(vec![station.clone()]);
+
+            let interactor = QueryInteractor {
+                station_repository: station_repo,
+                line_repository: ConfigurableMockLineRepository::new(vec![line1, line2]),
+                train_type_repository: ConfigurableMockTrainTypeRepository::new(vec![
+                    train_type1.clone(),
+                    train_type2.clone(),
+                ]),
+                company_repository: ConfigurableMockCompanyRepository::new(vec![company]),
+            };
+
+            let result = interactor
+                .get_stations_by_line_group_id_vec(&[1000], TransportTypeFilter::Rail)
+                .await
+                .expect("Should succeed");
+
+            assert_eq!(result.len(), 1);
+
+            let station_result = &result[0];
+            // top-level train_type
+            assert!(
+                station_result.train_type.is_some(),
+                "top-level station should have train_type"
+            );
+            assert_eq!(
+                station_result.train_type.as_ref().unwrap().type_name,
+                "快速"
+            );
+
+            // nested stations in lines[] should also have train_type
+            for line in &station_result.lines {
+                if let Some(ref nested_station) = line.station {
+                    if let Some(ref tt) = nested_station.train_type {
+                        assert_eq!(tt.type_name, "快速");
+                    }
+                }
+            }
+        }
+
+        #[tokio::test]
+        async fn test_get_stations_by_line_group_id_vec_empty_input() {
+            let interactor = create_configurable_interactor(vec![], vec![], vec![], vec![], vec![]);
+
+            let result = interactor
+                .get_stations_by_line_group_id_vec(&[], TransportTypeFilter::Rail)
+                .await
+                .expect("Should succeed");
+
+            assert!(result.is_empty());
         }
     }
 
