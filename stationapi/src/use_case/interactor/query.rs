@@ -197,10 +197,7 @@ where
         line_ids: &[u32],
         transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let stations = self
-            .station_repository
-            .get_by_line_id_vec(line_ids)
-            .await?;
+        let stations = self.station_repository.get_by_line_id_vec(line_ids).await?;
 
         let stations: Vec<Station> = stations
             .into_iter()
@@ -1340,10 +1337,7 @@ mod tests {
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
-            async fn get_by_line_id_vec(
-                &self,
-                _: &[u32],
-            ) -> Result<Vec<Station>, DomainError> {
+            async fn get_by_line_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
             async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
@@ -1730,10 +1724,7 @@ mod tests {
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
-            async fn get_by_line_id_vec(
-                &self,
-                _: &[u32],
-            ) -> Result<Vec<Station>, DomainError> {
+            async fn get_by_line_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
             async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
