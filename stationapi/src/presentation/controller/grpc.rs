@@ -9,7 +9,8 @@ use crate::{
         station_api_server::StationApi, GetConnectedStationsRequest, GetLineByIdListRequest,
         GetLineByIdRequest, GetLinesByNameRequest, GetRouteRequest, GetStationByCoordinatesRequest,
         GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
-        GetStationByLineIdRequest, GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
+        GetStationByLineIdListRequest, GetStationByLineIdRequest,
+        GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
         GetTrainTypesByStationIdRequest, MultipleLineResponse, MultipleStationResponse,
         MultipleTrainTypeResponse, Route, RouteMinimalResponse, RouteResponse, RouteTypeResponse,
         SingleLineResponse, SingleStationResponse, TransportType as GrpcTransportType,
@@ -159,6 +160,27 @@ impl StationApi for MyApi {
             Err(err) => Err(PresentationalError::from(err).into()),
         }
     }
+
+    async fn get_stations_by_line_id_list(
+        &self,
+        request: tonic::Request<GetStationByLineIdListRequest>,
+    ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
+        let request_ref = request.get_ref();
+        let line_ids = &request_ref.line_ids;
+        let transport_type = convert_transport_type(request_ref.transport_type);
+
+        match self
+            .query_use_case
+            .get_stations_by_line_id_vec(line_ids, transport_type)
+            .await
+        {
+            Ok(stations) => Ok(Response::new(MultipleStationResponse {
+                stations: stations.into_iter().map(|station| station.into()).collect(),
+            })),
+            Err(err) => Err(PresentationalError::from(err).into()),
+        }
+    }
+
     async fn get_stations_by_name(
         &self,
         request: tonic::Request<GetStationsByNameRequest>,
@@ -619,6 +641,14 @@ mod tests {
             _line_id: u32,
             _station_id: Option<u32>,
             _direction_id: Option<u32>,
+            _transport_type: TransportTypeFilter,
+        ) -> Result<Vec<Station>, UseCaseError> {
+            Ok(vec![])
+        }
+
+        async fn get_stations_by_line_id_vec(
+            &self,
+            _line_ids: &[u32],
             _transport_type: TransportTypeFilter,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(vec![])

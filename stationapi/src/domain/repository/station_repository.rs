@@ -15,6 +15,7 @@ pub trait StationRepository: Send + Sync + 'static {
         station_id: Option<u32>,
         direction_id: Option<u32>,
     ) -> Result<Vec<Station>, DomainError>;
+    async fn get_by_line_id_vec(&self, line_ids: &[u32]) -> Result<Vec<Station>, DomainError>;
     async fn get_by_station_group_id(
         &self,
         station_group_id: u32,
@@ -102,6 +103,16 @@ mod tests {
                 .stations
                 .values()
                 .filter(|station| station.line_cd == line_id as i32)
+                .cloned()
+                .collect();
+            Ok(result)
+        }
+
+        async fn get_by_line_id_vec(&self, line_ids: &[u32]) -> Result<Vec<Station>, DomainError> {
+            let result: Vec<Station> = self
+                .stations
+                .values()
+                .filter(|station| line_ids.contains(&(station.line_cd as u32)))
                 .cloned()
                 .collect();
             Ok(result)
