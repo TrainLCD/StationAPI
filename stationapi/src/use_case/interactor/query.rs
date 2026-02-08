@@ -389,6 +389,27 @@ where
 
         Ok(stations)
     }
+    async fn get_stations_by_line_group_id_vec(
+        &self,
+        line_group_ids: &[u32],
+        transport_type: TransportTypeFilter,
+    ) -> Result<Vec<Station>, UseCaseError> {
+        let stations = self
+            .station_repository
+            .get_by_line_group_id_vec(line_group_ids)
+            .await?;
+
+        let stations: Vec<Station> = stations
+            .into_iter()
+            .filter(|s| matches_transport_filter(s.transport_type, transport_type))
+            .collect();
+
+        let stations = self
+            .update_station_vec_with_attributes(stations, None, transport_type)
+            .await?;
+
+        Ok(stations)
+    }
     fn get_station_numbers(&self, station: &Station) -> Vec<StationNumber> {
         let line_symbols_raw = [
             &station.line_symbol1,
@@ -1370,6 +1391,12 @@ mod tests {
             async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
+            async fn get_by_line_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
             async fn get_route_stops(
                 &self,
                 _: u32,
@@ -1760,6 +1787,12 @@ mod tests {
                 Ok(vec![])
             }
             async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
             async fn get_route_stops(
