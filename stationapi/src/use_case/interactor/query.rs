@@ -420,24 +420,18 @@ where
             .collect();
 
         for station in stations.iter_mut() {
-            if let Some(tt) = train_type_map
+            station.train_type = train_type_map
                 .get(&station.station_cd)
                 .cloned()
                 .cloned()
-                .map(Box::new)
-            {
-                station.train_type = Some(tt);
-            }
+                .map(Box::new);
             for line in station.lines.iter_mut() {
                 if let Some(ref mut nested_station) = line.station {
-                    if let Some(tt) = train_type_map
+                    nested_station.train_type = train_type_map
                         .get(&nested_station.station_cd)
                         .cloned()
                         .cloned()
-                        .map(Box::new)
-                    {
-                        nested_station.train_type = Some(tt);
-                    }
+                        .map(Box::new);
                 }
             }
         }
