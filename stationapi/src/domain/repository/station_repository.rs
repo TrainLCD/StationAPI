@@ -39,6 +39,10 @@ pub trait StationRepository: Send + Sync + 'static {
         transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Station>, DomainError>;
+    async fn get_by_line_group_id_vec(
+        &self,
+        line_group_ids: &[u32],
+    ) -> Result<Vec<Station>, DomainError>;
     async fn get_route_stops(
         &self,
         from_station_id: u32,
@@ -214,6 +218,21 @@ mod tests {
                 .stations
                 .values()
                 .filter(|station| station.line_group_cd == Some(line_group_id as i32))
+                .cloned()
+                .collect();
+            Ok(result)
+        }
+
+        async fn get_by_line_group_id_vec(
+            &self,
+            line_group_ids: &[u32],
+        ) -> Result<Vec<Station>, DomainError> {
+            let result: Vec<Station> = self
+                .stations
+                .values()
+                .filter(|station| {
+                    line_group_ids.contains(&(station.line_group_cd.unwrap_or(0) as u32))
+                })
                 .cloned()
                 .collect();
             Ok(result)

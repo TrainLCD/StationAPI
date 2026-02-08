@@ -272,6 +272,14 @@ impl StationRepository for MyStationRepository {
         InternalStationRepository::get_by_line_group_id(line_group_id, &mut conn).await
     }
 
+    async fn get_by_line_group_id_vec(
+        &self,
+        line_group_ids: &[u32],
+    ) -> Result<Vec<Station>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalStationRepository::get_by_line_group_id_vec(line_group_ids, &mut conn).await
+    }
+
     async fn get_route_stops(
         &self,
         from_station_id: u32,
@@ -1338,6 +1346,112 @@ impl InternalStationRepository {
         .fetch_all(conn)
         .await?;
 
+        let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
+
+        Ok(stations)
+    }
+
+    async fn get_by_line_group_id_vec(
+        line_group_ids: &[u32],
+        conn: &mut PgConnection,
+    ) -> Result<Vec<Station>, DomainError> {
+        if line_group_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let params = (1..=line_group_ids.len())
+            .map(|i| format!("${i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let order_case = line_group_ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("WHEN ${} THEN {}", i + 1 + line_group_ids.len(), i))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let query_str = format!(
+            r#"SELECT
+            s.station_cd,
+            s.station_g_cd,
+            s.station_name,
+            s.station_name_k,
+            s.station_name_r,
+            s.station_name_rn,
+            s.station_name_zh,
+            s.station_name_ko,
+            s.station_number1,
+            s.station_number2,
+            s.station_number3,
+            s.station_number4,
+            s.three_letter_code,
+            s.line_cd,
+            s.pref_cd,
+            s.post,
+            s.address,
+            s.lon,
+            s.lat,
+            s.open_ymd,
+            s.close_ymd,
+            s.e_status,
+            s.e_sort,
+            COALESCE(NULLIF(COALESCE(a.line_name, l.line_name), ''), NULL) AS line_name,
+            COALESCE(NULLIF(COALESCE(a.line_name_k, l.line_name_k), ''), NULL) AS line_name_k,
+            COALESCE(NULLIF(COALESCE(a.line_name_h, l.line_name_h), ''), NULL) AS line_name_h,
+            COALESCE(NULLIF(COALESCE(a.line_name_r, l.line_name_r), ''), NULL) AS line_name_r,
+            COALESCE(NULLIF(COALESCE(a.line_name_zh, l.line_name_zh), ''), NULL) AS line_name_zh,
+            COALESCE(NULLIF(COALESCE(a.line_name_ko, l.line_name_ko), ''), NULL) AS line_name_ko,
+            COALESCE(NULLIF(COALESCE(a.line_color_c, l.line_color_c), ''), NULL) AS line_color_c,
+            l.company_cd,
+            l.line_type,
+            l.line_symbol1,
+            l.line_symbol2,
+            l.line_symbol3,
+            l.line_symbol4,
+            l.line_symbol1_color,
+            l.line_symbol2_color,
+            l.line_symbol3_color,
+            l.line_symbol4_color,
+            l.line_symbol1_shape,
+            l.line_symbol2_shape,
+            l.line_symbol3_shape,
+            l.line_symbol4_shape,
+            COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
+            sst.id AS sst_id,
+            sst.type_cd,
+            sst.line_group_cd,
+            sst.pass,
+            t.id AS type_id,
+            t.type_name,
+            t.type_name_k,
+            t.type_name_r,
+            t.type_name_zh,
+            t.type_name_ko,
+            t.color,
+            t.direction,
+            t.kind,
+            s.transport_type
+          FROM stations AS s
+          JOIN lines AS l ON l.line_cd = s.line_cd AND l.e_status = 0
+          JOIN station_station_types AS sst ON sst.line_group_cd IN ( {params} ) AND sst.station_cd = s.station_cd
+          JOIN types AS t ON t.type_cd = sst.type_cd
+          LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+          LEFT JOIN aliases AS a ON a.id = la.alias_cd
+          WHERE
+            s.e_status = 0
+          ORDER BY CASE sst.line_group_cd {order_case} END, sst.id"#
+        );
+
+        let mut query = sqlx::query_as::<_, StationRow>(&query_str);
+        for id in line_group_ids {
+            query = query.bind(*id as i32);
+        }
+        for id in line_group_ids {
+            query = query.bind(*id as i32);
+        }
+
+        let rows = query.fetch_all(conn).await?;
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(stations)
