@@ -9,10 +9,12 @@ use crate::{
         station_api_server::StationApi, GetConnectedStationsRequest, GetLineByIdListRequest,
         GetLineByIdRequest, GetLinesByNameRequest, GetRouteRequest, GetStationByCoordinatesRequest,
         GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
-        GetStationByLineIdRequest, GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
-        GetTrainTypesByStationIdRequest, MultipleLineResponse, MultipleStationResponse,
-        MultipleTrainTypeResponse, Route, RouteMinimalResponse, RouteResponse, RouteTypeResponse,
-        SingleLineResponse, SingleStationResponse, TransportType as GrpcTransportType,
+        GetStationByLineIdListRequest, GetStationByLineIdRequest,
+        GetStationsByLineGroupIdListRequest, GetStationsByLineGroupIdRequest,
+        GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleLineResponse,
+        MultipleStationResponse, MultipleTrainTypeResponse, Route, RouteMinimalResponse,
+        RouteResponse, RouteTypeResponse, SingleLineResponse, SingleStationResponse,
+        TransportType as GrpcTransportType,
     },
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
@@ -159,6 +161,27 @@ impl StationApi for MyApi {
             Err(err) => Err(PresentationalError::from(err).into()),
         }
     }
+
+    async fn get_stations_by_line_id_list(
+        &self,
+        request: tonic::Request<GetStationByLineIdListRequest>,
+    ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
+        let request_ref = request.get_ref();
+        let line_ids = &request_ref.line_ids;
+        let transport_type = convert_transport_type(request_ref.transport_type);
+
+        match self
+            .query_use_case
+            .get_stations_by_line_id_vec(line_ids, transport_type)
+            .await
+        {
+            Ok(stations) => Ok(Response::new(MultipleStationResponse {
+                stations: stations.into_iter().map(|station| station.into()).collect(),
+            })),
+            Err(err) => Err(PresentationalError::from(err).into()),
+        }
+    }
+
     async fn get_stations_by_name(
         &self,
         request: tonic::Request<GetStationsByNameRequest>,
@@ -205,6 +228,26 @@ impl StationApi for MyApi {
                     stations: stations.into_iter().map(|station| station.into()).collect(),
                 }));
             }
+            Err(err) => Err(PresentationalError::from(err).into()),
+        }
+    }
+
+    async fn get_stations_by_line_group_id_list(
+        &self,
+        request: tonic::Request<GetStationsByLineGroupIdListRequest>,
+    ) -> Result<tonic::Response<MultipleStationResponse>, tonic::Status> {
+        let request_ref = request.get_ref();
+        let line_group_ids = &request_ref.line_group_ids;
+        let transport_type = convert_transport_type(request_ref.transport_type);
+
+        match self
+            .query_use_case
+            .get_stations_by_line_group_id_vec(line_group_ids, transport_type)
+            .await
+        {
+            Ok(stations) => Ok(Response::new(MultipleStationResponse {
+                stations: stations.into_iter().map(|station| station.into()).collect(),
+            })),
             Err(err) => Err(PresentationalError::from(err).into()),
         }
     }
@@ -624,6 +667,14 @@ mod tests {
             Ok(vec![])
         }
 
+        async fn get_stations_by_line_id_vec(
+            &self,
+            _line_ids: &[u32],
+            _transport_type: TransportTypeFilter,
+        ) -> Result<Vec<Station>, UseCaseError> {
+            Ok(vec![])
+        }
+
         async fn get_stations_by_name(
             &self,
             _station_name: String,
@@ -730,6 +781,14 @@ mod tests {
         async fn get_stations_by_line_group_id(
             &self,
             _line_group_id: u32,
+            _transport_type: TransportTypeFilter,
+        ) -> Result<Vec<Station>, UseCaseError> {
+            Ok(vec![])
+        }
+
+        async fn get_stations_by_line_group_id_vec(
+            &self,
+            _line_group_ids: &[u32],
             _transport_type: TransportTypeFilter,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(vec![])

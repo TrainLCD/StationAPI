@@ -44,6 +44,11 @@ pub trait QueryUseCase: Send + Sync + 'static {
         direction_id: Option<u32>,
         transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError>;
+    async fn get_stations_by_line_id_vec(
+        &self,
+        line_ids: &[u32],
+        transport_type: TransportTypeFilter,
+    ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_name(
         &self,
         station_name: String,
@@ -75,6 +80,11 @@ pub trait QueryUseCase: Send + Sync + 'static {
     async fn get_stations_by_line_group_id(
         &self,
         line_group_id: u32,
+        transport_type: TransportTypeFilter,
+    ) -> Result<Vec<Station>, UseCaseError>;
+    async fn get_stations_by_line_group_id_vec(
+        &self,
+        line_group_ids: &[u32],
         transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_train_types_by_station_id(
