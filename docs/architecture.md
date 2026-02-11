@@ -175,7 +175,7 @@ CREATE INDEX idx_performance_station_name_trgm ON stations
 | カテゴリ | メソッド |
 |---------|---------|
 | 駅検索 | `GetStationById`, `GetStationByIdList`, `GetStationsByGroupId`, `GetStationsByCoordinates`, `GetStationsByLineId`, `GetStationsByName`, `GetStationsByLineGroupId` |
-| 路線検索 | `GetLineById`, `GetLineByIdList`, `GetLinesByName` |
+| 路線検索 | `GetLineById`, `GetLinesByIdList`, `GetLinesByName` |
 | 経路検索 | `GetRoutes`, `GetRoutesMinimal`, `GetConnectedRoutes` |
 | 列車種別 | `GetTrainTypesByStationId`, `GetRouteTypes` |
 
