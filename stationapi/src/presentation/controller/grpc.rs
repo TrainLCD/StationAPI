@@ -6,10 +6,10 @@ use crate::{
     },
     presentation::error::PresentationalError,
     proto::{
-        station_api_server::StationApi, GetConnectedStationsRequest, GetLineByIdListRequest,
-        GetLineByIdRequest, GetLinesByNameRequest, GetRouteRequest, GetStationByCoordinatesRequest,
-        GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
-        GetStationByLineIdListRequest, GetStationByLineIdRequest,
+        station_api_server::StationApi, GetConnectedStationsRequest, GetLineByIdRequest,
+        GetLinesByIdListRequest, GetLinesByNameRequest, GetRouteRequest,
+        GetStationByCoordinatesRequest, GetStationByGroupIdRequest, GetStationByIdListRequest,
+        GetStationByIdRequest, GetStationByLineIdListRequest, GetStationByLineIdRequest,
         GetStationsByLineGroupIdListRequest, GetStationsByLineGroupIdRequest,
         GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleLineResponse,
         MultipleStationResponse, MultipleTrainTypeResponse, Route, RouteMinimalResponse,
@@ -361,9 +361,9 @@ impl StationApi for MyApi {
         }))
     }
 
-    async fn get_line_by_id_list(
+    async fn get_lines_by_id_list(
         &self,
-        request: tonic::Request<GetLineByIdListRequest>,
+        request: tonic::Request<GetLinesByIdListRequest>,
     ) -> Result<tonic::Response<MultipleLineResponse>, tonic::Status> {
         let line_ids = &request.get_ref().line_ids;
 
