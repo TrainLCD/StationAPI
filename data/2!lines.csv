@@ -526,15 +526,15 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99614,197,北大阪急行電鉄,キタオオサカキュウコウデンテツ,北大阪急行電鉄,Kita Osaka Express Electric Railway,Kita Osaka Express Electric Railway,,,#DD5B5C,2,M,,,,#E5171F,,,,REVERSED_ROUND,,,,0,99614,1637.299415
 99616,22,南海泉北線,ナンカイセンボクセン,南海泉北線,Nankai Semboku Line,Nankai Semboku Line,南海泉北线,난카이 센보쿠선,#0099FF,2,NK,,,,#000000,,,,NANKAI,,,,0,99616,2665.75274
 99617,199,水間鉄道水間線,ミズマテツドウミズマセン,水間鉄道水間線,Mizuma Railway Mizuma Line,Mizuma Railway Mizuma Line,,,#005CB1,2,,,,,,,,,,,,,0,99617,597.0363676
-99618,249,Osaka Metro御堂筋線,オオサカメトロミドウスジセン,高速電気軌道第1号線,Midosuji Line,Midosuji Line,御堂筋线,미도스지선,#E5171F,3,M,,,,#E5171F,,,,REVERSED_ROUND,,,,0,99618,1250.699705
-99619,249,Osaka Metro谷町線,オオサカメトロタニマチセン,高速電気軌道第2号線,Tanimachi Line,Tanimachi Line,谷町线,다니마치선,#522886,3,T,,,,#522886,,,,REVERSED_ROUND,,,,0,99619,1058.128596
-99620,249,Osaka Metro四つ橋線,オオサカメトロヨツバシセン,高速電気軌道第3号線,Yotsubashi Line,Yotsubashi Line,四桥线,요쓰바시선,#0078BA,3,Y,,,,#0078BA,,,,REVERSED_ROUND,,,,0,99620,1110.395506
-99621,249,Osaka Metro中央線,オオサカメトロチュウオウセン,高速電気軌道第4号線,Chuo Line,Chuo Line,中央线,주오선,#019A66,3,C,,,,#019A66,,,,REVERSED_ROUND,,,,0,99621,1430.798816
-99622,249,Osaka Metro千日前線,オオサカメトロセンニチマエセン,高速電気軌道第5号線,Sennichimae Line,Sennichimae Line,千日前线,센니치마에선,#E44D93,3,S,,,,#E44D93,,,,REVERSED_ROUND,,,,0,99622,931.3059291
-99623,249,Osaka Metro堺筋線,オオサカメトロサカイスジセン,高速電気軌道第6号線,Sakaisuji Line,Sakaisuji Line,堺筋线,사카이스지선,#814721,3,K,,,,#814721,,,,REVERSED_ROUND,,,,0,99623,938.8513719
-99624,249,Osaka Metro長堀鶴見緑地線,オオサカメトロナガホリツルミリョクチセン,高速電気軌道第7号線,Nagahori Tsurumi-ryokuchi Line,Nagahori Tsurumi-ryokuchi Line,长堀鹤见绿地线,나가호리쓰루미료쿠치선,#A9CC51,3,N,,,,#A9CC51,,,,REVERSED_ROUND,,,,0,99624,894.0219355
-99652,249,Osaka Metro今里筋線,オオサカメトロイマザトスジセン,高速電気軌道第8号線,Imazatosuji Line,Imazatosuji Line,今里筋线,이마자토스지선,#EE7B1A,3,I,,,,#EE7B1A,,,,REVERSED_ROUND,,,,0,99624,1172.852949
-99625,249,Osaka Metro南港ポートタウン線,オオサカメトロナンコウポートタウンセン,大阪市高速電気軌道南港ポートタウン線,Nanko Port Town Line,Nanko Port Town Line,南港港城线,포트타운선,#00A0DE,5,P,,,,#00A0DE,,,,REVERSED_ROUND,,,,0,99625,837.9836632
+99618,249,Osaka Metro御堂筋線,オオサカメトロミドウスジセン,高速電気軌道第1号線,Osaka Metro Midosuji Line,Osaka Metro Midosuji Line,御堂筋线,미도스지선,#E5171F,3,M,,,,#E5171F,,,,REVERSED_ROUND,,,,0,99618,1250.699705
+99619,249,Osaka Metro谷町線,オオサカメトロタニマチセン,高速電気軌道第2号線,Osaka Metro Tanimachi Line,Osaka Metro Tanimachi Line,谷町线,다니마치선,#522886,3,T,,,,#522886,,,,REVERSED_ROUND,,,,0,99619,1058.128596
+99620,249,Osaka Metro四つ橋線,オオサカメトロヨツバシセン,高速電気軌道第3号線,Osaka Metro Yotsubashi Line,Osaka Metro Yotsubashi Line,四桥线,요쓰바시선,#0078BA,3,Y,,,,#0078BA,,,,REVERSED_ROUND,,,,0,99620,1110.395506
+99621,249,Osaka Metro中央線,オオサカメトロチュウオウセン,高速電気軌道第4号線,Osaka Metro Chuo Line,Osaka Metro Chuo Line,中央线,주오선,#019A66,3,C,,,,#019A66,,,,REVERSED_ROUND,,,,0,99621,1430.798816
+99622,249,Osaka Metro千日前線,オオサカメトロセンニチマエセン,高速電気軌道第5号線,Osaka Metro Sennichimae Line,Osaka Metro Sennichimae Line,千日前线,센니치마에선,#E44D93,3,S,,,,#E44D93,,,,REVERSED_ROUND,,,,0,99622,931.3059291
+99623,249,Osaka Metro堺筋線,オオサカメトロサカイスジセン,高速電気軌道第6号線,Osaka Metro Sakaisuji Line,Osaka Metro Sakaisuji Line,堺筋线,사카이스지선,#814721,3,K,,,,#814721,,,,REVERSED_ROUND,,,,0,99623,938.8513719
+99624,249,Osaka Metro長堀鶴見緑地線,オオサカメトロナガホリツルミリョクチセン,高速電気軌道第7号線,Osaka Metro Nagahori Tsurumi-ryokuchi Line,Osaka Metro Nagahori Tsurumi-ryokuchi Line,长堀鹤见绿地线,나가호리쓰루미료쿠치선,#A9CC51,3,N,,,,#A9CC51,,,,REVERSED_ROUND,,,,0,99624,894.0219355
+99652,249,Osaka Metro今里筋線,オオサカメトロイマザトスジセン,高速電気軌道第8号線,Osaka Metro Imazatosuji Line,Osaka Metro Imazatosuji Line,今里筋线,이마자토스지선,#EE7B1A,3,I,,,,#EE7B1A,,,,REVERSED_ROUND,,,,0,99624,1172.852949
+99625,249,Osaka Metro南港ポートタウン線,オオサカメトロナンコウポートタウンセン,大阪市高速電気軌道南港ポートタウン線,Osaka Metro Nanko Port Town Line,Osaka Metro Nanko Port Town Line,南港港城线,포트타운선,#00A0DE,5,P,,,,#00A0DE,,,,REVERSED_ROUND,,,,0,99625,837.9836632
 99626,201,大阪モノレール線,オオサカモノレールセン,大阪モノレール線,Osaka Monorail Main Line,Osaka Monorail Main Line,,,#5058C3,5,,,,,,,,,,,,,0,99626,1506.724464
 99627,201,大阪モノレール彩都線,オオサカモノレールサイトセン,国際文化公園都市線,Osaka Monorail Saito Line,Osaka Monorail Saito Line,,,#5058C3,5,,,,,,,,,,,,,0,99627,1577.183073
 99628,202,阪堺電軌上町線,ハンカイデンキウエマチセン,阪堺電軌上町線,Hankai Uemachi Line,Hankai Uemachi Line,,,#083388,4,HN,,,,#000000,,,,SQUARE,,,,0,99628,440.4072969
