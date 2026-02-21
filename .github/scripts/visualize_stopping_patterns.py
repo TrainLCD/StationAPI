@@ -413,15 +413,19 @@ def main() -> None:
         )
         parts.append("")
 
+    truncation_msg = "\n\n---\n> **注意:** コメントが長すぎるため、一部が省略されました。"
+    current_length = len("\n".join(parts))
+    truncated = False
     for section in group_sections:
+        section_length = len("\n") + len(section)
+        if current_length + section_length + len(truncation_msg) > MAX_COMMENT_LENGTH:
+            parts.append(truncation_msg)
+            truncated = True
+            break
         parts.append(section)
+        current_length += section_length
 
     comment = "\n".join(parts)
-
-    # Truncate if too long
-    if len(comment) > MAX_COMMENT_LENGTH:
-        truncation_msg = "\n\n---\n> **注意:** コメントが長すぎるため、一部が省略されました。"
-        comment = comment[: MAX_COMMENT_LENGTH - len(truncation_msg)] + truncation_msg
 
     # Write output
     output_path = "/tmp/visualization_comment.md"
