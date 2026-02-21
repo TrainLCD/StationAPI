@@ -40,6 +40,9 @@ def git_diff(base_ref: str, file_path: str) -> str:
         capture_output=True,
         text=True,
     )
+    if result.returncode != 0:
+        print(f"ERROR: git diff failed for {file_path}: {result.stderr}", file=sys.stderr)
+        sys.exit(1)
     return result.stdout
 
 
@@ -267,7 +270,7 @@ def format_group(
     # Full station list in details (skip for deleted groups)
     if group_stations:
         num_stations = len(group_stations)
-        lines.append(f"<details>")
+        lines.append("<details>")
         lines.append(f"<summary>全駅リスト ({num_stations}駅)</summary>")
         lines.append("")
         lines.append("| # | 駅名 | Station | 停車 |")
