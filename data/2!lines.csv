@@ -474,8 +474,8 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99425,245,あいの風とやま鉄道線,アイノカゼトヤマテツドウセン,あいの風とやま鉄道線,Ainokaze Toyama Railway Line,Ainokaze Toyama Railway Line,,,#63C65E,2,,,,,,,,,,,,,0,99417,4364.498347
 99426,246,IRいしかわ鉄道線,アイアールイシカワテツドウセン,IRいしかわ鉄道株式会社,IR Ishikawa Railway Line,IR Ishikawa Railway Line,,,#25A6DF,2,,,,,,,,,,,,,0,99417,3493.9062
 99418,166,のと鉄道七尾線,ノトテツドウナナオセン,のと鉄道七尾線,Noto Railway Nanao Line,Noto Railway Nanao Line,,,#1594EB,2,,,,,,,,,,,,,0,99418,4161.429853
-99419,167,えちぜん鉄道勝山永平寺線,エチゼンテツドウカツヤマエイヘイジセン,えちぜん鉄道勝山永平寺線,Echizen Railway Katsuyama Eiheiji Line,Echizen Railway Katsuyama Eiheiji Line,,,#FD6802,2,E,,,,,,,,,,,,0,99419,1213.806587
-99420,167,えちぜん鉄道三国芦原線,エチゼンテツドウミクニアワラセン,えちぜん鉄道三国芦原線,Echizen Railway Mikuni Ashihara Line,Echizen Railway Mikuni Ashihara Line,,,#0069FF,2,E,,,,,,,,,,,,0,99420,1120.611283
+99419,167,えちぜん鉄道勝山永平寺線,エチゼンテツドウカツヤマエイヘイジセン,えちぜん鉄道勝山永平寺線,Echizen Railway Katsuyama Eiheiji Line,Echizen Railway Katsuyama Eiheiji Line,,,#FD6802,2,E,,,,#FD6802,,,,,,,,0,99419,1213.806587
+99420,167,えちぜん鉄道三国芦原線,エチゼンテツドウミクニアワラセン,えちぜん鉄道三国芦原線,Echizen Railway Mikuni Ashihara Line,Echizen Railway Mikuni Ashihara Line,,,#0069FF,2,E,,,,#0069FF,,,,,,,,0,99420,1120.611283
 99421,168,福井鉄道福武線,フクイテツドウフクブセン,福井鉄道福武線,Fukui Railway Fukutake Line,Fukui Railway Fukutake Line,,,#197A3D,4,F,,,,#197A3D,,,,ROUND,,,,0,99421,855.6039455
 99428,251,ハピラインふくい線,ハピラインフクイセン,ハピラインふくい線,Hapi-line Fukui,Hapi-line Fukui线,,,#EC1C9C,2,,,,,,,,,,,,,0,99426,4480.588607
 99501,169,伊豆急行線,イズキュウコウセン,伊豆急行線,Izu Kyuko Line,Izu Kyuko Line,,,#0085CD,2,IZ,,,,#000000,,,,SQUARE,,,,0,99501,2837.052489
