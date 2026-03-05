@@ -834,6 +834,8 @@ where
                         })
                         .collect();
 
+                    let name_ipa = crate::domain::ipa::katakana_to_ipa(&row.station_name_k)
+                        .filter(|ipa| !ipa.is_empty());
                     proto::StationMinimal {
                         id: row.station_cd as u32,
                         group_id: row.station_g_cd as u32,
@@ -845,6 +847,7 @@ where
                         stop_condition: row.pass.unwrap_or(0),
                         has_train_types: Some(row.type_id.is_some()),
                         train_type_id: row.type_id.map(|id| id as u32),
+                        name_ipa,
                     }
                 })
                 .collect::<Vec<proto::StationMinimal>>();
