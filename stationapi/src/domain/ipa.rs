@@ -1,8 +1,3 @@
-/// Katakana to IPA (International Phonetic Alphabet) conversion module.
-///
-/// Converts Japanese katakana text to IPA transcription for use in
-/// SSML `<phoneme>` tags for text-to-speech pronunciation.
-
 /// Convert a katakana string to its IPA transcription.
 pub fn katakana_to_ipa(input: &str) -> String {
     let chars: Vec<char> = input.chars().collect();
@@ -188,8 +183,8 @@ fn lookup_single(c: char) -> Option<Phoneme> {
 #[derive(Debug, Clone)]
 enum Phoneme {
     Regular(&'static str),
-    MoraicNasal,  // ン - assimilates to following consonant
-    Geminate,     // ッ - doubles following consonant
+    MoraicNasal, // ン - assimilates to following consonant
+    Geminate,    // ッ - doubles following consonant
     LongVowel,   // ー - lengthens preceding vowel
 }
 
@@ -224,10 +219,7 @@ fn last_vowel(ipa: &str) -> Option<&'static str> {
 /// Classify the place of articulation of the following phoneme for ン assimilation.
 fn nasal_for_following(next_ipa: &str) -> &'static str {
     // Check first meaningful character(s) of the following phoneme
-    if next_ipa.starts_with('b')
-        || next_ipa.starts_with('p')
-        || next_ipa.starts_with('m')
-    {
+    if next_ipa.starts_with('b') || next_ipa.starts_with('p') || next_ipa.starts_with('m') {
         "m" // bilabial assimilation
     } else if next_ipa.starts_with('ɲ')
         || next_ipa.starts_with("dʑ")
@@ -237,9 +229,7 @@ fn nasal_for_following(next_ipa: &str) -> &'static str {
         || next_ipa.starts_with("kʲ")
     {
         "ɲ" // palatal assimilation
-    } else if next_ipa.starts_with('k')
-        || next_ipa.starts_with('ɡ')
-        || next_ipa.starts_with('ŋ')
+    } else if next_ipa.starts_with('k') || next_ipa.starts_with('ɡ') || next_ipa.starts_with('ŋ')
     {
         "ŋ" // velar assimilation
     } else if next_ipa.starts_with('n')
@@ -272,7 +262,7 @@ fn apply_phonological_rules(phonemes: &[Phoneme]) -> String {
                 if let Some(next_ipa) = find_next_regular(&phonemes[i + 1..]) {
                     output.push_str(nasal_for_following(next_ipa));
                 } else {
-                    output.push_str("ɴ"); // word-final
+                    output.push('ɴ'); // word-final
                 }
                 i += 1;
             }
@@ -280,7 +270,10 @@ fn apply_phonological_rules(phonemes: &[Phoneme]) -> String {
                 // Double the onset of the following consonant.
                 // For affricates (t͡ɕ, t͡s), only the stop portion (t) is geminated.
                 if let Some(next_ipa) = find_next_regular(&phonemes[i + 1..]) {
-                    if next_ipa.starts_with("t͡ɕ") || next_ipa.starts_with("t͡s") || next_ipa.starts_with("d͡") {
+                    if next_ipa.starts_with("t͡ɕ")
+                        || next_ipa.starts_with("t͡s")
+                        || next_ipa.starts_with("d͡")
+                    {
                         output.push('t');
                     } else {
                         let (onset, _) = split_onset(next_ipa);
