@@ -1,20 +1,24 @@
 ci/cd:
-  - ".github/workflows/*"
-  - ".github/*.yml"
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/*"
+          - ".github/*.yml"
 rust:
-  - "src/*"
-  - "src/**/*"
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/*"
+          - "src/**/*"
 protobuf:
-  - "proto/*"
-  - "proto/**/*"
-deploy-prod:
-  - "master"
-deploy-staging:
-  - "staging"
-deploy-dev:
-  - "dev"
+  - changed-files:
+      - any-glob-to-any-file:
+          - "proto/*"
+          - "proto/**/*"
 documentation:
-  - ".github/ISSUE_TEMPLATE/*"
-  - "pull_request_template.md"
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/ISSUE_TEMPLATE/*"
+          - "pull_request_template.md"
 data:
-  - "*.csv"
+  - changed-files:
+      - any-glob-to-any-file:
+          - "*.csv"

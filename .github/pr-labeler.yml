@@ -1,3 +1,11 @@
+# Head branch (source) patterns
 feature: feature/*
 fix: fix/*
 chore: chore/*
+data: data/*
+release: release/*
+
+# Base branch (target) patterns
+deploy:production: master
+deploy:dev: dev
+deploy:staging: staging
