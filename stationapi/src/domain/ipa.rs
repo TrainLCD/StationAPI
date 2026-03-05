@@ -289,7 +289,9 @@ fn apply_phonological_rules(phonemes: &[Phoneme]) -> String {
                         let (onset, _) = split_onset(next_ipa);
                         if !onset.is_empty() {
                             let base = strip_secondary_articulation(onset);
-                            output.push_str(&base);
+                            if let Some(c) = base.chars().next() {
+                                output.push(c);
+                            }
                         }
                     }
                 }
