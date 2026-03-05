@@ -27,14 +27,19 @@ jobs:
       - name: Read metadata
         id: meta
         run: |
-          echo "pr_number=$(cat /tmp/validation-artifacts/pr_number)" >> "$GITHUB_OUTPUT"
-          echo "result=$(cat /tmp/validation-artifacts/result)" >> "$GITHUB_OUTPUT"
+          echo "pr_number=${{ github.event.workflow_run.pull_requests[0].number }}" >> "$GITHUB_OUTPUT"
+          if [ -s /tmp/validation-artifacts/result ]; then
+            echo "result=$(cat /tmp/validation-artifacts/result)" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Missing or empty result metadata"
+            exit 1
+          fi
 
       - name: Find existing comment
         uses: peter-evans/find-comment@v3
         id: find_comment
         with:
-          issue-number: ${{ steps.meta.outputs.pr_number }}
+          issue-number: ${{ github.event.workflow_run.pull_requests[0].number }}
           comment-author: "github-actions[bot]"
           body-includes: "<!-- data-validator -->"
 
@@ -42,7 +47,7 @@ jobs:
         if: steps.meta.outputs.result == 'failure'
         uses: peter-evans/create-or-update-comment@v4
         with:
-          issue-number: ${{ steps.meta.outputs.pr_number }}
+          issue-number: ${{ github.event.workflow_run.pull_requests[0].number }}
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
           body-path: /tmp/validation-artifacts/validation_report.md
           edit-mode: replace
