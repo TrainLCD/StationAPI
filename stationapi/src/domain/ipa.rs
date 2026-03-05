@@ -227,6 +227,8 @@ fn nasal_for_following(next_ipa: &str) -> &'static str {
         || next_ipa.starts_with('ɕ')
         || next_ipa.starts_with("ɡʲ")
         || next_ipa.starts_with("kʲ")
+        || next_ipa.starts_with('j')
+        || next_ipa.starts_with('ç')
     {
         "ɲ" // palatal assimilation
     } else if next_ipa.starts_with('k') || next_ipa.starts_with('ɡ') || next_ipa.starts_with('ŋ')
@@ -270,11 +272,10 @@ fn apply_phonological_rules(phonemes: &[Phoneme]) -> String {
                 // Double the onset of the following consonant.
                 // For affricates (t͡ɕ, t͡s), only the stop portion (t) is geminated.
                 if let Some(next_ipa) = find_next_regular(&phonemes[i + 1..]) {
-                    if next_ipa.starts_with("t͡ɕ")
-                        || next_ipa.starts_with("t͡s")
-                        || next_ipa.starts_with("d͡")
-                    {
+                    if next_ipa.starts_with("t͡ɕ") || next_ipa.starts_with("t͡s") {
                         output.push('t');
+                    } else if next_ipa.starts_with("dʑ") || next_ipa.starts_with("ʤ") {
+                        output.push('d');
                     } else {
                         let (onset, _) = split_onset(next_ipa);
                         if !onset.is_empty() {
@@ -534,6 +535,12 @@ mod tests {
     fn test_namba() {
         // ン before バ → m
         assert_eq!(katakana_to_ipa("ナンバ"), "namba");
+    }
+
+    #[test]
+    fn test_shin_yokohama() {
+        // ン before ヨ(j) → ɲ (palatal assimilation)
+        assert_eq!(katakana_to_ipa("シンヨコハマ"), "ɕiɲjokohama");
     }
 
     #[test]
