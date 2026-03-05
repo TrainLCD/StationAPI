@@ -544,6 +544,18 @@ mod tests {
     }
 
     #[test]
+    fn test_geminate_ji() {
+        // ッジ → dʤi (voiced affricate gemination emits 'd')
+        assert_eq!(katakana_to_ipa("カッジ"), "kadʤi");
+    }
+
+    #[test]
+    fn test_geminate_ju() {
+        // ッジュ → ddʑɯ (voiced affricate gemination with digraph)
+        assert_eq!(katakana_to_ipa("カッジュ"), "kaddʑɯ");
+    }
+
+    #[test]
     fn test_empty() {
         assert_eq!(katakana_to_ipa(""), "");
     }
