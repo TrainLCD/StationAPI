@@ -11,8 +11,6 @@ name: Verify station data integrity
 
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
 
 jobs:
   verify_migration_data:
@@ -30,29 +28,22 @@ jobs:
             echo "result=failure" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Find existing comment
-        if: github.event_name == 'pull_request'
-        uses: peter-evans/find-comment@v3
-        id: find_comment
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          comment-author: "github-actions[bot]"
-          body-includes: "<!-- data-validator -->"
+      - name: Save metadata for comment workflow
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          mkdir -p /tmp/validation-artifacts
+          echo "${{ github.event.pull_request.number }}" > /tmp/validation-artifacts/pr_number
+          echo "${{ steps.validate.outputs.result }}" > /tmp/validation-artifacts/result
+          if [ -f /tmp/validation_report.md ]; then
+            cp /tmp/validation_report.md /tmp/validation-artifacts/
+          fi
 
-      - name: Post or update validation failure comment
-        if: github.event_name == 'pull_request' && steps.validate.outputs.result == 'failure'
-        uses: peter-evans/create-or-update-comment@v4
+      - name: Upload validation artifacts
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
         with:
-          issue-number: ${{ github.event.pull_request.number }}
-          comment-id: ${{ steps.find_comment.outputs.comment-id }}
-          body-path: /tmp/validation_report.md
-          edit-mode: replace
-
-      - name: Delete comment if validation passed
-        if: github.event_name == 'pull_request' && steps.validate.outputs.result == 'success' && steps.find_comment.outputs.comment-id != ''
-        run: gh api repos/${{ github.repository }}/issues/comments/${{ steps.find_comment.outputs.comment-id }} -X DELETE
-        env:
-          GH_TOKEN: ${{ github.token }}
+          name: validation-result
+          path: /tmp/validation-artifacts/
 
       - name: Fail job if validation failed
         if: steps.validate.outputs.result == 'failure'
