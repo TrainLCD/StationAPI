@@ -27,9 +27,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let records: Vec<StringRecord> = rdr.records().collect::<Result<Vec<_>, _>>()?;
 
     for record in &records {
-        let station_cd: u32 = record.get(1).unwrap().parse().unwrap();
-        let type_cd: u32 = record.get(2).unwrap().parse().unwrap();
         let line = || record.iter().collect::<Vec<&str>>().join(",");
+
+        let station_cd: u32 = match record.get(1).and_then(|v| v.parse().ok()) {
+            Some(id) => id,
+            None => {
+                println!("[INVALID] Failed to parse station_cd from row: {}", line());
+                invalid_station_ids.push(line());
+                continue;
+            }
+        };
+        let type_cd: u32 = match record.get(2).and_then(|v| v.parse().ok()) {
+            Some(id) => id,
+            None => {
+                println!("[INVALID] Failed to parse type_cd from row: {}", line());
+                invalid_type_ids.push(line());
+                continue;
+            }
+        };
 
         if !station_ids.contains(&station_cd) {
             println!("[INVALID] Unrecognized Station ID {:?} Found!", station_cd);
