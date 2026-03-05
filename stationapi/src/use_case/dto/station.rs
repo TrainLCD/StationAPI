@@ -17,8 +17,7 @@ impl From<TransportType> for i32 {
 
 impl From<Station> for GrpcStation {
     fn from(station: Station) -> Self {
-        let name_ipa =
-            katakana_to_ipa(&station.station_name_k).filter(|ipa| !ipa.is_empty());
+        let name_ipa = katakana_to_ipa(&station.station_name_k).filter(|ipa| !ipa.is_empty());
         Self {
             id: station.station_cd as u32,
             group_id: station.station_g_cd as u32,

@@ -8,8 +8,7 @@ use crate::{
 
 impl From<Line> for GrpcLine {
     fn from(line: Line) -> Self {
-        let name_ipa =
-            katakana_to_ipa(&line.line_name_k).filter(|ipa| !ipa.is_empty());
+        let name_ipa = katakana_to_ipa(&line.line_name_k).filter(|ipa| !ipa.is_empty());
         // バス路線の場合は line_type を OtherLineType (0) に強制
         // (鉄道用の line_type が誤って設定されている可能性があるため)
         let line_type = if line.transport_type == TransportType::Bus {
