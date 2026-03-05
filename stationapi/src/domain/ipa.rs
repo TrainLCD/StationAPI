@@ -1,3 +1,26 @@
+/// Common katakana suffixes for line names, ordered longest-first for greedy matching.
+const LINE_NAME_SUFFIXES: &[&str] = &["ホンセン", "シセン", "セン"];
+/// Suffixes that should NOT be stripped even though they end with セン.
+const LINE_NAME_SUFFIX_EXCEPTIONS: &[&str] = &["シンカンセン"];
+
+/// Strip a common line-name suffix (線/本線/支線/新幹線) from a katakana string.
+/// Returns the stem (without the suffix). If no known suffix is found, returns the input unchanged.
+pub fn strip_line_name_suffix(input: &str) -> &str {
+    for exception in LINE_NAME_SUFFIX_EXCEPTIONS {
+        if input.ends_with(exception) {
+            return input;
+        }
+    }
+    for suffix in LINE_NAME_SUFFIXES {
+        if let Some(stem) = input.strip_suffix(suffix) {
+            if !stem.is_empty() {
+                return stem;
+            }
+        }
+    }
+    input
+}
+
 /// Convert a katakana string to its IPA transcription.
 /// Returns `None` if the input contains characters that cannot be converted.
 pub fn katakana_to_ipa(input: &str) -> Option<String> {
@@ -607,5 +630,42 @@ mod tests {
             ipa("ドッキョウダイガクマエ ソウカマツバラ"),
             "dokkʲoːdaiɡakɯmae soːkamat͡sɯbaɾa"
         );
+    }
+
+    // ============================================
+    // strip_line_name_suffix tests
+    // ============================================
+
+    #[test]
+    fn test_strip_sen() {
+        assert_eq!(strip_line_name_suffix("セイブイケブクロセン"), "セイブイケブクロ");
+    }
+
+    #[test]
+    fn test_strip_honsen() {
+        assert_eq!(strip_line_name_suffix("トウカイドウホンセン"), "トウカイドウ");
+    }
+
+    #[test]
+    fn test_strip_shinkansen_preserved() {
+        // 新幹線(Shinkansen)は英語でもそのまま使われるので除去しない
+        assert_eq!(strip_line_name_suffix("トウホクシンカンセン"), "トウホクシンカンセン");
+    }
+
+    #[test]
+    fn test_strip_shisen() {
+        assert_eq!(strip_line_name_suffix("ナガノハラクサツグチシセン"), "ナガノハラクサツグチ");
+    }
+
+    #[test]
+    fn test_strip_no_suffix() {
+        // ライン等セン以外の末尾はそのまま返す
+        assert_eq!(strip_line_name_suffix("ショウナンシンジュクライン"), "ショウナンシンジュクライン");
+    }
+
+    #[test]
+    fn test_strip_bare_sen_returns_unchanged() {
+        // "セン" だけの場合、stemが空になるので除去しない
+        assert_eq!(strip_line_name_suffix("セン"), "セン");
     }
 }
