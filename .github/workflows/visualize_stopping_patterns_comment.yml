@@ -1,0 +1,53 @@
+name: Post stopping pattern visualization comment
+
+on:
+  workflow_run:
+    workflows: ["Visualize Stopping Patterns"]
+    types: [completed]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  comment:
+    name: Post visualization comment
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.event == 'pull_request'
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: visualization-result
+          path: /tmp/visualize-artifacts
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Read metadata
+        id: meta
+        run: |
+          echo "pr_number=$(cat /tmp/visualize-artifacts/pr_number)" >> "$GITHUB_OUTPUT"
+          echo "has_changes=$(cat /tmp/visualize-artifacts/has_changes)" >> "$GITHUB_OUTPUT"
+
+      - name: Find existing comment
+        uses: peter-evans/find-comment@v3
+        id: find_comment
+        with:
+          issue-number: ${{ steps.meta.outputs.pr_number }}
+          comment-author: "github-actions[bot]"
+          body-includes: "<!-- station-visualizer -->"
+
+      - name: Post or update comment
+        if: steps.meta.outputs.has_changes == 'true'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ steps.meta.outputs.pr_number }}
+          comment-id: ${{ steps.find_comment.outputs.comment-id }}
+          body-path: /tmp/visualize-artifacts/visualization_comment.md
+          edit-mode: replace
+
+      - name: Delete comment if no changes
+        if: steps.meta.outputs.has_changes == 'false' && steps.find_comment.outputs.comment-id != ''
+        run: gh api repos/${{ github.repository }}/issues/comments/${{ steps.find_comment.outputs.comment-id }} -X DELETE
+        env:
+          GH_TOKEN: ${{ github.token }}
