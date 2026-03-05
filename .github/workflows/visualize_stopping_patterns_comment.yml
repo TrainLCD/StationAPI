@@ -29,7 +29,17 @@ jobs:
       - name: Read metadata
         id: meta
         run: |
-          echo "pr_number=${{ github.event.workflow_run.pull_requests[0].number }}" >> "$GITHUB_OUTPUT"
+          PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
+          if [ -z "$PR_NUMBER" ] && [ -s /tmp/visualize-artifacts/pr_number ]; then
+            PR_NUMBER=$(cat /tmp/visualize-artifacts/pr_number)
+            echo "::warning::pull_requests context empty, using artifact fallback"
+          fi
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::error::Could not determine PR number"
+            exit 1
+          fi
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
           if [ -s /tmp/visualize-artifacts/has_changes ]; then
             echo "has_changes=$(cat /tmp/visualize-artifacts/has_changes)" >> "$GITHUB_OUTPUT"
           else
@@ -41,7 +51,7 @@ jobs:
         uses: peter-evans/find-comment@v3
         id: find_comment
         with:
-          issue-number: ${{ github.event.workflow_run.pull_requests[0].number }}
+          issue-number: ${{ steps.meta.outputs.pr_number }}
           comment-author: "github-actions[bot]"
           body-includes: "<!-- station-visualizer -->"
 
@@ -49,7 +59,7 @@ jobs:
         if: steps.meta.outputs.has_changes == 'true'
         uses: peter-evans/create-or-update-comment@v4
         with:
-          issue-number: ${{ github.event.workflow_run.pull_requests[0].number }}
+          issue-number: ${{ steps.meta.outputs.pr_number }}
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
           body-path: /tmp/visualize-artifacts/visualization_comment.md
           edit-mode: replace
