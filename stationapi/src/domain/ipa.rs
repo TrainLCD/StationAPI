@@ -1,5 +1,10 @@
 /// Convert a katakana string to its IPA transcription.
-pub fn katakana_to_ipa(input: &str) -> String {
+/// Returns `None` if the input contains characters that cannot be converted.
+pub fn katakana_to_ipa(input: &str) -> Option<String> {
+    if input.is_empty() {
+        return Some(String::new());
+    }
+
     let chars: Vec<char> = input.chars().collect();
     let len = chars.len();
     let mut result = Vec::new();
@@ -15,16 +20,13 @@ pub fn katakana_to_ipa(input: &str) -> String {
             }
         }
 
-        // Single character lookup
-        if let Some(ipa) = lookup_single(chars[i]) {
-            result.push(ipa);
-        }
-        // Skip unknown characters silently
+        // Single character lookup — return None on unknown characters
+        result.push(lookup_single(chars[i])?);
 
         i += 1;
     }
 
-    apply_phonological_rules(&result)
+    Some(apply_phonological_rules(&result))
 }
 
 /// Look up a two-character (digraph) combination.
@@ -200,6 +202,12 @@ fn split_onset(ipa: &str) -> (&str, &str) {
     ipa.split_at(vowel_start)
 }
 
+/// Strip secondary articulation markers (e.g., palatalization ʲ) from an onset,
+/// returning only the base consonant(s).
+fn strip_secondary_articulation(onset: &str) -> String {
+    onset.replace('ʲ', "")
+}
+
 /// Get the last vowel character from an IPA string for long vowel extension.
 fn last_vowel(ipa: &str) -> Option<&'static str> {
     for c in ipa.chars().rev() {
@@ -271,6 +279,7 @@ fn apply_phonological_rules(phonemes: &[Phoneme]) -> String {
             Phoneme::Geminate => {
                 // Double the onset of the following consonant.
                 // For affricates (t͡ɕ, t͡s), only the stop portion (t) is geminated.
+                // For palatalized onsets (kʲ, ɡʲ, etc.), only the base consonant is geminated.
                 if let Some(next_ipa) = find_next_regular(&phonemes[i + 1..]) {
                     if next_ipa.starts_with("t͡ɕ") || next_ipa.starts_with("t͡s") {
                         output.push('t');
@@ -279,7 +288,8 @@ fn apply_phonological_rules(phonemes: &[Phoneme]) -> String {
                     } else {
                         let (onset, _) = split_onset(next_ipa);
                         if !onset.is_empty() {
-                            output.push_str(onset);
+                            let base = strip_secondary_articulation(onset);
+                            output.push_str(&base);
                         }
                     }
                 }
@@ -346,217 +356,234 @@ fn apply_vowel_length(input: &str) -> String {
 mod tests {
     use super::*;
 
+    /// Helper: unwrap the Option for concise test assertions.
+    fn ipa(input: &str) -> String {
+        katakana_to_ipa(input).expect("expected valid katakana input")
+    }
+
     // Tests based on the hardcoded IPA mappings from Cloud Functions tts.ts
 
     #[test]
     fn test_shibuya() {
-        assert_eq!(katakana_to_ipa("シブヤ"), "ɕibɯja");
+        assert_eq!(ipa("シブヤ"), "ɕibɯja");
     }
 
     #[test]
     fn test_shinagawa() {
-        assert_eq!(katakana_to_ipa("シナガワ"), "ɕinaɡawa");
+        assert_eq!(ipa("シナガワ"), "ɕinaɡawa");
     }
 
     #[test]
     fn test_ueno() {
-        assert_eq!(katakana_to_ipa("ウエノ"), "ɯeno");
+        assert_eq!(ipa("ウエノ"), "ɯeno");
     }
 
     #[test]
     fn test_ikebukuro() {
-        assert_eq!(katakana_to_ipa("イケブクロ"), "ikebɯkɯɾo");
+        assert_eq!(ipa("イケブクロ"), "ikebɯkɯɾo");
     }
 
     #[test]
     fn test_shinjuku() {
         // ン before ジュ → ɲ, ジュ → dʑɯ
-        assert_eq!(katakana_to_ipa("シンジュク"), "ɕiɲdʑɯkɯ");
+        assert_eq!(ipa("シンジュク"), "ɕiɲdʑɯkɯ");
     }
 
     #[test]
     fn test_osaka() {
         // オオ → oː
-        assert_eq!(katakana_to_ipa("オオサカ"), "oːsaka");
+        assert_eq!(ipa("オオサカ"), "oːsaka");
     }
 
     #[test]
     fn test_kyoto() {
         // キョウ → kʲoː (via kʲo + ウ → oɯ → oː)
-        assert_eq!(katakana_to_ipa("キョウト"), "kʲoːto");
+        assert_eq!(ipa("キョウト"), "kʲoːto");
     }
 
     #[test]
     fn test_yokohama() {
-        assert_eq!(katakana_to_ipa("ヨコハマ"), "jokohama");
+        assert_eq!(ipa("ヨコハマ"), "jokohama");
     }
 
     #[test]
     fn test_chiba() {
-        assert_eq!(katakana_to_ipa("チバ"), "t͡ɕiba");
+        assert_eq!(ipa("チバ"), "t͡ɕiba");
     }
 
     #[test]
     fn test_kawasaki() {
-        assert_eq!(katakana_to_ipa("カワサキ"), "kawasakʲi");
+        assert_eq!(ipa("カワサキ"), "kawasakʲi");
     }
 
     #[test]
     fn test_tsurumi() {
-        assert_eq!(katakana_to_ipa("ツルミ"), "t͡sɯɾɯmi");
+        assert_eq!(ipa("ツルミ"), "t͡sɯɾɯmi");
     }
 
     #[test]
     fn test_ryogoku() {
         // リョウ → ɾʲoː (via ɾʲo + ウ → oɯ → oː)
-        assert_eq!(katakana_to_ipa("リョウゴク"), "ɾʲoːɡokɯ");
+        assert_eq!(ipa("リョウゴク"), "ɾʲoːɡokɯ");
     }
 
     #[test]
     fn test_shimbashi() {
         // ン before バ → m
-        assert_eq!(katakana_to_ipa("シンバシ"), "ɕimbaɕi");
+        assert_eq!(ipa("シンバシ"), "ɕimbaɕi");
     }
 
     #[test]
     fn test_keisei() {
-        assert_eq!(katakana_to_ipa("ケイセイ"), "keisei");
+        assert_eq!(ipa("ケイセイ"), "keisei");
     }
 
     #[test]
     fn test_oshiage() {
-        assert_eq!(katakana_to_ipa("オシアゲ"), "oɕiaɡe");
+        assert_eq!(ipa("オシアゲ"), "oɕiaɡe");
     }
 
     #[test]
     fn test_meitetsu() {
         // ツ is consistently t͡sɯ (affricate with tie bar)
-        assert_eq!(katakana_to_ipa("メイテツ"), "meitet͡sɯ");
+        assert_eq!(ipa("メイテツ"), "meitet͡sɯ");
     }
 
     #[test]
     fn test_seibu() {
-        assert_eq!(katakana_to_ipa("セイブ"), "seibɯ");
+        assert_eq!(ipa("セイブ"), "seibɯ");
     }
 
     #[test]
     fn test_toride() {
-        assert_eq!(katakana_to_ipa("トリデ"), "toɾide");
+        assert_eq!(ipa("トリデ"), "toɾide");
     }
 
     #[test]
     fn test_fukiage() {
-        assert_eq!(katakana_to_ipa("フキアゲ"), "ɸɯkʲiaɡe");
+        assert_eq!(ipa("フキアゲ"), "ɸɯkʲiaɡe");
     }
 
     #[test]
     fn test_fuse() {
-        assert_eq!(katakana_to_ipa("フセ"), "ɸɯse");
+        assert_eq!(ipa("フセ"), "ɸɯse");
     }
 
     #[test]
     fn test_inagekaigan() {
         // ン at word end → ɴ
-        assert_eq!(katakana_to_ipa("イナゲカイガン"), "inaɡekaiɡaɴ");
+        assert_eq!(ipa("イナゲカイガン"), "inaɡekaiɡaɴ");
     }
 
     #[test]
     fn test_inage() {
-        assert_eq!(katakana_to_ipa("イナゲ"), "inaɡe");
+        assert_eq!(ipa("イナゲ"), "inaɡe");
     }
 
     #[test]
     fn test_kire_uriwari() {
-        assert_eq!(katakana_to_ipa("キレウリワリ"), "kʲiɾeɯɾiwaɾi");
+        assert_eq!(ipa("キレウリワリ"), "kʲiɾeɯɾiwaɾi");
     }
 
     #[test]
     fn test_yao() {
-        assert_eq!(katakana_to_ipa("ヤオ"), "jao");
+        assert_eq!(ipa("ヤオ"), "jao");
     }
 
     #[test]
     fn test_mejiro() {
-        assert_eq!(katakana_to_ipa("メジロ"), "meʤiɾo");
+        assert_eq!(ipa("メジロ"), "meʤiɾo");
     }
 
     #[test]
     fn test_isesaki() {
-        assert_eq!(katakana_to_ipa("イセサキ"), "isesakʲi");
+        assert_eq!(ipa("イセサキ"), "isesakʲi");
     }
 
     #[test]
     fn test_ube() {
-        assert_eq!(katakana_to_ipa("ウベ"), "ɯbe");
+        assert_eq!(ipa("ウベ"), "ɯbe");
     }
 
     #[test]
     fn test_itchome() {
         // ッチョウ → tt͡ɕoː
-        assert_eq!(katakana_to_ipa("イッチョウメ"), "itt͡ɕoːme");
+        assert_eq!(ipa("イッチョウメ"), "itt͡ɕoːme");
     }
 
     #[test]
     fn test_sanchome() {
-        assert_eq!(katakana_to_ipa("サンチョウメ"), "sant͡ɕoːme");
+        assert_eq!(ipa("サンチョウメ"), "sant͡ɕoːme");
     }
 
     #[test]
     fn test_koen() {
         // コウエン: コ=ko, ウ→長音化でoː, エン=eɴ → koːeɴ
         // Note: the original hardcoded value was "koeɴ" but phonologically "koːeɴ" is correct
-        assert_eq!(katakana_to_ipa("コウエン"), "koːeɴ");
+        assert_eq!(ipa("コウエン"), "koːeɴ");
     }
 
     #[test]
     fn test_long_vowel_mark() {
         // ー explicitly lengthens
-        assert_eq!(katakana_to_ipa("ラーメン"), "ɾaːmeɴ");
+        assert_eq!(ipa("ラーメン"), "ɾaːmeɴ");
     }
 
     #[test]
     fn test_tokyo() {
         // トウキョウ: ト=to, ウ→oː, キョ=kʲo, ウ→oː
-        assert_eq!(katakana_to_ipa("トウキョウ"), "toːkʲoː");
+        assert_eq!(ipa("トウキョウ"), "toːkʲoː");
     }
 
     #[test]
     fn test_nagoya() {
-        assert_eq!(katakana_to_ipa("ナゴヤ"), "naɡoja");
+        assert_eq!(ipa("ナゴヤ"), "naɡoja");
     }
 
     #[test]
     fn test_sapporo() {
         // ッポ → ppo
-        assert_eq!(katakana_to_ipa("サッポロ"), "sappoɾo");
+        assert_eq!(ipa("サッポロ"), "sappoɾo");
     }
 
     #[test]
     fn test_namba() {
         // ン before バ → m
-        assert_eq!(katakana_to_ipa("ナンバ"), "namba");
+        assert_eq!(ipa("ナンバ"), "namba");
     }
 
     #[test]
     fn test_shin_yokohama() {
         // ン before ヨ(j) → ɲ (palatal assimilation)
-        assert_eq!(katakana_to_ipa("シンヨコハマ"), "ɕiɲjokohama");
+        assert_eq!(ipa("シンヨコハマ"), "ɕiɲjokohama");
     }
 
     #[test]
     fn test_geminate_ji() {
         // ッジ → dʤi (voiced affricate gemination emits 'd')
-        assert_eq!(katakana_to_ipa("カッジ"), "kadʤi");
+        assert_eq!(ipa("カッジ"), "kadʤi");
     }
 
     #[test]
     fn test_geminate_ju() {
         // ッジュ → ddʑɯ (voiced affricate gemination with digraph)
-        assert_eq!(katakana_to_ipa("カッジュ"), "kaddʑɯ");
+        assert_eq!(ipa("カッジュ"), "kaddʑɯ");
     }
 
     #[test]
     fn test_empty() {
-        assert_eq!(katakana_to_ipa(""), "");
+        assert_eq!(katakana_to_ipa(""), Some(String::new()));
+    }
+
+    #[test]
+    fn test_unknown_characters_returns_none() {
+        assert_eq!(katakana_to_ipa("ABC"), None);
+        assert_eq!(katakana_to_ipa("シブヤX"), None);
+    }
+
+    #[test]
+    fn test_geminate_palatalized() {
+        // ッキョ → kkʲo (only the base consonant 'k' is geminated, not 'kʲ')
+        assert_eq!(ipa("ニッキョウ"), "ɲikkʲoː");
     }
 }

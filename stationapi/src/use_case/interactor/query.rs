@@ -834,14 +834,8 @@ where
                         })
                         .collect();
 
-                    let name_ipa = {
-                        let ipa = crate::domain::ipa::katakana_to_ipa(&row.station_name_k);
-                        if ipa.is_empty() {
-                            None
-                        } else {
-                            Some(ipa)
-                        }
-                    };
+                    let name_ipa = crate::domain::ipa::katakana_to_ipa(&row.station_name_k)
+                        .filter(|ipa| !ipa.is_empty());
                     proto::StationMinimal {
                         id: row.station_cd as u32,
                         group_id: row.station_g_cd as u32,
