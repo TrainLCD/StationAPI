@@ -72,7 +72,7 @@ fn build_markdown_report(invalid_station_ids: &[String], invalid_type_ids: &[Str
         md.push_str("<details>\n<summary>該当レコード一覧</summary>\n\n");
         md.push_str("| 行データ |\n|---|\n");
         for line in invalid_station_ids {
-            md.push_str(&format!("| `{}` |\n", line));
+            md.push_str(&format!("| `{}` |\n", escape_markdown_cell(line)));
         }
         md.push_str("\n</details>\n\n");
     }
@@ -86,10 +86,14 @@ fn build_markdown_report(invalid_station_ids: &[String], invalid_type_ids: &[Str
         md.push_str("<details>\n<summary>該当レコード一覧</summary>\n\n");
         md.push_str("| 行データ |\n|---|\n");
         for line in invalid_type_ids {
-            md.push_str(&format!("| `{}` |\n", line));
+            md.push_str(&format!("| `{}` |\n", escape_markdown_cell(line)));
         }
         md.push_str("\n</details>\n\n");
     }
 
     md
+}
+
+fn escape_markdown_cell(s: &str) -> String {
+    s.replace('`', "&#96;").replace('|', "&#124;")
 }
