@@ -1,10 +1,17 @@
 use crate::{
-    domain::entity::{gtfs::TransportType, line::Line},
+    domain::{
+        entity::{gtfs::TransportType, line::Line},
+        ipa::katakana_to_ipa,
+    },
     proto::{Line as GrpcLine, TransportType as GrpcTransportType},
 };
 
 impl From<Line> for GrpcLine {
     fn from(line: Line) -> Self {
+        let name_ipa = {
+            let ipa = katakana_to_ipa(&line.line_name_k);
+            if ipa.is_empty() { None } else { Some(ipa) }
+        };
         // バス路線の場合は line_type を OtherLineType (0) に強制
         // (鉄道用の line_type が誤って設定されている可能性があるため)
         let line_type = if line.transport_type == TransportType::Bus {
@@ -32,6 +39,7 @@ impl From<Line> for GrpcLine {
                 .map(|train_type| Box::new(train_type.into())),
             average_distance: line.average_distance.unwrap_or(0.0),
             transport_type: convert_transport_type(line.transport_type),
+            name_ipa,
         }
     }
 }
