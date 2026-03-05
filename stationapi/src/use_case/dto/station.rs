@@ -19,7 +19,11 @@ impl From<Station> for GrpcStation {
     fn from(station: Station) -> Self {
         let name_ipa = {
             let ipa = katakana_to_ipa(&station.station_name_k);
-            if ipa.is_empty() { None } else { Some(ipa) }
+            if ipa.is_empty() {
+                None
+            } else {
+                Some(ipa)
+            }
         };
         Self {
             id: station.station_cd as u32,

@@ -836,7 +836,11 @@ where
 
                     let name_ipa = {
                         let ipa = crate::domain::ipa::katakana_to_ipa(&row.station_name_k);
-                        if ipa.is_empty() { None } else { Some(ipa) }
+                        if ipa.is_empty() {
+                            None
+                        } else {
+                            Some(ipa)
+                        }
                     };
                     proto::StationMinimal {
                         id: row.station_cd as u32,

@@ -10,7 +10,11 @@ impl From<Line> for GrpcLine {
     fn from(line: Line) -> Self {
         let name_ipa = {
             let ipa = katakana_to_ipa(&line.line_name_k);
-            if ipa.is_empty() { None } else { Some(ipa) }
+            if ipa.is_empty() {
+                None
+            } else {
+                Some(ipa)
+            }
         };
         // バス路線の場合は line_type を OtherLineType (0) に強制
         // (鉄道用の line_type が誤って設定されている可能性があるため)
