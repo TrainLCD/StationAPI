@@ -3,7 +3,8 @@ const LINE_NAME_SUFFIXES: &[&str] = &["ホンセン", "シセン", "セン"];
 /// Suffixes that should NOT be stripped even though they end with セン.
 const LINE_NAME_SUFFIX_EXCEPTIONS: &[&str] = &["シンカンセン"];
 
-/// Strip a common line-name suffix (線/本線/支線/新幹線) from a katakana string.
+/// Strip a common line-name suffix (線/本線/支線) from a katakana string.
+/// 新幹線 (Shinkansen) is preserved as it is used as-is in English.
 /// Returns the stem (without the suffix). If no known suffix is found, returns the input unchanged.
 pub fn strip_line_name_suffix(input: &str) -> &str {
     for exception in LINE_NAME_SUFFIX_EXCEPTIONS {
