@@ -638,29 +638,44 @@ mod tests {
 
     #[test]
     fn test_strip_sen() {
-        assert_eq!(strip_line_name_suffix("セイブイケブクロセン"), "セイブイケブクロ");
+        assert_eq!(
+            strip_line_name_suffix("セイブイケブクロセン"),
+            "セイブイケブクロ"
+        );
     }
 
     #[test]
     fn test_strip_honsen() {
-        assert_eq!(strip_line_name_suffix("トウカイドウホンセン"), "トウカイドウ");
+        assert_eq!(
+            strip_line_name_suffix("トウカイドウホンセン"),
+            "トウカイドウ"
+        );
     }
 
     #[test]
     fn test_strip_shinkansen_preserved() {
         // 新幹線(Shinkansen)は英語でもそのまま使われるので除去しない
-        assert_eq!(strip_line_name_suffix("トウホクシンカンセン"), "トウホクシンカンセン");
+        assert_eq!(
+            strip_line_name_suffix("トウホクシンカンセン"),
+            "トウホクシンカンセン"
+        );
     }
 
     #[test]
     fn test_strip_shisen() {
-        assert_eq!(strip_line_name_suffix("ナガノハラクサツグチシセン"), "ナガノハラクサツグチ");
+        assert_eq!(
+            strip_line_name_suffix("ナガノハラクサツグチシセン"),
+            "ナガノハラクサツグチ"
+        );
     }
 
     #[test]
     fn test_strip_no_suffix() {
         // ライン等セン以外の末尾はそのまま返す
-        assert_eq!(strip_line_name_suffix("ショウナンシンジュクライン"), "ショウナンシンジュクライン");
+        assert_eq!(
+            strip_line_name_suffix("ショウナンシンジュクライン"),
+            "ショウナンシンジュクライン"
+        );
     }
 
     #[test]
