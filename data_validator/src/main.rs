@@ -1,4 +1,5 @@
 use core::panic;
+use std::collections::HashSet;
 use std::path::Path;
 
 use csv::{ReaderBuilder, StringRecord};
@@ -10,14 +11,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let data_path: &Path = Path::new("data");
     let mut rdr = ReaderBuilder::new().from_path(data_path.join("3!stations.csv"))?;
     let records: Vec<StringRecord> = rdr.records().filter_map(|row| row.ok()).collect();
-    let station_ids: Vec<u32> = records
+    let station_ids: HashSet<u32> = records
         .iter()
         .map(|row| row.get(0).unwrap().parse::<u32>().unwrap())
         .collect();
 
     let mut rdr = ReaderBuilder::new().from_path(data_path.join("4!types.csv"))?;
     let records: Vec<StringRecord> = rdr.records().filter_map(|row| row.ok()).collect();
-    let type_ids: Vec<u32> = records
+    let type_ids: HashSet<u32> = records
         .iter()
         .map(|row| row.get(1).unwrap().parse::<u32>().unwrap())
         .collect();
@@ -26,20 +27,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let records: Vec<StringRecord> = rdr.records().filter_map(|row| row.ok()).collect();
 
     for record in &records {
-        let station_cd = record.get(1).unwrap();
-        if !station_ids.contains(&station_cd.parse::<u32>().unwrap()) {
-            let line = record.iter().collect::<Vec<&str>>().join(",");
-            println!("[INVALID] Unrecognized Station ID {:?} Found!", station_cd);
-            invalid_station_ids.push(line);
-        }
-    }
+        let station_cd: u32 = record.get(1).unwrap().parse().unwrap();
+        let type_cd: u32 = record.get(2).unwrap().parse().unwrap();
+        let line = || record.iter().collect::<Vec<&str>>().join(",");
 
-    for record in &records {
-        let type_cd = record.get(2).unwrap();
-        if !type_ids.contains(&type_cd.parse::<u32>().unwrap()) {
-            let line = record.iter().collect::<Vec<&str>>().join(",");
+        if !station_ids.contains(&station_cd) {
+            println!("[INVALID] Unrecognized Station ID {:?} Found!", station_cd);
+            invalid_station_ids.push(line());
+        }
+        if !type_ids.contains(&type_cd) {
             println!("[INVALID] Unrecognized Type ID {:?} Found!", type_cd);
-            invalid_type_ids.push(line);
+            invalid_type_ids.push(line());
         }
     }
 
