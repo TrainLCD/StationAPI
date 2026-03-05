@@ -1,32 +1,25 @@
-/// Katakana line-name suffixes paired with their English IPA replacements.
-/// Ordered longest-first for greedy matching.
-const LINE_NAME_SUFFIX_MAP: &[(&str, &str)] = &[
-    ("ホンセン", " meɪn laɪn"),
-    ("シセン", " laɪn"),
-    ("セン", " laɪn"),
-];
-/// Suffixes that should NOT be replaced even though they end with セン.
+/// Common katakana suffixes for line names, ordered longest-first for greedy matching.
+const LINE_NAME_SUFFIXES: &[&str] = &["ホンセン", "シセン", "セン"];
+/// Suffixes that should NOT be stripped even though they end with セン.
 const LINE_NAME_SUFFIX_EXCEPTIONS: &[&str] = &["シンカンセン"];
 
-/// Replace a common line-name suffix (線/本線/支線) in a katakana string
-/// with its English IPA equivalent (Line / Main Line).
+/// Strip a common line-name suffix (線/本線/支線) from a katakana string.
 /// 新幹線 (Shinkansen) is preserved as it is used as-is in English.
-/// Returns the stem and the English IPA suffix to append.
-/// If no known suffix is found, returns the full input with an empty suffix.
-pub fn replace_line_name_suffix(input: &str) -> (&str, &str) {
+/// Returns the stem (without the suffix). If no known suffix is found, returns the input unchanged.
+pub fn strip_line_name_suffix(input: &str) -> &str {
     for exception in LINE_NAME_SUFFIX_EXCEPTIONS {
         if input.ends_with(exception) {
-            return (input, "");
+            return input;
         }
     }
-    for (suffix, replacement) in LINE_NAME_SUFFIX_MAP {
+    for suffix in LINE_NAME_SUFFIXES {
         if let Some(stem) = input.strip_suffix(suffix) {
             if !stem.is_empty() {
-                return (stem, replacement);
+                return stem;
             }
         }
     }
-    (input, "")
+    input
 }
 
 /// Convert a katakana string to its IPA transcription.
@@ -641,54 +634,54 @@ mod tests {
     }
 
     // ============================================
-    // replace_line_name_suffix tests
+    // strip_line_name_suffix tests
     // ============================================
 
     #[test]
-    fn test_replace_sen() {
+    fn test_strip_sen() {
         assert_eq!(
-            replace_line_name_suffix("セイブイケブクロセン"),
-            ("セイブイケブクロ", " laɪn")
+            strip_line_name_suffix("セイブイケブクロセン"),
+            "セイブイケブクロ"
         );
     }
 
     #[test]
-    fn test_replace_honsen() {
+    fn test_strip_honsen() {
         assert_eq!(
-            replace_line_name_suffix("トウカイドウホンセン"),
-            ("トウカイドウ", " meɪn laɪn")
+            strip_line_name_suffix("トウカイドウホンセン"),
+            "トウカイドウ"
         );
     }
 
     #[test]
-    fn test_replace_shinkansen_preserved() {
+    fn test_strip_shinkansen_preserved() {
         // 新幹線(Shinkansen)は英語でもそのまま使われるので除去しない
         assert_eq!(
-            replace_line_name_suffix("トウホクシンカンセン"),
-            ("トウホクシンカンセン", "")
+            strip_line_name_suffix("トウホクシンカンセン"),
+            "トウホクシンカンセン"
         );
     }
 
     #[test]
-    fn test_replace_shisen() {
+    fn test_strip_shisen() {
         assert_eq!(
-            replace_line_name_suffix("ナガノハラクサツグチシセン"),
-            ("ナガノハラクサツグチ", " laɪn")
+            strip_line_name_suffix("ナガノハラクサツグチシセン"),
+            "ナガノハラクサツグチ"
         );
     }
 
     #[test]
-    fn test_replace_no_suffix() {
+    fn test_strip_no_suffix() {
         // ライン等セン以外の末尾はそのまま返す
         assert_eq!(
-            replace_line_name_suffix("ショウナンシンジュクライン"),
-            ("ショウナンシンジュクライン", "")
+            strip_line_name_suffix("ショウナンシンジュクライン"),
+            "ショウナンシンジュクライン"
         );
     }
 
     #[test]
-    fn test_replace_bare_sen_returns_unchanged() {
+    fn test_strip_bare_sen_returns_unchanged() {
         // "セン" だけの場合、stemが空になるので除去しない
-        assert_eq!(replace_line_name_suffix("セン"), ("セン", ""));
+        assert_eq!(strip_line_name_suffix("セン"), "セン");
     }
 }
