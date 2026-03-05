@@ -68,7 +68,7 @@ fn lookup_digraph(c1: char, c2: char) -> Option<Phoneme> {
         // ザ行拗音 (ジ is voiced postalveolar affricate)
         ('ジ', 'ャ') => "dʑa",
         ('ジ', 'ュ') => "dʑɯ",
-        ('ジ', 'ョ') => "ʤo",
+        ('ジ', 'ョ') => "dʑo",
         // バ行拗音
         ('ビ', 'ャ') => "bʲa",
         ('ビ', 'ュ') => "bʲɯ",
