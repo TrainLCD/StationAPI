@@ -599,4 +599,13 @@ mod tests {
             "dokkʲoːdaiɡakɯmae soːkamat͡sɯbaɾa"
         );
     }
+
+    #[test]
+    fn test_dokkyo_daigakumae_soka_matsubara_halfwidth() {
+        // Half-width (ASCII) space between words should also be accepted
+        assert_eq!(
+            ipa("ドッキョウダイガクマエ ソウカマツバラ"),
+            "dokkʲoːdaiɡakɯmae soːkamat͡sɯbaɾa"
+        );
+    }
 }
