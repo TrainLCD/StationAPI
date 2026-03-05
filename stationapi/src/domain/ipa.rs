@@ -176,6 +176,8 @@ fn lookup_single(c: char) -> Option<Phoneme> {
         'ン' => return Some(Phoneme::MoraicNasal),
         'ッ' => return Some(Phoneme::Geminate),
         'ー' => return Some(Phoneme::LongVowel),
+        // 空白（全角・半角）はそのまま透過
+        '　' | ' ' => return Some(Phoneme::Regular(" ")),
         _ => return None,
     };
     Some(Phoneme::Regular(ipa))
@@ -587,5 +589,14 @@ mod tests {
     fn test_geminate_palatalized() {
         // ッキョ → kkʲo (only the base consonant 'k' is geminated, not 'kʲ')
         assert_eq!(ipa("ニッキョウ"), "ɲikkʲoː");
+    }
+
+    #[test]
+    fn test_dokkyo_daigakumae_soka_matsubara() {
+        // Full-width space between words should be preserved
+        assert_eq!(
+            ipa("ドッキョウダイガクマエ　ソウカマツバラ"),
+            "dokkʲoːdaiɡakɯmae soːkamat͡sɯbaɾa"
+        );
     }
 }
