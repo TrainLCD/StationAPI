@@ -10,21 +10,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let data_path: &Path = Path::new("data");
     let mut rdr = ReaderBuilder::new().from_path(data_path.join("3!stations.csv"))?;
-    let records: Vec<StringRecord> = rdr.records().filter_map(|row| row.ok()).collect();
+    let records: Vec<StringRecord> = rdr.records().collect::<Result<Vec<_>, _>>()?;
     let station_ids: HashSet<u32> = records
         .iter()
         .map(|row| row.get(0).unwrap().parse::<u32>().unwrap())
         .collect();
 
     let mut rdr = ReaderBuilder::new().from_path(data_path.join("4!types.csv"))?;
-    let records: Vec<StringRecord> = rdr.records().filter_map(|row| row.ok()).collect();
+    let records: Vec<StringRecord> = rdr.records().collect::<Result<Vec<_>, _>>()?;
     let type_ids: HashSet<u32> = records
         .iter()
         .map(|row| row.get(1).unwrap().parse::<u32>().unwrap())
         .collect();
 
     let mut rdr = ReaderBuilder::new().from_path(data_path.join("5!station_station_types.csv"))?;
-    let records: Vec<StringRecord> = rdr.records().filter_map(|row| row.ok()).collect();
+    let records: Vec<StringRecord> = rdr.records().collect::<Result<Vec<_>, _>>()?;
 
     for record in &records {
         let station_cd: u32 = record.get(1).unwrap().parse().unwrap();
