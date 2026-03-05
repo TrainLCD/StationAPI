@@ -1,6 +1,6 @@
 on:
   workflow_dispatch:
-  pull_request:
+  pull_request_target:
     paths:
       - "data/*.csv"
   push:
@@ -20,6 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Run data validator
         id: validate
@@ -31,7 +33,7 @@ jobs:
           fi
 
       - name: Find existing comment
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request_target'
         uses: peter-evans/find-comment@v3
         id: find_comment
         with:
@@ -40,7 +42,7 @@ jobs:
           body-includes: "<!-- data-validator -->"
 
       - name: Post or update validation failure comment
-        if: github.event_name == 'pull_request' && steps.validate.outputs.result == 'failure'
+        if: github.event_name == 'pull_request_target' && steps.validate.outputs.result == 'failure'
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
@@ -49,7 +51,7 @@ jobs:
           edit-mode: replace
 
       - name: Delete comment if validation passed
-        if: github.event_name == 'pull_request' && steps.validate.outputs.result == 'success' && steps.find_comment.outputs.comment-id != ''
+        if: github.event_name == 'pull_request_target' && steps.validate.outputs.result == 'success' && steps.find_comment.outputs.comment-id != ''
         run: gh api repos/${{ github.repository }}/issues/comments/${{ steps.find_comment.outputs.comment-id }} -X DELETE
         env:
           GH_TOKEN: ${{ github.token }}
