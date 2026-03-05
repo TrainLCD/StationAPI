@@ -191,7 +191,7 @@ enum Phoneme {
 }
 
 /// Extract the leading consonant cluster from an IPA string.
-/// Returns (consonant_cluster, remainder) or None if starts with a vowel.
+/// Returns (onset, remainder). If the string starts with a vowel, onset is "".
 fn split_onset(ipa: &str) -> (&str, &str) {
     // Find where the first vowel-like character starts
     let vowel_start = ipa
