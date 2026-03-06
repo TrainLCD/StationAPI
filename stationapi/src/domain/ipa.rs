@@ -344,7 +344,26 @@ fn apply_phonological_rules(phonemes: &[Phoneme]) -> String {
         }
     }
 
-    output
+    insert_syllable_breaks(&output)
+}
+
+/// Insert IPA syllable boundary markers (`.`) between consecutive vowels.
+/// This prevents Google TTS from interpreting cross-mora vowel sequences
+/// (e.g. `ei` in セイ) as English diphthongs (e.g. /eɪ/ → "ai").
+fn insert_syllable_breaks(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    let mut prev_is_vowel = false;
+
+    for c in input.chars() {
+        let is_vowel = "aiɯeou".contains(c);
+        if is_vowel && prev_is_vowel {
+            result.push('.');
+        }
+        result.push(c);
+        prev_is_vowel = is_vowel;
+    }
+
+    result
 }
 
 /// Find the IPA string of the next Regular phoneme in the slice.
@@ -378,7 +397,7 @@ mod tests {
 
     #[test]
     fn test_ueno() {
-        assert_eq!(ipa("ウエノ"), "ɯeno");
+        assert_eq!(ipa("ウエノ"), "ɯ.eno");
     }
 
     #[test]
@@ -394,12 +413,12 @@ mod tests {
 
     #[test]
     fn test_osaka() {
-        assert_eq!(ipa("オオサカ"), "oosaka");
+        assert_eq!(ipa("オオサカ"), "o.osaka");
     }
 
     #[test]
     fn test_kyoto() {
-        assert_eq!(ipa("キョウト"), "kʲoɯto");
+        assert_eq!(ipa("キョウト"), "kʲo.ɯto");
     }
 
     #[test]
@@ -424,7 +443,7 @@ mod tests {
 
     #[test]
     fn test_ryogoku() {
-        assert_eq!(ipa("リョウゴク"), "ɾʲoɯgokɯ");
+        assert_eq!(ipa("リョウゴク"), "ɾʲo.ɯgokɯ");
     }
 
     #[test]
@@ -435,39 +454,39 @@ mod tests {
 
     #[test]
     fn test_keisei() {
-        assert_eq!(ipa("ケイセイ"), "keisei");
+        assert_eq!(ipa("ケイセイ"), "ke.ise.i");
     }
 
     #[test]
     fn test_oshiage() {
-        assert_eq!(ipa("オシアゲ"), "oɕiage");
+        assert_eq!(ipa("オシアゲ"), "oɕi.age");
     }
 
     #[test]
     fn test_meitetsu() {
         // ツ is consistently t͡sɯ (affricate with tie bar)
-        assert_eq!(ipa("メイテツ"), "meitet͡sɯ");
+        assert_eq!(ipa("メイテツ"), "me.itet͡sɯ");
     }
 
     #[test]
     fn test_seibu() {
-        assert_eq!(ipa("セイブ"), "seibɯ");
+        assert_eq!(ipa("セイブ"), "se.ibɯ");
     }
 
     #[test]
     fn test_ei_long_vowel_no_duplicate() {
         // セイー should produce "seiː" (ー lengthens the preceding イ)
-        assert_eq!(ipa("セイー"), "seiː");
+        assert_eq!(ipa("セイー"), "se.iː");
     }
 
     #[test]
     fn test_ou_long_vowel_no_duplicate() {
-        assert_eq!(ipa("コウー"), "koɯː");
+        assert_eq!(ipa("コウー"), "ko.ɯː");
     }
 
     #[test]
     fn test_oo_long_vowel_no_duplicate() {
-        assert_eq!(ipa("オオー"), "ooː");
+        assert_eq!(ipa("オオー"), "o.oː");
     }
 
     #[test]
@@ -477,7 +496,7 @@ mod tests {
 
     #[test]
     fn test_fukiage() {
-        assert_eq!(ipa("フキアゲ"), "ɸɯkʲiage");
+        assert_eq!(ipa("フキアゲ"), "ɸɯkʲi.age");
     }
 
     #[test]
@@ -488,7 +507,7 @@ mod tests {
     #[test]
     fn test_inagekaigan() {
         // ン at word end → ɴ
-        assert_eq!(ipa("イナゲカイガン"), "inagekaigaɴ");
+        assert_eq!(ipa("イナゲカイガン"), "inageka.igaɴ");
     }
 
     #[test]
@@ -498,12 +517,12 @@ mod tests {
 
     #[test]
     fn test_kire_uriwari() {
-        assert_eq!(ipa("キレウリワリ"), "kʲiɾeɯɾiwaɾi");
+        assert_eq!(ipa("キレウリワリ"), "kʲiɾe.ɯɾiwaɾi");
     }
 
     #[test]
     fn test_yao() {
-        assert_eq!(ipa("ヤオ"), "jao");
+        assert_eq!(ipa("ヤオ"), "ja.o");
     }
 
     #[test]
@@ -523,17 +542,17 @@ mod tests {
 
     #[test]
     fn test_itchome() {
-        assert_eq!(ipa("イッチョウメ"), "itt͡ɕoɯme");
+        assert_eq!(ipa("イッチョウメ"), "itt͡ɕo.ɯme");
     }
 
     #[test]
     fn test_sanchome() {
-        assert_eq!(ipa("サンチョウメ"), "sant͡ɕoɯme");
+        assert_eq!(ipa("サンチョウメ"), "sant͡ɕo.ɯme");
     }
 
     #[test]
     fn test_koen() {
-        assert_eq!(ipa("コウエン"), "koɯeɴ");
+        assert_eq!(ipa("コウエン"), "ko.ɯ.eɴ");
     }
 
     #[test]
@@ -544,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_tokyo() {
-        assert_eq!(ipa("トウキョウ"), "toɯkʲoɯ");
+        assert_eq!(ipa("トウキョウ"), "to.ɯkʲo.ɯ");
     }
 
     #[test]
@@ -596,7 +615,7 @@ mod tests {
     #[test]
     fn test_geminate_palatalized() {
         // ッキョ → kkʲo (only the base consonant 'k' is geminated, not 'kʲ')
-        assert_eq!(ipa("ニッキョウ"), "ɲikkʲoɯ");
+        assert_eq!(ipa("ニッキョウ"), "ɲikkʲo.ɯ");
     }
 
     #[test]
@@ -604,7 +623,7 @@ mod tests {
         // Full-width space between words should be preserved
         assert_eq!(
             ipa("ドッキョウダイガクマエ　ソウカマツバラ"),
-            "dokkʲoɯdaigakɯmae soɯkamat͡sɯbaɾa"
+            "dokkʲo.ɯda.igakɯma.e so.ɯkamat͡sɯbaɾa"
         );
     }
 
@@ -613,7 +632,7 @@ mod tests {
         // Half-width (ASCII) space between words should also be accepted
         assert_eq!(
             ipa("ドッキョウダイガクマエ ソウカマツバラ"),
-            "dokkʲoɯdaigakɯmae soɯkamat͡sɯbaɾa"
+            "dokkʲo.ɯda.igakɯma.e so.ɯkamat͡sɯbaɾa"
         );
     }
 
