@@ -370,6 +370,10 @@ fn apply_vowel_length(input: &str) -> String {
             result.push('o');
             result.push('ː');
             i += 2;
+            // Skip a following long-vowel mark to avoid duplicate 'ː'
+            if i < len && (chars[i] == 'ː' || chars[i] == 'ー') {
+                i += 1;
+            }
             continue;
         }
         if i + 1 < len && chars[i] == 'o' && chars[i + 1] == 'o' {
@@ -377,6 +381,10 @@ fn apply_vowel_length(input: &str) -> String {
             result.push('o');
             result.push('ː');
             i += 2;
+            // Skip a following long-vowel mark to avoid duplicate 'ː'
+            if i < len && (chars[i] == 'ː' || chars[i] == 'ー') {
+                i += 1;
+            }
             continue;
         }
         if i + 1 < len && chars[i] == 'e' && chars[i + 1] == 'i' {
@@ -503,6 +511,18 @@ mod tests {
     fn test_ei_long_vowel_no_duplicate() {
         // セイー should not produce "seːː"
         assert_eq!(ipa("セイー"), "seː");
+    }
+
+    #[test]
+    fn test_ou_long_vowel_no_duplicate() {
+        // コウー should not produce "koːː"
+        assert_eq!(ipa("コウー"), "koː");
+    }
+
+    #[test]
+    fn test_oo_long_vowel_no_duplicate() {
+        // オオー should not produce "oːː"
+        assert_eq!(ipa("オオー"), "oː");
     }
 
     #[test]
