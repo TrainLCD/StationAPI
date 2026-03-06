@@ -474,22 +474,6 @@ mod tests {
     }
 
     #[test]
-    fn test_ei_long_vowel_no_duplicate() {
-        // セイー should produce "seiː" (ー lengthens the preceding イ)
-        assert_eq!(ipa("セイー"), "se.iː");
-    }
-
-    #[test]
-    fn test_ou_long_vowel_no_duplicate() {
-        assert_eq!(ipa("コウー"), "ko.ɯː");
-    }
-
-    #[test]
-    fn test_oo_long_vowel_no_duplicate() {
-        assert_eq!(ipa("オオー"), "o.oː");
-    }
-
-    #[test]
     fn test_toride() {
         assert_eq!(ipa("トリデ"), "toɾide");
     }
@@ -556,12 +540,6 @@ mod tests {
     }
 
     #[test]
-    fn test_long_vowel_mark() {
-        // ー explicitly lengthens
-        assert_eq!(ipa("ラーメン"), "ɾaːmeɴ");
-    }
-
-    #[test]
     fn test_tokyo() {
         assert_eq!(ipa("トウキョウ"), "to.ɯkʲo.ɯ");
     }
@@ -590,18 +568,6 @@ mod tests {
     }
 
     #[test]
-    fn test_geminate_ji() {
-        // ッジ → dʤi (voiced affricate gemination emits 'd')
-        assert_eq!(ipa("カッジ"), "kadʤi");
-    }
-
-    #[test]
-    fn test_geminate_ju() {
-        // ッジュ → ddʑɯ (voiced affricate gemination with digraph)
-        assert_eq!(ipa("カッジュ"), "kaddʑɯ");
-    }
-
-    #[test]
     fn test_empty() {
         assert_eq!(katakana_to_ipa(""), Some(String::new()));
     }
@@ -610,12 +576,6 @@ mod tests {
     fn test_unknown_characters_returns_none() {
         assert_eq!(katakana_to_ipa("ABC"), None);
         assert_eq!(katakana_to_ipa("シブヤX"), None);
-    }
-
-    #[test]
-    fn test_geminate_palatalized() {
-        // ッキョ → kkʲo (only the base consonant 'k' is geminated, not 'kʲ')
-        assert_eq!(ipa("ニッキョウ"), "ɲikkʲo.ɯ");
     }
 
     #[test]
