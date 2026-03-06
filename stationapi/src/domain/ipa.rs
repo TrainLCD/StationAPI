@@ -355,7 +355,6 @@ fn find_next_regular(phonemes: &[Phoneme]) -> Option<&'static str> {
     })
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
