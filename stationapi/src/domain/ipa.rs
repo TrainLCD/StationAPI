@@ -384,6 +384,10 @@ fn apply_vowel_length(input: &str) -> String {
             result.push('e');
             result.push('ː');
             i += 2;
+            // Skip a following long-vowel mark to avoid duplicate 'ː'
+            if i < len && (chars[i] == 'ː' || chars[i] == 'ー') {
+                i += 1;
+            }
             continue;
         }
         result.push(chars[i]);
@@ -493,6 +497,12 @@ mod tests {
     #[test]
     fn test_seibu() {
         assert_eq!(ipa("セイブ"), "seːbɯ");
+    }
+
+    #[test]
+    fn test_ei_long_vowel_no_duplicate() {
+        // セイー should not produce "seːː"
+        assert_eq!(ipa("セイー"), "seː");
     }
 
     #[test]
