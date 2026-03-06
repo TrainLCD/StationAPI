@@ -120,43 +120,43 @@ fn lookup_single(c: char) -> Option<Phoneme> {
         'ア' | 'ァ' => return Some(Phoneme::Regular("a")),
         'イ' | 'ィ' => return Some(Phoneme::Regular("i")),
         'ウ' | 'ゥ' => return Some(Phoneme::Regular("ɯ")),
-        'エ' | 'ェ' => return Some(Phoneme::Regular("ɛ")),
+        'エ' | 'ェ' => return Some(Phoneme::Regular("e")),
         'オ' | 'ォ' => return Some(Phoneme::Regular("o")),
         // カ行
         'カ' => "ka",
         'キ' => "kʲi",
         'ク' => "kɯ",
-        'ケ' => "kɛ",
+        'ケ' => "ke",
         'コ' => "ko",
         // サ行
         'サ' => "sa",
         'シ' => "ɕi",
         'ス' => "sɯ",
-        'セ' => "sɛ",
+        'セ' => "se",
         'ソ' => "so",
         // タ行
         'タ' => "ta",
         'チ' => "t͡ɕi",
         'ツ' => "t͡sɯ",
-        'テ' => "tɛ",
+        'テ' => "te",
         'ト' => "to",
         // ナ行
         'ナ' => "na",
         'ニ' => "ɲi",
         'ヌ' => "nɯ",
-        'ネ' => "nɛ",
+        'ネ' => "ne",
         'ノ' => "no",
         // ハ行
         'ハ' => "ha",
         'ヒ' => "çi",
         'フ' => "ɸɯ",
-        'ヘ' => "hɛ",
+        'ヘ' => "he",
         'ホ' => "ho",
         // マ行
         'マ' => "ma",
         'ミ' => "mi",
         'ム' => "mɯ",
-        'メ' => "mɛ",
+        'メ' => "me",
         'モ' => "mo",
         // ヤ行
         'ヤ' | 'ャ' => "ja",
@@ -166,42 +166,42 @@ fn lookup_single(c: char) -> Option<Phoneme> {
         'ラ' => "ɾa",
         'リ' => "ɾi",
         'ル' => "ɾɯ",
-        'レ' => "ɾɛ",
+        'レ' => "ɾe",
         'ロ' => "ɾo",
         // ワ行
         'ワ' => "wa",
         'ヰ' => "i",
-        'ヱ' => "ɛ",
+        'ヱ' => "e",
         'ヲ' => "o",
         // ガ行
         'ガ' => "ga",
         'ギ' => "gi",
         'グ' => "gɯ",
-        'ゲ' => "gɛ",
+        'ゲ' => "ge",
         'ゴ' => "go",
         // ザ行
         'ザ' => "za",
         'ジ' => "ʤi",
         'ズ' => "zɯ",
-        'ゼ' => "zɛ",
+        'ゼ' => "ze",
         'ゾ' => "zo",
         // ダ行
         'ダ' => "da",
         'ヂ' => "dʑi",
         'ヅ' => "dzɯ",
-        'デ' => "dɛ",
+        'デ' => "de",
         'ド' => "do",
         // バ行
         'バ' => "ba",
         'ビ' => "bi",
         'ブ' => "bɯ",
-        'ベ' => "bɛ",
+        'ベ' => "be",
         'ボ' => "bo",
         // パ行
         'パ' => "pa",
         'ピ' => "pi",
         'プ' => "pɯ",
-        'ペ' => "pɛ",
+        'ペ' => "pe",
         'ポ' => "po",
         // 特殊
         'ン' => return Some(Phoneme::MoraicNasal),
@@ -229,7 +229,7 @@ fn split_onset(ipa: &str) -> (&str, &str) {
     // Find where the first vowel-like character starts
     let vowel_start = ipa
         .char_indices()
-        .find(|(_, c)| "aiɯɛeouəɐ".contains(*c))
+        .find(|(_, c)| "aiɯeouəɐ".contains(*c))
         .map(|(i, _)| i)
         .unwrap_or(ipa.len());
     ipa.split_at(vowel_start)
@@ -248,7 +248,7 @@ fn last_vowel(ipa: &str) -> Option<&'static str> {
             'a' => return Some("a"),
             'i' => return Some("i"),
             'ɯ' => return Some("ɯ"),
-            'ɛ' => return Some("ɛ"),
+            'e' => return Some("e"),
             'o' => return Some("o"),
             'u' => return Some("u"),
             _ => continue,
@@ -370,6 +370,10 @@ fn apply_vowel_length(input: &str) -> String {
             result.push('o');
             result.push('ː');
             i += 2;
+            // Skip a following long-vowel mark to avoid duplicate 'ː'
+            if i < len && (chars[i] == 'ː' || chars[i] == 'ー') {
+                i += 1;
+            }
             continue;
         }
         if i + 1 < len && chars[i] == 'o' && chars[i + 1] == 'o' {
@@ -377,6 +381,21 @@ fn apply_vowel_length(input: &str) -> String {
             result.push('o');
             result.push('ː');
             i += 2;
+            // Skip a following long-vowel mark to avoid duplicate 'ː'
+            if i < len && (chars[i] == 'ː' || chars[i] == 'ー') {
+                i += 1;
+            }
+            continue;
+        }
+        if i + 1 < len && chars[i] == 'e' && chars[i + 1] == 'i' {
+            // ei → eː (えい/けい pattern — 京成 keisei → keːseː)
+            result.push('e');
+            result.push('ː');
+            i += 2;
+            // Skip a following long-vowel mark to avoid duplicate 'ː'
+            if i < len && (chars[i] == 'ː' || chars[i] == 'ー') {
+                i += 1;
+            }
             continue;
         }
         result.push(chars[i]);
@@ -409,12 +428,12 @@ mod tests {
 
     #[test]
     fn test_ueno() {
-        assert_eq!(ipa("ウエノ"), "ɯɛno");
+        assert_eq!(ipa("ウエノ"), "ɯeno");
     }
 
     #[test]
     fn test_ikebukuro() {
-        assert_eq!(ipa("イケブクロ"), "ikɛbɯkɯɾo");
+        assert_eq!(ipa("イケブクロ"), "ikebɯkɯɾo");
     }
 
     #[test]
@@ -469,54 +488,72 @@ mod tests {
 
     #[test]
     fn test_keisei() {
-        assert_eq!(ipa("ケイセイ"), "kɛisɛi");
+        assert_eq!(ipa("ケイセイ"), "keːseː");
     }
 
     #[test]
     fn test_oshiage() {
-        assert_eq!(ipa("オシアゲ"), "oɕiagɛ");
+        assert_eq!(ipa("オシアゲ"), "oɕiage");
     }
 
     #[test]
     fn test_meitetsu() {
         // ツ is consistently t͡sɯ (affricate with tie bar)
-        assert_eq!(ipa("メイテツ"), "mɛitɛt͡sɯ");
+        assert_eq!(ipa("メイテツ"), "meːtet͡sɯ");
     }
 
     #[test]
     fn test_seibu() {
-        assert_eq!(ipa("セイブ"), "sɛibɯ");
+        assert_eq!(ipa("セイブ"), "seːbɯ");
+    }
+
+    #[test]
+    fn test_ei_long_vowel_no_duplicate() {
+        // セイー should not produce "seːː"
+        assert_eq!(ipa("セイー"), "seː");
+    }
+
+    #[test]
+    fn test_ou_long_vowel_no_duplicate() {
+        // コウー should not produce "koːː"
+        assert_eq!(ipa("コウー"), "koː");
+    }
+
+    #[test]
+    fn test_oo_long_vowel_no_duplicate() {
+        // オオー should not produce "oːː"
+        assert_eq!(ipa("オオー"), "oː");
     }
 
     #[test]
     fn test_toride() {
-        assert_eq!(ipa("トリデ"), "toɾidɛ");
+        assert_eq!(ipa("トリデ"), "toɾide");
     }
 
     #[test]
     fn test_fukiage() {
-        assert_eq!(ipa("フキアゲ"), "ɸɯkʲiagɛ");
+        assert_eq!(ipa("フキアゲ"), "ɸɯkʲiage");
     }
 
     #[test]
     fn test_fuse() {
-        assert_eq!(ipa("フセ"), "ɸɯsɛ");
+        assert_eq!(ipa("フセ"), "ɸɯse");
     }
 
     #[test]
     fn test_inagekaigan() {
         // ン at word end → ɴ
-        assert_eq!(ipa("イナゲカイガン"), "inagɛkaigaɴ");
+        assert_eq!(ipa("イナゲカイガン"), "inagekaigaɴ");
     }
 
     #[test]
     fn test_inage() {
-        assert_eq!(ipa("イナゲ"), "inagɛ");
+        assert_eq!(ipa("イナゲ"), "inage");
     }
 
     #[test]
     fn test_kire_uriwari() {
-        assert_eq!(ipa("キレウリワリ"), "kʲiɾɛɯɾiwaɾi");
+        assert_eq!(ipa("キレウリワリ"), "kʲiɾeɯɾiwaɾi");
     }
 
     #[test]
@@ -526,41 +563,41 @@ mod tests {
 
     #[test]
     fn test_mejiro() {
-        assert_eq!(ipa("メジロ"), "mɛʤiɾo");
+        assert_eq!(ipa("メジロ"), "meʤiɾo");
     }
 
     #[test]
     fn test_isesaki() {
-        assert_eq!(ipa("イセサキ"), "isɛsakʲi");
+        assert_eq!(ipa("イセサキ"), "isesakʲi");
     }
 
     #[test]
     fn test_ube() {
-        assert_eq!(ipa("ウベ"), "ɯbɛ");
+        assert_eq!(ipa("ウベ"), "ɯbe");
     }
 
     #[test]
     fn test_itchome() {
         // ッチョウ → tt͡ɕoː
-        assert_eq!(ipa("イッチョウメ"), "itt͡ɕoːmɛ");
+        assert_eq!(ipa("イッチョウメ"), "itt͡ɕoːme");
     }
 
     #[test]
     fn test_sanchome() {
-        assert_eq!(ipa("サンチョウメ"), "sant͡ɕoːmɛ");
+        assert_eq!(ipa("サンチョウメ"), "sant͡ɕoːme");
     }
 
     #[test]
     fn test_koen() {
         // コウエン: コ=ko, ウ→長音化でoː, エン=eɴ → koːeɴ
         // Note: the original hardcoded value was "koeɴ" but phonologically "koːeɴ" is correct
-        assert_eq!(ipa("コウエン"), "koːɛɴ");
+        assert_eq!(ipa("コウエン"), "koːeɴ");
     }
 
     #[test]
     fn test_long_vowel_mark() {
         // ー explicitly lengthens
-        assert_eq!(ipa("ラーメン"), "ɾaːmɛɴ");
+        assert_eq!(ipa("ラーメン"), "ɾaːmeɴ");
     }
 
     #[test]
@@ -626,7 +663,7 @@ mod tests {
         // Full-width space between words should be preserved
         assert_eq!(
             ipa("ドッキョウダイガクマエ　ソウカマツバラ"),
-            "dokkʲoːdaigakɯmaɛ soːkamat͡sɯbaɾa"
+            "dokkʲoːdaigakɯmae soːkamat͡sɯbaɾa"
         );
     }
 
@@ -635,7 +672,7 @@ mod tests {
         // Half-width (ASCII) space between words should also be accepted
         assert_eq!(
             ipa("ドッキョウダイガクマエ ソウカマツバラ"),
-            "dokkʲoːdaigakɯmaɛ soːkamat͡sɯbaɾa"
+            "dokkʲoːdaigakɯmae soːkamat͡sɯbaɾa"
         );
     }
 
