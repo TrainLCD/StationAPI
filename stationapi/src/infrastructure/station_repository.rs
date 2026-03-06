@@ -1222,11 +1222,11 @@ impl InternalStationRepository {
                         AND l.e_status = 0
                 WHERE
                     (
-                        s.station_name   LIKE $2
-                        OR s.station_name_rn LIKE $3
-                        OR s.station_name_k LIKE $4
-                        OR s.station_name_zh LIKE $5
-                        OR s.station_name_ko LIKE $6
+                        s.station_name   ILIKE $2
+                        OR s.station_name_rn ILIKE $3
+                        OR s.station_name_k ILIKE $4
+                        OR s.station_name_zh ILIKE $5
+                        OR s.station_name_ko ILIKE $6
                     )
                     AND s.e_status = 0
                     AND ($8::int IS NULL OR COALESCE(s.transport_type, 0) = $8)
