@@ -372,4 +372,38 @@ mod tests {
 
         assert_eq!(grpc_line.id, 12345);
     }
+
+    // ============================================
+    // name_ipa 変換テスト
+    // ============================================
+
+    #[test]
+    fn test_name_ipa_sen_suffix_replaced_with_line() {
+        // 〜セン → IPA + " laɪn"
+        let mut line = create_test_line(TransportType::Rail, None);
+        line.line_name_k = "セイブイケブクロセン".to_string();
+        let grpc_line: GrpcLine = line.into();
+
+        assert_eq!(grpc_line.name_ipa, Some("sɛibɯikɛbɯkɯɾo laɪn".to_string()));
+    }
+
+    #[test]
+    fn test_name_ipa_honsen_suffix_replaced_with_main_line() {
+        // 〜ホンセン → IPA + " meɪn laɪn"
+        let mut line = create_test_line(TransportType::Rail, None);
+        line.line_name_k = "トウカイドウホンセン".to_string();
+        let grpc_line: GrpcLine = line.into();
+
+        assert_eq!(grpc_line.name_ipa, Some("toːkaidoː meɪn laɪn".to_string()));
+    }
+
+    #[test]
+    fn test_name_ipa_shinkansen_preserved() {
+        // 〜シンカンセン は英語でもそのまま使われるため置換しない
+        let mut line = create_test_line(TransportType::Rail, None);
+        line.line_name_k = "トウホクシンカンセン".to_string();
+        let grpc_line: GrpcLine = line.into();
+
+        assert_eq!(grpc_line.name_ipa, Some("toːhokɯɕiŋkansɛɴ".to_string()));
+    }
 }
