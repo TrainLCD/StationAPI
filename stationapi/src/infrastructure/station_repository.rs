@@ -1223,7 +1223,7 @@ impl InternalStationRepository {
                 WHERE
                     (
                         s.station_name   LIKE $2
-                        OR s.station_name_rn LIKE $3
+                        OR s.station_name_rn ILIKE $3
                         OR s.station_name_k LIKE $4
                         OR s.station_name_zh LIKE $5
                         OR s.station_name_ko LIKE $6
