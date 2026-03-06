@@ -344,8 +344,7 @@ fn apply_phonological_rules(phonemes: &[Phoneme]) -> String {
         }
     }
 
-    // Apply long vowel contractions: オウ → oː pattern
-    apply_vowel_length(&output)
+    output
 }
 
 /// Find the IPA string of the next Regular phoneme in the slice.
@@ -356,54 +355,6 @@ fn find_next_regular(phonemes: &[Phoneme]) -> Option<&'static str> {
     })
 }
 
-/// Apply vowel length rules for common Japanese patterns.
-/// オウ → oː (after consonant+o), ョウ/ョオ patterns are handled by digraph + this.
-fn apply_vowel_length(input: &str) -> String {
-    let mut result = String::with_capacity(input.len());
-    let chars: Vec<char> = input.chars().collect();
-    let len = chars.len();
-    let mut i = 0;
-
-    while i < len {
-        if i + 1 < len && chars[i] == 'o' && chars[i + 1] == 'ɯ' {
-            // oɯ → oː (おう/こう pattern)
-            result.push('o');
-            result.push('ː');
-            i += 2;
-            // Skip a following long-vowel mark to avoid duplicate 'ː'
-            if i < len && (chars[i] == 'ː' || chars[i] == 'ー') {
-                i += 1;
-            }
-            continue;
-        }
-        if i + 1 < len && chars[i] == 'o' && chars[i + 1] == 'o' {
-            // oo → oː (おお pattern)
-            result.push('o');
-            result.push('ː');
-            i += 2;
-            // Skip a following long-vowel mark to avoid duplicate 'ː'
-            if i < len && (chars[i] == 'ː' || chars[i] == 'ー') {
-                i += 1;
-            }
-            continue;
-        }
-        if i + 1 < len && chars[i] == 'e' && chars[i + 1] == 'i' {
-            // ei → eː (えい/けい pattern — 京成 keisei → keːseː)
-            result.push('e');
-            result.push('ː');
-            i += 2;
-            // Skip a following long-vowel mark to avoid duplicate 'ː'
-            if i < len && (chars[i] == 'ː' || chars[i] == 'ー') {
-                i += 1;
-            }
-            continue;
-        }
-        result.push(chars[i]);
-        i += 1;
-    }
-
-    result
-}
 
 #[cfg(test)]
 mod tests {
@@ -444,14 +395,12 @@ mod tests {
 
     #[test]
     fn test_osaka() {
-        // オオ → oː
-        assert_eq!(ipa("オオサカ"), "oːsaka");
+        assert_eq!(ipa("オオサカ"), "oosaka");
     }
 
     #[test]
     fn test_kyoto() {
-        // キョウ → kʲoː (via kʲo + ウ → oɯ → oː)
-        assert_eq!(ipa("キョウト"), "kʲoːto");
+        assert_eq!(ipa("キョウト"), "kʲoɯto");
     }
 
     #[test]
@@ -476,8 +425,7 @@ mod tests {
 
     #[test]
     fn test_ryogoku() {
-        // リョウ → ɾʲoː (via ɾʲo + ウ → oɯ → oː)
-        assert_eq!(ipa("リョウゴク"), "ɾʲoːgokɯ");
+        assert_eq!(ipa("リョウゴク"), "ɾʲoɯgokɯ");
     }
 
     #[test]
@@ -488,7 +436,7 @@ mod tests {
 
     #[test]
     fn test_keisei() {
-        assert_eq!(ipa("ケイセイ"), "keːseː");
+        assert_eq!(ipa("ケイセイ"), "keisei");
     }
 
     #[test]
@@ -499,30 +447,28 @@ mod tests {
     #[test]
     fn test_meitetsu() {
         // ツ is consistently t͡sɯ (affricate with tie bar)
-        assert_eq!(ipa("メイテツ"), "meːtet͡sɯ");
+        assert_eq!(ipa("メイテツ"), "meitet͡sɯ");
     }
 
     #[test]
     fn test_seibu() {
-        assert_eq!(ipa("セイブ"), "seːbɯ");
+        assert_eq!(ipa("セイブ"), "seibɯ");
     }
 
     #[test]
     fn test_ei_long_vowel_no_duplicate() {
-        // セイー should not produce "seːː"
-        assert_eq!(ipa("セイー"), "seː");
+        // セイー should produce "seiː" (ー lengthens the preceding イ)
+        assert_eq!(ipa("セイー"), "seiː");
     }
 
     #[test]
     fn test_ou_long_vowel_no_duplicate() {
-        // コウー should not produce "koːː"
-        assert_eq!(ipa("コウー"), "koː");
+        assert_eq!(ipa("コウー"), "koɯː");
     }
 
     #[test]
     fn test_oo_long_vowel_no_duplicate() {
-        // オオー should not produce "oːː"
-        assert_eq!(ipa("オオー"), "oː");
+        assert_eq!(ipa("オオー"), "ooː");
     }
 
     #[test]
@@ -578,20 +524,17 @@ mod tests {
 
     #[test]
     fn test_itchome() {
-        // ッチョウ → tt͡ɕoː
-        assert_eq!(ipa("イッチョウメ"), "itt͡ɕoːme");
+        assert_eq!(ipa("イッチョウメ"), "itt͡ɕoɯme");
     }
 
     #[test]
     fn test_sanchome() {
-        assert_eq!(ipa("サンチョウメ"), "sant͡ɕoːme");
+        assert_eq!(ipa("サンチョウメ"), "sant͡ɕoɯme");
     }
 
     #[test]
     fn test_koen() {
-        // コウエン: コ=ko, ウ→長音化でoː, エン=eɴ → koːeɴ
-        // Note: the original hardcoded value was "koeɴ" but phonologically "koːeɴ" is correct
-        assert_eq!(ipa("コウエン"), "koːeɴ");
+        assert_eq!(ipa("コウエン"), "koɯeɴ");
     }
 
     #[test]
@@ -602,8 +545,7 @@ mod tests {
 
     #[test]
     fn test_tokyo() {
-        // トウキョウ: ト=to, ウ→oː, キョ=kʲo, ウ→oː
-        assert_eq!(ipa("トウキョウ"), "toːkʲoː");
+        assert_eq!(ipa("トウキョウ"), "toɯkʲoɯ");
     }
 
     #[test]
@@ -655,7 +597,7 @@ mod tests {
     #[test]
     fn test_geminate_palatalized() {
         // ッキョ → kkʲo (only the base consonant 'k' is geminated, not 'kʲ')
-        assert_eq!(ipa("ニッキョウ"), "ɲikkʲoː");
+        assert_eq!(ipa("ニッキョウ"), "ɲikkʲoɯ");
     }
 
     #[test]
@@ -663,7 +605,7 @@ mod tests {
         // Full-width space between words should be preserved
         assert_eq!(
             ipa("ドッキョウダイガクマエ　ソウカマツバラ"),
-            "dokkʲoːdaigakɯmae soːkamat͡sɯbaɾa"
+            "dokkʲoɯdaigakɯmae soɯkamat͡sɯbaɾa"
         );
     }
 
@@ -672,7 +614,7 @@ mod tests {
         // Half-width (ASCII) space between words should also be accepted
         assert_eq!(
             ipa("ドッキョウダイガクマエ ソウカマツバラ"),
-            "dokkʲoːdaigakɯmae soːkamat͡sɯbaɾa"
+            "dokkʲoɯdaigakɯmae soɯkamat͡sɯbaɾa"
         );
     }
 
