@@ -1,25 +1,32 @@
-/// Common katakana suffixes for line names, ordered longest-first for greedy matching.
-const LINE_NAME_SUFFIXES: &[&str] = &["ホンセン", "シセン", "セン"];
-/// Suffixes that should NOT be stripped even though they end with セン.
+/// Katakana line-name suffixes paired with their English IPA replacements.
+/// Ordered longest-first for greedy matching.
+const LINE_NAME_SUFFIX_MAP: &[(&str, &str)] = &[
+    ("ホンセン", " meɪn laɪn"),
+    ("シセン", " laɪn"),
+    ("セン", " laɪn"),
+];
+/// Suffixes that should NOT be replaced even though they end with セン.
 const LINE_NAME_SUFFIX_EXCEPTIONS: &[&str] = &["シンカンセン"];
 
-/// Strip a common line-name suffix (線/本線/支線) from a katakana string.
+/// Replace a common line-name suffix (線/本線/支線) in a katakana string
+/// with its English IPA equivalent (Line / Main Line).
 /// 新幹線 (Shinkansen) is preserved as it is used as-is in English.
-/// Returns the stem (without the suffix). If no known suffix is found, returns the input unchanged.
-pub fn strip_line_name_suffix(input: &str) -> &str {
+/// Returns the stem and the English IPA suffix to append.
+/// If no known suffix is found, returns the full input with an empty suffix.
+pub fn replace_line_name_suffix(input: &str) -> (&str, &str) {
     for exception in LINE_NAME_SUFFIX_EXCEPTIONS {
         if input.ends_with(exception) {
-            return input;
+            return (input, "");
         }
     }
-    for suffix in LINE_NAME_SUFFIXES {
+    for (suffix, replacement) in LINE_NAME_SUFFIX_MAP {
         if let Some(stem) = input.strip_suffix(suffix) {
             if !stem.is_empty() {
-                return stem;
+                return (stem, replacement);
             }
         }
     }
-    input
+    (input, "")
 }
 
 /// Convert a katakana string to its IPA transcription.
@@ -86,9 +93,9 @@ fn lookup_digraph(c1: char, c2: char) -> Option<Phoneme> {
         ('リ', 'ュ') => "ɾʲɯ",
         ('リ', 'ョ') => "ɾʲo",
         // ガ行拗音
-        ('ギ', 'ャ') => "ɡʲa",
-        ('ギ', 'ュ') => "ɡʲɯ",
-        ('ギ', 'ョ') => "ɡʲo",
+        ('ギ', 'ャ') => "gʲa",
+        ('ギ', 'ュ') => "gʲɯ",
+        ('ギ', 'ョ') => "gʲo",
         // ザ行拗音 (ジ is voiced postalveolar affricate)
         ('ジ', 'ャ') => "dʑa",
         ('ジ', 'ュ') => "dʑɯ",
@@ -113,43 +120,43 @@ fn lookup_single(c: char) -> Option<Phoneme> {
         'ア' | 'ァ' => return Some(Phoneme::Regular("a")),
         'イ' | 'ィ' => return Some(Phoneme::Regular("i")),
         'ウ' | 'ゥ' => return Some(Phoneme::Regular("ɯ")),
-        'エ' | 'ェ' => return Some(Phoneme::Regular("e")),
+        'エ' | 'ェ' => return Some(Phoneme::Regular("ɛ")),
         'オ' | 'ォ' => return Some(Phoneme::Regular("o")),
         // カ行
         'カ' => "ka",
         'キ' => "kʲi",
         'ク' => "kɯ",
-        'ケ' => "ke",
+        'ケ' => "kɛ",
         'コ' => "ko",
         // サ行
         'サ' => "sa",
         'シ' => "ɕi",
         'ス' => "sɯ",
-        'セ' => "se",
+        'セ' => "sɛ",
         'ソ' => "so",
         // タ行
         'タ' => "ta",
         'チ' => "t͡ɕi",
         'ツ' => "t͡sɯ",
-        'テ' => "te",
+        'テ' => "tɛ",
         'ト' => "to",
         // ナ行
         'ナ' => "na",
         'ニ' => "ɲi",
         'ヌ' => "nɯ",
-        'ネ' => "ne",
+        'ネ' => "nɛ",
         'ノ' => "no",
         // ハ行
         'ハ' => "ha",
         'ヒ' => "çi",
         'フ' => "ɸɯ",
-        'ヘ' => "he",
+        'ヘ' => "hɛ",
         'ホ' => "ho",
         // マ行
         'マ' => "ma",
         'ミ' => "mi",
         'ム' => "mɯ",
-        'メ' => "me",
+        'メ' => "mɛ",
         'モ' => "mo",
         // ヤ行
         'ヤ' | 'ャ' => "ja",
@@ -159,42 +166,42 @@ fn lookup_single(c: char) -> Option<Phoneme> {
         'ラ' => "ɾa",
         'リ' => "ɾi",
         'ル' => "ɾɯ",
-        'レ' => "ɾe",
+        'レ' => "ɾɛ",
         'ロ' => "ɾo",
         // ワ行
         'ワ' => "wa",
         'ヰ' => "i",
-        'ヱ' => "e",
+        'ヱ' => "ɛ",
         'ヲ' => "o",
         // ガ行
-        'ガ' => "ɡa",
-        'ギ' => "ɡi",
-        'グ' => "ɡɯ",
-        'ゲ' => "ɡe",
-        'ゴ' => "ɡo",
+        'ガ' => "ga",
+        'ギ' => "gi",
+        'グ' => "gɯ",
+        'ゲ' => "gɛ",
+        'ゴ' => "go",
         // ザ行
         'ザ' => "za",
         'ジ' => "ʤi",
         'ズ' => "zɯ",
-        'ゼ' => "ze",
+        'ゼ' => "zɛ",
         'ゾ' => "zo",
         // ダ行
         'ダ' => "da",
         'ヂ' => "dʑi",
         'ヅ' => "dzɯ",
-        'デ' => "de",
+        'デ' => "dɛ",
         'ド' => "do",
         // バ行
         'バ' => "ba",
         'ビ' => "bi",
         'ブ' => "bɯ",
-        'ベ' => "be",
+        'ベ' => "bɛ",
         'ボ' => "bo",
         // パ行
         'パ' => "pa",
         'ピ' => "pi",
         'プ' => "pɯ",
-        'ペ' => "pe",
+        'ペ' => "pɛ",
         'ポ' => "po",
         // 特殊
         'ン' => return Some(Phoneme::MoraicNasal),
@@ -222,7 +229,7 @@ fn split_onset(ipa: &str) -> (&str, &str) {
     // Find where the first vowel-like character starts
     let vowel_start = ipa
         .char_indices()
-        .find(|(_, c)| "aiɯeouəɐ".contains(*c))
+        .find(|(_, c)| "aiɯɛeouəɐ".contains(*c))
         .map(|(i, _)| i)
         .unwrap_or(ipa.len());
     ipa.split_at(vowel_start)
@@ -241,7 +248,7 @@ fn last_vowel(ipa: &str) -> Option<&'static str> {
             'a' => return Some("a"),
             'i' => return Some("i"),
             'ɯ' => return Some("ɯ"),
-            'e' => return Some("e"),
+            'ɛ' => return Some("ɛ"),
             'o' => return Some("o"),
             'u' => return Some("u"),
             _ => continue,
@@ -259,14 +266,13 @@ fn nasal_for_following(next_ipa: &str) -> &'static str {
         || next_ipa.starts_with("dʑ")
         || next_ipa.starts_with('ʤ')
         || next_ipa.starts_with('ɕ')
-        || next_ipa.starts_with("ɡʲ")
+        || next_ipa.starts_with("gʲ")
         || next_ipa.starts_with("kʲ")
         || next_ipa.starts_with('j')
         || next_ipa.starts_with('ç')
     {
         "ɲ" // palatal assimilation
-    } else if next_ipa.starts_with('k') || next_ipa.starts_with('ɡ') || next_ipa.starts_with('ŋ')
-    {
+    } else if next_ipa.starts_with('k') || next_ipa.starts_with('g') || next_ipa.starts_with('ŋ') {
         "ŋ" // velar assimilation
     } else if next_ipa.starts_with('n')
         || next_ipa.starts_with('t')
@@ -305,7 +311,7 @@ fn apply_phonological_rules(phonemes: &[Phoneme]) -> String {
             Phoneme::Geminate => {
                 // Double the onset of the following consonant.
                 // For affricates (t͡ɕ, t͡s), only the stop portion (t) is geminated.
-                // For palatalized onsets (kʲ, ɡʲ, etc.), only the base consonant is geminated.
+                // For palatalized onsets (kʲ, gʲ, etc.), only the base consonant is geminated.
                 if let Some(next_ipa) = find_next_regular(&phonemes[i + 1..]) {
                     if next_ipa.starts_with("t͡ɕ") || next_ipa.starts_with("t͡s") {
                         output.push('t');
@@ -398,17 +404,17 @@ mod tests {
 
     #[test]
     fn test_shinagawa() {
-        assert_eq!(ipa("シナガワ"), "ɕinaɡawa");
+        assert_eq!(ipa("シナガワ"), "ɕinagawa");
     }
 
     #[test]
     fn test_ueno() {
-        assert_eq!(ipa("ウエノ"), "ɯeno");
+        assert_eq!(ipa("ウエノ"), "ɯɛno");
     }
 
     #[test]
     fn test_ikebukuro() {
-        assert_eq!(ipa("イケブクロ"), "ikebɯkɯɾo");
+        assert_eq!(ipa("イケブクロ"), "ikɛbɯkɯɾo");
     }
 
     #[test]
@@ -452,7 +458,7 @@ mod tests {
     #[test]
     fn test_ryogoku() {
         // リョウ → ɾʲoː (via ɾʲo + ウ → oɯ → oː)
-        assert_eq!(ipa("リョウゴク"), "ɾʲoːɡokɯ");
+        assert_eq!(ipa("リョウゴク"), "ɾʲoːgokɯ");
     }
 
     #[test]
@@ -463,54 +469,54 @@ mod tests {
 
     #[test]
     fn test_keisei() {
-        assert_eq!(ipa("ケイセイ"), "keisei");
+        assert_eq!(ipa("ケイセイ"), "kɛisɛi");
     }
 
     #[test]
     fn test_oshiage() {
-        assert_eq!(ipa("オシアゲ"), "oɕiaɡe");
+        assert_eq!(ipa("オシアゲ"), "oɕiagɛ");
     }
 
     #[test]
     fn test_meitetsu() {
         // ツ is consistently t͡sɯ (affricate with tie bar)
-        assert_eq!(ipa("メイテツ"), "meitet͡sɯ");
+        assert_eq!(ipa("メイテツ"), "mɛitɛt͡sɯ");
     }
 
     #[test]
     fn test_seibu() {
-        assert_eq!(ipa("セイブ"), "seibɯ");
+        assert_eq!(ipa("セイブ"), "sɛibɯ");
     }
 
     #[test]
     fn test_toride() {
-        assert_eq!(ipa("トリデ"), "toɾide");
+        assert_eq!(ipa("トリデ"), "toɾidɛ");
     }
 
     #[test]
     fn test_fukiage() {
-        assert_eq!(ipa("フキアゲ"), "ɸɯkʲiaɡe");
+        assert_eq!(ipa("フキアゲ"), "ɸɯkʲiagɛ");
     }
 
     #[test]
     fn test_fuse() {
-        assert_eq!(ipa("フセ"), "ɸɯse");
+        assert_eq!(ipa("フセ"), "ɸɯsɛ");
     }
 
     #[test]
     fn test_inagekaigan() {
         // ン at word end → ɴ
-        assert_eq!(ipa("イナゲカイガン"), "inaɡekaiɡaɴ");
+        assert_eq!(ipa("イナゲカイガン"), "inagɛkaigaɴ");
     }
 
     #[test]
     fn test_inage() {
-        assert_eq!(ipa("イナゲ"), "inaɡe");
+        assert_eq!(ipa("イナゲ"), "inagɛ");
     }
 
     #[test]
     fn test_kire_uriwari() {
-        assert_eq!(ipa("キレウリワリ"), "kʲiɾeɯɾiwaɾi");
+        assert_eq!(ipa("キレウリワリ"), "kʲiɾɛɯɾiwaɾi");
     }
 
     #[test]
@@ -520,41 +526,41 @@ mod tests {
 
     #[test]
     fn test_mejiro() {
-        assert_eq!(ipa("メジロ"), "meʤiɾo");
+        assert_eq!(ipa("メジロ"), "mɛʤiɾo");
     }
 
     #[test]
     fn test_isesaki() {
-        assert_eq!(ipa("イセサキ"), "isesakʲi");
+        assert_eq!(ipa("イセサキ"), "isɛsakʲi");
     }
 
     #[test]
     fn test_ube() {
-        assert_eq!(ipa("ウベ"), "ɯbe");
+        assert_eq!(ipa("ウベ"), "ɯbɛ");
     }
 
     #[test]
     fn test_itchome() {
         // ッチョウ → tt͡ɕoː
-        assert_eq!(ipa("イッチョウメ"), "itt͡ɕoːme");
+        assert_eq!(ipa("イッチョウメ"), "itt͡ɕoːmɛ");
     }
 
     #[test]
     fn test_sanchome() {
-        assert_eq!(ipa("サンチョウメ"), "sant͡ɕoːme");
+        assert_eq!(ipa("サンチョウメ"), "sant͡ɕoːmɛ");
     }
 
     #[test]
     fn test_koen() {
         // コウエン: コ=ko, ウ→長音化でoː, エン=eɴ → koːeɴ
         // Note: the original hardcoded value was "koeɴ" but phonologically "koːeɴ" is correct
-        assert_eq!(ipa("コウエン"), "koːeɴ");
+        assert_eq!(ipa("コウエン"), "koːɛɴ");
     }
 
     #[test]
     fn test_long_vowel_mark() {
         // ー explicitly lengthens
-        assert_eq!(ipa("ラーメン"), "ɾaːmeɴ");
+        assert_eq!(ipa("ラーメン"), "ɾaːmɛɴ");
     }
 
     #[test]
@@ -565,7 +571,7 @@ mod tests {
 
     #[test]
     fn test_nagoya() {
-        assert_eq!(ipa("ナゴヤ"), "naɡoja");
+        assert_eq!(ipa("ナゴヤ"), "nagoja");
     }
 
     #[test]
@@ -620,7 +626,7 @@ mod tests {
         // Full-width space between words should be preserved
         assert_eq!(
             ipa("ドッキョウダイガクマエ　ソウカマツバラ"),
-            "dokkʲoːdaiɡakɯmae soːkamat͡sɯbaɾa"
+            "dokkʲoːdaigakɯmaɛ soːkamat͡sɯbaɾa"
         );
     }
 
@@ -629,59 +635,59 @@ mod tests {
         // Half-width (ASCII) space between words should also be accepted
         assert_eq!(
             ipa("ドッキョウダイガクマエ ソウカマツバラ"),
-            "dokkʲoːdaiɡakɯmae soːkamat͡sɯbaɾa"
+            "dokkʲoːdaigakɯmaɛ soːkamat͡sɯbaɾa"
         );
     }
 
     // ============================================
-    // strip_line_name_suffix tests
+    // replace_line_name_suffix tests
     // ============================================
 
     #[test]
-    fn test_strip_sen() {
+    fn test_replace_sen() {
         assert_eq!(
-            strip_line_name_suffix("セイブイケブクロセン"),
-            "セイブイケブクロ"
+            replace_line_name_suffix("セイブイケブクロセン"),
+            ("セイブイケブクロ", " laɪn")
         );
     }
 
     #[test]
-    fn test_strip_honsen() {
+    fn test_replace_honsen() {
         assert_eq!(
-            strip_line_name_suffix("トウカイドウホンセン"),
-            "トウカイドウ"
+            replace_line_name_suffix("トウカイドウホンセン"),
+            ("トウカイドウ", " meɪn laɪn")
         );
     }
 
     #[test]
-    fn test_strip_shinkansen_preserved() {
+    fn test_replace_shinkansen_preserved() {
         // 新幹線(Shinkansen)は英語でもそのまま使われるので除去しない
         assert_eq!(
-            strip_line_name_suffix("トウホクシンカンセン"),
-            "トウホクシンカンセン"
+            replace_line_name_suffix("トウホクシンカンセン"),
+            ("トウホクシンカンセン", "")
         );
     }
 
     #[test]
-    fn test_strip_shisen() {
+    fn test_replace_shisen() {
         assert_eq!(
-            strip_line_name_suffix("ナガノハラクサツグチシセン"),
-            "ナガノハラクサツグチ"
+            replace_line_name_suffix("ナガノハラクサツグチシセン"),
+            ("ナガノハラクサツグチ", " laɪn")
         );
     }
 
     #[test]
-    fn test_strip_no_suffix() {
+    fn test_replace_no_suffix() {
         // ライン等セン以外の末尾はそのまま返す
         assert_eq!(
-            strip_line_name_suffix("ショウナンシンジュクライン"),
-            "ショウナンシンジュクライン"
+            replace_line_name_suffix("ショウナンシンジュクライン"),
+            ("ショウナンシンジュクライン", "")
         );
     }
 
     #[test]
-    fn test_strip_bare_sen_returns_unchanged() {
+    fn test_replace_bare_sen_returns_unchanged() {
         // "セン" だけの場合、stemが空になるので除去しない
-        assert_eq!(strip_line_name_suffix("セン"), "セン");
+        assert_eq!(replace_line_name_suffix("セン"), ("セン", ""));
     }
 }
