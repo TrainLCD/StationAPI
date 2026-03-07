@@ -384,7 +384,10 @@ mod tests {
         line.line_name_k = "セイブイケブクロセン".to_string();
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("seːbɯikebɯkɯɾo laɪn".to_string()));
+        assert_eq!(
+            grpc_line.name_ipa,
+            Some("se.ibɯ.ikebɯkɯɾo laɪn".to_string())
+        );
     }
 
     #[test]
@@ -394,7 +397,10 @@ mod tests {
         line.line_name_k = "トウカイドウホンセン".to_string();
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("toːkaidoː meɪn laɪn".to_string()));
+        assert_eq!(
+            grpc_line.name_ipa,
+            Some("to.ɯka.ido.ɯ meɪn laɪn".to_string())
+        );
     }
 
     #[test]
@@ -404,6 +410,6 @@ mod tests {
         line.line_name_k = "トウホクシンカンセン".to_string();
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("toːhokɯɕiŋkanseɴ".to_string()));
+        assert_eq!(grpc_line.name_ipa, Some("to.ɯhokɯɕiŋkanseɴ".to_string()));
     }
 }
