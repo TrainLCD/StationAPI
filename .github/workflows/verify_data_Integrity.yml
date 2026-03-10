@@ -9,10 +9,42 @@ on:
 
 name: Verify station data integrity
 
+permissions:
+  contents: read
+
 jobs:
   verify_migration_data:
     name: Verify pushed migration data
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: cargo run --bin data_validator
+
+      - name: Run data validator
+        id: validate
+        run: |
+          if cargo run --bin data_validator; then
+            echo "result=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=failure" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Save metadata for comment workflow
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          mkdir -p /tmp/validation-artifacts
+          echo "${{ github.event.pull_request.number }}" > /tmp/validation-artifacts/pr_number
+          echo "${{ steps.validate.outputs.result }}" > /tmp/validation-artifacts/result
+          if [ -f /tmp/validation_report.md ]; then
+            cp /tmp/validation_report.md /tmp/validation-artifacts/
+          fi
+
+      - name: Upload validation artifacts
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-result
+          path: /tmp/validation-artifacts/
+
+      - name: Fail job if validation failed
+        if: steps.validate.outputs.result == 'failure'
+        run: exit 1
