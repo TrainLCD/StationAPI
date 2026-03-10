@@ -304,7 +304,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 30004,20,名鉄蒲郡線,メイテツガマゴオリセン,名鉄蒲郡線,Gamagori Line,Gamagori Line,蒲郡线,가마고리 선,#654E9E,2,GN,NH,,,#654E9E,#D12027,,,HALF_SQUARE,HALF_SQUARE,,,0,30004,1851.878486
 30005,20,名鉄三河線,メイテツミカワセン,名鉄三河線,Mikawa Line,Mikawa Line,三河线,미카와 선,#9EB03A,2,MY,NH,MU,,#9EB03A,#D12027,#654E9E,,HALF_SQUARE,HALF_SQUARE,HALF_SQUARE,,0,30005,1712.967911
 30006,20,名鉄豊田線,メイテツトヨタセン,名鉄豊田線,Toyota Line,Toyota Line,丰田线,도요타 선,#9EB03A,2,TT,MY,,,#9EB03A,#9EB03A,,,HALF_SQUARE,HALF_SQUARE,,,0,30006,2033.956266
-30007,20,名鉄常滑・空港線,メイテツトコナメクウコウセン,名鉄空港線,Meitetsu Airport Line,Meitetsu Airport Line,机场线,쿠코 선,#1065AB,2,TA,NH,,,#1065AB,#D12027,,,HALF_SQUARE,HALF_SQUARE,,,0,30007,1963.626165
+30007,20,名鉄常滑・空港線,メイテツトコナメクウコウセン,名鉄空港線,Airport Line,Airport Line,机场线,쿠코 선,#1065AB,2,TA,NH,,,#1065AB,#D12027,,,HALF_SQUARE,HALF_SQUARE,,,0,30007,1963.626165
 30008,20,名鉄常滑線,メイテツトコナメセン,名鉄常滑線,Tokoname Line,Tokoname Line,常滑线,도코나메 선,#1065AB,2,TA,NH,,,#1065AB,#D12027,,,HALF_SQUARE,HALF_SQUARE,,,0,30008,1377.073011
 30009,20,名鉄河和線,メイテツコウワセン,名鉄河和線,Kowa Line,Kowa Line,河和线,고와 선,#2A9DD8,2,KC,TA,,,#2A9DD8,#1065AB,,,HALF_SQUARE,HALF_SQUARE,,,0,30009,1319.738301
 30010,20,名鉄知多新線,メイテツチタシンセン,名鉄知多新線,Chita Line,Chita Line,知多新线,지타 신선,#2A9DD8,2,KC,TA,,,#2A9DD8,#1065AB,,,HALF_SQUARE,HALF_SQUARE,,,0,30010,2506.025703
