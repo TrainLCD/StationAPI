@@ -267,6 +267,14 @@ Yokokawa","SL群马
 228,375,急行,キュウコウ,Express,特快,급행,#F7931D,0,3,0,近鉄用,COMPLETE
 213,376,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#DC143C,0,3,0,近鉄用,COMPLETE
 213,377,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#00BFFF,0,3,0,阪神なんば線・阪神本線用,COMPLETE
+22,378,快速,カイソク,Rapid,快车,쾌속,#0000FF,0,2,0,京王用,PARTIAL
+22,379,快速,カイソク,Rapid,快车,쾌속,#00BFFF,0,2,0,西武用,PARTIAL
+228,380,急行,キュウコウ,Express,特快,급행,#F7931D,0,3,0,阪急用,COMPLETE
+198,381,通勤急行,ツウキンキュウコウ,Commuter Express,通勤快车,통근급행,#FFFF00,0,3,0,西武・阪急用,PARTIAL
+189,382,急行,キュウコウ,Express,特快,급행,#008000,0,3,0,京王・西鉄用,PARTIAL
+188,383,区間急行,クカンキュウコウ,Semi Express,区域特快,구간급행,#009A41,0,3,0,京阪用,PARTIAL
+199,384,準急,ジュンキュウ,Sub Express,准急,준급,#0000FF,0,3,0,京阪用,PARTIAL
+199,385,準急,ジュンキュウ,Semi Express,准急,준급,#0000FF,0,3,0,南海用,PARTIAL
 256,400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,2,0,,COMPLETE
 257,401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,2,0,,COMPLETE
 258,402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,2,0,,COMPLETE
