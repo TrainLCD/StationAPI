@@ -262,70 +262,70 @@ Yokokawa","SL群马
 253,370,通勤準急,ツウキンジュンキュウ,Commuter Semi Express,通勤准急,통근준급,#0072BA,0,3,0,西武線用,COMPLETE
 254,371,A特急,Aトッキュウ,A Limited Express,A特快,A특급,#DC143C,0,4,0,,COMPLETE
 255,372,B特急,Bトッキュウ,B Limited Express,B特快,B특급,#DC143C,0,4,0,,COMPLETE
-202,373,区間準急,クカンジュンキュウ,Sub. Semi-Express,区间准急,구간준급,#00FF00,0,3,0,近鉄奈良線・難波線・大阪線、阪神なんば線・阪神本線用,PARTIAL
-221,374,区間急行,クカンキュウコウ,Sub. Express,区间快速,구간급행,#F7931D,0,3,0,近鉄用,COMPLETE
-228,375,急行,キュウコウ,Express,特快,급행,#F7931D,0,3,0,近鉄用,COMPLETE
-213,376,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#DC143C,0,3,0,近鉄用,COMPLETE
-213,377,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#00BFFF,0,3,0,阪神なんば線・阪神本線用,COMPLETE
-22,378,快速,カイソク,Rapid,快车,쾌속,#0000FF,0,2,0,京王用,PARTIAL
-22,379,快速,カイソク,Rapid,快车,쾌속,#00BFFF,0,2,0,西武用,PARTIAL
-228,380,急行,キュウコウ,Express,特快,급행,#F7931D,0,3,0,阪急用,COMPLETE
-198,381,通勤急行,ツウキンキュウコウ,Commuter Express,通勤快车,통근급행,#FFFF00,0,3,0,西武・阪急用,PARTIAL
-189,382,急行,キュウコウ,Express,特快,급행,#008000,0,3,0,京王・西鉄用,PARTIAL
-188,383,区間急行,クカンキュウコウ,Semi Express,区域特快,구간급행,#009A41,0,3,0,京阪用,PARTIAL
-199,384,準急,ジュンキュウ,Sub Express,准急,준급,#0000FF,0,3,0,京阪用,PARTIAL
-199,385,準急,ジュンキュウ,Semi Express,准急,준급,#0000FF,0,3,0,南海用,PARTIAL
-256,400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,2,0,,COMPLETE
-257,401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,2,0,,COMPLETE
-258,402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,2,0,,COMPLETE
-259,403,イブニングウィング号,イブニングウィングゴウ,Evening Wing(Shinagawa to Misakiguchi),Evening Wing,이브닝윙호,#379412,2,2,0,,COMPLETE
-260,404,普通(方南町支線),フツウ,Local(Honancho Branch Line),慢车(方南町支线),보통(호난초 지선),#E60012,0,1,0,,COMPLETE
-261,405,拝島ライナー,ハイジマライナー,Haijima Liner,拜岛Liner,하이지마 라이너,#B4C300,0,2,0,,COMPLETE
-262,406,TJライナー(下り),TJライナー,TJ Liner(Ikebukuro to Ogawamachi),TJ Liner,TJ Liner,#FF710A,2,2,0,,COMPLETE
-263,407,TJライナー(上り),TJライナー,TJ Liner(Ogawamachi to Ikebukuro),TJ Liner,TJ Liner,#008CD6,1,2,0,,COMPLETE
-264,408,各駅停車(北埠頭方面),カクエキテイシャ,Local,每站停车,각역정차,#9686BD,0,1,0,ポートアイランド線用,COMPLETE
-265,409,各駅停車(田園都市線経由),カクエキテイシャ,Local,每站停车,각역정차,#1F63C7,0,0,0,大井町線用,COMPLETE
-266,410,泉北ライナー,センボクライナー,Semboku Liner,泉北Liner,센보쿠라이너,#E6B422,0,2,0,,COMPLETE
-267,411,各駅停車(北綾瀬支線),カクエキテイシャ,Local,每站停车,각역정차,#009944,0,1,0,北綾瀬支線,COMPLETE
-268,412,ライナー,ライナー,Liner,Liner,정기선,#DC143C,0,2,0,,COMPLETE
-269,500,りょうもう(浅草〜伊勢崎),リョウモウ,Ryomo(Asakusa to Isesaki),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
-270,501,りょうもう(浅草〜葛生),リョウモウ,Ryomo(Asakusa to Kuzū),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
-271,502,りょうもう(浅草〜赤城),リョウモウ,Ryomo(Asakusa to Akagi),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
-272,503,スカイライナー,スカイライナー,Skyliner,Skyliner,스카이라이너,#0A3788,0,4,0,,COMPLETE
-273,504,小江戸号,コエドゴウ,Koedo,小江户,고에도,#E73042,0,4,0,,COMPLETE
-274,505,川越特急,カワゴエトッキュウ,Kawagoe Limited Express,川越特快,가와고에 특급,#E73799,0,4,0,,COMPLETE
-275,506,サザン,サザン,Southern,南方,남부,#3366CC,0,4,0,,COMPLETE
-276,507,ラピートα,ラピートアルファ,rapi:tα,rapi:tα,라피트α,#0065AF,0,4,0,,COMPLETE
-277,508,ラピートβ,ラピートベータ,rapi:tβ,rapi:tβ,라피트β,#0065AF,0,4,0,,COMPLETE
-278,509,ちちぶ,チチブ,Chichibu,秩父,지치부,#FF6600,0,4,0,,COMPLETE
-279,510,Mt.TAKAO,マウントタカオ,Mt.TAKAO,Mt.TAKAO,Mt.TAKAO,#57A100,0,4,0,,COMPLETE
-280,511,ミュースカイ,ミュースカイ,μ-SKY,μ-SKY,μ-SKY,#FAA902,0,4,0,,COMPLETE
-281,512,ひのとり,ヒノトリ,HINOTORI,HINOTORI,HINOTORI,#AD2320,0,4,0,,COMPLETE
-282,513,こうや,コウヤ,KŌYA,高野,코야,#009A41,0,4,0,,COMPLETE
-283,514,りんかん,リンカン,RINKAN,林间,린칸,#009A42,0,4,0,,COMPLETE
-284,515,はしだて,ハシダテ,Hashidate,桥立,하시다테,#E80000,0,4,0,,COMPLETE
-285,516,スーパーはこね,スーパーハコネ,Super Hakone,超级箱根,슈퍼 하코네,#2288CC,0,4,0,,COMPLETE
-286,517,はこね,ハコネ,Hakone,箱根,하코네,#2288CC,0,4,0,,COMPLETE
-287,518,メトロはこね,メトロハコネ,Metro Hakone,地下铁箱根,메트로 하코네,#2288CC,0,4,0,,COMPLETE
-288,519,THライナー,THライナー,TH Liner,TH Liner,TH Liner,#B50033,0,2,0,,COMPLETE
-289,520,けごん・きぬ,ケゴン・キヌ,Kegon/Kinu,华严・绢,케곤・키누,#00458F,0,4,0,,COMPLETE
-290,521,きぬがわ,キヌガワ,Kinugawa,鬼怒川,기누가와,#378640,0,4,0,,COMPLETE
-291,522,会津,アイヅ,Aizu,会津,아이즈,#009F49,0,4,0,,COMPLETE
-292,523,スペーシアX(7号・8号),スペーシアX(7ゴウ・8ゴウ),SPACIA X(No.7/No.8),SPACIA X(7号/8号),SPACIA X(7호/8호),#221614,0,4,0,,COMPLETE
-293,524,スペーシアX(1号〜6号),スペーシアX(1ゴウ〜6ゴウ),SPACIA X(No.1 through No.6),SPACIA X(1号~6号),SPACIA X(7호~8호),#221614,0,4,0,,COMPLETE
-294,525,日光,ニッコウ,Nikkō,日光,햇빛,#378640,0,4,0,,COMPLETE
-295,526,さがみ,サガミ,Sagami,相模,사가미,#2288CC,0,4,0,,COMPLETE
-296,527,モーニングウェイ,モーニングウェイ,Morning Way,早晨的方式,모닝웨이,#2288CC,0,4,0,,COMPLETE
-297,528,ホームウェイ,ホームウェイ,Home way,回家的路,홈웨이,#2288CC,0,4,0,,COMPLETE
-298,529,メトロモーニングウェイ,メトロモーニングウェイ,Metro Morning Way,地下铁早晨的方式,메트로 모닝웨이,#2288CC,0,4,0,,COMPLETE
-299,530,メトロホームウェイ,メトロホームウェイ,Metro Home way,地下铁回家的路,메트로 홈웨이,#2288CC,0,4,0,,COMPLETE
-300,531,えのしま,エノシマ,Enoshima,江之岛,에노시마,#2288CC,0,4,0,,COMPLETE
-301,532,メトロえのしま,メトロエノシマ,Metro Enoshima,地下铁江之岛,메트로 에노시마,#2288CC,0,4,0,,COMPLETE
-302,533,ふじさん,フジサン,Mt. Fuji,富士山,후지 씨,#2288CC,0,4,0,,COMPLETE
-303,534,スカイツリーライナー,スカイツリーライナー,Skytree Liner,天空树衬里,스카이 트리 라이너,#87ceeb,0,4,0,,COMPLETE
-304,535,むさし,ムサシ,Musashi,武藏,무사시,#FF6600,0,4,0,,COMPLETE
-305,536,ドーム,ドーム,dome,圆顶,돔,#696969,0,4,0,,COMPLETE
-306,537,シティライナー,シティライナー,City Liner,City Liner,시티 라이너,#1e90ff,0,4,0,,COMPLETE
-307,538,モーニングライナー,モーニングライナー,Morning Liner,Morning Liner,모닝 라이너,#9400d3,0,4,0,,COMPLETE
-308,539,イブニングライナー,イブニングライナー,Evening Liner,Evening Liner,이브닝 라이너,#9400d3,0,4,0,,COMPLETE
-309,540,臨時ライナー,リンジライナー,Special Liner,临时Liner,임시 라이너,#add8e6,0,4,0,,COMPLETE
+256,373,区間準急,クカンジュンキュウ,Sub. Semi-Express,区间准急,구간준급,#00FF00,0,3,0,近鉄奈良線・難波線・大阪線、阪神なんば線・阪神本線用,PARTIAL
+257,374,区間急行,クカンキュウコウ,Sub. Express,区间快速,구간급행,#F7931D,0,3,0,近鉄用,COMPLETE
+258,375,急行,キュウコウ,Express,特快,급행,#F7931D,0,3,0,近鉄用,COMPLETE
+259,376,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#DC143C,0,3,0,近鉄用,COMPLETE
+260,377,快速急行,カイソクキュウコウ,Rapid Express,快速急行,쾌속급행,#00BFFF,0,3,0,阪神なんば線・阪神本線用,COMPLETE
+261,378,快速,カイソク,Rapid,快车,쾌속,#0000FF,0,2,0,京王用,PARTIAL
+262,379,快速,カイソク,Rapid,快车,쾌속,#00BFFF,0,2,0,西武用,PARTIAL
+263,380,急行,キュウコウ,Express,特快,급행,#F7931D,0,3,0,阪急用,COMPLETE
+264,381,通勤急行,ツウキンキュウコウ,Commuter Express,通勤快车,통근급행,#FFFF00,0,3,0,西武・阪急用,PARTIAL
+265,382,急行,キュウコウ,Express,特快,급행,#008000,0,3,0,京王・西鉄用,PARTIAL
+266,383,区間急行,クカンキュウコウ,Semi Express,区域特快,구간급행,#009A41,0,3,0,京阪用,PARTIAL
+267,384,準急,ジュンキュウ,Sub Express,准急,준급,#0000FF,0,3,0,京阪用,PARTIAL
+268,385,準急,ジュンキュウ,Semi Express,准急,준급,#0000FF,0,3,0,南海用,PARTIAL
+269,400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,2,0,,COMPLETE
+270,401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,2,0,,COMPLETE
+271,402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,2,0,,COMPLETE
+272,403,イブニングウィング号,イブニングウィングゴウ,Evening Wing(Shinagawa to Misakiguchi),Evening Wing,이브닝윙호,#379412,2,2,0,,COMPLETE
+273,404,普通(方南町支線),フツウ,Local(Honancho Branch Line),慢车(方南町支线),보통(호난초 지선),#E60012,0,1,0,,COMPLETE
+274,405,拝島ライナー,ハイジマライナー,Haijima Liner,拜岛Liner,하이지마 라이너,#B4C300,0,2,0,,COMPLETE
+275,406,TJライナー(下り),TJライナー,TJ Liner(Ikebukuro to Ogawamachi),TJ Liner,TJ Liner,#FF710A,2,2,0,,COMPLETE
+276,407,TJライナー(上り),TJライナー,TJ Liner(Ogawamachi to Ikebukuro),TJ Liner,TJ Liner,#008CD6,1,2,0,,COMPLETE
+277,408,各駅停車(北埠頭方面),カクエキテイシャ,Local,每站停车,각역정차,#9686BD,0,1,0,ポートアイランド線用,COMPLETE
+278,409,各駅停車(田園都市線経由),カクエキテイシャ,Local,每站停车,각역정차,#1F63C7,0,0,0,大井町線用,COMPLETE
+279,410,泉北ライナー,センボクライナー,Semboku Liner,泉北Liner,센보쿠라이너,#E6B422,0,2,0,,COMPLETE
+280,411,各駅停車(北綾瀬支線),カクエキテイシャ,Local,每站停车,각역정차,#009944,0,1,0,北綾瀬支線,COMPLETE
+281,412,ライナー,ライナー,Liner,Liner,정기선,#DC143C,0,2,0,,COMPLETE
+282,500,りょうもう(浅草〜伊勢崎),リョウモウ,Ryomo(Asakusa to Isesaki),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
+283,501,りょうもう(浅草〜葛生),リョウモウ,Ryomo(Asakusa to Kuzū),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
+284,502,りょうもう(浅草〜赤城),リョウモウ,Ryomo(Asakusa to Akagi),Ryomo,료이제,#FF0000,0,4,0,,COMPLETE
+285,503,スカイライナー,スカイライナー,Skyliner,Skyliner,스카이라이너,#0A3788,0,4,0,,COMPLETE
+286,504,小江戸号,コエドゴウ,Koedo,小江户,고에도,#E73042,0,4,0,,COMPLETE
+287,505,川越特急,カワゴエトッキュウ,Kawagoe Limited Express,川越特快,가와고에 특급,#E73799,0,4,0,,COMPLETE
+288,506,サザン,サザン,Southern,南方,남부,#3366CC,0,4,0,,COMPLETE
+289,507,ラピートα,ラピートアルファ,rapi:tα,rapi:tα,라피트α,#0065AF,0,4,0,,COMPLETE
+290,508,ラピートβ,ラピートベータ,rapi:tβ,rapi:tβ,라피트β,#0065AF,0,4,0,,COMPLETE
+291,509,ちちぶ,チチブ,Chichibu,秩父,지치부,#FF6600,0,4,0,,COMPLETE
+292,510,Mt.TAKAO,マウントタカオ,Mt.TAKAO,Mt.TAKAO,Mt.TAKAO,#57A100,0,4,0,,COMPLETE
+293,511,ミュースカイ,ミュースカイ,μ-SKY,μ-SKY,μ-SKY,#FAA902,0,4,0,,COMPLETE
+294,512,ひのとり,ヒノトリ,HINOTORI,HINOTORI,HINOTORI,#AD2320,0,4,0,,COMPLETE
+295,513,こうや,コウヤ,KŌYA,高野,코야,#009A41,0,4,0,,COMPLETE
+296,514,りんかん,リンカン,RINKAN,林间,린칸,#009A42,0,4,0,,COMPLETE
+297,515,はしだて,ハシダテ,Hashidate,桥立,하시다테,#E80000,0,4,0,,COMPLETE
+298,516,スーパーはこね,スーパーハコネ,Super Hakone,超级箱根,슈퍼 하코네,#2288CC,0,4,0,,COMPLETE
+299,517,はこね,ハコネ,Hakone,箱根,하코네,#2288CC,0,4,0,,COMPLETE
+300,518,メトロはこね,メトロハコネ,Metro Hakone,地下铁箱根,메트로 하코네,#2288CC,0,4,0,,COMPLETE
+301,519,THライナー,THライナー,TH Liner,TH Liner,TH Liner,#B50033,0,2,0,,COMPLETE
+302,520,けごん・きぬ,ケゴン・キヌ,Kegon/Kinu,华严・绢,케곤・키누,#00458F,0,4,0,,COMPLETE
+303,521,きぬがわ,キヌガワ,Kinugawa,鬼怒川,기누가와,#378640,0,4,0,,COMPLETE
+304,522,会津,アイヅ,Aizu,会津,아이즈,#009F49,0,4,0,,COMPLETE
+305,523,スペーシアX(7号・8号),スペーシアX(7ゴウ・8ゴウ),SPACIA X(No.7/No.8),SPACIA X(7号/8号),SPACIA X(7호/8호),#221614,0,4,0,,COMPLETE
+306,524,スペーシアX(1号〜6号),スペーシアX(1ゴウ〜6ゴウ),SPACIA X(No.1 through No.6),SPACIA X(1号~6号),SPACIA X(7호~8호),#221614,0,4,0,,COMPLETE
+307,525,日光,ニッコウ,Nikkō,日光,햇빛,#378640,0,4,0,,COMPLETE
+308,526,さがみ,サガミ,Sagami,相模,사가미,#2288CC,0,4,0,,COMPLETE
+309,527,モーニングウェイ,モーニングウェイ,Morning Way,早晨的方式,모닝웨이,#2288CC,0,4,0,,COMPLETE
+310,528,ホームウェイ,ホームウェイ,Home way,回家的路,홈웨이,#2288CC,0,4,0,,COMPLETE
+311,529,メトロモーニングウェイ,メトロモーニングウェイ,Metro Morning Way,地下铁早晨的方式,메트로 모닝웨이,#2288CC,0,4,0,,COMPLETE
+312,530,メトロホームウェイ,メトロホームウェイ,Metro Home way,地下铁回家的路,메트로 홈웨이,#2288CC,0,4,0,,COMPLETE
+313,531,えのしま,エノシマ,Enoshima,江之岛,에노시마,#2288CC,0,4,0,,COMPLETE
+314,532,メトロえのしま,メトロエノシマ,Metro Enoshima,地下铁江之岛,메트로 에노시마,#2288CC,0,4,0,,COMPLETE
+315,533,ふじさん,フジサン,Mt. Fuji,富士山,후지 씨,#2288CC,0,4,0,,COMPLETE
+316,534,スカイツリーライナー,スカイツリーライナー,Skytree Liner,天空树衬里,스카이 트리 라이너,#87ceeb,0,4,0,,COMPLETE
+317,535,むさし,ムサシ,Musashi,武藏,무사시,#FF6600,0,4,0,,COMPLETE
+318,536,ドーム,ドーム,dome,圆顶,돔,#696969,0,4,0,,COMPLETE
+319,537,シティライナー,シティライナー,City Liner,City Liner,시티 라이너,#1e90ff,0,4,0,,COMPLETE
+320,538,モーニングライナー,モーニングライナー,Morning Liner,Morning Liner,모닝 라이너,#9400d3,0,4,0,,COMPLETE
+321,539,イブニングライナー,イブニングライナー,Evening Liner,Evening Liner,이브닝 라이너,#9400d3,0,4,0,,COMPLETE
+322,540,臨時ライナー,リンジライナー,Special Liner,临时Liner,임시 라이너,#add8e6,0,4,0,,COMPLETE
