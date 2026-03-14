@@ -46,6 +46,7 @@ This guide explains how automation agents and human contributors should work wit
 - **Full suite** – `make test-all` runs unit then integration tests sequentially. Set `RUST_LOG=debug` to inspect SQL queries during debugging.
 - **Linting and formatting** – Run `cargo fmt` and `cargo clippy --all-targets --all-features` before committing. Resolve new Clippy warnings unless an existing `#![allow]` covers the case.
 - **Data verification** – Execute `cargo run -p data_validator` whenever CSVs change and record results in pull requests.
+- **IPA coverage audit** – Execute `make ipa-audit` when English or romanized CSV names change. This is a read-only report for `data/2!lines.csv`, `data/3!stations.csv`, and `data/4!types.csv`; it does not fail validation, but highlights unresolved tokens and example names so the IPA dictionary can be extended deliberately.
 
 ## gRPC Endpoint Overview
 - **Stations** – `GetStationById`, `GetStationByIdList`, `GetStationsByGroupId`, `GetStationsByCoordinates`, `GetStationsByLineId`, `GetStationsByName`, `GetStationsByLineGroupId`. `QueryInteractor` enriches stations with lines, companies, station numbers, and train types.

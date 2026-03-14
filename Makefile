@@ -1,7 +1,7 @@
 # StationAPI Makefile
 # Cargoを使ったテスト実行のためのシンプルなタスク定義
 
-.PHONY: test test-unit test-integration test-all clean help
+.PHONY: test test-unit test-integration test-all ipa-audit clean help
 
 # デフォルトターゲット
 help:
@@ -9,6 +9,7 @@ help:
 	@echo "  test-unit        - Run unit tests only (no database required)"
 	@echo "  test-integration - Run integration tests (requires PostgreSQL)"
 	@echo "  test-all         - Run all tests"
+	@echo "  ipa-audit        - Print IPA coverage report for English/romanized CSV names"
 	@echo "  test             - Alias for test-unit"
 	@echo "  clean            - Clean build artifacts"
 	@echo ""
@@ -29,6 +30,11 @@ test-integration:
 
 # 全てのテストを実行
 test-all: test-unit test-integration
+
+ipa-audit:
+	@echo "Printing IPA coverage report..."
+	rustc tools/ipa_audit.rs -o /tmp/stationapi-ipa-audit
+	/tmp/stationapi-ipa-audit
 
 # デフォルトはユニットテスト
 test: test-unit
