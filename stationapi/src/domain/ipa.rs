@@ -121,6 +121,10 @@ fn word_to_ipa(token: &str) -> Option<String> {
         return Some(String::new());
     }
 
+    if let Some(ipa) = split_compound_token_to_ipa(&normalized) {
+        return Some(ipa);
+    }
+
     if let Some(ipa) = lookup_english_word_ipa(&normalized) {
         return Some(ipa.to_string());
     }
@@ -139,6 +143,26 @@ fn word_to_ipa(token: &str) -> Option<String> {
     }
 
     romaji_to_katakana(&normalized).and_then(|katakana| katakana_to_ipa(&katakana))
+}
+
+fn split_compound_token_to_ipa(token: &str) -> Option<String> {
+    const JAPANESE_SUFFIXES: &[&str] = &["kaigan"];
+
+    for suffix in JAPANESE_SUFFIXES {
+        if token.len() <= suffix.len() || !token.ends_with(suffix) {
+            continue;
+        }
+
+        let stem = &token[..token.len() - suffix.len()];
+        let stem_ipa = word_to_ipa(stem)?;
+        let suffix_ipa = word_to_ipa(suffix)?;
+        if stem_ipa.is_empty() || suffix_ipa.is_empty() {
+            return None;
+        }
+        return Some(format!("{stem_ipa} {suffix_ipa}"));
+    }
+
+    None
 }
 
 fn is_name_token_char(c: char) -> bool {
@@ -1251,6 +1275,22 @@ mod tests {
         assert_eq!(
             station_name_to_ipa("シンバシ", Some("Shimbashi")),
             Some("ɕimbaɕi".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_splits_compound_kaigan_suffix() {
+        assert_eq!(
+            station_name_to_ipa("イナゲカイガン", Some("Inagekaigan")),
+            Some("inage ka.igaɴ".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_splits_other_compound_kaigan_suffix() {
+        assert_eq!(
+            station_name_to_ipa("オオモリカイガン", Some("Omorikaigan")),
+            Some("omoɾi ka.igaɴ".to_string())
         );
     }
 
