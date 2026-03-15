@@ -126,7 +126,16 @@ fn word_to_ipa(token: &str) -> Option<String> {
     }
 
     if normalized.chars().all(|c| c.is_ascii_digit()) {
-        return number_to_ipa(&normalized).map(str::to_string);
+        if let Some(ipa) = number_to_ipa(&normalized) {
+            return Some(ipa.to_string());
+        }
+
+        let mut output = String::new();
+        for digit in normalized.chars() {
+            let ipa = number_to_ipa(&digit.to_string())?;
+            output.push_str(ipa);
+        }
+        return Some(output);
     }
 
     romaji_to_katakana(&normalized).and_then(|katakana| katakana_to_ipa(&katakana))
@@ -1202,6 +1211,14 @@ mod tests {
         assert_eq!(
             station_name_to_ipa("ナリタクウコウ", Some("Narita Airport Terminal 1")),
             Some("naɾita ɛɚpɔɹt tɚmɪnəl wʌn".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_multi_digit_numbers() {
+        assert_eq!(
+            station_name_to_ipa("ハネダクウコウ", Some("Haneda Airport Terminal 10")),
+            Some("haneda ɛɚpɔɹt tɚmɪnəl wʌnzɪɹoʊ".to_string())
         );
     }
 
