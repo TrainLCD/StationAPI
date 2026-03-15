@@ -1,9 +1,10 @@
 use crate::{
     domain::{
         entity::{gtfs::TransportType, station::Station},
-        ipa::{katakana_name_to_ipa, station_name_to_ipa},
+        ipa::{katakana_name_to_ipa, station_name_to_ipa, station_name_to_tts_segments},
     },
     proto::{Station as GrpcStation, TransportType as GrpcTransportType},
+    use_case::dto::tts::to_proto_tts_segments,
 };
 
 impl From<TransportType> for i32 {
@@ -20,6 +21,10 @@ impl From<Station> for GrpcStation {
         let name_ipa = katakana_name_to_ipa(&station.station_name_k);
         let name_roman_ipa =
             station_name_to_ipa(&station.station_name_k, station.station_name_r.as_deref());
+        let name_tts_segments = to_proto_tts_segments(station_name_to_tts_segments(
+            &station.station_name_k,
+            station.station_name_r.as_deref(),
+        ));
         Self {
             id: station.station_cd as u32,
             group_id: station.station_g_cd as u32,
@@ -51,6 +56,7 @@ impl From<Station> for GrpcStation {
             transport_type: station.transport_type.into(),
             name_ipa,
             name_roman_ipa,
+            name_tts_segments,
         }
     }
 }
@@ -164,5 +170,28 @@ mod tests {
             grpc_station.name_roman_ipa,
             Some("me.itet͡sɯ it͡ɕinomija".to_string())
         );
+    }
+
+    #[test]
+    fn test_station_name_tts_segments_split_mixed_english_station_name() {
+        let grpc_station: GrpcStation = create_test_station(
+            "葛西臨海公園",
+            "カサイリンカイコウエン",
+            Some("Kasai-Rinkai Park"),
+        )
+        .into();
+
+        assert_eq!(grpc_station.name_tts_segments.len(), 3);
+        assert_eq!(grpc_station.name_tts_segments[0].surface, "Kasai");
+        assert_eq!(grpc_station.name_tts_segments[0].fallback_text, "かさい");
+        assert_eq!(grpc_station.name_tts_segments[0].pronunciation, "kasa.i");
+        assert_eq!(grpc_station.name_tts_segments[0].separator, " ");
+        assert_eq!(grpc_station.name_tts_segments[1].surface, "Rinkai");
+        assert_eq!(grpc_station.name_tts_segments[1].fallback_text, "りんかい");
+        assert_eq!(grpc_station.name_tts_segments[1].separator, " ");
+        assert_eq!(grpc_station.name_tts_segments[2].surface, "Park");
+        assert_eq!(grpc_station.name_tts_segments[2].fallback_text, "Park");
+        assert_eq!(grpc_station.name_tts_segments[2].pronunciation, "pɑɹk");
+        assert_eq!(grpc_station.name_tts_segments[2].separator, "");
     }
 }
