@@ -69,6 +69,7 @@ pub fn station_name_to_ipa(name_katakana: &str, name_roman: Option<&str>) -> Opt
             .map(str::trim)
             .filter(|name| !name.is_empty())
             .and_then(romanized_name_to_ipa)
+            .filter(|ipa| !ipa.is_empty())
             .or_else(|| katakana_to_ipa(name_katakana)),
     )
 }
