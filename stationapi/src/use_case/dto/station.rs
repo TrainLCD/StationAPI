@@ -18,7 +18,8 @@ impl From<TransportType> for i32 {
 impl From<Station> for GrpcStation {
     fn from(station: Station) -> Self {
         let name_ipa = katakana_to_ipa(&station.station_name_k).filter(|ipa| !ipa.is_empty());
-        let name_roman_ipa = station_name_to_ipa("", station.station_name_r.as_deref());
+        let name_roman_ipa =
+            station_name_to_ipa(&station.station_name_k, station.station_name_r.as_deref());
         Self {
             id: station.station_cd as u32,
             group_id: station.station_g_cd as u32,
@@ -51,5 +52,102 @@ impl From<Station> for GrpcStation {
             name_ipa,
             name_roman_ipa,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        domain::entity::{gtfs::TransportType, station::Station},
+        proto::StopCondition,
+    };
+
+    fn create_test_station(name: &str, name_katakana: &str, name_roman: Option<&str>) -> Station {
+        Station::new(
+            1,
+            1,
+            name.to_string(),
+            name_katakana.to_string(),
+            name_roman.map(str::to_string),
+            None,
+            None,
+            vec![],
+            None,
+            None,
+            None,
+            None,
+            None,
+            1,
+            None,
+            vec![],
+            12,
+            String::new(),
+            String::new(),
+            0.0,
+            0.0,
+            String::new(),
+            String::new(),
+            0,
+            0,
+            StopCondition::All,
+            None,
+            false,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            TransportType::Rail,
+        )
+    }
+
+    #[test]
+    fn test_station_sets_expected_roman_ipa_for_inagekaigan() {
+        let grpc_station: GrpcStation =
+            create_test_station("稲毛海岸", "イナゲカイガン", Some("Inagekaigan")).into();
+
+        assert_eq!(
+            grpc_station.name_roman_ipa,
+            Some("inage ka.igaɴ".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_roman_ipa_falls_back_to_katakana() {
+        let grpc_station: GrpcStation = create_test_station("渋谷", "シブヤ", Some("???")).into();
+
+        assert_eq!(grpc_station.name_roman_ipa, Some("ɕibɯja".to_string()));
     }
 }
