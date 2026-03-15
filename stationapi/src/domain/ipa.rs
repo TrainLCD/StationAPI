@@ -64,27 +64,42 @@ pub fn katakana_to_ipa(input: &str) -> Option<String> {
 /// Prefers the official romanized/English name when present so mixed names like
 /// "Kasai-Rinkai Park" use English pronunciation for translated segments.
 pub fn station_name_to_ipa(name_katakana: &str, name_roman: Option<&str>) -> Option<String> {
-    name_roman
-        .map(str::trim)
-        .filter(|name| !name.is_empty())
-        .and_then(romanized_name_to_ipa)
-        .filter(|ipa| !ipa.is_empty())
-        .or_else(|| katakana_to_ipa(name_katakana))
-        .filter(|ipa| !ipa.is_empty())
+    non_empty_ipa(
+        name_roman
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .and_then(romanized_name_to_ipa)
+            .filter(|ipa| !ipa.is_empty())
+            .or_else(|| katakana_to_ipa(name_katakana)),
+    )
+}
+
+pub fn katakana_name_to_ipa(input: &str) -> Option<String> {
+    non_empty_ipa(katakana_to_ipa(input))
+}
+
+pub fn non_empty_ipa(ipa: Option<String>) -> Option<String> {
+    ipa.filter(|ipa| !ipa.is_empty())
 }
 
 fn romanized_name_to_ipa(input: &str) -> Option<String> {
     let mut output = String::new();
     let mut token = String::new();
     let mut emitted_word = false;
+    let mut prev_token_char: Option<char> = None;
 
     for c in input.chars() {
         if is_name_token_char(c) {
+            if should_split_camel_case_token(prev_token_char, c) {
+                flush_name_token(&mut output, &mut token, &mut emitted_word)?;
+            }
             token.push(c);
+            prev_token_char = Some(c);
             continue;
         }
 
         flush_name_token(&mut output, &mut token, &mut emitted_word)?;
+        prev_token_char = None;
 
         if is_separator_like(c) && emitted_word && !output.ends_with(' ') {
             output.push(' ');
@@ -94,6 +109,10 @@ fn romanized_name_to_ipa(input: &str) -> Option<String> {
     flush_name_token(&mut output, &mut token, &mut emitted_word)?;
 
     Some(output.trim().to_string())
+}
+
+fn should_split_camel_case_token(prev: Option<char>, current: char) -> bool {
+    matches!(prev, Some(prev) if prev.is_ascii_lowercase() && current.is_ascii_uppercase())
 }
 
 fn flush_name_token(
@@ -1308,6 +1327,35 @@ mod tests {
             station_name_to_ipa("カイソク", Some("Commuter Rapid")),
             Some("kəmjuːtɚ ɹæpɪd".to_string())
         );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_spaced_romanized_names_from_csv() {
+        assert_eq!(
+            station_name_to_ipa("メイテツイチノミヤ", Some("Meitetsu Ichinomiya")),
+            Some("me.itet͡sɯ it͡ɕinomija".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_meitetsu_prefixed_station_names_from_csv() {
+        let cases = [
+            ("メイテツナゴヤ", "Meitetsu Nagoya", "me.itet͡sɯ nagoja"),
+            (
+                "メイテツイチノミヤ",
+                "Meitetsu Ichinomiya",
+                "me.itet͡sɯ it͡ɕinomija",
+            ),
+            ("メイテツギフ", "Meitetsu Gifu", "me.itet͡sɯ giɸɯ"),
+        ];
+
+        for (katakana, roman, expected) in cases {
+            assert_eq!(
+                station_name_to_ipa(katakana, Some(roman)),
+                Some(expected.to_string()),
+                "failed for {roman}"
+            );
+        }
     }
 
     #[test]
