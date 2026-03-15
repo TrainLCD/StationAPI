@@ -1,9 +1,10 @@
 use crate::{
     domain::{
         entity::train_type::TrainType,
-        ipa::{katakana_name_to_ipa, station_name_to_ipa},
+        ipa::{katakana_name_to_ipa, station_name_to_ipa, station_name_to_tts_segments},
     },
     proto::TrainType as GrpcTrainType,
+    use_case::dto::tts::to_proto_tts_segments,
 };
 
 impl From<TrainType> for GrpcTrainType {
@@ -27,6 +28,10 @@ impl From<TrainType> for GrpcTrainType {
         } = train_type;
         let name_ipa = katakana_name_to_ipa(&type_name_k);
         let name_roman_ipa = station_name_to_ipa("", type_name_r.as_deref());
+        let name_tts_segments = to_proto_tts_segments(station_name_to_tts_segments(
+            &type_name_k,
+            type_name_r.as_deref(),
+        ));
         Self {
             id: id.map(|id| id as u32).unwrap_or(0),
             type_id: type_cd.map(|id| id as u32).unwrap_or(0),
@@ -43,6 +48,7 @@ impl From<TrainType> for GrpcTrainType {
             kind: kind.unwrap_or(0),
             name_ipa,
             name_roman_ipa,
+            name_tts_segments,
         }
     }
 }

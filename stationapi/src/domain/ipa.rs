@@ -64,14 +64,8 @@ pub fn katakana_to_ipa(input: &str) -> Option<String> {
 /// Prefers the official romanized/English name when present so mixed names like
 /// "Kasai-Rinkai Park" use English pronunciation for translated segments.
 pub fn station_name_to_ipa(name_katakana: &str, name_roman: Option<&str>) -> Option<String> {
-    non_empty_ipa(
-        name_roman
-            .map(str::trim)
-            .filter(|name| !name.is_empty())
-            .and_then(romanized_name_to_ipa)
-            .filter(|ipa| !ipa.is_empty())
-            .or_else(|| katakana_to_ipa(name_katakana)),
-    )
+    let segments = station_name_to_tts_segments(name_katakana, name_roman);
+    non_empty_ipa(join_tts_segment_pronunciations(&segments))
 }
 
 pub fn katakana_name_to_ipa(input: &str) -> Option<String> {
@@ -82,106 +76,217 @@ pub fn non_empty_ipa(ipa: Option<String>) -> Option<String> {
     ipa.filter(|ipa| !ipa.is_empty())
 }
 
-fn romanized_name_to_ipa(input: &str) -> Option<String> {
-    let mut output = String::new();
-    let mut token = String::new();
-    let mut emitted_word = false;
-    let mut prev_token_char: Option<char> = None;
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TtsAlphabetKind {
+    Ipa,
+    Yomigana,
+    Plain,
+}
 
-    for c in input.chars() {
-        if is_name_token_char(c) {
-            if should_split_camel_case_token(prev_token_char, c) {
-                flush_name_token(&mut output, &mut token, &mut emitted_word)?;
-            }
-            token.push(c);
-            prev_token_char = Some(c);
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TtsNameSegment {
+    pub surface: String,
+    pub fallback_text: String,
+    pub pronunciation: String,
+    pub alphabet: TtsAlphabetKind,
+    pub lang: &'static str,
+    pub separator: String,
+}
+
+pub fn station_name_to_tts_segments(
+    name_katakana: &str,
+    name_roman: Option<&str>,
+) -> Vec<TtsNameSegment> {
+    name_roman
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .and_then(romanized_name_to_tts_segments)
+        .filter(|segments| !segments.is_empty())
+        .or_else(|| katakana_name_to_tts_segments(name_katakana))
+        .unwrap_or_default()
+}
+
+fn join_tts_segment_pronunciations(segments: &[TtsNameSegment]) -> Option<String> {
+    let mut output = String::new();
+
+    for segment in segments {
+        if segment.pronunciation.is_empty() {
             continue;
         }
-
-        flush_name_token(&mut output, &mut token, &mut emitted_word)?;
-        prev_token_char = None;
-
-        if is_separator_like(c) && emitted_word && !output.ends_with(' ') {
-            output.push(' ');
-        }
+        output.push_str(&segment.pronunciation);
+        output.push_str(&segment.separator);
     }
 
-    flush_name_token(&mut output, &mut token, &mut emitted_word)?;
+    non_empty_ipa(Some(output.trim().to_string()))
+}
 
-    Some(output.trim().to_string())
+fn katakana_name_to_tts_segments(input: &str) -> Option<Vec<TtsNameSegment>> {
+    let pronunciation = katakana_name_to_ipa(input)?;
+    Some(vec![TtsNameSegment {
+        surface: input.to_string(),
+        fallback_text: katakana_to_hiragana(input),
+        pronunciation,
+        alphabet: TtsAlphabetKind::Ipa,
+        lang: "ja-JP",
+        separator: String::new(),
+    }])
 }
 
 fn should_split_camel_case_token(prev: Option<char>, current: char) -> bool {
     matches!(prev, Some(prev) if prev.is_ascii_lowercase() && current.is_ascii_uppercase())
 }
 
-fn flush_name_token(
-    output: &mut String,
-    token: &mut String,
-    emitted_word: &mut bool,
-) -> Option<()> {
-    if token.is_empty() {
-        return Some(());
+fn romanized_name_to_tts_segments(input: &str) -> Option<Vec<TtsNameSegment>> {
+    let mut tokens: Vec<String> = Vec::new();
+    let mut token = String::new();
+    let mut prev_token_char: Option<char> = None;
+
+    for c in input.chars() {
+        if is_name_token_char(c) {
+            if should_split_camel_case_token(prev_token_char, c) {
+                flush_name_token(&mut tokens, &mut token);
+            }
+            token.push(c);
+            prev_token_char = Some(c);
+            continue;
+        }
+
+        flush_name_token(&mut tokens, &mut token);
+        prev_token_char = None;
     }
 
-    let ipa = word_to_ipa(token)?;
-    if *emitted_word && !output.ends_with(' ') {
-        output.push(' ');
+    flush_name_token(&mut tokens, &mut token);
+
+    if tokens.is_empty() {
+        return Some(vec![]);
     }
-    output.push_str(&ipa);
-    *emitted_word = true;
-    token.clear();
-    Some(())
+
+    let mut segments = Vec::new();
+    for (index, token) in tokens.iter().enumerate() {
+        let mut word_segments = word_to_tts_segments(token)?;
+        if let Some(last) = word_segments.last_mut() {
+            last.separator = if index + 1 < tokens.len() {
+                " ".to_string()
+            } else {
+                String::new()
+            };
+        }
+        segments.extend(word_segments);
+    }
+
+    Some(segments)
 }
 
-fn word_to_ipa(token: &str) -> Option<String> {
-    let normalized = normalize_name_token(token);
-    if normalized.is_empty() {
-        return Some(String::new());
+fn flush_name_token(tokens: &mut Vec<String>, token: &mut String) {
+    if token.is_empty() {
+        return;
     }
 
-    if let Some(ipa) = split_compound_token_to_ipa(&normalized) {
-        return Some(ipa);
+    tokens.push(token.clone());
+    token.clear();
+}
+
+fn word_to_tts_segments(token: &str) -> Option<Vec<TtsNameSegment>> {
+    let normalized = normalize_name_token(token);
+    if normalized.is_empty() {
+        return Some(vec![]);
+    }
+
+    if let Some(segments) = split_compound_token_to_tts_segments(token, &normalized) {
+        return Some(segments);
     }
 
     if let Some(ipa) = lookup_english_word_ipa(&normalized) {
-        return Some(ipa.to_string());
+        return Some(vec![TtsNameSegment {
+            surface: token.to_string(),
+            fallback_text: token.to_string(),
+            pronunciation: ipa.to_string(),
+            alphabet: TtsAlphabetKind::Ipa,
+            lang: "en-US",
+            separator: String::new(),
+        }]);
     }
 
     if normalized.chars().all(|c| c.is_ascii_digit()) {
         if let Some(ipa) = number_to_ipa(&normalized) {
-            return Some(ipa.to_string());
+            return Some(vec![TtsNameSegment {
+                surface: token.to_string(),
+                fallback_text: token.to_string(),
+                pronunciation: ipa.to_string(),
+                alphabet: TtsAlphabetKind::Ipa,
+                lang: "en-US",
+                separator: String::new(),
+            }]);
         }
 
-        let mut output = String::new();
+        let mut pronunciation = String::new();
         for digit in normalized.chars() {
             let ipa = number_to_ipa(&digit.to_string())?;
-            output.push_str(ipa);
+            pronunciation.push_str(ipa);
         }
-        return Some(output);
+        return Some(vec![TtsNameSegment {
+            surface: token.to_string(),
+            fallback_text: token.to_string(),
+            pronunciation,
+            alphabet: TtsAlphabetKind::Ipa,
+            lang: "en-US",
+            separator: String::new(),
+        }]);
     }
 
-    romaji_to_katakana(&normalized).and_then(|katakana| katakana_to_ipa(&katakana))
+    let katakana = romaji_to_katakana(&normalized)?;
+    let pronunciation = katakana_to_ipa(&katakana)?;
+    Some(vec![TtsNameSegment {
+        surface: token.to_string(),
+        fallback_text: katakana_to_hiragana(&katakana),
+        pronunciation,
+        alphabet: TtsAlphabetKind::Ipa,
+        lang: "ja-JP",
+        separator: String::new(),
+    }])
 }
 
-fn split_compound_token_to_ipa(token: &str) -> Option<String> {
+fn split_compound_token_to_tts_segments(
+    original: &str,
+    normalized: &str,
+) -> Option<Vec<TtsNameSegment>> {
     const JAPANESE_SUFFIXES: &[&str] = &["kaigan"];
 
     for suffix in JAPANESE_SUFFIXES {
-        if token.len() <= suffix.len() || !token.ends_with(suffix) {
+        if normalized.len() <= suffix.len() || !normalized.ends_with(suffix) {
             continue;
         }
 
-        let stem = &token[..token.len() - suffix.len()];
-        let stem_ipa = word_to_ipa(stem)?;
-        let suffix_ipa = word_to_ipa(suffix)?;
-        if stem_ipa.is_empty() || suffix_ipa.is_empty() {
+        let stem_char_count = normalized.chars().count() - suffix.chars().count();
+        let stem_byte_offset = original
+            .char_indices()
+            .nth(stem_char_count)
+            .map(|(index, _)| index)
+            .unwrap_or(original.len());
+        let stem = &original[..stem_byte_offset];
+        let mut stem_segments = word_to_tts_segments(stem)?;
+        let suffix_segments = word_to_tts_segments(suffix)?;
+        if stem_segments.is_empty() || suffix_segments.is_empty() {
             return None;
         }
-        return Some(format!("{stem_ipa} {suffix_ipa}"));
+        if let Some(last) = stem_segments.last_mut() {
+            last.separator = " ".to_string();
+        }
+        stem_segments.extend(suffix_segments);
+        return Some(stem_segments);
     }
 
     None
+}
+
+fn katakana_to_hiragana(input: &str) -> String {
+    input
+        .chars()
+        .map(|c| match c {
+            'ァ'..='ヶ' => char::from_u32(c as u32 - 0x60).unwrap_or(c),
+            _ => c,
+        })
+        .collect()
 }
 
 fn is_name_token_char(c: char) -> bool {
@@ -189,29 +294,6 @@ fn is_name_token_char(c: char) -> bool {
         || matches!(
             c,
             '\'' | '.' | 'Ā' | 'Ī' | 'Ū' | 'Ē' | 'Ō' | 'ā' | 'ī' | 'ū' | 'ē' | 'ō'
-        )
-}
-
-fn is_separator_like(c: char) -> bool {
-    c.is_whitespace()
-        || matches!(
-            c,
-            '-' | '‐'
-                | '‑'
-                | '‒'
-                | '–'
-                | '—'
-                | '―'
-                | '/'
-                | '･'
-                | '・'
-                | '·'
-                | '('
-                | ')'
-                | '（'
-                | '）'
-                | ','
-                | '、'
         )
 }
 

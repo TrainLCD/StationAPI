@@ -53,6 +53,7 @@ This guide explains how automation agents and human contributors should work wit
 - **Lines** – `GetLineById`, `GetLinesByIdList`, `GetLinesByName`. Results include company data and computed line symbols based on repository helpers.
 - **Routes** – `GetRoutes`, `GetRoutesMinimal`. The minimal variant returns `RouteMinimalResponse` with deduplicated `LineMinimal` data; paging tokens are currently empty (pagination not implemented).
 - **Train types** – `GetTrainTypesByStationId`, `GetRouteTypes`. Train types aggregate by line group and include related lines plus optional train type metadata.
+- **TTS metadata** – `Station`, `StationMinimal`, `Line`, and `TrainType` expose `name_ipa` / `name_roman_ipa` plus `name_tts_segments` for multi-segment pronunciation output. Use `name_tts_segments` when clients need per-token SSML construction for mixed-language names such as `Kasai-Rinkai Park`.
 - **Connected routes** – `GetConnectedRoutes`. `QueryInteractor::get_connected_stations` is not implemented yet and returns an empty vector; update the use-case and infrastructure layers together when adding real logic.
 - Changes to the service contract require coordinated updates to `proto/stationapi.proto`, regenerated code via `tonic-build`, and corresponding adjustments in both presentation and use-case layers.
 
