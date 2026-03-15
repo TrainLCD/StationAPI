@@ -834,8 +834,7 @@ where
                         })
                         .collect();
 
-                    let name_ipa = crate::domain::ipa::katakana_to_ipa(&row.station_name_k)
-                        .filter(|ipa| !ipa.is_empty());
+                    let name_ipa = crate::domain::ipa::katakana_name_to_ipa(&row.station_name_k);
                     let name_roman_ipa = crate::domain::ipa::station_name_to_ipa(
                         &row.station_name_k,
                         row.station_name_r.as_deref(),

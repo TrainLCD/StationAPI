@@ -1,7 +1,7 @@
 use crate::{
     domain::{
         entity::{gtfs::TransportType, station::Station},
-        ipa::{katakana_to_ipa, station_name_to_ipa},
+        ipa::{katakana_name_to_ipa, station_name_to_ipa},
     },
     proto::{Station as GrpcStation, TransportType as GrpcTransportType},
 };
@@ -17,7 +17,7 @@ impl From<TransportType> for i32 {
 
 impl From<Station> for GrpcStation {
     fn from(station: Station) -> Self {
-        let name_ipa = katakana_to_ipa(&station.station_name_k).filter(|ipa| !ipa.is_empty());
+        let name_ipa = katakana_name_to_ipa(&station.station_name_k);
         let name_roman_ipa =
             station_name_to_ipa(&station.station_name_k, station.station_name_r.as_deref());
         Self {
@@ -149,5 +149,20 @@ mod tests {
         let grpc_station: GrpcStation = create_test_station("渋谷", "シブヤ", Some("???")).into();
 
         assert_eq!(grpc_station.name_roman_ipa, Some("ɕibɯja".to_string()));
+    }
+
+    #[test]
+    fn test_station_name_roman_ipa_uses_meitetsu_station_data() {
+        let grpc_station: GrpcStation = create_test_station(
+            "名鉄一宮",
+            "メイテツイチノミヤ",
+            Some("Meitetsu Ichinomiya"),
+        )
+        .into();
+
+        assert_eq!(
+            grpc_station.name_roman_ipa,
+            Some("me.itet͡sɯ it͡ɕinomija".to_string())
+        );
     }
 }

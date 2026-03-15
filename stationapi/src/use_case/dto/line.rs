@@ -1,7 +1,7 @@
 use crate::{
     domain::{
         entity::{gtfs::TransportType, line::Line},
-        ipa::{katakana_to_ipa, replace_line_name_suffix, station_name_to_ipa},
+        ipa::{katakana_name_to_ipa, non_empty_ipa, replace_line_name_suffix, station_name_to_ipa},
     },
     proto::{Line as GrpcLine, TransportType as GrpcTransportType},
 };
@@ -10,11 +10,9 @@ impl From<Line> for GrpcLine {
     fn from(line: Line) -> Self {
         let name_ipa = {
             let (stem, suffix_ipa) = replace_line_name_suffix(&line.line_name_k);
-            katakana_to_ipa(stem).map(|ipa| format!("{ipa}{suffix_ipa}"))
-        }
-        .filter(|ipa| !ipa.is_empty());
-        let name_roman_ipa =
-            station_name_to_ipa("", line.line_name_r.as_deref()).filter(|ipa| !ipa.is_empty());
+            non_empty_ipa(katakana_name_to_ipa(stem).map(|ipa| format!("{ipa}{suffix_ipa}")))
+        };
+        let name_roman_ipa = station_name_to_ipa("", line.line_name_r.as_deref());
         // バス路線の場合は line_type を OtherLineType (0) に強制
         // (鉄道用の line_type が誤って設定されている可能性があるため)
         let line_type = if line.transport_type == TransportType::Bus {

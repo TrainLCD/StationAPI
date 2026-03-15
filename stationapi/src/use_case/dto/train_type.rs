@@ -1,7 +1,7 @@
 use crate::{
     domain::{
         entity::train_type::TrainType,
-        ipa::{katakana_to_ipa, station_name_to_ipa},
+        ipa::{katakana_name_to_ipa, station_name_to_ipa},
     },
     proto::TrainType as GrpcTrainType,
 };
@@ -25,7 +25,7 @@ impl From<TrainType> for GrpcTrainType {
             lines,
             kind,
         } = train_type;
-        let name_ipa = katakana_to_ipa(&type_name_k).filter(|ipa| !ipa.is_empty());
+        let name_ipa = katakana_name_to_ipa(&type_name_k);
         let name_roman_ipa = station_name_to_ipa("", type_name_r.as_deref());
         Self {
             id: id.map(|id| id as u32).unwrap_or(0),
