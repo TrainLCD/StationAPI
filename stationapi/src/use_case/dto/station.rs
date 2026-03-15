@@ -1,7 +1,7 @@
 use crate::{
     domain::{
         entity::{gtfs::TransportType, station::Station},
-        ipa::katakana_to_ipa,
+        ipa::{katakana_to_ipa, station_name_to_ipa},
     },
     proto::{Station as GrpcStation, TransportType as GrpcTransportType},
 };
@@ -18,6 +18,7 @@ impl From<TransportType> for i32 {
 impl From<Station> for GrpcStation {
     fn from(station: Station) -> Self {
         let name_ipa = katakana_to_ipa(&station.station_name_k).filter(|ipa| !ipa.is_empty());
+        let name_roman_ipa = station_name_to_ipa("", station.station_name_r.as_deref());
         Self {
             id: station.station_cd as u32,
             group_id: station.station_g_cd as u32,
@@ -48,6 +49,7 @@ impl From<Station> for GrpcStation {
             train_type: station.train_type.map(|tt| Box::new((*tt).into())),
             transport_type: station.transport_type.into(),
             name_ipa,
+            name_roman_ipa,
         }
     }
 }
