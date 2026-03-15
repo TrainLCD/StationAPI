@@ -18,7 +18,7 @@ impl From<Line> for GrpcLine {
         };
         let name_roman_ipa = station_name_to_ipa("", line.line_name_r.as_deref());
         let name_tts_segments = to_proto_tts_segments(station_name_to_tts_segments(
-            "",
+            &line.line_name_k,
             line.line_name_r.as_deref(),
         ));
         // バス路線の場合は line_type を OtherLineType (0) に強制

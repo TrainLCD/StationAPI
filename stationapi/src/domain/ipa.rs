@@ -257,8 +257,13 @@ fn split_compound_token_to_tts_segments(
             continue;
         }
 
-        let stem_len = normalized.len() - suffix.len();
-        let stem = &original[..stem_len];
+        let stem_char_count = normalized.chars().count() - suffix.chars().count();
+        let stem_byte_offset = original
+            .char_indices()
+            .nth(stem_char_count)
+            .map(|(index, _)| index)
+            .unwrap_or(original.len());
+        let stem = &original[..stem_byte_offset];
         let mut stem_segments = word_to_tts_segments(stem)?;
         let suffix_segments = word_to_tts_segments(suffix)?;
         if stem_segments.is_empty() || suffix_segments.is_empty() {
