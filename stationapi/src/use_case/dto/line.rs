@@ -8,12 +8,13 @@ use crate::{
 
 impl From<Line> for GrpcLine {
     fn from(line: Line) -> Self {
-        let name_ipa = station_name_to_ipa("", line.line_name_r.as_deref())
-            .or_else(|| {
-                let (stem, suffix_ipa) = replace_line_name_suffix(&line.line_name_k);
-                katakana_to_ipa(stem).map(|ipa| format!("{ipa}{suffix_ipa}"))
-            })
-            .filter(|ipa| !ipa.is_empty());
+        let name_ipa = {
+            let (stem, suffix_ipa) = replace_line_name_suffix(&line.line_name_k);
+            katakana_to_ipa(stem).map(|ipa| format!("{ipa}{suffix_ipa}"))
+        }
+        .filter(|ipa| !ipa.is_empty());
+        let name_roman_ipa =
+            station_name_to_ipa("", line.line_name_r.as_deref()).filter(|ipa| !ipa.is_empty());
         // バス路線の場合は line_type を OtherLineType (0) に強制
         // (鉄道用の line_type が誤って設定されている可能性があるため)
         let line_type = if line.transport_type == TransportType::Bus {
@@ -42,6 +43,7 @@ impl From<Line> for GrpcLine {
             average_distance: line.average_distance.unwrap_or(0.0),
             transport_type: convert_transport_type(line.transport_type),
             name_ipa,
+            name_roman_ipa,
         }
     }
 }
@@ -375,12 +377,12 @@ mod tests {
     }
 
     // ============================================
-    // name_ipa 変換テスト
+    // IPA 変換テスト
     // ============================================
 
     #[test]
     fn test_name_ipa_sen_suffix_replaced_with_line() {
-        // 〜セン → IPA + " laɪn"
+        // name_ipa はカタカナ由来
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "セイブイケブクロセン".to_string();
         let grpc_line: GrpcLine = line.into();
@@ -393,7 +395,6 @@ mod tests {
 
     #[test]
     fn test_name_ipa_honsen_suffix_replaced_with_main_line() {
-        // 〜ホンセン → IPA + " meɪn laɪn"
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "トウカイドウホンセン".to_string();
         let grpc_line: GrpcLine = line.into();
@@ -406,7 +407,6 @@ mod tests {
 
     #[test]
     fn test_name_ipa_shinkansen_preserved() {
-        // 〜シンカンセン は英語でもそのまま使われるため置換しない
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "トウホクシンカンセン".to_string();
         let grpc_line: GrpcLine = line.into();
@@ -415,13 +415,17 @@ mod tests {
     }
 
     #[test]
-    fn test_name_ipa_prefers_romanized_line_name_for_keisei() {
+    fn test_name_roman_ipa_prefers_romanized_line_name_for_keisei() {
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "ケイセイホンセン".to_string();
         line.line_name_r = Some("Keisei Main Line".to_string());
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("keːseː meɪn laɪn".to_string()));
+        assert_eq!(grpc_line.name_ipa, Some("ke.ise.i meɪn laɪn".to_string()));
+        assert_eq!(
+            grpc_line.name_roman_ipa,
+            Some("keːseː meɪn laɪn".to_string())
+        );
     }
 
     #[test]
@@ -432,5 +436,6 @@ mod tests {
         let grpc_line: GrpcLine = line.into();
 
         assert_eq!(grpc_line.name_ipa, None);
+        assert_eq!(grpc_line.name_roman_ipa, None);
     }
 }

@@ -1,4 +1,10 @@
-use crate::{domain::entity::train_type::TrainType, proto::TrainType as GrpcTrainType};
+use crate::{
+    domain::{
+        entity::train_type::TrainType,
+        ipa::{katakana_to_ipa, station_name_to_ipa},
+    },
+    proto::TrainType as GrpcTrainType,
+};
 
 impl From<TrainType> for GrpcTrainType {
     fn from(train_type: TrainType) -> Self {
@@ -19,6 +25,8 @@ impl From<TrainType> for GrpcTrainType {
             lines,
             kind,
         } = train_type;
+        let name_ipa = katakana_to_ipa(&type_name_k).filter(|ipa| !ipa.is_empty());
+        let name_roman_ipa = station_name_to_ipa("", type_name_r.as_deref());
         Self {
             id: id.map(|id| id as u32).unwrap_or(0),
             type_id: type_cd.map(|id| id as u32).unwrap_or(0),
@@ -33,6 +41,39 @@ impl From<TrainType> for GrpcTrainType {
             lines: lines.into_iter().map(|line| line.into()).collect(),
             direction: direction.unwrap_or(0),
             kind: kind.unwrap_or(0),
+            name_ipa,
+            name_roman_ipa,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_train_type() -> TrainType {
+        TrainType::new(
+            Some(1),
+            Some(1130201),
+            Some(1001),
+            Some(1001),
+            Some(1),
+            "快速".to_string(),
+            "カイソク".to_string(),
+            Some("Rapid".to_string()),
+            Some("快速".to_string()),
+            Some("쾌속".to_string()),
+            "#ff6600".to_string(),
+            Some(0),
+            Some(1),
+        )
+    }
+
+    #[test]
+    fn test_train_type_sets_katakana_and_roman_ipa() {
+        let grpc_train_type: GrpcTrainType = create_test_train_type().into();
+
+        assert_eq!(grpc_train_type.name_ipa, Some("ka.isokɯ".to_string()));
+        assert_eq!(grpc_train_type.name_roman_ipa, Some("ɹæpɪd".to_string()));
     }
 }
