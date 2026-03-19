@@ -106,7 +106,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 11342,2,上越線,ジョウエツセン,上越線,Joetsu Line,Joetsu Line,上越线,조에쓰선,#00B3E6,2,,,,,,,,,,,,,0,11342,4232.335496
 11401,2,小海線,コウミセン,小海線,Koumi Line,Koumi Line,小海线,고우미선,#008000,2,,,,,,,,,,,,,0,11401,2236.511091
 11402,3,身延線,ミノブセン,身延線,Minobu Line,Minobu Line,身延线,미노부선,#6F2D98,2,CC,,,,#6F2D98,,,,HALF_SQUARE_WITHOUT_ROUND,,,,0,11402,2118.828735
-11403,2,信越本線,シンエツホンセン,信越本線(篠ノ井～長野),Shin’etsu Main Line,Shin’etsu Main Line,信越本线,신에쓰 본선,#FFD400,2,SE,,,,,,,,,,,,0,11403,2288.052518
+11403,2,信越本線,シンエツホンセン,信越本線(篠ノ井～長野),Shin’etsu Main Line,Shin’etsu Main Line,信越本线,신에쓰 본선,#FFD400,2,SE,,,,#00B3E6,,,,ROUND,,,,0,11403,2288.052518
 11404,2,信越本線,シンエツホンセン,信越本線(直江津～新潟),Shin’etsu Main Line,Shin’etsu Main Line,信越本线,신에쓰 본선,#FFD400,2,,,,,,,,,,,,,0,11404,3209.490939
 11405,4,北陸本線,ホクリクホンセン,北陸本線(富山～直江津),Hokuriku Main Line,Hokuriku Main Line,北陆本线,호쿠리쿠 본선,#FFD400,2,,,,,,,,,,,,,2,11405,0
 11406,2,白新線,ハクシンセン,白新線,Hakushin Line,Hakushin Line,白新线,하쿠신선,#F387B7,2,,,,,,,,,,,,,0,11406,2848.392563
@@ -136,7 +136,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 11508,3,関西本線,カンサイホンセン,関西本線(名古屋～亀山),Kansai Line,Kansai Line,关西线,간사이선,#0FB68F,2,CJ,,,,#0FB68F,,,,HALF_SQUARE_WITHOUT_ROUND,,,,0,11508,3376.375476
 11509,4,関西本線,カンサイホンセン,関西本線(亀山～加茂),Kansai Main Line,Kansai Main Line,关西本线,간사이 본선,#0FB68F,2,,,,,,,,,,,,,0,11509,5064.656522
 11510,3,紀勢本線,キセイホンセン,紀勢本線,Kisei Line,Kisei Line,纪势线,기세이선,#F80039,2,,,,,,,,,,,,,0,11510,3910.567975
-11511,4,草津線,クサツセン,草津線,Kusatsu Line,Kusatsu Line,草津线,구사쓰선,#CBCF10,2,C,,,,#CBCF10,,,,,,,,0,11511,3539.969888
+11511,4,草津線,クサツセン,草津線,Kusatsu Line,Kusatsu Line,草津线,구사쓰선,#CBCF10,2,C,,,,#CBCF10,,,,REVERSED_SQUARE_WEST,,,,0,11511,3539.969888
 11512,3,参宮線,サングウセン,参宮線,Sangu Line,Sangu Line,参宫线,산구선,#4D2E8C,2,,,,,,,,,,,,,0,11512,2685.141942
 11513,3,名松線,メイショウセン,名松線,Meisho Line,Meisho Line,名松线,메이쇼선,#E9E343,2,,,,,,,,,,,,,0,11513,2806.316563
 11601,4,琵琶湖線,ビワコセン,東海道本線(米原～京都),Biwako Line,Biwako Line,琵琶湖线,비와코선,#0072BC,2,A,,,,#0072BC,,,,REVERSED_SQUARE_WEST,,,,0,11601,3504.002841
@@ -182,7 +182,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 11706,4,木次線,キスキセン,木次線,Kisuki Line,Kisuki Line,木次线,기스키선,#339966,2,E,,,,#339966,,,,REVERSED_SQUARE_WEST,,,,0,11706,3810.633068
 11707,4,三江線,サンコウセン,三江線,Sanko Line,Sanko Line,三江线,산코선,#C9090B,2,,,,,,,,,,,,,2,11707,2733.853709
 11708,4,山口線,ヤマグチセン,山口線,Yamaguchi Line,Yamaguchi Line,山口线,야마구치선,#FF6600,2,,,,,,,,,,,,,0,11708,3106.524054
-11709,4,宇野線,ウノセン,宇野線,Uno Line,Uno Line,宇野线,우노선,#3333CC,2,M,,,,,,,,,,,,0,11709,2203.987674
+11709,4,宇野線,ウノセン,宇野線,Uno Line,Uno Line,宇野线,우노선,#3333CC,2,M,,,,#63D2D3,,,,REVERSED_SQUARE_WEST_DARK_TEXT,,,,0,11709,2203.987674
 11710,4,瀬戸大橋線,セトオオハシセン,本四備讃線,Honshi-Bisan Line,Honshi-Bisan Line,本四备赞线,혼시비산선,#0072BC,2,M,Y,,,#0072BC,#FBAF18,,,REVERSED_SQUARE_WEST,ROUND,,,0,11710,6043.772613
 11713,4,吉備線,キビセン,吉備線,Kibi Line,Kibi Line,吉备线,기비선,#FFA500,2,,,,,,,,,,,,,0,11713,2090.757344
 11714,4,芸備線,ゲイビセン,芸備線,Geibi Line,Geibi Line,艺备线,게이비선,#00CED1,2,P,,,,#00CED1,,,,REVERSED_SQUARE_WEST,,,,0,11714,3231.314394
@@ -466,24 +466,24 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99413,160,富山地鉄市内線【１・２系統】,トヤマチテツシナイセン,富山地鉄市内線,Toyama City Tram Line Route 1/2,Toyama City Tram Line Route 1/2,,,#EF1731,4,C,,,,#EF1731,,,,ROUND,,,,0,99413,349.5224301
 99422,160,富山地鉄富山都心線【３系統(環状線)】,トヤマチテツトヤマトシンセン,富山地鉄富山都心線,Toyama City Tram Line Route 3,Toyama City Tram Line Route 3,,,#4243BE,4,C,,,,#4243BE,,,,ROUND,,,,0,99413,157.987708
 99414,163,万葉線,マンヨウセン,万葉線,Manyo Line,Manyo Line,,,#FF0B4B,4,,,,,,,,,,,,,0,99414,521.089882
-99415,160,富山港線,トヤマコウセン,富山港線,Toyamako line,Toyamako line,,,#3698C4,4,C,,,,,,,,,,,,0,99415,545.37464
-99416,165,北陸鉄道石川線,ホクリクテツドウイシカワセン,北陸鉄道石川線,Hokuriku Railroad Ishikawa Line,Hokuriku Railroad Ishikawa Line,,,#A9731E,2,I,,,,,,,,,,,,0,99416,854.0732615
-99417,165,北陸鉄道浅野川線,ホクリクテツドウアサノガワセン,北陸鉄道浅野川線,Hokuriku Railroad Asanogawa Line,Hokuriku Railroad Asanogawa Line,,,#559652,2,A,,,,,,,,,,,,0,99417,601.1770034
+99415,160,富山港線,トヤマコウセン,富山港線,Toyamako line,Toyamako line,,,#3698C4,4,C,,,,#3698C4,,,,ROUND,,,,0,99415,545.37464
+99416,165,北陸鉄道石川線,ホクリクテツドウイシカワセン,北陸鉄道石川線,Hokuriku Railroad Ishikawa Line,Hokuriku Railroad Ishikawa Line,,,#A9731E,2,I,,,,#008000,,,,ROUND,,,,0,99416,854.0732615
+99417,165,北陸鉄道浅野川線,ホクリクテツドウアサノガワセン,北陸鉄道浅野川線,Hokuriku Railroad Asanogawa Line,Hokuriku Railroad Asanogawa Line,,,#559652,2,A,,,,#0067C0,,,,ROUND,,,,0,99417,601.1770034
 99423,244,日本海ひすいライン,ニホンカイヒスイライン,日本海ひすいライン,Nihonkai Hisui Line,Nihonkai Hisui Line,,,#3782BD,2,,,,,,,,,,,,,0,99417,4816.810094
 99424,244,妙高はねうまライン,ミョウコウハネウマライン,妙高はねうまライン,Myoko Haneuma Line,Myoko Haneuma Line,,,#35C98E,2,,,,,,,,,,,,,0,99417,3780.959805
 99425,245,あいの風とやま鉄道線,アイノカゼトヤマテツドウセン,あいの風とやま鉄道線,Ainokaze Toyama Railway Line,Ainokaze Toyama Railway Line,,,#63C65E,2,,,,,,,,,,,,,0,99417,4364.498347
 99426,246,IRいしかわ鉄道線,アイアールイシカワテツドウセン,IRいしかわ鉄道株式会社,IR Ishikawa Railway Line,IR Ishikawa Railway Line,,,#25A6DF,2,,,,,,,,,,,,,0,99417,3493.9062
 99418,166,のと鉄道七尾線,ノトテツドウナナオセン,のと鉄道七尾線,Noto Railway Nanao Line,Noto Railway Nanao Line,,,#1594EB,2,,,,,,,,,,,,,0,99418,4161.429853
-99419,167,えちぜん鉄道勝山永平寺線,エチゼンテツドウカツヤマエイヘイジセン,えちぜん鉄道勝山永平寺線,Echizen Railway Katsuyama Eiheiji Line,Echizen Railway Katsuyama Eiheiji Line,,,#FD6802,2,E,,,,#FD6802,,,,,,,,0,99419,1213.806587
-99420,167,えちぜん鉄道三国芦原線,エチゼンテツドウミクニアワラセン,えちぜん鉄道三国芦原線,Echizen Railway Mikuni Ashihara Line,Echizen Railway Mikuni Ashihara Line,,,#0069FF,2,E,,,,#0069FF,,,,,,,,0,99420,1120.611283
+99419,167,えちぜん鉄道勝山永平寺線,エチゼンテツドウカツヤマエイヘイジセン,えちぜん鉄道勝山永平寺線,Echizen Railway Katsuyama Eiheiji Line,Echizen Railway Katsuyama Eiheiji Line,,,#FD6802,2,E,,,,#FD6802,,,,ROUND,,,,0,99419,1213.806587
+99420,167,えちぜん鉄道三国芦原線,エチゼンテツドウミクニアワラセン,えちぜん鉄道三国芦原線,Echizen Railway Mikuni Ashihara Line,Echizen Railway Mikuni Ashihara Line,,,#0069FF,2,E,,,,#0069FF,,,,ROUND,,,,0,99420,1120.611283
 99421,168,福井鉄道福武線,フクイテツドウフクブセン,福井鉄道福武線,Fukui Railway Fukutake Line,Fukui Railway Fukutake Line,,,#197A3D,4,F,,,,#197A3D,,,,ROUND,,,,0,99421,855.6039455
 99428,251,ハピラインふくい線,ハピラインフクイセン,ハピラインふくい線,Hapi-line Fukui,Hapi-line Fukui线,,,#EC1C9C,2,,,,,,,,,,,,,0,99426,4480.588607
 99501,169,伊豆急行線,イズキュウコウセン,伊豆急行線,Izu Kyuko Line,Izu Kyuko Line,,,#0085CD,2,IZ,,,,#000000,,,,SQUARE,,,,0,99501,2837.052489
 99502,128,伊豆箱根鉄道駿豆線,イズハコネテツドウスンズセン,伊豆箱根鉄道駿豆線,Izuhakone Railway Sunzu Line,Izuhakone Railway Sunzu Line,,,#4086E5,2,IS,,,,#4086E5,,,,IZUHAKONE,,,,0,99502,1550.334564
-99503,170,岳南鉄道線,ガクナンテツドウセン,岳南鉄道線,Gakunan Railway Line,Gakunan Railway Line,,,#6B0102,2,GD,,,,,,,,,,,,0,99503,926.2883295
-99504,171,静岡鉄道静岡清水線,シズオカテツドウシズオカシミズセン,静岡鉄道静岡清水線,Shizuoka Railway Shizuoka Shimizu Line,Shizuoka Railway Shizuoka Shimizu Line,,,#0063B5,2,S,,,,,,,,,,,,0,99504,759.7729306
+99503,170,岳南鉄道線,ガクナンテツドウセン,岳南鉄道線,Gakunan Railway Line,Gakunan Railway Line,,,#6B0102,2,GD,,,,#000000,,,,ROUND_HORIZONTAL,,,,0,99503,926.2883295
+99504,171,静岡鉄道静岡清水線,シズオカテツドウシズオカシミズセン,静岡鉄道静岡清水線,Shizuoka Railway Shizuoka Shimizu Line,Shizuoka Railway Shizuoka Shimizu Line,,,#0063B5,2,S,,,,#0094E2,,,,ROUND_HORIZONTAL,,,,0,99504,759.7729306
 99505,172,天竜浜名湖線,テンリュウハマナコセン,天竜浜名湖鉄道天竜浜名湖線,Tenryu Hamanako Line,Tenryu Hamanako Line,,,#95805A,2,,,,,,,,,,,,,0,99505,1653.706397
-99506,173,遠州鉄道鉄道線,エンシュウテツドウテツドウセン,遠州鉄道鉄道線,Enshu Railway Line,Enshu Railway Line,,,#0672B0,2,ET,,,,,,,,REVERSED_SQUARE,,,,0,99506,1038.546232
+99506,173,遠州鉄道鉄道線,エンシュウテツドウテツドウセン,遠州鉄道鉄道線,Enshu Railway Line,Enshu Railway Line,,,#0672B0,2,ET,,,,#0672B0,,,,NUMBER_ONLY,,,,0,99506,1038.546232
 99507,174,大井川鐵道大井川本線,オオイガワテツドウオオイガワホンセン,大井川鐵道大井川本線,Oigawa Railway Oigawa Main Line,Oigawa Railway Oigawa Main Line,,,#F5F5F5,2,,,,,,,,,,,,,0,99507,1878.303832
 99508,174,南アルプスあぷとライン,ミナミアルプスアプトライン,大井川鐵道井川線,Oigawa Railway Ikawa Line,Oigawa Railway Ikawa Line,,,#FFFFCC,2,,,,,,,,,,,,,0,99508,1444.65395
 99509,175,あおなみ線,アオナミセン,西名古屋港線,Aonami Line,Aonami Line,,,#464285,2,AN,,,,#464285,,,,ROUND,,,,0,99509,1449.553017
@@ -503,15 +503,15 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99523,182,ゆとりーとライン,ユトリートライン,ガイドウェイバス志段味線,Yutorito Line,Yutorito Line,,,#3C459A,5,Y,,,,#3C459A,,,,ROUND,,,,0,99523,781.8173214
 99524,183,明知鉄道明知線,アケチテツドウアケチセン,明知鉄道明知線,Akechi Railway Akechi Line,Akechi Railway Akechi Line,,,#000000,2,,,,,#000000,,,,MONOCHROME_ROUND,,,,0,99524,2203.610369
 99525,184,長良川鉄道越美南線,ナガラガワテツドウエツミナンセン,長良川鉄道越美南線,Nagaragawa Railway Etsumi-Nan Line,Nagaragawa Railway Etsumi-Nan Line,,,#FF1493,2,,,,,#1C4A9A,,,,MONOCHROME_ROUND,,,,0,99525,1753.021335
-99526,185,樽見鉄道樽見線,タルミテツドウタルミセン,樽見鉄道樽見線,Tarumi Railway Tarumi Line,Tarumi Railway Tarumi Line,,,#097AD6,2,TR,,,,,,,,,,,,0,99526,1852.466042
+99526,185,樽見鉄道樽見線,タルミテツドウタルミセン,樽見鉄道樽見線,Tarumi Railway Tarumi Line,Tarumi Railway Tarumi Line,,,#097AD6,2,TR,,,,#D50707,,,,REVERSED_ROUND_HORIZONTAL,,,,0,99526,1852.466042
 99528,186,三岐鉄道三岐線,サンギテツドウサンギセン,三岐鉄道三岐線,Sangi Railway Sanki Line,Sangi Railway Sanki Line,,,#0D287C,2,,,,,,,,,,,,,0,99528,1814.991093
 99529,186,三岐鉄道北勢線,サンギテツドウホクセイセン,三岐鉄道北勢線,Sangi Railway Hokusei Line,Sangi Railway Hokusei Line,,,#0D287C,2,,,,,,,,,,,,,0,99529,1604.938311
 99530,187,伊勢鉄道伊勢線,イセテツドウイセセン,伊勢鉄道伊勢線,Ise Railway Ise Line,Ise Railway Ise Line,,,#0300FA,2,,,,,,,,,,,,,0,99530,2429.603632
 99531,188,伊賀鉄道伊賀線,イガテツドウイガセン,伊賀鉄道伊賀線,Iga Railway Iga Line,Iga Railway Iga Line,,,#895B8A,2,,,,,,,,,,,,,0,99531,1090.600757
 99532,189,養老鉄道養老線,ヨウロウテツドウヨウロウセン,養老鉄道養老線,Yoro Railway Yoro Line,Yoro Railway Yoro Line,,,#ADDB8E,2,,,,,,,,,,,,,0,99532,2083.545351
-99601,190,近江鉄道本線,オウミテツドウホンセン,近江鉄道本線,Ohmi Railway Main Line,Ohmi Railway Main Line,,,#DF8A28,2,OR,,,,,,,,,,,,0,99601,1932.172613
-99602,190,近江鉄道多賀線,オウミテツドウタガセン,近江鉄道多賀線,Ohmi Railway Taga Line,Ohmi Railway Taga Line,,,#DF8A28,2,OR,,,,,,,,,,,,0,99602,1202.770588
-99603,190,近江鉄道八日市線,オウミテツドウヨウカイチセン,近江鉄道八日市線,Ohmi Railway Yokaichi Line,Ohmi Railway Yokaichi Line,,,#DF8A28,2,OR,,,,,,,,,,,,0,99603,1509.813645
+99601,190,近江鉄道本線,オウミテツドウホンセン,近江鉄道本線,Ohmi Railway Main Line,Ohmi Railway Main Line,,,#DF8A28,2,OR,,,,#DF8A28,,,,ROUND,,,,0,99601,1932.172613
+99602,190,近江鉄道多賀線,オウミテツドウタガセン,近江鉄道多賀線,Ohmi Railway Taga Line,Ohmi Railway Taga Line,,,#DF8A28,2,OR,,,,#DF8A28,,,,ROUND,,,,0,99602,1202.770588
+99603,190,近江鉄道八日市線,オウミテツドウヨウカイチセン,近江鉄道八日市線,Ohmi Railway Yokaichi Line,Ohmi Railway Yokaichi Line,,,#DF8A28,2,OR,,,,#DF8A28,,,,ROUND,,,,0,99603,1509.813645
 99604,191,信楽高原鐵道信楽線,シガラキコウゲンテツドウシガラキセン,信楽高原鐵道信楽線,Shigaraki Kogen Railway Shigaraki Line,Shigaraki Kogen Railway Shigaraki Line,,,#FF6633,2,,,,,,,,,,,,,0,99604,2443.167056
 99605,192,嵯峨野観光線,サガノカンコウセン,嵯峨野観光線,Sagano Scenic Railway,Sagano Scenic Railway,,,#B22222,2,,,,,,,,,,,,,0,99605,2419.347795
 99606,193,叡山電鉄叡山本線,エイザンデンテツエイザンホンセン,叡山電鉄叡山本線,Eizan Electric Railway Eizan Main Line,Eizan Electric Railway Eizan Main Line,,,#007F00,2,E,,,,#007F00,,,,KEIHAN,,,,0,99606,776.0586831
