@@ -80,7 +80,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 11317,2,八高線,ハチコウセン,八高線(八王子～高麗川),Hachiko Line,Hachiko Line,八高线,하치코선,#A8A39D,2,,,,,,,,,,,,,0,11317,3651.873126
 11318,2,八高線,ハチコウセン,八高線(高麗川～高崎),Hachiko Line,Hachiko Line,八高线,하치코선,#A8A39D,2,,,,,,,,,,,,,0,11318,3983.690946
 11319,2,宇都宮線,ウツノミヤセン,東北本線,Utsunomiya Line,Utsunomiya Line,宇都宫线,우쓰노미야선,#F68B1E,2,JU,,,,#F68B1E,,,,SQUARE,,,,0,11319,4815.931405
-11320,2,常磐線,ジョウバンセン,常磐線(上野～取手),Joban Line,Joban Line,常磐线,조반선,#00B261,2,JJ,JL,,,#00B261,#A2A9B1,,,SQUARE,SQUARE,,,0,11320,2001.759231
+11320,2,常磐快速線,ジョウバンカイソクセン,常磐線(上野～取手),Joban Rapid Line,Joban Rapid Line,常磐快速线,조반 쾌속선,#00B261,2,JJ,JL,,,#00B261,#A2A9B1,,,SQUARE,SQUARE,,,0,11320,2001.759231
 11344,2,常磐線,ジョウバンセン,常磐線(緩行線),Joban Line,Joban Line,常磐线,조반선,#A2A9B1,2,JL,JJ,,,#A2A9B1,#00B261,,,SQUARE,SQUARE,,,0,11344,2001.759231
 11321,2,埼京線,サイキョウセン,埼京線,Saikyo Line,Saikyo Line,埼京线,사이쿄선,#00B48D,2,JA,,,,#00B48D,,,,SQUARE,,,,0,11321,2323.133887
 11322,2,川越線,カワゴエセン,川越線,Kawagoe Line,Kawagoe Line,川越线,가와고에선,#00B48D,2,,,,,,,,,,,,,0,11322,2880.176953
@@ -480,7 +480,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99428,251,ハピラインふくい線,ハピラインフクイセン,ハピラインふくい線,Hapi-line Fukui,Hapi-line Fukui线,,,#EC1C9C,2,,,,,,,,,,,,,0,99426,4480.588607
 99501,169,伊豆急行線,イズキュウコウセン,伊豆急行線,Izu Kyuko Line,Izu Kyuko Line,,,#0085CD,2,IZ,,,,#000000,,,,SQUARE,,,,0,99501,2837.052489
 99502,128,伊豆箱根鉄道駿豆線,イズハコネテツドウスンズセン,伊豆箱根鉄道駿豆線,Izuhakone Railway Sunzu Line,Izuhakone Railway Sunzu Line,,,#4086E5,2,IS,,,,#4086E5,,,,IZUHAKONE,,,,0,99502,1550.334564
-99503,170,岳南鉄道線,ガクナンテツドウセン,岳南鉄道線,Gakunan Railway Line,Gakunan Railway Line,,,#6B0102,2,GD,,,,#000000,,,,ROUND_HORIZONTAL,,,,0,99503,926.2883295
+99503,170,岳南鉄道線,ガクナンテツドウセン,岳南鉄道線,Gakunan Railway Line,Gakunan Railway Line,,,#6B0102,2,GD,,,,#000000,,,,MONOCHROME_ROUND,,,,0,99503,926.2883295
 99504,171,静岡鉄道静岡清水線,シズオカテツドウシズオカシミズセン,静岡鉄道静岡清水線,Shizuoka Railway Shizuoka Shimizu Line,Shizuoka Railway Shizuoka Shimizu Line,,,#0063B5,2,S,,,,#0094E2,,,,ROUND_HORIZONTAL,,,,0,99504,759.7729306
 99505,172,天竜浜名湖線,テンリュウハマナコセン,天竜浜名湖鉄道天竜浜名湖線,Tenryu Hamanako Line,Tenryu Hamanako Line,,,#95805A,2,,,,,,,,,,,,,0,99505,1653.706397
 99506,173,遠州鉄道鉄道線,エンシュウテツドウテツドウセン,遠州鉄道鉄道線,Enshu Railway Line,Enshu Railway Line,,,#0672B0,2,ET,,,,#0672B0,,,,NUMBER_ONLY,,,,0,99506,1038.546232
