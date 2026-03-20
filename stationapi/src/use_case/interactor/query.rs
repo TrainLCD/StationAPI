@@ -279,8 +279,9 @@ where
         )?;
 
         // Build HashMap for O(1) company lookup instead of O(n) linear search
-        let company_map: std::collections::HashMap<i32, &Company> =
-            companies.iter().map(|c| (c.company_cd, c)).collect();
+        // Owns the values so we can add bus companies later
+        let mut company_map: std::collections::HashMap<i32, Company> =
+            companies.into_iter().map(|c| (c.company_cd, c)).collect();
 
         // Build HashMap for O(1) train_type lookup by station_cd
         let train_type_map: std::collections::HashMap<i32, &TrainType> = train_types
@@ -294,10 +295,10 @@ where
             .map(|s| ((s.line_cd, s.station_g_cd), s))
             .collect();
 
-        // Cache nearby bus stop candidates by grid key (~100m resolution).
-        // The candidate set is cached, but the 300m distance filter is applied
-        // per-station to ensure correctness.
-        let mut bus_candidate_cache: std::collections::HashMap<(i64, i64), Vec<Station>> =
+        // Cache nearby bus stop candidates by station_g_cd.
+        // Stations with the same station_g_cd are at the same physical location,
+        // so they share identical bus stop candidates.
+        let mut bus_candidate_cache: std::collections::HashMap<i32, Vec<Station>> =
             std::collections::HashMap::new();
         // Cache bus lines by station_group_ids to avoid repeated DB queries
         // for the same set of bus stop groups.
@@ -307,7 +308,7 @@ where
         for station in stations.iter_mut() {
             let mut line = self.extract_line_from_station(station);
             line.line_symbols = self.get_line_symbols(&line);
-            line.company = company_map.get(&line.company_cd).cloned().cloned();
+            line.company = company_map.get(&line.company_cd).cloned();
             line.station = Some(station.clone());
 
             let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
@@ -337,10 +338,7 @@ where
             // Only add bus routes if transport_type is RailAndBus
             let should_include_bus_routes = transport_type == TransportTypeFilter::RailAndBus;
             if station.transport_type == TransportType::Rail && should_include_bus_routes {
-                let cache_key = (
-                    (station.lat * 1000.0).round() as i64,
-                    (station.lon * 1000.0).round() as i64,
-                );
+                let cache_key = station.station_g_cd;
                 let candidates = if let Some(cached) = bus_candidate_cache.get(&cache_key) {
                     cached.clone()
                 } else {
@@ -416,8 +414,23 @@ where
                 }
             }
 
+            // Fetch any missing companies (e.g., bus-only operators not in initial lines)
+            let missing_company_ids: Vec<u32> = lines
+                .iter()
+                .filter(|l| !company_map.contains_key(&l.company_cd))
+                .map(|l| l.company_cd as u32)
+                .collect::<std::collections::HashSet<u32>>()
+                .into_iter()
+                .collect();
+            if !missing_company_ids.is_empty() {
+                let extra_companies = self.find_company_by_id_vec(&missing_company_ids).await?;
+                for c in extra_companies {
+                    company_map.insert(c.company_cd, c);
+                }
+            }
+
             for line in lines.iter_mut() {
-                line.company = company_map.get(&line.company_cd).cloned().cloned();
+                line.company = company_map.get(&line.company_cd).cloned();
                 line.line_symbols = self.get_line_symbols(line);
                 if let Some(station_ref) = station_lookup.get(&(line.line_cd, station.station_g_cd))
                 {
