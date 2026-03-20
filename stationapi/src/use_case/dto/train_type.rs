@@ -1,8 +1,5 @@
 use crate::{
-    domain::{
-        entity::train_type::TrainType,
-        ipa::compute_ipa_cached,
-    },
+    domain::{entity::train_type::TrainType, ipa::compute_ipa_cached},
     proto::TrainType as GrpcTrainType,
     use_case::dto::tts::to_proto_tts_segments,
 };

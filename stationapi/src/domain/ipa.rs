@@ -61,10 +61,7 @@ fn cached_lookup(
 
 /// Compute IPA for station/train-type names with memoization.
 pub fn compute_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
-    let key = (
-        name_katakana.to_string(),
-        name_roman.map(str::to_string),
-    );
+    let key = (name_katakana.to_string(), name_roman.map(str::to_string));
     cached_lookup(&STATION_IPA_CACHE, &key, || {
         compute_ipa(name_katakana, name_roman)
     })
@@ -72,10 +69,7 @@ pub fn compute_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaR
 
 /// Compute IPA for line names (with suffix replacement) with memoization.
 pub fn compute_line_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
-    let key = (
-        name_katakana.to_string(),
-        name_roman.map(str::to_string),
-    );
+    let key = (name_katakana.to_string(), name_roman.map(str::to_string));
     cached_lookup(&LINE_IPA_CACHE, &key, || {
         compute_line_ipa(name_katakana, name_roman)
     })
