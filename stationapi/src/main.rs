@@ -66,7 +66,9 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
         .parse()
         .expect("Failed to parse metrics address");
     metrics_exporter_prometheus::PrometheusBuilder::new()
-        .set_buckets(&[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0])
+        .set_buckets(&[
+            0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+        ])
         .expect("Failed to set histogram buckets")
         .with_http_listener(metrics_addr)
         .install()
@@ -222,10 +224,7 @@ fn fetch_metrics_port() -> u16 {
         Ok(s) => s.parse().expect("Failed to parse $METRICS_PORT"),
         Err(env::VarError::NotPresent) => {
             let default = fetch_port() + 1;
-            warn!(
-                "$METRICS_PORT is not set. Falling back to {}.",
-                default
-            );
+            warn!("$METRICS_PORT is not set. Falling back to {}.", default);
             default
         }
         Err(VarError::NotUnicode(_)) => panic!("$METRICS_PORT should be written in Unicode."),
