@@ -1,10 +1,7 @@
 use crate::{
     domain::{
         entity::{gtfs::TransportType, line::Line},
-        ipa::{
-            katakana_name_to_ipa, non_empty_ipa, replace_line_name_suffix, station_name_to_ipa,
-            station_name_to_tts_segments,
-        },
+        ipa::compute_line_ipa_cached,
     },
     proto::{Line as GrpcLine, TransportType as GrpcTransportType},
     use_case::dto::tts::to_proto_tts_segments,
@@ -12,15 +9,10 @@ use crate::{
 
 impl From<Line> for GrpcLine {
     fn from(line: Line) -> Self {
-        let name_ipa = {
-            let (stem, suffix_ipa) = replace_line_name_suffix(&line.line_name_k);
-            non_empty_ipa(katakana_name_to_ipa(stem).map(|ipa| format!("{ipa}{suffix_ipa}")))
-        };
-        let name_roman_ipa = station_name_to_ipa("", line.line_name_r.as_deref());
-        let name_tts_segments = to_proto_tts_segments(station_name_to_tts_segments(
-            &line.line_name_k,
-            line.line_name_r.as_deref(),
-        ));
+        let ipa = compute_line_ipa_cached(&line.line_name_k, line.line_name_r.as_deref());
+        let name_ipa = ipa.name_ipa;
+        let name_roman_ipa = ipa.name_roman_ipa;
+        let name_tts_segments = to_proto_tts_segments(ipa.tts_segments);
         // バス路線の場合は line_type を OtherLineType (0) に強制
         // (鉄道用の line_type が誤って設定されている可能性があるため)
         let line_type = if line.transport_type == TransportType::Bus {

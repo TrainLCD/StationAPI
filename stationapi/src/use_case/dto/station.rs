@@ -1,7 +1,7 @@
 use crate::{
     domain::{
         entity::{gtfs::TransportType, station::Station},
-        ipa::{katakana_name_to_ipa, station_name_to_ipa, station_name_to_tts_segments},
+        ipa::compute_ipa_cached,
     },
     proto::{Station as GrpcStation, TransportType as GrpcTransportType},
     use_case::dto::tts::to_proto_tts_segments,
@@ -18,13 +18,10 @@ impl From<TransportType> for i32 {
 
 impl From<Station> for GrpcStation {
     fn from(station: Station) -> Self {
-        let name_ipa = katakana_name_to_ipa(&station.station_name_k);
-        let name_roman_ipa =
-            station_name_to_ipa(&station.station_name_k, station.station_name_r.as_deref());
-        let name_tts_segments = to_proto_tts_segments(station_name_to_tts_segments(
-            &station.station_name_k,
-            station.station_name_r.as_deref(),
-        ));
+        let ipa = compute_ipa_cached(&station.station_name_k, station.station_name_r.as_deref());
+        let name_ipa = ipa.name_ipa;
+        let name_roman_ipa = ipa.name_roman_ipa;
+        let name_tts_segments = to_proto_tts_segments(ipa.tts_segments);
         Self {
             id: station.station_cd as u32,
             group_id: station.station_g_cd as u32,

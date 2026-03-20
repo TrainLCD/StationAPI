@@ -12,6 +12,10 @@ pub trait TrainTypeRepository: Send + Sync + 'static {
         line_group_id: u32,
         line_id: u32,
     ) -> Result<Option<TrainType>, DomainError>;
+    async fn find_by_line_group_id_and_line_id_vec(
+        &self,
+        pairs: &[(u32, u32)],
+    ) -> Result<std::collections::HashMap<(u32, u32), TrainType>, DomainError>;
     async fn get_by_station_id_vec(
         &self,
         station_id_vec: &[u32],
@@ -135,6 +139,22 @@ mod tests {
                         && train_type.type_cd == Some(line_id as i32)
                 })
                 .cloned();
+            Ok(result)
+        }
+
+        async fn find_by_line_group_id_and_line_id_vec(
+            &self,
+            pairs: &[(u32, u32)],
+        ) -> Result<std::collections::HashMap<(u32, u32), TrainType>, DomainError> {
+            let mut result = std::collections::HashMap::new();
+            for &(line_group_id, line_id) in pairs {
+                if let Some(tt) = self
+                    .find_by_line_group_id_and_line_id(line_group_id, line_id)
+                    .await?
+                {
+                    result.insert((line_group_id, line_id), tt);
+                }
+            }
             Ok(result)
         }
 
