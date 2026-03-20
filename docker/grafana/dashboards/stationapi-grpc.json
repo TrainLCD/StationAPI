@@ -204,7 +204,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(grpc_requests_total{status=\"error\"}[5m])) / sum(rate(grpc_requests_total[5m]))",
+          "expr": "sum(rate(grpc_requests_total{status=\"error\"}[5m])) / (sum(rate(grpc_requests_total[5m])) > 0) or vector(0)",
           "legendFormat": "Error Ratio",
           "refId": "A"
         }

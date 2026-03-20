@@ -55,7 +55,7 @@ Do you like this project? Join our Discord community!
 Prometheus + Grafana による gRPC メトリクスの可視化環境が同梱されています。
 
 ```bash
-docker compose up -d prometheus grafana
+docker compose up -d api prometheus grafana
 ```
 
 - **Grafana**: http://localhost:3001 (ログイン: `admin` / `admin`)

@@ -33,7 +33,7 @@ services:
       - ./docker/postgres:/docker-entrypoint-initdb.d:ro
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v3.2.1}
     volumes:
       - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -42,7 +42,7 @@ services:
     restart: always
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:${GRAFANA_VERSION:-11.5.2}
     depends_on:
       - prometheus
     volumes:
