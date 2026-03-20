@@ -50,6 +50,19 @@ This project follows the [all-contributors](https://github.com/all-contributors/
 Do you like this project? Join our Discord community!
 [https://discord.gg/qKT7zSGQre](https://discord.gg/qKT7zSGQre)
 
+## Monitoring
+
+Prometheus + Grafana による gRPC メトリクスの可視化環境が同梱されています。
+
+```bash
+docker compose up -d prometheus grafana
+```
+
+- **Grafana**: http://localhost:3001 (ログイン: `admin` / `admin`)
+- **Prometheus**: http://localhost:9090
+
+Grafana には「StationAPI gRPC Metrics」ダッシュボードが自動でプロビジョニングされ、リクエストレート、エラーレート、レイテンシパーセンタイル等を確認できます。
+
 ## Development
 
 ### Running Tests
