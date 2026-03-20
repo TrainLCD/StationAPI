@@ -250,10 +250,12 @@ where
         line_group_id: Option<u32>,
         transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let station_group_ids = stations
+        let mut station_group_ids: Vec<u32> = stations
             .iter()
             .map(|station| station.station_g_cd as u32)
-            .collect::<Vec<u32>>();
+            .collect();
+        station_group_ids.sort_unstable();
+        station_group_ids.dedup();
 
         // Phase 1: independent queries in parallel
         let (stations_by_group_ids, lines) = tokio::try_join!(
@@ -266,10 +268,9 @@ where
             .map(|station| station.station_cd as u32)
             .collect::<Vec<u32>>();
 
-        let company_ids = lines
-            .iter()
-            .map(|station| station.company_cd as u32)
-            .collect::<Vec<u32>>();
+        let mut company_ids: Vec<u32> = lines.iter().map(|l| l.company_cd as u32).collect();
+        company_ids.sort_unstable();
+        company_ids.dedup();
 
         // Phase 2: dependent queries in parallel
         let (companies, train_types) = tokio::try_join!(
@@ -297,6 +298,10 @@ where
         // The candidate set is cached, but the 300m distance filter is applied
         // per-station to ensure correctness.
         let mut bus_candidate_cache: std::collections::HashMap<(i64, i64), Vec<Station>> =
+            std::collections::HashMap::new();
+        // Cache bus lines by station_group_ids to avoid repeated DB queries
+        // for the same set of bus stop groups.
+        let mut bus_lines_cache: std::collections::HashMap<Vec<u32>, Vec<Line>> =
             std::collections::HashMap::new();
 
         for station in stations.iter_mut() {
@@ -341,7 +346,12 @@ where
                 } else {
                     let result = self
                         .station_repository
-                        .get_by_coordinates(station.lat, station.lon, Some(50), Some(TransportType::Bus))
+                        .get_by_coordinates(
+                            station.lat,
+                            station.lon,
+                            Some(50),
+                            Some(TransportType::Bus),
+                        )
                         .await?;
                     bus_candidate_cache.insert(cache_key, result.clone());
                     result
@@ -357,15 +367,24 @@ where
                     .collect();
 
                 if !nearby_bus_stops.is_empty() {
-                    let bus_station_group_ids: Vec<u32> = nearby_bus_stops
+                    let mut bus_station_group_ids: Vec<u32> = nearby_bus_stops
                         .iter()
                         .map(|s| s.station_g_cd as u32)
                         .collect();
+                    bus_station_group_ids.sort_unstable();
+                    bus_station_group_ids.dedup();
 
-                    let mut bus_lines = self
-                        .line_repository
-                        .get_by_station_group_id_vec(&bus_station_group_ids)
-                        .await?;
+                    let mut bus_lines =
+                        if let Some(cached) = bus_lines_cache.get(&bus_station_group_ids) {
+                            cached.clone()
+                        } else {
+                            let result = self
+                                .line_repository
+                                .get_by_station_group_id_vec(&bus_station_group_ids)
+                                .await?;
+                            bus_lines_cache.insert(bus_station_group_ids, result.clone());
+                            result
+                        };
 
                     let mut seen_bus_line_cds = std::collections::HashSet::new();
                     bus_lines.retain(|line| {
@@ -384,8 +403,7 @@ where
                         bus_line.line_symbols = self.get_line_symbols(bus_line);
                         if let Some(&bus_stop) = bus_stop_by_line_cd.get(&bus_line.line_cd) {
                             let mut station_copy = bus_stop.clone();
-                            station_copy.station_numbers =
-                                self.get_station_numbers(&station_copy);
+                            station_copy.station_numbers = self.get_station_numbers(&station_copy);
                             bus_line.station = Some(station_copy);
                         }
                     }
