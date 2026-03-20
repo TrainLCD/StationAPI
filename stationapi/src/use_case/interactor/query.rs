@@ -617,7 +617,7 @@ where
             return Ok(vec![]);
         };
 
-        // Collect all (line_group_cd, line_cd) pairs and batch-fetch train types
+        // Collect all unique (line_group_cd, line_cd) pairs and batch-fetch train types
         let tt_lookup_pairs: Vec<(u32, u32)> = train_types
             .iter()
             .filter_map(|tt| tt.line_group_cd.map(|lgc| lgc as u32))
@@ -627,6 +627,8 @@ where
                     .filter(move |l| l.line_group_cd == Some(lgc as i32))
                     .map(move |l| (lgc, l.line_cd as u32))
             })
+            .collect::<HashSet<_>>()
+            .into_iter()
             .collect();
 
         let tt_by_pair = self
@@ -1944,9 +1946,19 @@ mod tests {
             }
             async fn find_by_line_group_id_and_line_id_vec(
                 &self,
-                _: &[(u32, u32)],
+                pairs: &[(u32, u32)],
             ) -> Result<std::collections::HashMap<(u32, u32), TrainType>, DomainError> {
-                Ok(std::collections::HashMap::new())
+                let mut map = std::collections::HashMap::new();
+                for &(lg, lc) in pairs {
+                    if let Some(tt) = self
+                        .train_types
+                        .iter()
+                        .find(|t| t.line_group_cd == Some(lg as i32))
+                    {
+                        map.insert((lg, lc), tt.clone());
+                    }
+                }
+                Ok(map)
             }
             async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<TrainType>, DomainError> {
                 Ok(vec![])
