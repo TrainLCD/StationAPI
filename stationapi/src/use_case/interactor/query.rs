@@ -1126,69 +1126,6 @@ where
     TR: TrainTypeRepository,
     CR: CompanyRepository,
 {
-    /// Get bus lines (routes) within 300m radius of the given coordinates
-    async fn get_nearby_bus_lines(
-        &self,
-        ref_lat: f64,
-        ref_lon: f64,
-    ) -> Result<Vec<Line>, crate::use_case::error::UseCaseError> {
-        let nearby_candidates = self
-            .station_repository
-            .get_by_coordinates(ref_lat, ref_lon, Some(50), Some(TransportType::Bus))
-            .await?;
-
-        let nearby_bus_stops: Vec<Station> = nearby_candidates
-            .into_iter()
-            .filter(|bus_stop| {
-                let distance = haversine_distance(ref_lat, ref_lon, bus_stop.lat, bus_stop.lon);
-                distance <= NEARBY_BUS_STOP_RADIUS_METERS
-            })
-            .collect();
-
-        if nearby_bus_stops.is_empty() {
-            return Ok(vec![]);
-        }
-
-        // Get bus lines for nearby bus stops
-        let bus_station_group_ids: Vec<u32> = nearby_bus_stops
-            .iter()
-            .map(|s| s.station_g_cd as u32)
-            .collect();
-
-        let mut bus_lines = self
-            .line_repository
-            .get_by_station_group_id_vec(&bus_station_group_ids)
-            .await?;
-
-        // Add line symbols and filter to only bus lines
-        let mut seen_line_cds = std::collections::HashSet::new();
-        bus_lines.retain(|line| {
-            line.transport_type == TransportType::Bus && seen_line_cds.insert(line.line_cd)
-        });
-
-        // Build HashMap for O(1) bus stop lookup by line_cd
-        // Deduplicate by line_cd, keeping the first (closest) bus stop for each line
-        let mut seen_bus_line_cds = std::collections::HashSet::new();
-        let bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> = nearby_bus_stops
-            .iter()
-            .filter(|s| seen_bus_line_cds.insert(s.line_cd))
-            .map(|s| (s.line_cd, s))
-            .collect();
-
-        for line in bus_lines.iter_mut() {
-            line.line_symbols = self.get_line_symbols(line);
-
-            // Find the matching bus stop for this line and embed it
-            if let Some(&bus_stop) = bus_stop_by_line_cd.get(&line.line_cd) {
-                let mut station_copy = bus_stop.clone();
-                station_copy.station_numbers = self.get_station_numbers(&station_copy);
-                line.station = Some(station_copy);
-            }
-        }
-
-        Ok(bus_lines)
-    }
-
     fn build_route_tree_map<'a>(&self, stops: &'a [Station]) -> BTreeMap<i32, Vec<&'a Station>> {
         stops.iter().fold(
             BTreeMap::new(),
