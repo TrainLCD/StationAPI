@@ -617,6 +617,23 @@ where
             return Ok(vec![]);
         };
 
+        // Collect all (line_group_cd, line_cd) pairs and batch-fetch train types
+        let tt_lookup_pairs: Vec<(u32, u32)> = train_types
+            .iter()
+            .filter_map(|tt| tt.line_group_cd.map(|lgc| lgc as u32))
+            .flat_map(|lgc| {
+                lines
+                    .iter()
+                    .filter(move |l| l.line_group_cd == Some(lgc as i32))
+                    .map(move |l| (lgc, l.line_cd as u32))
+            })
+            .collect();
+
+        let tt_by_pair = self
+            .train_type_repository
+            .find_by_line_group_id_and_line_id_vec(&tt_lookup_pairs)
+            .await?;
+
         for tt in train_types.iter_mut() {
             if let Some(line_group_cd) = tt.line_group_cd {
                 let mut lines: Vec<Line> = lines
@@ -628,15 +645,9 @@ where
                 for line in lines.iter_mut() {
                     line.company = company_map.get(&line.company_cd).cloned().cloned();
                     line.line_symbols = self.get_line_symbols(line);
-
-                    let train_type: Option<TrainType> = self
-                        .train_type_repository
-                        .find_by_line_group_id_and_line_id(
-                            line_group_cd as u32,
-                            line.line_cd as u32,
-                        )
-                        .await?;
-                    line.train_type = train_type;
+                    line.train_type = tt_by_pair
+                        .get(&(line_group_cd as u32, line.line_cd as u32))
+                        .cloned();
                 }
 
                 line.company = company_map.get(&line.company_cd).cloned().cloned();
@@ -834,17 +845,14 @@ where
                         })
                         .collect();
 
-                    let name_ipa = crate::domain::ipa::katakana_name_to_ipa(&row.station_name_k);
-                    let name_roman_ipa = crate::domain::ipa::station_name_to_ipa(
+                    let ipa = crate::domain::ipa::compute_ipa_cached(
                         &row.station_name_k,
                         row.station_name_r.as_deref(),
                     );
-                    let name_tts_segments = crate::use_case::dto::tts::to_proto_tts_segments(
-                        crate::domain::ipa::station_name_to_tts_segments(
-                            &row.station_name_k,
-                            row.station_name_r.as_deref(),
-                        ),
-                    );
+                    let name_ipa = ipa.name_ipa;
+                    let name_roman_ipa = ipa.name_roman_ipa;
+                    let name_tts_segments =
+                        crate::use_case::dto::tts::to_proto_tts_segments(ipa.tts_segments);
                     proto::StationMinimal {
                         id: row.station_cd as u32,
                         group_id: row.station_g_cd as u32,
@@ -1499,6 +1507,12 @@ mod tests {
             ) -> Result<Option<TrainType>, DomainError> {
                 Ok(None)
             }
+            async fn find_by_line_group_id_and_line_id_vec(
+                &self,
+                _: &[(u32, u32)],
+            ) -> Result<std::collections::HashMap<(u32, u32), TrainType>, DomainError> {
+                Ok(std::collections::HashMap::new())
+            }
             async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<TrainType>, DomainError> {
                 Ok(vec![])
             }
@@ -1927,6 +1941,12 @@ mod tests {
                 _: u32,
             ) -> Result<Option<TrainType>, DomainError> {
                 Ok(None)
+            }
+            async fn find_by_line_group_id_and_line_id_vec(
+                &self,
+                _: &[(u32, u32)],
+            ) -> Result<std::collections::HashMap<(u32, u32), TrainType>, DomainError> {
+                Ok(std::collections::HashMap::new())
             }
             async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<TrainType>, DomainError> {
                 Ok(vec![])

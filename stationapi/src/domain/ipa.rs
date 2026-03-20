@@ -1,3 +1,86 @@
+use std::collections::HashMap;
+use std::sync::{LazyLock, RwLock};
+
+/// Cached IPA computation result for a single name.
+#[derive(Clone, Debug)]
+pub struct IpaResult {
+    pub name_ipa: Option<String>,
+    pub name_roman_ipa: Option<String>,
+    pub tts_segments: Vec<TtsNameSegment>,
+}
+
+type IpaCacheKey = (String, Option<String>);
+
+static STATION_IPA_CACHE: LazyLock<RwLock<HashMap<IpaCacheKey, IpaResult>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+static LINE_IPA_CACHE: LazyLock<RwLock<HashMap<IpaCacheKey, IpaResult>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+/// Compute all three IPA outputs in a single pass, eliminating the redundant
+/// double-computation of `station_name_to_tts_segments`.
+fn compute_ipa(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
+    let name_ipa = katakana_name_to_ipa(name_katakana);
+    let tts_segments = station_name_to_tts_segments(name_katakana, name_roman);
+    let name_roman_ipa = non_empty_ipa(join_tts_segment_pronunciations(&tts_segments));
+    IpaResult {
+        name_ipa,
+        name_roman_ipa,
+        tts_segments,
+    }
+}
+
+fn compute_line_ipa(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
+    let name_ipa = {
+        let (stem, suffix_ipa) = replace_line_name_suffix(name_katakana);
+        non_empty_ipa(katakana_name_to_ipa(stem).map(|ipa| format!("{ipa}{suffix_ipa}")))
+    };
+    let tts_segments = station_name_to_tts_segments(name_katakana, name_roman);
+    let name_roman_ipa = station_name_to_ipa("", name_roman);
+    IpaResult {
+        name_ipa,
+        name_roman_ipa,
+        tts_segments,
+    }
+}
+
+fn cached_lookup(
+    cache: &LazyLock<RwLock<HashMap<IpaCacheKey, IpaResult>>>,
+    key: &IpaCacheKey,
+    compute: impl FnOnce() -> IpaResult,
+) -> IpaResult {
+    // Fast path: read lock
+    if let Some(result) = cache.read().unwrap().get(key) {
+        return result.clone();
+    }
+    // Slow path: compute and insert
+    let result = compute();
+    cache.write().unwrap().insert(key.clone(), result.clone());
+    result
+}
+
+/// Compute IPA for station/train-type names with memoization.
+pub fn compute_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
+    let key = (
+        name_katakana.to_string(),
+        name_roman.map(str::to_string),
+    );
+    cached_lookup(&STATION_IPA_CACHE, &key, || {
+        compute_ipa(name_katakana, name_roman)
+    })
+}
+
+/// Compute IPA for line names (with suffix replacement) with memoization.
+pub fn compute_line_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
+    let key = (
+        name_katakana.to_string(),
+        name_roman.map(str::to_string),
+    );
+    cached_lookup(&LINE_IPA_CACHE, &key, || {
+        compute_line_ipa(name_katakana, name_roman)
+    })
+}
+
 /// Katakana line-name suffixes paired with their English IPA replacements.
 /// Ordered longest-first for greedy matching.
 const LINE_NAME_SUFFIX_MAP: &[(&str, &str)] = &[

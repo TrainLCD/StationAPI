@@ -1,7 +1,7 @@
 use crate::{
     domain::{
         entity::train_type::TrainType,
-        ipa::{katakana_name_to_ipa, station_name_to_ipa, station_name_to_tts_segments},
+        ipa::compute_ipa_cached,
     },
     proto::TrainType as GrpcTrainType,
     use_case::dto::tts::to_proto_tts_segments,
@@ -26,12 +26,10 @@ impl From<TrainType> for GrpcTrainType {
             lines,
             kind,
         } = train_type;
-        let name_ipa = katakana_name_to_ipa(&type_name_k);
-        let name_roman_ipa = station_name_to_ipa("", type_name_r.as_deref());
-        let name_tts_segments = to_proto_tts_segments(station_name_to_tts_segments(
-            &type_name_k,
-            type_name_r.as_deref(),
-        ));
+        let ipa = compute_ipa_cached(&type_name_k, type_name_r.as_deref());
+        let name_ipa = ipa.name_ipa;
+        let name_roman_ipa = ipa.name_roman_ipa;
+        let name_tts_segments = to_proto_tts_segments(ipa.tts_segments);
         Self {
             id: id.map(|id| id as u32).unwrap_or(0),
             type_id: type_cd.map(|id| id as u32).unwrap_or(0),

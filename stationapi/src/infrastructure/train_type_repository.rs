@@ -99,6 +99,17 @@ impl TrainTypeRepository for MyTrainTypeRepository {
         .await
     }
 
+    async fn find_by_line_group_id_and_line_id_vec(
+        &self,
+        pairs: &[(u32, u32)],
+    ) -> Result<std::collections::HashMap<(u32, u32), TrainType>, DomainError> {
+        if pairs.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        let mut conn = self.pool.acquire().await?;
+        InternalTrainTypeRepository::get_by_line_group_id_and_line_id_vec(pairs, &mut conn).await
+    }
+
     async fn get_by_station_id_vec(
         &self,
         station_id_vec: &[u32],
@@ -404,6 +415,92 @@ impl InternalTrainTypeRepository {
         let train_types: Vec<TrainType> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(train_types)
+    }
+
+    async fn get_by_line_group_id_and_line_id_vec(
+        pairs: &[(u32, u32)],
+        conn: &mut PgConnection,
+    ) -> Result<std::collections::HashMap<(u32, u32), TrainType>, DomainError> {
+        if pairs.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let line_group_ids: Vec<i32> = pairs.iter().map(|(lg, _)| *lg as i32).collect();
+        let line_ids: Vec<i32> = pairs.iter().map(|(_, l)| *l as i32).collect();
+
+        #[derive(sqlx::FromRow)]
+        struct TrainTypeWithPairRow {
+            pair_lg: i32,
+            pair_lc: i32,
+            id: Option<i32>,
+            station_cd: Option<i32>,
+            type_cd: Option<i32>,
+            line_group_cd: Option<i32>,
+            pass: Option<i32>,
+            type_name: String,
+            type_name_k: String,
+            type_name_r: Option<String>,
+            type_name_zh: Option<String>,
+            type_name_ko: Option<String>,
+            color: String,
+            direction: Option<i32>,
+            kind: Option<i32>,
+        }
+
+        let rows: Vec<TrainTypeWithPairRow> = sqlx::query_as(
+            "SELECT DISTINCT ON (pair.lg, pair.lc)
+                pair.lg AS pair_lg,
+                pair.lc AS pair_lc,
+                t.type_name,
+                t.type_name_k,
+                t.type_name_r,
+                t.type_name_zh,
+                t.type_name_ko,
+                t.color,
+                t.direction,
+                t.kind,
+                sst.id,
+                sst.station_cd,
+                sst.type_cd,
+                sst.line_group_cd,
+                sst.pass
+            FROM UNNEST($1::int[], $2::int[]) AS pair(lg, lc)
+            JOIN station_station_types AS sst ON sst.line_group_cd = pair.lg
+            JOIN types AS t ON t.type_cd = sst.type_cd
+            WHERE sst.station_cd IN (
+                SELECT station_cd FROM stations AS s
+                WHERE s.line_cd = pair.lc AND s.e_status = 0
+            )
+            ORDER BY pair.lg, pair.lc, sst.id",
+        )
+        .bind(&line_group_ids)
+        .bind(&line_ids)
+        .fetch_all(&mut *conn)
+        .await?;
+
+        let mut result = std::collections::HashMap::new();
+        for row in rows {
+            let tt = TrainType {
+                id: row.id,
+                station_cd: row.station_cd,
+                type_cd: row.type_cd,
+                line_group_cd: row.line_group_cd,
+                pass: row.pass,
+                type_name: row.type_name,
+                type_name_k: row.type_name_k,
+                type_name_r: row.type_name_r,
+                type_name_zh: row.type_name_zh,
+                type_name_ko: row.type_name_ko,
+                color: row.color,
+                direction: row.direction,
+                line: None,
+                lines: vec![],
+                kind: row.kind,
+            };
+            result.insert((row.pair_lg as u32, row.pair_lc as u32), tt);
+        }
+
+        Ok(result)
     }
 }
 
