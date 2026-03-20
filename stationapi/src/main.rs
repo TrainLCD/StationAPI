@@ -8,6 +8,7 @@ use stationapi::infrastructure::line_repository::MyLineRepository;
 use stationapi::infrastructure::station_repository::MyStationRepository;
 use stationapi::infrastructure::train_type_repository::MyTrainTypeRepository;
 use stationapi::presentation::controller::grpc::MyApi;
+use stationapi::presentation::middleware::metrics::GrpcMetricsLayer;
 use stationapi::proto;
 use stationapi::proto::station_api_server::StationApiServer;
 use stationapi::use_case::interactor::query::QueryInteractor;
@@ -58,6 +59,19 @@ async fn main() -> std::result::Result<(), anyhow::Error> {
 
 async fn run() -> std::result::Result<(), anyhow::Error> {
     tracing_subscriber::fmt::init();
+
+    // Initialize Prometheus metrics exporter on a separate HTTP port
+    let metrics_port = fetch_metrics_port();
+    let metrics_addr: SocketAddr = format!("0.0.0.0:{metrics_port}")
+        .parse()
+        .expect("Failed to parse metrics address");
+    metrics_exporter_prometheus::PrometheusBuilder::new()
+        .set_buckets(&[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0])
+        .expect("Failed to set histogram buckets")
+        .with_http_listener(metrics_addr)
+        .install()
+        .expect("Failed to install Prometheus exporter");
+    info!("Prometheus metrics server listening on {}", metrics_addr);
 
     if dotenv::from_filename(".env.local").is_err() {
         warn!("Could not load .env.local");
@@ -159,6 +173,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
     if disable_grpc_web {
         Server::builder()
+            .layer(GrpcMetricsLayer)
             .add_service(health_service)
             .add_service(svc)
             .add_service(reflection_svc)
@@ -167,6 +182,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     } else {
         Server::builder()
             .accept_http1(true)
+            .layer(GrpcMetricsLayer)
             .add_service(health_service)
             .add_service(tonic_web::enable(svc))
             .add_service(tonic_web::enable(reflection_svc))
@@ -198,6 +214,21 @@ fn fetch_addr() -> Result<SocketAddr, AddrParseError> {
             fallback_host.parse()
         }
         Err(VarError::NotUnicode(_)) => panic!("$HOST should be written in Unicode."),
+    }
+}
+
+fn fetch_metrics_port() -> u16 {
+    match env::var("METRICS_PORT") {
+        Ok(s) => s.parse().expect("Failed to parse $METRICS_PORT"),
+        Err(env::VarError::NotPresent) => {
+            let default = fetch_port() + 1;
+            warn!(
+                "$METRICS_PORT is not set. Falling back to {}.",
+                default
+            );
+            default
+        }
+        Err(VarError::NotUnicode(_)) => panic!("$METRICS_PORT should be written in Unicode."),
     }
 }
 
