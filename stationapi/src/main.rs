@@ -60,9 +60,14 @@ async fn main() -> std::result::Result<(), anyhow::Error> {
 async fn run() -> std::result::Result<(), anyhow::Error> {
     tracing_subscriber::fmt::init();
 
+    if dotenv::from_filename(".env.local").is_err() {
+        warn!("Could not load .env.local");
+    };
+
     // Initialize Prometheus metrics exporter on a separate HTTP port
+    let metrics_host = fetch_metrics_host();
     let metrics_port = fetch_metrics_port();
-    let metrics_addr: SocketAddr = format!("0.0.0.0:{metrics_port}")
+    let metrics_addr: SocketAddr = format!("{metrics_host}:{metrics_port}")
         .parse()
         .expect("Failed to parse metrics address");
     metrics_exporter_prometheus::PrometheusBuilder::new()
@@ -74,10 +79,6 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
         .install()
         .expect("Failed to install Prometheus exporter");
     info!("Prometheus metrics server listening on {}", metrics_addr);
-
-    if dotenv::from_filename(".env.local").is_err() {
-        warn!("Could not load .env.local");
-    };
 
     if let Err(e) = import::import_csv().await {
         return Err(anyhow::anyhow!("Failed to import CSV: {}", e));
@@ -219,11 +220,29 @@ fn fetch_addr() -> Result<SocketAddr, AddrParseError> {
     }
 }
 
+fn fetch_metrics_host() -> String {
+    match env::var("METRICS_HOST") {
+        Ok(s) => s,
+        Err(env::VarError::NotPresent) => {
+            warn!("$METRICS_HOST is not set. Falling back to 127.0.0.1.");
+            "127.0.0.1".to_owned()
+        }
+        Err(VarError::NotUnicode(_)) => panic!("$METRICS_HOST should be written in Unicode."),
+    }
+}
+
 fn fetch_metrics_port() -> u16 {
     match env::var("METRICS_PORT") {
         Ok(s) => s.parse().expect("Failed to parse $METRICS_PORT"),
         Err(env::VarError::NotPresent) => {
-            let default = fetch_port() + 1;
+            let port = fetch_port();
+            let default = port.checked_add(1).unwrap_or_else(|| {
+                tracing::error!(
+                    "Cannot derive default METRICS_PORT: PORT={} would overflow u16. Set $METRICS_PORT explicitly.",
+                    port
+                );
+                std::process::exit(1);
+            });
             warn!("$METRICS_PORT is not set. Falling back to {}.", default);
             default
         }
