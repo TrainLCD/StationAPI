@@ -293,7 +293,10 @@ where
             .map(|s| ((s.line_cd, s.station_g_cd), s))
             .collect();
 
-        let mut bus_line_cache: std::collections::HashMap<(i64, i64), Vec<Line>> =
+        // Cache nearby bus stop candidates by grid key (~100m resolution).
+        // The candidate set is cached, but the 300m distance filter is applied
+        // per-station to ensure correctness.
+        let mut bus_candidate_cache: std::collections::HashMap<(i64, i64), Vec<Station>> =
             std::collections::HashMap::new();
 
         for station in stations.iter_mut() {
@@ -333,16 +336,64 @@ where
                     (station.lat * 1000.0).round() as i64,
                     (station.lon * 1000.0).round() as i64,
                 );
-                let nearby_bus_lines = if let Some(cached) = bus_line_cache.get(&cache_key) {
+                let candidates = if let Some(cached) = bus_candidate_cache.get(&cache_key) {
                     cached.clone()
                 } else {
-                    let result = self.get_nearby_bus_lines(station.lat, station.lon).await?;
-                    bus_line_cache.insert(cache_key, result.clone());
+                    let result = self
+                        .station_repository
+                        .get_by_coordinates(station.lat, station.lon, Some(50), Some(TransportType::Bus))
+                        .await?;
+                    bus_candidate_cache.insert(cache_key, result.clone());
                     result
                 };
-                for bus_line in nearby_bus_lines {
-                    if seen_line_cds.insert(bus_line.line_cd) {
-                        lines.push(bus_line);
+
+                // Apply 300m filter from this station's exact coordinates
+                let nearby_bus_stops: Vec<&Station> = candidates
+                    .iter()
+                    .filter(|bus_stop| {
+                        haversine_distance(station.lat, station.lon, bus_stop.lat, bus_stop.lon)
+                            <= NEARBY_BUS_STOP_RADIUS_METERS
+                    })
+                    .collect();
+
+                if !nearby_bus_stops.is_empty() {
+                    let bus_station_group_ids: Vec<u32> = nearby_bus_stops
+                        .iter()
+                        .map(|s| s.station_g_cd as u32)
+                        .collect();
+
+                    let mut bus_lines = self
+                        .line_repository
+                        .get_by_station_group_id_vec(&bus_station_group_ids)
+                        .await?;
+
+                    let mut seen_bus_line_cds = std::collections::HashSet::new();
+                    bus_lines.retain(|line| {
+                        line.transport_type == TransportType::Bus
+                            && seen_bus_line_cds.insert(line.line_cd)
+                    });
+
+                    let bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> =
+                        nearby_bus_stops
+                            .iter()
+                            .filter(|s| seen_bus_line_cds.contains(&s.line_cd))
+                            .map(|s| (s.line_cd, *s))
+                            .collect();
+
+                    for bus_line in bus_lines.iter_mut() {
+                        bus_line.line_symbols = self.get_line_symbols(bus_line);
+                        if let Some(&bus_stop) = bus_stop_by_line_cd.get(&bus_line.line_cd) {
+                            let mut station_copy = bus_stop.clone();
+                            station_copy.station_numbers =
+                                self.get_station_numbers(&station_copy);
+                            bus_line.station = Some(station_copy);
+                        }
+                    }
+
+                    for bus_line in bus_lines {
+                        if seen_line_cds.insert(bus_line.line_cd) {
+                            lines.push(bus_line);
+                        }
                     }
                 }
             }
@@ -1942,11 +1993,20 @@ mod tests {
         /// Configurable mock train type repository for testing
         struct ConfigurableMockTrainTypeRepository {
             train_types: Vec<TrainType>,
+            expected_line_group_id: Option<u32>,
         }
 
         impl ConfigurableMockTrainTypeRepository {
             fn new(train_types: Vec<TrainType>) -> Self {
-                Self { train_types }
+                Self {
+                    train_types,
+                    expected_line_group_id: None,
+                }
+            }
+
+            fn with_expected_line_group_id(mut self, line_group_id: Option<u32>) -> Self {
+                self.expected_line_group_id = line_group_id;
+                self
             }
         }
 
@@ -2004,9 +2064,20 @@ mod tests {
             async fn get_types_by_station_id_vec(
                 &self,
                 _: &[u32],
-                _: Option<u32>,
+                line_group_id: Option<u32>,
             ) -> Result<Vec<TrainType>, DomainError> {
-                Ok(self.train_types.clone())
+                if let Some(expected) = self.expected_line_group_id {
+                    assert_eq!(
+                        line_group_id,
+                        Some(expected),
+                        "get_types_by_station_id_vec called with unexpected line_group_id"
+                    );
+                }
+                // Only return train types when line_group_id matches
+                match line_group_id {
+                    Some(_) => Ok(self.train_types.clone()),
+                    None => Ok(vec![]),
+                }
             }
             async fn get_by_line_group_id_vec(
                 &self,
@@ -2101,13 +2172,37 @@ mod tests {
             ConfigurableMockTrainTypeRepository,
             ConfigurableMockCompanyRepository,
         > {
+            create_configurable_interactor_with_line_group_id(
+                stations_by_group,
+                bus_stops,
+                lines,
+                train_types,
+                companies,
+                None,
+            )
+        }
+
+        fn create_configurable_interactor_with_line_group_id(
+            stations_by_group: Vec<Station>,
+            bus_stops: Vec<Station>,
+            lines: Vec<Line>,
+            train_types: Vec<TrainType>,
+            companies: Vec<Company>,
+            expected_line_group_id: Option<u32>,
+        ) -> QueryInteractor<
+            ConfigurableMockStationRepository,
+            ConfigurableMockLineRepository,
+            ConfigurableMockTrainTypeRepository,
+            ConfigurableMockCompanyRepository,
+        > {
             QueryInteractor {
                 station_repository: ConfigurableMockStationRepository::new(
                     stations_by_group,
                     bus_stops,
                 ),
                 line_repository: ConfigurableMockLineRepository::new(lines),
-                train_type_repository: ConfigurableMockTrainTypeRepository::new(train_types),
+                train_type_repository: ConfigurableMockTrainTypeRepository::new(train_types)
+                    .with_expected_line_group_id(expected_line_group_id),
                 company_repository: ConfigurableMockCompanyRepository::new(companies),
             }
         }
@@ -2176,12 +2271,13 @@ mod tests {
 
             let line = create_test_line_for_station_group(100, 1001);
 
-            let interactor = create_configurable_interactor(
+            let interactor = create_configurable_interactor_with_line_group_id(
                 vec![station.clone()],
                 vec![],
                 vec![line],
                 vec![train_type.clone()],
                 vec![company],
+                Some(1000),
             );
 
             let stations = vec![station];
@@ -2415,6 +2511,38 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn test_update_station_vec_with_attributes_no_train_type_when_line_group_id_none() {
+            let company = create_test_company(1, "JR東日本");
+            let train_type = create_test_train_type_for_station(101, "快速");
+
+            let mut station = create_test_station(101, 1001, 100, Some(1000));
+            station.company_cd = Some(1);
+
+            let line = create_test_line_for_station_group(100, 1001);
+
+            // Even though train_types are provided, line_group_id=None should skip the query
+            let interactor = create_configurable_interactor(
+                vec![station.clone()],
+                vec![],
+                vec![line],
+                vec![train_type],
+                vec![company],
+            );
+
+            let stations = vec![station];
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
+                .await
+                .expect("Should succeed");
+
+            assert_eq!(result.len(), 1);
+            assert!(
+                result[0].train_type.is_none(),
+                "Train type should be None when line_group_id is None"
+            );
+        }
+
+        #[tokio::test]
         async fn test_update_station_vec_with_attributes_empty_input() {
             let interactor = create_configurable_interactor(vec![], vec![], vec![], vec![], vec![]);
 
@@ -2441,12 +2569,13 @@ mod tests {
 
             let line = create_test_line_for_station_group(100, 1001);
 
-            let interactor = create_configurable_interactor(
+            let interactor = create_configurable_interactor_with_line_group_id(
                 vec![station1.clone(), station2.clone()],
                 vec![],
                 vec![line],
                 vec![train_type1, train_type2],
                 vec![company.clone()],
+                Some(1000),
             );
 
             let stations = vec![station1, station2];
