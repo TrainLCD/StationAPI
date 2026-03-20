@@ -255,32 +255,31 @@ where
             .map(|station| station.station_g_cd as u32)
             .collect::<Vec<u32>>();
 
-        let stations_by_group_ids = self
-            .get_stations_by_group_id_vec(&station_group_ids)
-            .await?;
+        // Phase 1: independent queries in parallel
+        let (stations_by_group_ids, lines) = tokio::try_join!(
+            self.get_stations_by_group_id_vec(&station_group_ids),
+            self.get_lines_by_station_group_id_vec(&station_group_ids),
+        )?;
 
         let station_ids = stations_by_group_ids
             .iter()
             .map(|station| station.station_cd as u32)
             .collect::<Vec<u32>>();
 
-        let lines = &self
-            .get_lines_by_station_group_id_vec(&station_group_ids)
-            .await?;
-
-        let company_ids = &lines
+        let company_ids = lines
             .iter()
             .map(|station| station.company_cd as u32)
             .collect::<Vec<u32>>();
-        let companies = self.find_company_by_id_vec(company_ids).await?;
+
+        // Phase 2: dependent queries in parallel
+        let (companies, train_types) = tokio::try_join!(
+            self.find_company_by_id_vec(&company_ids),
+            self.get_train_types_by_station_id_vec(&station_ids, line_group_id),
+        )?;
 
         // Build HashMap for O(1) company lookup instead of O(n) linear search
         let company_map: std::collections::HashMap<i32, &Company> =
             companies.iter().map(|c| (c.company_cd, c)).collect();
-
-        let train_types = self
-            .get_train_types_by_station_id_vec(&station_ids, line_group_id)
-            .await?;
 
         // Build HashMap for O(1) train_type lookup by station_cd
         let train_type_map: std::collections::HashMap<i32, &TrainType> = train_types
@@ -293,6 +292,9 @@ where
             .iter()
             .map(|s| ((s.line_cd, s.station_g_cd), s))
             .collect();
+
+        let mut bus_line_cache: std::collections::HashMap<(i64, i64), Vec<Line>> =
+            std::collections::HashMap::new();
 
         for station in stations.iter_mut() {
             let mut line = self.extract_line_from_station(station);
@@ -327,7 +329,17 @@ where
             // Only add bus routes if transport_type is RailAndBus
             let should_include_bus_routes = transport_type == TransportTypeFilter::RailAndBus;
             if station.transport_type == TransportType::Rail && should_include_bus_routes {
-                let nearby_bus_lines = self.get_nearby_bus_lines(station.lat, station.lon).await?;
+                let cache_key = (
+                    (station.lat * 1000.0).round() as i64,
+                    (station.lon * 1000.0).round() as i64,
+                );
+                let nearby_bus_lines = if let Some(cached) = bus_line_cache.get(&cache_key) {
+                    cached.clone()
+                } else {
+                    let result = self.get_nearby_bus_lines(station.lat, station.lon).await?;
+                    bus_line_cache.insert(cache_key, result.clone());
+                    result
+                };
                 for bus_line in nearby_bus_lines {
                     if seen_line_cds.insert(bus_line.line_cd) {
                         lines.push(bus_line);
@@ -668,6 +680,9 @@ where
         station_id_vec: &[u32],
         line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, UseCaseError> {
+        if line_group_id.is_none() {
+            return Ok(vec![]);
+        }
         let train_types = self
             .train_type_repository
             .get_types_by_station_id_vec(station_id_vec, line_group_id)
@@ -2171,7 +2186,7 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
+                .update_station_vec_with_attributes(stations, Some(1000), TransportTypeFilter::Rail)
                 .await
                 .expect("Should succeed");
 
@@ -2436,7 +2451,7 @@ mod tests {
 
             let stations = vec![station1, station2];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
+                .update_station_vec_with_attributes(stations, Some(1000), TransportTypeFilter::Rail)
                 .await
                 .expect("Should succeed");
 
