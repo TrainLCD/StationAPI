@@ -14,8 +14,10 @@ services:
       DISABLE_GRPC_WEB: false
       DISABLE_BUS_FEATURE: false
       HOST: 0.0.0.0
+      METRICS_HOST: 0.0.0.0
     ports:
       - 50051:50051
+      - 50052:50052
     restart: always
 
   psql:
@@ -29,3 +31,32 @@ services:
       - 5432:5432
     volumes:
       - ./docker/postgres:/docker-entrypoint-initdb.d:ro
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - 9090:9090
+    restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    depends_on:
+      - prometheus
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - 3001:3000
+    restart: always
+
+volumes:
+  prometheus_data:
+  grafana_data:
