@@ -1935,14 +1935,31 @@ mod tests {
             }
         }
 
+        /// Check if a TrainType matches the given (line_group_id, line_id) pair.
+        /// Matches on line_group_cd, and also checks line_id against tt.lines
+        /// when populated.
+        fn matches_pair(tt: &TrainType, line_group_id: u32, line_id: u32) -> bool {
+            if tt.line_group_cd != Some(line_group_id as i32) {
+                return false;
+            }
+            if tt.lines.is_empty() {
+                return true;
+            }
+            tt.lines.iter().any(|l| l.line_cd == line_id as i32)
+        }
+
         #[async_trait::async_trait]
         impl TrainTypeRepository for ConfigurableMockTrainTypeRepository {
             async fn find_by_line_group_id_and_line_id(
                 &self,
-                _: u32,
-                _: u32,
+                line_group_id: u32,
+                line_id: u32,
             ) -> Result<Option<TrainType>, DomainError> {
-                Ok(None)
+                Ok(self
+                    .train_types
+                    .iter()
+                    .find(|t| matches_pair(t, line_group_id, line_id))
+                    .cloned())
             }
             async fn find_by_line_group_id_and_line_id_vec(
                 &self,
@@ -1950,11 +1967,7 @@ mod tests {
             ) -> Result<std::collections::HashMap<(u32, u32), TrainType>, DomainError> {
                 let mut map = std::collections::HashMap::new();
                 for &(lg, lc) in pairs {
-                    if let Some(tt) = self
-                        .train_types
-                        .iter()
-                        .find(|t| t.line_group_cd == Some(lg as i32))
-                    {
+                    if let Some(tt) = self.train_types.iter().find(|t| matches_pair(t, lg, lc)) {
                         map.insert((lg, lc), tt.clone());
                     }
                 }
