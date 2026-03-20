@@ -46,12 +46,14 @@ This guide explains how automation agents and human contributors should work wit
 - **Full suite** – `make test-all` runs unit then integration tests sequentially. Set `RUST_LOG=debug` to inspect SQL queries during debugging.
 - **Linting and formatting** – Run `cargo fmt` and `cargo clippy --all-targets --all-features` before committing. Resolve new Clippy warnings unless an existing `#![allow]` covers the case.
 - **Data verification** – Execute `cargo run -p data_validator` whenever CSVs change and record results in pull requests.
+- **IPA coverage audit** – Execute `make ipa-audit` when English or romanized CSV names change. This is a read-only report for `data/2!lines.csv`, `data/3!stations.csv`, and `data/4!types.csv`; it does not fail validation, but highlights unresolved tokens and example names so the IPA dictionary can be extended deliberately.
 
 ## gRPC Endpoint Overview
 - **Stations** – `GetStationById`, `GetStationByIdList`, `GetStationsByGroupId`, `GetStationsByCoordinates`, `GetStationsByLineId`, `GetStationsByName`, `GetStationsByLineGroupId`. `QueryInteractor` enriches stations with lines, companies, station numbers, and train types.
 - **Lines** – `GetLineById`, `GetLinesByIdList`, `GetLinesByName`. Results include company data and computed line symbols based on repository helpers.
 - **Routes** – `GetRoutes`, `GetRoutesMinimal`. The minimal variant returns `RouteMinimalResponse` with deduplicated `LineMinimal` data; paging tokens are currently empty (pagination not implemented).
 - **Train types** – `GetTrainTypesByStationId`, `GetRouteTypes`. Train types aggregate by line group and include related lines plus optional train type metadata.
+- **TTS metadata** – `Station`, `StationMinimal`, `Line`, and `TrainType` expose `name_ipa` / `name_roman_ipa` plus `name_tts_segments` for multi-segment pronunciation output. Use `name_tts_segments` when clients need per-token SSML construction for mixed-language names such as `Kasai-Rinkai Park`.
 - **Connected routes** – `GetConnectedRoutes`. `QueryInteractor::get_connected_stations` is not implemented yet and returns an empty vector; update the use-case and infrastructure layers together when adding real logic.
 - Changes to the service contract require coordinated updates to `proto/stationapi.proto`, regenerated code via `tonic-build`, and corresponding adjustments in both presentation and use-case layers.
 

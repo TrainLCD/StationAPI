@@ -19,6 +19,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "StationNumber",
             "#[derive(serde::Serialize, serde::Deserialize)]",
         )
+        .type_attribute(
+            "TtsAlphabet",
+            "#[derive(serde::Serialize, serde::Deserialize)]",
+        )
+        .type_attribute(
+            "TtsSegment",
+            "#[derive(serde::Serialize, serde::Deserialize)]",
+        )
         .type_attribute("Line", "#[derive(serde::Serialize, serde::Deserialize)]")
         .type_attribute("Station", "#[derive(serde::Serialize, serde::Deserialize)]")
         .type_attribute(

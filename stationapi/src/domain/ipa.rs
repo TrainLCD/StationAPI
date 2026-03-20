@@ -1,3 +1,80 @@
+use std::collections::HashMap;
+use std::sync::{LazyLock, RwLock};
+
+/// Cached IPA computation result for a single name.
+#[derive(Clone, Debug)]
+pub struct IpaResult {
+    pub name_ipa: Option<String>,
+    pub name_roman_ipa: Option<String>,
+    pub tts_segments: Vec<TtsNameSegment>,
+}
+
+type IpaCacheKey = (String, Option<String>);
+
+static STATION_IPA_CACHE: LazyLock<RwLock<HashMap<IpaCacheKey, IpaResult>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+static LINE_IPA_CACHE: LazyLock<RwLock<HashMap<IpaCacheKey, IpaResult>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+/// Compute all three IPA outputs in a single pass, eliminating the redundant
+/// double-computation of `station_name_to_tts_segments`.
+fn compute_ipa(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
+    let name_ipa = katakana_name_to_ipa(name_katakana);
+    let tts_segments = station_name_to_tts_segments(name_katakana, name_roman);
+    let name_roman_ipa = non_empty_ipa(join_tts_segment_pronunciations(&tts_segments));
+    IpaResult {
+        name_ipa,
+        name_roman_ipa,
+        tts_segments,
+    }
+}
+
+fn compute_line_ipa(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
+    let name_ipa = {
+        let (stem, suffix_ipa) = replace_line_name_suffix(name_katakana);
+        non_empty_ipa(katakana_name_to_ipa(stem).map(|ipa| format!("{ipa}{suffix_ipa}")))
+    };
+    let tts_segments = station_name_to_tts_segments(name_katakana, name_roman);
+    let name_roman_ipa = station_name_to_ipa("", name_roman);
+    IpaResult {
+        name_ipa,
+        name_roman_ipa,
+        tts_segments,
+    }
+}
+
+fn cached_lookup(
+    cache: &LazyLock<RwLock<HashMap<IpaCacheKey, IpaResult>>>,
+    key: &IpaCacheKey,
+    compute: impl FnOnce() -> IpaResult,
+) -> IpaResult {
+    // Fast path: read lock
+    if let Some(result) = cache.read().unwrap().get(key) {
+        return result.clone();
+    }
+    // Slow path: compute and insert
+    let result = compute();
+    cache.write().unwrap().insert(key.clone(), result.clone());
+    result
+}
+
+/// Compute IPA for station/train-type names with memoization.
+pub fn compute_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
+    let key = (name_katakana.to_string(), name_roman.map(str::to_string));
+    cached_lookup(&STATION_IPA_CACHE, &key, || {
+        compute_ipa(name_katakana, name_roman)
+    })
+}
+
+/// Compute IPA for line names (with suffix replacement) with memoization.
+pub fn compute_line_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
+    let key = (name_katakana.to_string(), name_roman.map(str::to_string));
+    cached_lookup(&LINE_IPA_CACHE, &key, || {
+        compute_line_ipa(name_katakana, name_roman)
+    })
+}
+
 /// Katakana line-name suffixes paired with their English IPA replacements.
 /// Ordered longest-first for greedy matching.
 const LINE_NAME_SUFFIX_MAP: &[(&str, &str)] = &[
@@ -58,6 +135,751 @@ pub fn katakana_to_ipa(input: &str) -> Option<String> {
     }
 
     Some(apply_phonological_rules(&result))
+}
+
+/// Convert a station name to IPA.
+/// Prefers the official romanized/English name when present so mixed names like
+/// "Kasai-Rinkai Park" use English pronunciation for translated segments.
+pub fn station_name_to_ipa(name_katakana: &str, name_roman: Option<&str>) -> Option<String> {
+    let segments = station_name_to_tts_segments(name_katakana, name_roman);
+    non_empty_ipa(join_tts_segment_pronunciations(&segments))
+}
+
+pub fn katakana_name_to_ipa(input: &str) -> Option<String> {
+    non_empty_ipa(katakana_to_ipa(input))
+}
+
+pub fn non_empty_ipa(ipa: Option<String>) -> Option<String> {
+    ipa.filter(|ipa| !ipa.is_empty())
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TtsAlphabetKind {
+    Ipa,
+    Yomigana,
+    Plain,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TtsNameSegment {
+    pub surface: String,
+    pub fallback_text: String,
+    pub pronunciation: String,
+    pub alphabet: TtsAlphabetKind,
+    pub lang: &'static str,
+    pub separator: String,
+}
+
+pub fn station_name_to_tts_segments(
+    name_katakana: &str,
+    name_roman: Option<&str>,
+) -> Vec<TtsNameSegment> {
+    name_roman
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .and_then(romanized_name_to_tts_segments)
+        .filter(|segments| !segments.is_empty())
+        .or_else(|| katakana_name_to_tts_segments(name_katakana))
+        .unwrap_or_default()
+}
+
+fn join_tts_segment_pronunciations(segments: &[TtsNameSegment]) -> Option<String> {
+    let mut output = String::new();
+
+    for segment in segments {
+        if segment.pronunciation.is_empty() {
+            continue;
+        }
+        output.push_str(&segment.pronunciation);
+        output.push_str(&segment.separator);
+    }
+
+    non_empty_ipa(Some(output.trim().to_string()))
+}
+
+fn katakana_name_to_tts_segments(input: &str) -> Option<Vec<TtsNameSegment>> {
+    let pronunciation = katakana_name_to_ipa(input)?;
+    Some(vec![TtsNameSegment {
+        surface: input.to_string(),
+        fallback_text: katakana_to_hiragana(input),
+        pronunciation,
+        alphabet: TtsAlphabetKind::Ipa,
+        lang: "ja-JP",
+        separator: String::new(),
+    }])
+}
+
+fn should_split_camel_case_token(prev: Option<char>, current: char) -> bool {
+    matches!(prev, Some(prev) if prev.is_ascii_lowercase() && current.is_ascii_uppercase())
+}
+
+fn romanized_name_to_tts_segments(input: &str) -> Option<Vec<TtsNameSegment>> {
+    let mut tokens: Vec<String> = Vec::new();
+    let mut token = String::new();
+    let mut prev_token_char: Option<char> = None;
+
+    for c in input.chars() {
+        if is_name_token_char(c) {
+            if should_split_camel_case_token(prev_token_char, c) {
+                flush_name_token(&mut tokens, &mut token);
+            }
+            token.push(c);
+            prev_token_char = Some(c);
+            continue;
+        }
+
+        flush_name_token(&mut tokens, &mut token);
+        prev_token_char = None;
+    }
+
+    flush_name_token(&mut tokens, &mut token);
+
+    if tokens.is_empty() {
+        return Some(vec![]);
+    }
+
+    let mut segments = Vec::new();
+    for (index, token) in tokens.iter().enumerate() {
+        let mut word_segments = word_to_tts_segments(token)?;
+        if let Some(last) = word_segments.last_mut() {
+            last.separator = if index + 1 < tokens.len() {
+                " ".to_string()
+            } else {
+                String::new()
+            };
+        }
+        segments.extend(word_segments);
+    }
+
+    Some(segments)
+}
+
+fn flush_name_token(tokens: &mut Vec<String>, token: &mut String) {
+    if token.is_empty() {
+        return;
+    }
+
+    tokens.push(token.clone());
+    token.clear();
+}
+
+fn word_to_tts_segments(token: &str) -> Option<Vec<TtsNameSegment>> {
+    let normalized = normalize_name_token(token);
+    if normalized.is_empty() {
+        return Some(vec![]);
+    }
+
+    if let Some(segments) = split_compound_token_to_tts_segments(token, &normalized) {
+        return Some(segments);
+    }
+
+    if let Some(ipa) = lookup_english_word_ipa(&normalized) {
+        return Some(vec![TtsNameSegment {
+            surface: token.to_string(),
+            fallback_text: token.to_string(),
+            pronunciation: ipa.to_string(),
+            alphabet: TtsAlphabetKind::Ipa,
+            lang: "en-US",
+            separator: String::new(),
+        }]);
+    }
+
+    if normalized.chars().all(|c| c.is_ascii_digit()) {
+        if let Some(ipa) = number_to_ipa(&normalized) {
+            return Some(vec![TtsNameSegment {
+                surface: token.to_string(),
+                fallback_text: token.to_string(),
+                pronunciation: ipa.to_string(),
+                alphabet: TtsAlphabetKind::Ipa,
+                lang: "en-US",
+                separator: String::new(),
+            }]);
+        }
+
+        let mut pronunciation = String::new();
+        for digit in normalized.chars() {
+            let ipa = number_to_ipa(&digit.to_string())?;
+            pronunciation.push_str(ipa);
+        }
+        return Some(vec![TtsNameSegment {
+            surface: token.to_string(),
+            fallback_text: token.to_string(),
+            pronunciation,
+            alphabet: TtsAlphabetKind::Ipa,
+            lang: "en-US",
+            separator: String::new(),
+        }]);
+    }
+
+    let katakana = romaji_to_katakana(&normalized)?;
+    let pronunciation = katakana_to_ipa(&katakana)?;
+    Some(vec![TtsNameSegment {
+        surface: token.to_string(),
+        fallback_text: katakana_to_hiragana(&katakana),
+        pronunciation,
+        alphabet: TtsAlphabetKind::Ipa,
+        lang: "ja-JP",
+        separator: String::new(),
+    }])
+}
+
+fn split_compound_token_to_tts_segments(
+    original: &str,
+    normalized: &str,
+) -> Option<Vec<TtsNameSegment>> {
+    const JAPANESE_SUFFIXES: &[&str] = &["kaigan"];
+
+    for suffix in JAPANESE_SUFFIXES {
+        if normalized.len() <= suffix.len() || !normalized.ends_with(suffix) {
+            continue;
+        }
+
+        let stem_char_count = normalized.chars().count() - suffix.chars().count();
+        let stem_byte_offset = original
+            .char_indices()
+            .nth(stem_char_count)
+            .map(|(index, _)| index)
+            .unwrap_or(original.len());
+        let stem = &original[..stem_byte_offset];
+        let mut stem_segments = word_to_tts_segments(stem)?;
+        let suffix_segments = word_to_tts_segments(suffix)?;
+        if stem_segments.is_empty() || suffix_segments.is_empty() {
+            return None;
+        }
+        if let Some(last) = stem_segments.last_mut() {
+            last.separator = " ".to_string();
+        }
+        stem_segments.extend(suffix_segments);
+        return Some(stem_segments);
+    }
+
+    None
+}
+
+fn katakana_to_hiragana(input: &str) -> String {
+    input
+        .chars()
+        .map(|c| match c {
+            'ァ'..='ヶ' => char::from_u32(c as u32 - 0x60).unwrap_or(c),
+            _ => c,
+        })
+        .collect()
+}
+
+fn is_name_token_char(c: char) -> bool {
+    c.is_ascii_alphanumeric()
+        || matches!(
+            c,
+            '\'' | '.' | 'Ā' | 'Ī' | 'Ū' | 'Ē' | 'Ō' | 'ā' | 'ī' | 'ū' | 'ē' | 'ō'
+        )
+}
+
+fn normalize_name_token(token: &str) -> String {
+    token
+        .trim_matches(|c: char| !is_name_token_char(c))
+        .trim_end_matches('.')
+        .chars()
+        .flat_map(normalize_name_char)
+        .collect::<String>()
+        .to_lowercase()
+}
+
+fn normalize_name_char(c: char) -> Vec<char> {
+    match c {
+        'Ā' | 'ā' => vec!['a', 'a'],
+        'Ī' | 'ī' => vec!['i', 'i'],
+        'Ū' | 'ū' => vec!['u', 'u'],
+        'Ē' | 'ē' => vec!['e', 'i'],
+        'Ō' | 'ō' => vec!['o', 'u'],
+        _ => vec![c],
+    }
+}
+
+fn lookup_english_word_ipa(word: &str) -> Option<&'static str> {
+    match word {
+        "airport" => Some("ɛɚpɔɹt"),
+        "and" => Some("ænd"),
+        "art" => Some("ɑɹt"),
+        "avenue" => Some("ævənuː"),
+        "atomic" => Some("ətɑmɪk"),
+        "beach" => Some("biːtʃ"),
+        "beer" => Some("bɪɹ"),
+        "big" => Some("bɪg"),
+        "blue" => Some("bluː"),
+        "branch" => Some("bɹæntʃ"),
+        "bomb" => Some("bɑm"),
+        "botanical" => Some("bətænɪkəl"),
+        "building" => Some("bɪldɪŋ"),
+        "business" => Some("bɪznəs"),
+        "bus" => Some("bʌs"),
+        "cable" => Some("keɪbəl"),
+        "campus" => Some("kæmpəs"),
+        "castle" => Some("kæsəl"),
+        "center" | "centre" => Some("sɛntɚ"),
+        "central" => Some("sɛntɹəl"),
+        "city" => Some("sɪti"),
+        "commuter" => Some("kəmjuːtɚ"),
+        "conference" => Some("kɑnfɚəns"),
+        "cruise" => Some("kɹuːz"),
+        "cross" => Some("kɹɔs"),
+        "district" => Some("dɪstɹɪkt"),
+        "distribution" => Some("dɪstɹəbjuːʃən"),
+        "direct" => Some("dɚɛkt"),
+        "east" => Some("iːst"),
+        "electric" => Some("ɪlɛktɹɪk"),
+        "elementary" => Some("ɛləməntɛɹi"),
+        "entrance" => Some("ɛntɹəns"),
+        "evening" => Some("iːvnɪŋ"),
+        "express" => Some("ɪkspɹɛs"),
+        "family" => Some("fæməli"),
+        "ferry" => Some("fɛɹi"),
+        "flower" => Some("flaʊɚ"),
+        "for" => Some("fɔɹ"),
+        "from" => Some("fɹʌm"),
+        "fruit" => Some("fɹuːt"),
+        "garden" => Some("gɑɹdən"),
+        "gardens" => Some("gɑɹdənz"),
+        "gateway" => Some("geɪtweɪ"),
+        "general" => Some("dʒɛnɚəl"),
+        "golf" => Some("gɑlf"),
+        "green" => Some("gɹiːn"),
+        "ground" => Some("gɹaʊnd"),
+        "gymnasium" => Some("dʒɪmneɪziəm"),
+        "hall" => Some("hɔl"),
+        "high" => Some("haɪ"),
+        "hospital" => Some("hɑspɪtəl"),
+        "industrial" => Some("ɪndʌstɹiəl"),
+        "international" => Some("ɪntɚnæʃənəl"),
+        "island" => Some("aɪlənd"),
+        "isle" => Some("aɪl"),
+        "japan" => Some("dʒəpæn"),
+        "jr" => Some("dʒeɪ ɑɹ"),
+        "junior" => Some("dʒuːnjɚ"),
+        "keisei" => Some("keːseː"),
+        "line" => Some("laɪn"),
+        "link" => Some("lɪŋk"),
+        "liner" => Some("laɪnɚ"),
+        "lrt" => Some("ɛl ɑɹ tiː"),
+        "limited" => Some("lɪmɪtɪd"),
+        "local" => Some("loʊkəl"),
+        "loop" => Some("luːp"),
+        "main" => Some("meɪn"),
+        "mae" => Some("mae"),
+        "management" => Some("mænɪdʒmənt"),
+        "marine" => Some("məɹiːn"),
+        "medical" => Some("mɛdɪkəl"),
+        "metro" => Some("mɛtɹoʊ"),
+        "monorail" => Some("mɑnoʊɹeɪl"),
+        "morning" => Some("mɔɹnɪŋ"),
+        "museum" => Some("mjuːziəm"),
+        "municipal" => Some("mjuːnɪsəpəl"),
+        "new" => Some("nuː"),
+        "north" => Some("nɔɹθ"),
+        "or" => Some("ɔɹ"),
+        "park" => Some("pɑɹk"),
+        "peace" => Some("piːs"),
+        "port" => Some("pɔɹt"),
+        "pool" => Some("puːl"),
+        "railway" => Some("ɹeɪlweɪ"),
+        "rail" => Some("ɹeɪl"),
+        "rapid" => Some("ɹæpɪd"),
+        "red" => Some("ɹɛd"),
+        "regional" => Some("ɹiːdʒənəl"),
+        "relay" => Some("ɹiːleɪ"),
+        "ropeway" => Some("ɹoʊpweɪ"),
+        "route" => Some("ɹuːt"),
+        "scenic" => Some("siːnɪk"),
+        "saint" => Some("seɪnt"),
+        "school" => Some("skuːl"),
+        "science" => Some("saɪəns"),
+        "section" => Some("sɛkʃən"),
+        "seaside" => Some("siːsaɪd"),
+        "semi" => Some("sɛmi"),
+        "senior" => Some("siːnjɚ"),
+        "shiyakusho" => Some("ɕijakɯɕo"),
+        "sight" => Some("saɪt"),
+        "site" => Some("saɪt"),
+        "skiing" => Some("skiːɪŋ"),
+        "skytree" => Some("skaɪtɹiː"),
+        "soccer" => Some("sɑkɚ"),
+        "south" => Some("saʊθ"),
+        "space" => Some("speɪs"),
+        "special" => Some("spɛʃəl"),
+        "sports" => Some("spɔɹts"),
+        "square" => Some("skwɛɚ"),
+        "stadium" => Some("steɪdiəm"),
+        "station" => Some("steɪʃən"),
+        "streetcar" => Some("stɹiːtkɑɹ"),
+        "subway" => Some("sʌbweɪ"),
+        "service" => Some("sɝvɪs"),
+        "shuttle" => Some("ʃʌtəl"),
+        "sub" => Some("sʌb"),
+        "sunrise" => Some("sʌnɹaɪz"),
+        "super" => Some("suːpɚ"),
+        "telecom" => Some("tɛləkɑm"),
+        "teleport" => Some("tɛləpɔɹt"),
+        "terminal" => Some("tɚmɪnəl"),
+        "the" => Some("ðə"),
+        "town" => Some("taʊn"),
+        "to" => Some("tuː"),
+        "trade" => Some("tɹeɪd"),
+        "train" => Some("tɹeɪn"),
+        "transit" => Some("tɹænsɪt"),
+        "tramway" => Some("tɹæmweɪ"),
+        "tram" => Some("tɹæm"),
+        "transport" => Some("tɹænspɔɹt"),
+        "university" => Some("juːnəvɚsəti"),
+        "universal" => Some("juːnəvɚsəl"),
+        "urban" => Some("ɝbən"),
+        "village" => Some("vɪlɪdʒ"),
+        "way" => Some("weɪ"),
+        "west" => Some("wɛst"),
+        "world" => Some("wɝld"),
+        "yard" => Some("jɑɹd"),
+        "railroad" => Some("ɹeɪlɹoʊd"),
+        "access" => Some("æksɛs"),
+        "excursion" => Some("ɪkskɝʒən"),
+        "holiday" => Some("hɑlədeɪ"),
+        "nonstop" => Some("nɑnstɑp"),
+        "weekday" => Some("wiːkdeɪ"),
+        "southern" => Some("sʌðɚn"),
+        "sky" => Some("skaɪ"),
+        "office" => Some("ɔfɪs"),
+        "police" => Some("pəliːs"),
+        "shrine" => Some("ʃɹaɪn"),
+        "temple" => Some("tɛmpəl"),
+        "prefectural" => Some("pɹifɛktʃɚəl"),
+        "bridge" => Some("bɹɪdʒ"),
+        "plaza" => Some("plɑːzə"),
+        "canal" => Some("kənæl"),
+        "hotel" => Some("hoʊtɛl"),
+        "cathedral" => Some("kəθiːdɹəl"),
+        "arts" => Some("ɑɹts"),
+        "crafts" => Some("kɹæfts"),
+        "theater" => Some("θiətɚ"),
+        "abt" => Some("eɪ biː tiː"),
+        "angelland" => Some("eɪndʒəllænd"),
+        "arcade" => Some("ɑɹkeɪd"),
+        "anoh" => Some("ano"),
+        "astram" => Some("æstɹæm"),
+        "balloon" => Some("bəluːn"),
+        "boat" => Some("boʊt"),
+        "bitchu" => Some("bit͡ɕɯ"),
+        "bitchuu" => Some("bit͡ɕɯː"),
+        "bosch" => Some("bɑʃ"),
+        "car" => Some("kɑɹ"),
+        "centerpool" => Some("sɛntɚpuːl"),
+        "centralpark" => Some("sɛntɹəlpɑɹk"),
+        "chinatown" => Some("tʃaɪnətaʊn"),
+        "chikucenter" => Some("tʃikjuːsɛntɚ"),
+        "civic" => Some("sɪvɪk"),
+        "circuit" => Some("sɝkɪt"),
+        "cosmosquare" => Some("kɑzmoʊskwɛɚ"),
+        "dam" => Some("dæm"),
+        "depot" => Some("diːpoʊ"),
+        "dinostar" => Some("daɪnoʊstɑɹ"),
+        "english" => Some("ɪŋglɪʃ"),
+        "etchu" => Some("ett͡ɕɯ"),
+        "etchuu" => Some("ett͡ɕɯː"),
+        "esta" => Some("ɛstə"),
+        "expo" => Some("ɛkspoʊ"),
+        "galaxy" => Some("gæləksi"),
+        "gorge" => Some("gɔɹdʒ"),
+        "hatchobaba" => Some("hatt͡ɕoːbaba"),
+        "hatchobori" => Some("hatt͡ɕoːboɾi"),
+        "huis" => Some("haʊs"),
+        "itchome" => Some("itt͡ɕoːme"),
+        "ir" => Some("aɪ ɑɹ"),
+        "j" => Some("dʒeɪ"),
+        "juhatchome" => Some("dʑɯːhatt͡ɕoːme"),
+        "kintestu" => Some("kintetsɯ"),
+        "kutchan" => Some("kɯtt͡ɕaɴ"),
+        "linimo" => Some("linimo"),
+        "minoh" => Some("minoː"),
+        "newtown" => Some("njuːtaʊn"),
+        "no.1" => Some("nʌmbɚ wʌn"),
+        "no.6" => Some("nʌmbɚ sɪks"),
+        "no.7" => Some("nʌmbɚ sɛvən"),
+        "no.8" => Some("nʌmbɚ eɪt"),
+        "peach" => Some("piːtʃ"),
+        "retro" => Some("ɹɛtɹoʊ"),
+        "rias" => Some("ɹiːəs"),
+        "shim" => Some("ɕiɴ"),
+        "side" => Some("saɪd"),
+        "skyliner" => Some("skaɪlaɪnɚ"),
+        "skyrail" => Some("skaɪɹeɪl"),
+        "sonic" => Some("sɑnɪk"),
+        "saphir" => Some("sæfiɹ"),
+        "spacia" => Some("speɪʃə"),
+        "sta" => Some("steɪʃən"),
+        "sunport" => Some("sʌnpɔɹt"),
+        "th" => Some("tiː eɪtʃ"),
+        "through" => Some("θɹuː"),
+        "thunderbird" => Some("θʌndɚbɝd"),
+        "tj" => Some("tiː dʒeɪ"),
+        "wing" => Some("wɪŋ"),
+        "woody" => Some("wʊdi"),
+        "x" => Some("ɛks"),
+        "aqua" => Some("ækwə"),
+        "lavender" => Some("lævəndɚ"),
+        "lilac" => Some("laɪlæk"),
+        "okhotsk" => Some("oʊkhɑtsk"),
+        "b" => Some("biː"),
+        "crossbay" => Some("kɹɔsbeɪ"),
+        "farm" => Some("fɑɹm"),
+        "field" => Some("fiːld"),
+        "gala" => Some("gɑːlə"),
+        "girls" => Some("gɝlz"),
+        "grand" => Some("gɹænd"),
+        "highland" => Some("haɪlənd"),
+        "hills" => Some("hɪlz"),
+        "harmonyhall" => Some("hɑɹmənihɔl"),
+        "harborland" => Some("hɑɹbɚlænd"),
+        "heartpia" => Some("hɑɹtpiə"),
+        "land" => Some("lænd"),
+        "laketown" => Some("leɪktaʊn"),
+        "mall" => Some("mɔl"),
+        "mary's" => Some("mɛɹiz"),
+        "mt" => Some("maʊnt"),
+        "mt.takao" => Some("maʊnt taka.o"),
+        "mt.fuji" => Some("maʊnt ɸɯdʑi"),
+        "norfolk" => Some("nɔɹfoʊk"),
+        "ohmi" => Some("oːmi"),
+        "oarks" => Some("oʊks"),
+        "paddy" => Some("pædi"),
+        "pref" => Some("pɹɛf"),
+        "costa" => Some("kɔstə"),
+        "grandberry" => Some("gɹændbɛɹi"),
+        "fujifilm" => Some("ɸɯdʑifɪɾɯm"),
+        "fujitec" => Some("ɸɯdʑitek"),
+        "intec" => Some("ɪntek"),
+        "jatco" => Some("dʒætkoʊ"),
+        "s" => Some("ɛs"),
+        "t" => Some("tiː"),
+        "trans" => Some("tɹæns"),
+        "zoological" => Some("zuːəlɑdʒɪkəl"),
+        _ => None,
+    }
+}
+
+fn number_to_ipa(word: &str) -> Option<&'static str> {
+    match word {
+        "0" => Some("zɪɹoʊ"),
+        "1" => Some("wʌn"),
+        "2" => Some("tuː"),
+        "3" => Some("θɹiː"),
+        "4" => Some("fɔɹ"),
+        "5" => Some("faɪv"),
+        "6" => Some("sɪks"),
+        "7" => Some("sɛvən"),
+        "8" => Some("eɪt"),
+        "9" => Some("naɪn"),
+        _ => None,
+    }
+}
+
+fn romaji_to_katakana(input: &str) -> Option<String> {
+    if input.is_empty() {
+        return Some(String::new());
+    }
+
+    let chars: Vec<char> = input.chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+
+    while i < chars.len() {
+        if chars[i] == '\'' {
+            i += 1;
+            continue;
+        }
+
+        if i + 1 < chars.len()
+            && chars[i] == chars[i + 1]
+            && chars[i] != 'n'
+            && is_romaji_consonant(chars[i])
+        {
+            out.push('ッ');
+            i += 1;
+            continue;
+        }
+
+        if chars[i] == 'n' || (chars[i] == 'm' && i + 1 < chars.len() && is_bilabial(chars[i + 1]))
+        {
+            if i + 1 == chars.len() {
+                out.push('ン');
+                i += 1;
+                continue;
+            }
+
+            let next = chars[i + 1];
+            if next == 'n' {
+                out.push('ン');
+                i += 1;
+                continue;
+            }
+
+            if !is_romaji_vowel(next) && next != 'y' {
+                out.push('ン');
+                i += 1;
+                continue;
+            }
+        }
+
+        if let Some((kana, consumed)) = match_romaji_chunk(&chars[i..]) {
+            out.push_str(kana);
+            i += consumed;
+            continue;
+        }
+
+        return None;
+    }
+
+    Some(out)
+}
+
+fn is_romaji_vowel(c: char) -> bool {
+    matches!(c, 'a' | 'i' | 'u' | 'e' | 'o')
+}
+
+fn is_romaji_consonant(c: char) -> bool {
+    c.is_ascii_alphabetic() && !is_romaji_vowel(c)
+}
+
+fn is_bilabial(c: char) -> bool {
+    matches!(c, 'b' | 'p' | 'm')
+}
+
+fn match_romaji_chunk(chars: &[char]) -> Option<(&'static str, usize)> {
+    const MAP: &[(&str, &str)] = &[
+        ("ltsu", "ッ"),
+        ("xtsu", "ッ"),
+        ("kya", "キャ"),
+        ("kyu", "キュ"),
+        ("kyo", "キョ"),
+        ("gya", "ギャ"),
+        ("gyu", "ギュ"),
+        ("gyo", "ギョ"),
+        ("sha", "シャ"),
+        ("shu", "シュ"),
+        ("sho", "ショ"),
+        ("sya", "シャ"),
+        ("syu", "シュ"),
+        ("syo", "ショ"),
+        ("cha", "チャ"),
+        ("chu", "チュ"),
+        ("cho", "チョ"),
+        ("tya", "チャ"),
+        ("tyu", "チュ"),
+        ("tyo", "チョ"),
+        ("nya", "ニャ"),
+        ("nyu", "ニュ"),
+        ("nyo", "ニョ"),
+        ("hya", "ヒャ"),
+        ("hyu", "ヒュ"),
+        ("hyo", "ヒョ"),
+        ("mya", "ミャ"),
+        ("myu", "ミュ"),
+        ("myo", "ミョ"),
+        ("rya", "リャ"),
+        ("ryu", "リュ"),
+        ("ryo", "リョ"),
+        ("bya", "ビャ"),
+        ("byu", "ビュ"),
+        ("byo", "ビョ"),
+        ("pya", "ピャ"),
+        ("pyu", "ピュ"),
+        ("pyo", "ピョ"),
+        ("ja", "ジャ"),
+        ("ju", "ジュ"),
+        ("jo", "ジョ"),
+        ("jya", "ジャ"),
+        ("jyu", "ジュ"),
+        ("jyo", "ジョ"),
+        ("shi", "シ"),
+        ("chi", "チ"),
+        ("tsu", "ツ"),
+        ("fu", "フ"),
+        ("ji", "ジ"),
+        ("ka", "カ"),
+        ("ki", "キ"),
+        ("ku", "ク"),
+        ("ke", "ケ"),
+        ("ko", "コ"),
+        ("ga", "ガ"),
+        ("gi", "ギ"),
+        ("gu", "グ"),
+        ("ge", "ゲ"),
+        ("go", "ゴ"),
+        ("sa", "サ"),
+        ("su", "ス"),
+        ("se", "セ"),
+        ("so", "ソ"),
+        ("za", "ザ"),
+        ("zu", "ズ"),
+        ("ze", "ゼ"),
+        ("zo", "ゾ"),
+        ("ta", "タ"),
+        ("te", "テ"),
+        ("to", "ト"),
+        ("da", "ダ"),
+        ("de", "デ"),
+        ("do", "ド"),
+        ("na", "ナ"),
+        ("ni", "ニ"),
+        ("nu", "ヌ"),
+        ("ne", "ネ"),
+        ("no", "ノ"),
+        ("ha", "ハ"),
+        ("hi", "ヒ"),
+        ("he", "ヘ"),
+        ("ho", "ホ"),
+        ("ba", "バ"),
+        ("bi", "ビ"),
+        ("bu", "ブ"),
+        ("be", "ベ"),
+        ("bo", "ボ"),
+        ("pa", "パ"),
+        ("pi", "ピ"),
+        ("pu", "プ"),
+        ("pe", "ペ"),
+        ("po", "ポ"),
+        ("ma", "マ"),
+        ("mi", "ミ"),
+        ("mu", "ム"),
+        ("me", "メ"),
+        ("mo", "モ"),
+        ("ya", "ヤ"),
+        ("yu", "ユ"),
+        ("yo", "ヨ"),
+        ("ra", "ラ"),
+        ("ri", "リ"),
+        ("ru", "ル"),
+        ("re", "レ"),
+        ("ro", "ロ"),
+        ("wa", "ワ"),
+        ("wo", "ヲ"),
+        ("va", "ヴァ"),
+        ("vi", "ヴィ"),
+        ("vu", "ヴ"),
+        ("ve", "ヴェ"),
+        ("vo", "ヴォ"),
+        ("a", "ア"),
+        ("i", "イ"),
+        ("u", "ウ"),
+        ("e", "エ"),
+        ("o", "オ"),
+    ];
+
+    for (roman, kana) in MAP {
+        if chars.len() < roman.len() {
+            continue;
+        }
+        if chars.iter().take(roman.len()).copied().eq(roman.chars()) {
+            return Some((*kana, roman.len()));
+        }
+    }
+
+    None
 }
 
 /// Look up a two-character (digraph) combination.
@@ -576,6 +1398,123 @@ mod tests {
     fn test_unknown_characters_returns_none() {
         assert_eq!(katakana_to_ipa("ABC"), None);
         assert_eq!(katakana_to_ipa("シブヤX"), None);
+    }
+
+    #[test]
+    fn test_station_name_ipa_uses_official_english_wording() {
+        assert_eq!(
+            station_name_to_ipa("カサイリンカイコウエン", Some("Kasai-Rinkai Park")),
+            Some("kasa.i ɾiŋka.i pɑɹk".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_english_and_digits() {
+        assert_eq!(
+            station_name_to_ipa("ナリタクウコウ", Some("Narita Airport Terminal 1")),
+            Some("naɾita ɛɚpɔɹt tɚmɪnəl wʌn".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_multi_digit_numbers() {
+        assert_eq!(
+            station_name_to_ipa("ハネダクウコウ", Some("Haneda Airport Terminal 10")),
+            Some("haneda ɛɚpɔɹt tɚmɪnəl wʌnzɪɹoʊ".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_falls_back_to_katakana_when_roman_parse_fails() {
+        assert_eq!(
+            station_name_to_ipa("シブヤ", Some("???")),
+            Some("ɕibɯja".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_mixed_english_facility_words() {
+        assert_eq!(
+            station_name_to_ipa("トウキョウビッグサイト", Some("Tōkyō Big Sight")),
+            Some("to.ɯkʲo.ɯ bɪg saɪt".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_common_line_words() {
+        assert_eq!(
+            station_name_to_ipa("ヤマノテセン", Some("Yamanote Line")),
+            Some("jamanote laɪn".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_bilabial_m_in_romaji() {
+        assert_eq!(
+            station_name_to_ipa("シンバシ", Some("Shimbashi")),
+            Some("ɕimbaɕi".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_splits_compound_kaigan_suffix() {
+        assert_eq!(
+            station_name_to_ipa("イナゲカイガン", Some("Inagekaigan")),
+            Some("inage ka.igaɴ".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_splits_other_compound_kaigan_suffix() {
+        assert_eq!(
+            station_name_to_ipa("オオモリカイガン", Some("Omorikaigan")),
+            Some("omoɾi ka.igaɴ".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_line_related_english_words() {
+        assert_eq!(
+            station_name_to_ipa("トウザイセン", Some("Municipal Subway Blue Line")),
+            Some("mjuːnɪsəpəl sʌbweɪ bluː laɪn".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_train_type_words() {
+        assert_eq!(
+            station_name_to_ipa("カイソク", Some("Commuter Rapid")),
+            Some("kəmjuːtɚ ɹæpɪd".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_spaced_romanized_names_from_csv() {
+        assert_eq!(
+            station_name_to_ipa("メイテツイチノミヤ", Some("Meitetsu Ichinomiya")),
+            Some("me.itet͡sɯ it͡ɕinomija".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_meitetsu_prefixed_station_names_from_csv() {
+        let cases = [
+            ("メイテツナゴヤ", "Meitetsu Nagoya", "me.itet͡sɯ nagoja"),
+            (
+                "メイテツイチノミヤ",
+                "Meitetsu Ichinomiya",
+                "me.itet͡sɯ it͡ɕinomija",
+            ),
+            ("メイテツギフ", "Meitetsu Gifu", "me.itet͡sɯ giɸɯ"),
+        ];
+
+        for (katakana, roman, expected) in cases {
+            assert_eq!(
+                station_name_to_ipa(katakana, Some(roman)),
+                Some(expected.to_string()),
+                "failed for {roman}"
+            );
+        }
     }
 
     #[test]
