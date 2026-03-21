@@ -318,6 +318,15 @@ where
                 .cloned()
                 .cloned()
                 .map(Box::new);
+            if let Some(ref mut line) = station.line {
+                if let Some(ref mut nested_station) = line.station {
+                    nested_station.train_type = train_type_map
+                        .get(&nested_station.station_cd)
+                        .cloned()
+                        .cloned()
+                        .map(Box::new);
+                }
+            }
             for line in station.lines.iter_mut() {
                 if let Some(ref mut nested_station) = line.station {
                     nested_station.train_type = train_type_map
@@ -2810,14 +2819,31 @@ mod tests {
         async fn test_update_station_vec_with_attributes_skip_types_join_enriches_correctly() {
             let company = create_test_company(1, "JR東日本");
 
-            let mut station = create_test_station(101, 1001, 100, None);
+            // stations_by_group にはtype系フィールドを持つstationを設定する。
+            // skip_types_join=true の場合、get_by_station_group_id_vec_no_types が呼ばれ
+            // type系フィールドが除去された状態で返される。
+            let mut station_with_types = create_test_station(101, 1001, 100, Some(5000));
+            station_with_types.company_cd = Some(1);
+            station_with_types.has_train_types = true;
+            station_with_types.type_name = Some("快速".to_string());
+            station_with_types.type_name_k = Some("カイソク".to_string());
+            station_with_types.type_name_r = Some("Rapid".to_string());
+            station_with_types.type_cd = Some(1);
+            station_with_types.type_id = Some(1);
+            station_with_types.pass = Some(0);
+            station_with_types.color = Some("FF0000".to_string());
+            station_with_types.direction = Some(0);
+            station_with_types.kind = Some(0);
+
+            // 入力stationはtype系フィールドあり（enrichment対象）
+            let mut station = create_test_station(101, 1001, 100, Some(5000));
             station.company_cd = Some(1);
 
             let mut line = create_test_line(100);
             line.station_g_cd = Some(1001);
 
             let interactor = create_configurable_interactor(
-                vec![station.clone()],
+                vec![station_with_types],
                 vec![],
                 vec![line],
                 vec![],
@@ -2838,7 +2864,7 @@ mod tests {
             assert!(station_result.line.is_some());
             assert!(!station_result.station_numbers.is_empty());
 
-            // train_type should be None since line_group_id is None
+            // train_type should be None since line_group_id is None for train_type_map lookup
             assert!(station_result.train_type.is_none());
 
             // Lines should have company populated
@@ -2846,6 +2872,43 @@ mod tests {
                 assert!(line.company.is_some());
                 assert!(!line.line_symbols.is_empty());
             }
+
+            // skip_types_join=true なので lines[*].station のtype系フィールドは
+            // get_by_station_group_id_vec_no_types により除去されているべき
+            for line in &station_result.lines {
+                if let Some(ref nested_station) = line.station {
+                    assert!(
+                        nested_station.line_group_cd.is_none(),
+                        "nested station line_group_cd should be None with skip_types_join"
+                    );
+                    assert!(
+                        nested_station.type_name.is_none(),
+                        "nested station type_name should be None with skip_types_join"
+                    );
+                    assert!(
+                        nested_station.pass.is_none(),
+                        "nested station pass should be None with skip_types_join"
+                    );
+                    assert!(
+                        !nested_station.has_train_types,
+                        "nested station has_train_types should be false with skip_types_join"
+                    );
+                }
+            }
+
+            // station.line.station は入力stationのcloneなので、元の値を保持する
+            // （station_lookupからではなく直接cloneされるため）
+            let line_station = station_result
+                .line
+                .as_ref()
+                .unwrap()
+                .station
+                .as_ref()
+                .unwrap();
+            assert_eq!(
+                line_station.station_cd, 101,
+                "line.station should reference the correct station"
+            );
         }
 
         #[tokio::test]
@@ -2896,6 +2959,13 @@ mod tests {
             );
             assert_eq!(s1.train_type.as_ref().unwrap().type_name, "快速");
             assert_eq!(s1.train_type.as_ref().unwrap().station_cd, Some(101));
+            // station.line.station.train_type も設定されていること
+            let line_station1 = s1.line.as_ref().unwrap().station.as_ref().unwrap();
+            assert!(
+                line_station1.train_type.is_some(),
+                "station 101 line.station should have train_type"
+            );
+            assert_eq!(line_station1.train_type.as_ref().unwrap().type_name, "快速");
 
             let s2 = result.iter().find(|s| s.station_cd == 201).unwrap();
             assert!(
@@ -2904,6 +2974,13 @@ mod tests {
             );
             assert_eq!(s2.train_type.as_ref().unwrap().type_name, "特急");
             assert_eq!(s2.train_type.as_ref().unwrap().station_cd, Some(201));
+            // station.line.station.train_type も設定されていること
+            let line_station2 = s2.line.as_ref().unwrap().station.as_ref().unwrap();
+            assert!(
+                line_station2.train_type.is_some(),
+                "station 201 line.station should have train_type"
+            );
+            assert_eq!(line_station2.train_type.as_ref().unwrap().type_name, "特急");
         }
 
         #[tokio::test]
@@ -2956,6 +3033,20 @@ mod tests {
                 station_result.train_type.as_ref().unwrap().type_name,
                 "快速"
             );
+
+            // station.line.station.train_type も設定されていること
+            let line_station = station_result
+                .line
+                .as_ref()
+                .unwrap()
+                .station
+                .as_ref()
+                .unwrap();
+            assert!(
+                line_station.train_type.is_some(),
+                "line.station should have train_type"
+            );
+            assert_eq!(line_station.train_type.as_ref().unwrap().type_name, "快速");
 
             // nested stations in lines[] should also have train_type
             for line in &station_result.lines {
