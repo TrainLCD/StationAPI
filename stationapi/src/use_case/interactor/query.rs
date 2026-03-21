@@ -258,10 +258,19 @@ where
         station_group_ids.dedup();
 
         // Phase 1: independent queries in parallel
-        let (stations_by_group_ids, lines) = tokio::try_join!(
-            self.get_stations_by_group_id_vec(&station_group_ids),
-            self.get_lines_by_station_group_id_vec(&station_group_ids),
-        )?;
+        // When line_group_id is None, train type data won't be used, so skip the
+        // expensive JOINs to station_station_types and types tables
+        let (stations_by_group_ids, lines) = if line_group_id.is_some() {
+            tokio::try_join!(
+                self.get_stations_by_group_id_vec(&station_group_ids),
+                self.get_lines_by_station_group_id_vec(&station_group_ids),
+            )?
+        } else {
+            tokio::try_join!(
+                self.get_stations_by_group_id_vec_no_types(&station_group_ids),
+                self.get_lines_by_station_group_id_vec(&station_group_ids),
+            )?
+        };
 
         let station_ids = stations_by_group_ids
             .iter()
@@ -295,6 +304,15 @@ where
             .map(|s| ((s.line_cd, s.station_g_cd), s))
             .collect();
 
+        // Pre-index lines by station_g_cd for O(1) lookup instead of O(n*m) linear scan
+        let mut lines_by_g_cd: std::collections::HashMap<i32, Vec<usize>> =
+            std::collections::HashMap::new();
+        for (idx, line) in lines.iter().enumerate() {
+            if let Some(g_cd) = line.station_g_cd {
+                lines_by_g_cd.entry(g_cd).or_default().push(idx);
+            }
+        }
+
         // Cache nearby bus stop candidates by station_g_cd.
         // Stations with the same station_g_cd are at the same physical location,
         // so they share identical bus stop candidates.
@@ -324,15 +342,24 @@ where
             };
 
             let mut seen_line_cds = std::collections::HashSet::new();
-            let mut lines: Vec<Line> = lines
-                .iter()
-                .filter(|&l| {
-                    l.station_g_cd.unwrap_or(0) == station.station_g_cd
-                        && seen_line_cds.insert(l.line_cd)
-                        && matches_transport_filter(l.transport_type, transport_type)
+            let mut station_lines: Vec<Line> = lines_by_g_cd
+                .get(&station.station_g_cd)
+                .map(|indices| {
+                    indices
+                        .iter()
+                        .filter_map(|&idx| {
+                            let l = &lines[idx];
+                            if seen_line_cds.insert(l.line_cd)
+                                && matches_transport_filter(l.transport_type, transport_type)
+                            {
+                                Some(l.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect()
                 })
-                .cloned()
-                .collect();
+                .unwrap_or_default();
 
             // For rail stations, add nearby bus routes to lines array
             // Only add bus routes if transport_type is RailAndBus
@@ -408,14 +435,14 @@ where
 
                     for bus_line in bus_lines {
                         if seen_line_cds.insert(bus_line.line_cd) {
-                            lines.push(bus_line);
+                            station_lines.push(bus_line);
                         }
                     }
                 }
             }
 
             // Fetch any missing companies (e.g., bus-only operators not in initial lines)
-            let missing_company_ids: Vec<u32> = lines
+            let missing_company_ids: Vec<u32> = station_lines
                 .iter()
                 .filter(|l| !company_map.contains_key(&l.company_cd))
                 .map(|l| l.company_cd as u32)
@@ -429,7 +456,7 @@ where
                 }
             }
 
-            for line in lines.iter_mut() {
+            for line in station_lines.iter_mut() {
                 line.company = company_map.get(&line.company_cd).cloned();
                 line.line_symbols = self.get_line_symbols(line);
                 if let Some(station_ref) = station_lookup.get(&(line.line_cd, station.station_g_cd))
@@ -451,7 +478,7 @@ where
             }
             let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
             station.station_numbers = station_numbers;
-            station.lines = lines;
+            station.lines = station_lines;
         }
 
         Ok(stations)
@@ -1139,6 +1166,18 @@ where
     TR: TrainTypeRepository,
     CR: CompanyRepository,
 {
+    async fn get_stations_by_group_id_vec_no_types(
+        &self,
+        station_group_id_vec: &[u32],
+    ) -> Result<Vec<Station>, UseCaseError> {
+        let stations = self
+            .station_repository
+            .get_by_station_group_id_vec_no_types(station_group_id_vec)
+            .await?;
+
+        Ok(stations)
+    }
+
     fn build_route_tree_map<'a>(&self, stops: &'a [Station]) -> BTreeMap<i32, Vec<&'a Station>> {
         stops.iter().fold(
             BTreeMap::new(),
@@ -1451,6 +1490,12 @@ mod tests {
                 Ok(vec![])
             }
             async fn get_by_station_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec_no_types(
                 &self,
                 _: &[u32],
             ) -> Result<Vec<Station>, DomainError> {
@@ -1861,6 +1906,12 @@ mod tests {
                 _: &[u32],
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(self.stations_by_group.clone())
+            }
+            async fn get_by_station_group_id_vec_no_types(
+                &self,
+                station_group_id_vec: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                self.get_by_station_group_id_vec(station_group_id_vec).await
             }
             async fn get_by_coordinates(
                 &self,

@@ -229,6 +229,17 @@ impl StationRepository for MyStationRepository {
         InternalStationRepository::get_by_station_group_id_vec(station_group_id_vec, &mut conn)
             .await
     }
+    async fn get_by_station_group_id_vec_no_types(
+        &self,
+        station_group_id_vec: &[u32],
+    ) -> Result<Vec<Station>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalStationRepository::get_by_station_group_id_vec_no_types(
+            station_group_id_vec,
+            &mut conn,
+        )
+        .await
+    }
 
     // ほぼ確実にキャッシュがヒットしないと思うのでキャッシュを使わない
     async fn get_by_coordinates(
@@ -1020,6 +1031,101 @@ impl InternalStationRepository {
         let lines: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(lines)
+    }
+
+    async fn get_by_station_group_id_vec_no_types(
+        group_id_vec: &[u32],
+        conn: &mut PgConnection,
+    ) -> Result<Vec<Station>, DomainError> {
+        if group_id_vec.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let params = (1..=group_id_vec.len())
+            .map(|i| format!("${i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let query_str = format!(
+            r#"SELECT
+            s.station_cd,
+            s.station_g_cd,
+            s.station_name,
+            s.station_name_k,
+            s.station_name_r,
+            s.station_name_rn,
+            s.station_name_zh,
+            s.station_name_ko,
+            s.station_number1,
+            s.station_number2,
+            s.station_number3,
+            s.station_number4,
+            s.three_letter_code,
+            s.line_cd,
+            s.pref_cd,
+            s.post,
+            s.address,
+            s.lon,
+            s.lat,
+            s.open_ymd,
+            s.close_ymd,
+            s.e_status,
+            s.e_sort,
+            l.company_cd,
+            COALESCE(NULLIF(COALESCE(a.line_name, l.line_name), ''), NULL) AS line_name,
+            COALESCE(NULLIF(COALESCE(a.line_name_k, l.line_name_k), ''), NULL) AS line_name_k,
+            COALESCE(NULLIF(COALESCE(a.line_name_h, l.line_name_h), ''), NULL) AS line_name_h,
+            COALESCE(NULLIF(COALESCE(a.line_name_r, l.line_name_r), ''), NULL) AS line_name_r,
+            COALESCE(NULLIF(COALESCE(a.line_name_zh, l.line_name_zh), ''), NULL) AS line_name_zh,
+            COALESCE(NULLIF(COALESCE(a.line_name_ko, l.line_name_ko), ''), NULL) AS line_name_ko,
+            COALESCE(NULLIF(COALESCE(a.line_color_c, l.line_color_c), ''), NULL) AS line_color_c,
+            l.line_type,
+            l.line_symbol1,
+            l.line_symbol2,
+            l.line_symbol3,
+            l.line_symbol4,
+            l.line_symbol1_color,
+            l.line_symbol2_color,
+            l.line_symbol3_color,
+            l.line_symbol4_color,
+            l.line_symbol1_shape,
+            l.line_symbol2_shape,
+            l.line_symbol3_shape,
+            l.line_symbol4_shape,
+            COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
+            NULL::int AS sst_id,
+            NULL::int AS type_cd,
+            NULL::int AS line_group_cd,
+            NULL::int AS pass,
+            NULL::int AS type_id,
+            NULL::text AS type_name,
+            NULL::text AS type_name_k,
+            NULL::text AS type_name_r,
+            NULL::text AS type_name_zh,
+            NULL::text AS type_name_ko,
+            NULL::text AS color,
+            NULL::int AS direction,
+            NULL::int AS kind,
+            s.transport_type
+          FROM
+            stations AS s
+            JOIN lines AS l ON l.line_cd = s.line_cd AND l.e_status = 0
+            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+            LEFT JOIN aliases AS a ON a.id = la.alias_cd
+          WHERE
+            s.station_g_cd IN ( {params} )
+            AND s.line_cd = l.line_cd
+            AND s.e_status = 0"#
+        );
+
+        let mut query = sqlx::query_as::<_, StationRow>(&query_str);
+        for id in group_id_vec {
+            query = query.bind(*id as i32);
+        }
+
+        let rows = query.fetch_all(conn).await?;
+        let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
+
+        Ok(stations)
     }
 
     async fn get_by_coordinates(
