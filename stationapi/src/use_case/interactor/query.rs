@@ -111,7 +111,12 @@ where
             .collect();
 
         let stations = self
-            .update_station_vec_with_attributes(stations, Some(station_group_id), transport_type, false)
+            .update_station_vec_with_attributes(
+                stations,
+                Some(station_group_id),
+                transport_type,
+                false,
+            )
             .await?;
 
         Ok(stations)
@@ -507,7 +512,12 @@ where
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(stations, Some(line_group_id), transport_type, false)
+            .update_station_vec_with_attributes(
+                stations,
+                Some(line_group_id),
+                transport_type,
+                false,
+            )
             .await?;
 
         Ok(stations)
@@ -2274,7 +2284,12 @@ mod tests {
 
             let stations = vec![station1, station2];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail, false)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2324,7 +2339,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, Some(1000), TransportTypeFilter::Rail, false)
+                .update_station_vec_with_attributes(
+                    stations,
+                    Some(1000),
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2356,7 +2376,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail, false)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2410,7 +2435,12 @@ mod tests {
             let stations = vec![rail_station];
             // Bus routes are added only when transport_type is RailAndBus
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::RailAndBus, false)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::RailAndBus,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2463,7 +2493,12 @@ mod tests {
             // When transport_type is Rail, bus routes should NOT be added
             let stations = vec![rail_station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail, false)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2500,7 +2535,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail, false)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed even with missing company");
 
@@ -2538,7 +2578,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail, false)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed even with missing train type");
 
@@ -2573,7 +2618,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail, false)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2590,7 +2640,12 @@ mod tests {
 
             let stations: Vec<Station> = vec![];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail, false)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed with empty input");
 
@@ -2622,7 +2677,12 @@ mod tests {
 
             let stations = vec![station1, station2];
             let result = interactor
-                .update_station_vec_with_attributes(stations, Some(1000), TransportTypeFilter::Rail, false)
+                .update_station_vec_with_attributes(
+                    stations,
+                    Some(1000),
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2670,7 +2730,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail, false)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2707,7 +2772,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail, false)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
