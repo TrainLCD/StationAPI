@@ -1034,11 +1034,9 @@ where
             let mut line = self.extract_line_from_station(station);
             line.line_symbols = self.get_line_symbols(&line);
             line.company = company_map.get(&line.company_cd).cloned();
-            line.station = Some(station.clone());
 
             let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
             station.station_numbers = station_numbers;
-            station.line = Some(Box::new(line));
             if let Some(tt) = train_type_map
                 .get(&station.station_cd)
                 .cloned()
@@ -1046,7 +1044,10 @@ where
                 .map(Box::new)
             {
                 station.train_type = Some(tt);
-            };
+            }
+
+            line.station = Some(station.clone());
+            station.line = Some(Box::new(line));
 
             let mut seen_line_cds = std::collections::HashSet::new();
             let mut station_lines: Vec<Line> = lines_by_g_cd
