@@ -24,6 +24,10 @@ pub trait StationRepository: Send + Sync + 'static {
         &self,
         station_group_id_vec: &[u32],
     ) -> Result<Vec<Station>, DomainError>;
+    async fn get_by_station_group_id_vec_no_types(
+        &self,
+        station_group_id_vec: &[u32],
+    ) -> Result<Vec<Station>, DomainError>;
     async fn get_by_coordinates(
         &self,
         latitude: f64,
@@ -146,6 +150,13 @@ mod tests {
                 .cloned()
                 .collect();
             Ok(result)
+        }
+
+        async fn get_by_station_group_id_vec_no_types(
+            &self,
+            station_group_id_vec: &[u32],
+        ) -> Result<Vec<Station>, DomainError> {
+            self.get_by_station_group_id_vec(station_group_id_vec).await
         }
 
         async fn get_by_coordinates(

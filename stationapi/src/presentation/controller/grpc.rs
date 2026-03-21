@@ -708,15 +708,6 @@ mod tests {
             Ok(vec![])
         }
 
-        async fn update_station_vec_with_attributes(
-            &self,
-            stations: Vec<Station>,
-            _line_group_id: Option<u32>,
-            _transport_type: TransportTypeFilter,
-        ) -> Result<Vec<Station>, UseCaseError> {
-            Ok(stations)
-        }
-
         async fn get_lines_by_station_group_id(
             &self,
             _station_group_id: u32,

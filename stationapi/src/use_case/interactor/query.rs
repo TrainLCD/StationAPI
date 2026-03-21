@@ -72,7 +72,7 @@ where
             return Ok(None);
         }
         let stations = self
-            .update_station_vec_with_attributes(vec![station], None, transport_type)
+            .update_station_vec_with_attributes(vec![station], None, transport_type, false)
             .await?;
 
         Ok(stations.into_iter().next())
@@ -89,7 +89,7 @@ where
             .filter(|s| matches_transport_filter(s.transport_type, transport_type))
             .collect();
         let stations = self
-            .update_station_vec_with_attributes(stations, None, transport_type)
+            .update_station_vec_with_attributes(stations, None, transport_type, false)
             .await?;
 
         Ok(stations)
@@ -111,7 +111,12 @@ where
             .collect();
 
         let stations = self
-            .update_station_vec_with_attributes(stations, Some(station_group_id), transport_type)
+            .update_station_vec_with_attributes(
+                stations,
+                Some(station_group_id),
+                transport_type,
+                false,
+            )
             .await?;
 
         Ok(stations)
@@ -156,7 +161,7 @@ where
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(stations, None, transport_type)
+            .update_station_vec_with_attributes(stations, None, transport_type, false)
             .await?;
 
         Ok(stations)
@@ -187,6 +192,7 @@ where
                 stations,
                 line_group_id.map(|id| id as u32),
                 transport_type,
+                false,
             )
             .await?;
 
@@ -205,7 +211,7 @@ where
             .collect();
 
         let stations = self
-            .update_station_vec_with_attributes(stations, None, transport_type)
+            .update_station_vec_with_attributes(stations, None, transport_type, true)
             .await?;
 
         Ok(stations)
@@ -228,7 +234,7 @@ where
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(stations, None, transport_type)
+            .update_station_vec_with_attributes(stations, None, transport_type, false)
             .await?;
 
         Ok(stations)
@@ -243,218 +249,6 @@ where
             .await?;
 
         Ok(companies)
-    }
-    async fn update_station_vec_with_attributes(
-        &self,
-        mut stations: Vec<Station>,
-        line_group_id: Option<u32>,
-        transport_type: TransportTypeFilter,
-    ) -> Result<Vec<Station>, UseCaseError> {
-        let mut station_group_ids: Vec<u32> = stations
-            .iter()
-            .map(|station| station.station_g_cd as u32)
-            .collect();
-        station_group_ids.sort_unstable();
-        station_group_ids.dedup();
-
-        // Phase 1: independent queries in parallel
-        let (stations_by_group_ids, lines) = tokio::try_join!(
-            self.get_stations_by_group_id_vec(&station_group_ids),
-            self.get_lines_by_station_group_id_vec(&station_group_ids),
-        )?;
-
-        let station_ids = stations_by_group_ids
-            .iter()
-            .map(|station| station.station_cd as u32)
-            .collect::<Vec<u32>>();
-
-        let mut company_ids: Vec<u32> = lines.iter().map(|l| l.company_cd as u32).collect();
-        company_ids.sort_unstable();
-        company_ids.dedup();
-
-        // Phase 2: dependent queries in parallel
-        let (companies, train_types) = tokio::try_join!(
-            self.find_company_by_id_vec(&company_ids),
-            self.get_train_types_by_station_id_vec(&station_ids, line_group_id),
-        )?;
-
-        // Build HashMap for O(1) company lookup instead of O(n) linear search
-        // Owns the values so we can add bus companies later
-        let mut company_map: std::collections::HashMap<i32, Company> =
-            companies.into_iter().map(|c| (c.company_cd, c)).collect();
-
-        // Build HashMap for O(1) train_type lookup by station_cd
-        let train_type_map: std::collections::HashMap<i32, &TrainType> = train_types
-            .iter()
-            .filter_map(|tt| tt.station_cd.map(|cd| (cd, tt)))
-            .collect();
-
-        // Build lookup map for stations_by_group_ids: (line_cd, station_g_cd) -> Station
-        let station_lookup: std::collections::HashMap<(i32, i32), &Station> = stations_by_group_ids
-            .iter()
-            .map(|s| ((s.line_cd, s.station_g_cd), s))
-            .collect();
-
-        // Cache nearby bus stop candidates by station_g_cd.
-        // Stations with the same station_g_cd are at the same physical location,
-        // so they share identical bus stop candidates.
-        let mut bus_candidate_cache: std::collections::HashMap<i32, Vec<Station>> =
-            std::collections::HashMap::new();
-        // Cache bus lines by station_group_ids to avoid repeated DB queries
-        // for the same set of bus stop groups.
-        let mut bus_lines_cache: std::collections::HashMap<Vec<u32>, Vec<Line>> =
-            std::collections::HashMap::new();
-
-        for station in stations.iter_mut() {
-            let mut line = self.extract_line_from_station(station);
-            line.line_symbols = self.get_line_symbols(&line);
-            line.company = company_map.get(&line.company_cd).cloned();
-            line.station = Some(station.clone());
-
-            let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
-            station.station_numbers = station_numbers;
-            station.line = Some(Box::new(line));
-            if let Some(tt) = train_type_map
-                .get(&station.station_cd)
-                .cloned()
-                .cloned()
-                .map(Box::new)
-            {
-                station.train_type = Some(tt);
-            };
-
-            let mut seen_line_cds = std::collections::HashSet::new();
-            let mut lines: Vec<Line> = lines
-                .iter()
-                .filter(|&l| {
-                    l.station_g_cd.unwrap_or(0) == station.station_g_cd
-                        && seen_line_cds.insert(l.line_cd)
-                        && matches_transport_filter(l.transport_type, transport_type)
-                })
-                .cloned()
-                .collect();
-
-            // For rail stations, add nearby bus routes to lines array
-            // Only add bus routes if transport_type is RailAndBus
-            let should_include_bus_routes = transport_type == TransportTypeFilter::RailAndBus;
-            if station.transport_type == TransportType::Rail && should_include_bus_routes {
-                let cache_key = station.station_g_cd;
-                let candidates = if let Some(cached) = bus_candidate_cache.get(&cache_key) {
-                    cached.clone()
-                } else {
-                    let result = self
-                        .station_repository
-                        .get_by_coordinates(
-                            station.lat,
-                            station.lon,
-                            Some(50),
-                            Some(TransportType::Bus),
-                        )
-                        .await?;
-                    bus_candidate_cache.insert(cache_key, result.clone());
-                    result
-                };
-
-                // Apply 300m filter from this station's exact coordinates
-                let nearby_bus_stops: Vec<&Station> = candidates
-                    .iter()
-                    .filter(|bus_stop| {
-                        haversine_distance(station.lat, station.lon, bus_stop.lat, bus_stop.lon)
-                            <= NEARBY_BUS_STOP_RADIUS_METERS
-                    })
-                    .collect();
-
-                if !nearby_bus_stops.is_empty() {
-                    let mut bus_station_group_ids: Vec<u32> = nearby_bus_stops
-                        .iter()
-                        .map(|s| s.station_g_cd as u32)
-                        .collect();
-                    bus_station_group_ids.sort_unstable();
-                    bus_station_group_ids.dedup();
-
-                    let mut bus_lines =
-                        if let Some(cached) = bus_lines_cache.get(&bus_station_group_ids) {
-                            cached.clone()
-                        } else {
-                            let result = self
-                                .line_repository
-                                .get_by_station_group_id_vec(&bus_station_group_ids)
-                                .await?;
-                            bus_lines_cache.insert(bus_station_group_ids, result.clone());
-                            result
-                        };
-
-                    let mut seen_bus_line_cds = std::collections::HashSet::new();
-                    bus_lines.retain(|line| {
-                        line.transport_type == TransportType::Bus
-                            && seen_bus_line_cds.insert(line.line_cd)
-                    });
-
-                    let bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> =
-                        nearby_bus_stops
-                            .iter()
-                            .filter(|s| seen_bus_line_cds.contains(&s.line_cd))
-                            .map(|s| (s.line_cd, *s))
-                            .collect();
-
-                    for bus_line in bus_lines.iter_mut() {
-                        bus_line.line_symbols = self.get_line_symbols(bus_line);
-                        if let Some(&bus_stop) = bus_stop_by_line_cd.get(&bus_line.line_cd) {
-                            let mut station_copy = bus_stop.clone();
-                            station_copy.station_numbers = self.get_station_numbers(&station_copy);
-                            bus_line.station = Some(station_copy);
-                        }
-                    }
-
-                    for bus_line in bus_lines {
-                        if seen_line_cds.insert(bus_line.line_cd) {
-                            lines.push(bus_line);
-                        }
-                    }
-                }
-            }
-
-            // Fetch any missing companies (e.g., bus-only operators not in initial lines)
-            let missing_company_ids: Vec<u32> = lines
-                .iter()
-                .filter(|l| !company_map.contains_key(&l.company_cd))
-                .map(|l| l.company_cd as u32)
-                .collect::<std::collections::HashSet<u32>>()
-                .into_iter()
-                .collect();
-            if !missing_company_ids.is_empty() {
-                let extra_companies = self.find_company_by_id_vec(&missing_company_ids).await?;
-                for c in extra_companies {
-                    company_map.insert(c.company_cd, c);
-                }
-            }
-
-            for line in lines.iter_mut() {
-                line.company = company_map.get(&line.company_cd).cloned();
-                line.line_symbols = self.get_line_symbols(line);
-                if let Some(station_ref) = station_lookup.get(&(line.line_cd, station.station_g_cd))
-                {
-                    let mut station_copy = (*station_ref).clone();
-                    let station_numbers: Vec<StationNumber> =
-                        self.get_station_numbers(&station_copy);
-                    station_copy.station_numbers = station_numbers;
-                    if let Some(tt) = train_type_map
-                        .get(&station_copy.station_cd)
-                        .cloned()
-                        .cloned()
-                        .map(Box::new)
-                    {
-                        station_copy.train_type = Some(tt);
-                    };
-                    line.station = Some(station_copy);
-                }
-            }
-            let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
-            station.station_numbers = station_numbers;
-            station.lines = lines;
-        }
-
-        Ok(stations)
     }
     async fn get_lines_by_station_group_id(
         &self,
@@ -478,7 +272,12 @@ where
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(stations, Some(line_group_id), transport_type)
+            .update_station_vec_with_attributes(
+                stations,
+                Some(line_group_id),
+                transport_type,
+                false,
+            )
             .await?;
 
         Ok(stations)
@@ -500,7 +299,7 @@ where
 
         // lines, companies, station_numbers等を付与（train_typeはNoneで空になる）
         let mut stations = self
-            .update_station_vec_with_attributes(stations, None, transport_type)
+            .update_station_vec_with_attributes(stations, None, transport_type, false)
             .await?;
 
         // 複数line_group_idの列車種別を一括取得してセット
@@ -519,6 +318,15 @@ where
                 .cloned()
                 .cloned()
                 .map(Box::new);
+            if let Some(ref mut line) = station.line {
+                if let Some(ref mut nested_station) = line.station {
+                    nested_station.train_type = train_type_map
+                        .get(&nested_station.station_cd)
+                        .cloned()
+                        .cloned()
+                        .map(Box::new);
+                }
+            }
             for line in station.lines.iter_mut() {
                 if let Some(ref mut nested_station) = line.station {
                     nested_station.train_type = train_type_map
@@ -1139,6 +947,260 @@ where
     TR: TrainTypeRepository,
     CR: CompanyRepository,
 {
+    async fn get_stations_by_group_id_vec_no_types(
+        &self,
+        station_group_id_vec: &[u32],
+    ) -> Result<Vec<Station>, UseCaseError> {
+        let stations = self
+            .station_repository
+            .get_by_station_group_id_vec_no_types(station_group_id_vec)
+            .await?;
+
+        Ok(stations)
+    }
+
+    async fn update_station_vec_with_attributes(
+        &self,
+        mut stations: Vec<Station>,
+        line_group_id: Option<u32>,
+        transport_type: TransportTypeFilter,
+        skip_types_join: bool,
+    ) -> Result<Vec<Station>, UseCaseError> {
+        let mut station_group_ids: Vec<u32> = stations
+            .iter()
+            .map(|station| station.station_g_cd as u32)
+            .collect();
+        station_group_ids.sort_unstable();
+        station_group_ids.dedup();
+
+        // Phase 1: independent queries in parallel
+        // When skip_types_join is true, skip the expensive JOINs to
+        // station_station_types and types tables (used by GetStationsByLineIdList)
+        let (stations_by_group_ids, lines) = if skip_types_join {
+            tokio::try_join!(
+                self.get_stations_by_group_id_vec_no_types(&station_group_ids),
+                self.get_lines_by_station_group_id_vec(&station_group_ids),
+            )?
+        } else {
+            tokio::try_join!(
+                self.get_stations_by_group_id_vec(&station_group_ids),
+                self.get_lines_by_station_group_id_vec(&station_group_ids),
+            )?
+        };
+
+        let station_ids = stations_by_group_ids
+            .iter()
+            .map(|station| station.station_cd as u32)
+            .collect::<Vec<u32>>();
+
+        let mut company_ids: Vec<u32> = lines.iter().map(|l| l.company_cd as u32).collect();
+        company_ids.sort_unstable();
+        company_ids.dedup();
+
+        // Phase 2: dependent queries in parallel
+        let (companies, train_types) = tokio::try_join!(
+            self.find_company_by_id_vec(&company_ids),
+            self.get_train_types_by_station_id_vec(&station_ids, line_group_id),
+        )?;
+
+        // Build HashMap for O(1) company lookup instead of O(n) linear search
+        // Owns the values so we can add bus companies later
+        let mut company_map: std::collections::HashMap<i32, Company> =
+            companies.into_iter().map(|c| (c.company_cd, c)).collect();
+
+        // Build HashMap for O(1) train_type lookup by station_cd
+        let train_type_map: std::collections::HashMap<i32, &TrainType> = train_types
+            .iter()
+            .filter_map(|tt| tt.station_cd.map(|cd| (cd, tt)))
+            .collect();
+
+        // Build lookup map for stations_by_group_ids: (line_cd, station_g_cd) -> Station
+        let station_lookup: std::collections::HashMap<(i32, i32), &Station> = stations_by_group_ids
+            .iter()
+            .map(|s| ((s.line_cd, s.station_g_cd), s))
+            .collect();
+
+        // Pre-index lines by station_g_cd for O(1) lookup instead of O(n*m) linear scan
+        let mut lines_by_g_cd: std::collections::HashMap<i32, Vec<usize>> =
+            std::collections::HashMap::new();
+        for (idx, line) in lines.iter().enumerate() {
+            if let Some(g_cd) = line.station_g_cd {
+                lines_by_g_cd.entry(g_cd).or_default().push(idx);
+            }
+        }
+
+        // Cache nearby bus stop candidates by station_g_cd.
+        // Stations with the same station_g_cd are at the same physical location,
+        // so they share identical bus stop candidates.
+        let mut bus_candidate_cache: std::collections::HashMap<i32, Vec<Station>> =
+            std::collections::HashMap::new();
+        // Cache bus lines by station_group_ids to avoid repeated DB queries
+        // for the same set of bus stop groups.
+        let mut bus_lines_cache: std::collections::HashMap<Vec<u32>, Vec<Line>> =
+            std::collections::HashMap::new();
+
+        for station in stations.iter_mut() {
+            let mut line = self.extract_line_from_station(station);
+            line.line_symbols = self.get_line_symbols(&line);
+            line.company = company_map.get(&line.company_cd).cloned();
+
+            let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
+            station.station_numbers = station_numbers;
+            if let Some(tt) = train_type_map
+                .get(&station.station_cd)
+                .cloned()
+                .cloned()
+                .map(Box::new)
+            {
+                station.train_type = Some(tt);
+            }
+
+            line.station = Some(station.clone());
+            station.line = Some(Box::new(line));
+
+            let mut seen_line_cds = std::collections::HashSet::new();
+            let mut station_lines: Vec<Line> = lines_by_g_cd
+                .get(&station.station_g_cd)
+                .map(|indices| {
+                    indices
+                        .iter()
+                        .filter_map(|&idx| {
+                            let l = &lines[idx];
+                            if seen_line_cds.insert(l.line_cd)
+                                && matches_transport_filter(l.transport_type, transport_type)
+                            {
+                                Some(l.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            // For rail stations, add nearby bus routes to lines array
+            // Only add bus routes if transport_type is RailAndBus
+            let should_include_bus_routes = transport_type == TransportTypeFilter::RailAndBus;
+            if station.transport_type == TransportType::Rail && should_include_bus_routes {
+                let cache_key = station.station_g_cd;
+                let candidates = if let Some(cached) = bus_candidate_cache.get(&cache_key) {
+                    cached.clone()
+                } else {
+                    let result = self
+                        .station_repository
+                        .get_by_coordinates(
+                            station.lat,
+                            station.lon,
+                            Some(50),
+                            Some(TransportType::Bus),
+                        )
+                        .await?;
+                    bus_candidate_cache.insert(cache_key, result.clone());
+                    result
+                };
+
+                // Apply 300m filter from this station's exact coordinates
+                let nearby_bus_stops: Vec<&Station> = candidates
+                    .iter()
+                    .filter(|bus_stop| {
+                        haversine_distance(station.lat, station.lon, bus_stop.lat, bus_stop.lon)
+                            <= NEARBY_BUS_STOP_RADIUS_METERS
+                    })
+                    .collect();
+
+                if !nearby_bus_stops.is_empty() {
+                    let mut bus_station_group_ids: Vec<u32> = nearby_bus_stops
+                        .iter()
+                        .map(|s| s.station_g_cd as u32)
+                        .collect();
+                    bus_station_group_ids.sort_unstable();
+                    bus_station_group_ids.dedup();
+
+                    let mut bus_lines =
+                        if let Some(cached) = bus_lines_cache.get(&bus_station_group_ids) {
+                            cached.clone()
+                        } else {
+                            let result = self
+                                .line_repository
+                                .get_by_station_group_id_vec(&bus_station_group_ids)
+                                .await?;
+                            bus_lines_cache.insert(bus_station_group_ids, result.clone());
+                            result
+                        };
+
+                    let mut seen_bus_line_cds = std::collections::HashSet::new();
+                    bus_lines.retain(|line| {
+                        line.transport_type == TransportType::Bus
+                            && seen_bus_line_cds.insert(line.line_cd)
+                    });
+
+                    let bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> =
+                        nearby_bus_stops
+                            .iter()
+                            .filter(|s| seen_bus_line_cds.contains(&s.line_cd))
+                            .map(|s| (s.line_cd, *s))
+                            .collect();
+
+                    for bus_line in bus_lines.iter_mut() {
+                        bus_line.line_symbols = self.get_line_symbols(bus_line);
+                        if let Some(&bus_stop) = bus_stop_by_line_cd.get(&bus_line.line_cd) {
+                            let mut station_copy = bus_stop.clone();
+                            station_copy.station_numbers = self.get_station_numbers(&station_copy);
+                            bus_line.station = Some(station_copy);
+                        }
+                    }
+
+                    for bus_line in bus_lines {
+                        if seen_line_cds.insert(bus_line.line_cd) {
+                            station_lines.push(bus_line);
+                        }
+                    }
+                }
+            }
+
+            // Fetch any missing companies (e.g., bus-only operators not in initial lines)
+            let missing_company_ids: Vec<u32> = station_lines
+                .iter()
+                .filter(|l| !company_map.contains_key(&l.company_cd))
+                .map(|l| l.company_cd as u32)
+                .collect::<std::collections::HashSet<u32>>()
+                .into_iter()
+                .collect();
+            if !missing_company_ids.is_empty() {
+                let extra_companies = self.find_company_by_id_vec(&missing_company_ids).await?;
+                for c in extra_companies {
+                    company_map.insert(c.company_cd, c);
+                }
+            }
+
+            for line in station_lines.iter_mut() {
+                line.company = company_map.get(&line.company_cd).cloned();
+                line.line_symbols = self.get_line_symbols(line);
+                if let Some(station_ref) = station_lookup.get(&(line.line_cd, station.station_g_cd))
+                {
+                    let mut station_copy = (*station_ref).clone();
+                    let station_numbers: Vec<StationNumber> =
+                        self.get_station_numbers(&station_copy);
+                    station_copy.station_numbers = station_numbers;
+                    if let Some(tt) = train_type_map
+                        .get(&station_copy.station_cd)
+                        .cloned()
+                        .cloned()
+                        .map(Box::new)
+                    {
+                        station_copy.train_type = Some(tt);
+                    };
+                    line.station = Some(station_copy);
+                }
+            }
+            let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
+            station.station_numbers = station_numbers;
+            station.lines = station_lines;
+        }
+
+        Ok(stations)
+    }
+
     fn build_route_tree_map<'a>(&self, stops: &'a [Station]) -> BTreeMap<i32, Vec<&'a Station>> {
         stops.iter().fold(
             BTreeMap::new(),
@@ -1451,6 +1513,12 @@ mod tests {
                 Ok(vec![])
             }
             async fn get_by_station_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec_no_types(
                 &self,
                 _: &[u32],
             ) -> Result<Vec<Station>, DomainError> {
@@ -1862,6 +1930,35 @@ mod tests {
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(self.stations_by_group.clone())
             }
+            async fn get_by_station_group_id_vec_no_types(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                let stations = self
+                    .stations_by_group
+                    .iter()
+                    .map(|s| {
+                        let mut s = s.clone();
+                        s.line_group_cd = None;
+                        s.pass = None;
+                        s.sst_id = None;
+                        s.type_cd = None;
+                        s.type_id = None;
+                        s.type_name = None;
+                        s.type_name_k = None;
+                        s.type_name_r = None;
+                        s.type_name_zh = None;
+                        s.type_name_ko = None;
+                        s.color = None;
+                        s.direction = None;
+                        s.kind = None;
+                        s.has_train_types = false;
+                        s.train_type = None;
+                        s
+                    })
+                    .collect();
+                Ok(stations)
+            }
             async fn get_by_coordinates(
                 &self,
                 _: f64,
@@ -2200,7 +2297,12 @@ mod tests {
 
             let stations = vec![station1, station2];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2250,7 +2352,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, Some(1000), TransportTypeFilter::Rail)
+                .update_station_vec_with_attributes(
+                    stations,
+                    Some(1000),
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2282,7 +2389,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2336,7 +2448,12 @@ mod tests {
             let stations = vec![rail_station];
             // Bus routes are added only when transport_type is RailAndBus
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::RailAndBus)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::RailAndBus,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2389,7 +2506,12 @@ mod tests {
             // When transport_type is Rail, bus routes should NOT be added
             let stations = vec![rail_station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2426,7 +2548,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed even with missing company");
 
@@ -2464,7 +2591,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed even with missing train type");
 
@@ -2499,7 +2631,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2516,7 +2653,12 @@ mod tests {
 
             let stations: Vec<Station> = vec![];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed with empty input");
 
@@ -2548,7 +2690,12 @@ mod tests {
 
             let stations = vec![station1, station2];
             let result = interactor
-                .update_station_vec_with_attributes(stations, Some(1000), TransportTypeFilter::Rail)
+                .update_station_vec_with_attributes(
+                    stations,
+                    Some(1000),
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2596,7 +2743,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2633,7 +2785,12 @@ mod tests {
 
             let stations = vec![station];
             let result = interactor
-                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail)
+                .update_station_vec_with_attributes(
+                    stations,
+                    None,
+                    TransportTypeFilter::Rail,
+                    false,
+                )
                 .await
                 .expect("Should succeed");
 
@@ -2656,6 +2813,102 @@ mod tests {
                 assert!(line.company.is_some());
                 assert!(!line.line_symbols.is_empty());
             }
+        }
+
+        #[tokio::test]
+        async fn test_update_station_vec_with_attributes_skip_types_join_enriches_correctly() {
+            let company = create_test_company(1, "JR東日本");
+
+            // stations_by_group にはtype系フィールドを持つstationを設定する。
+            // skip_types_join=true の場合、get_by_station_group_id_vec_no_types が呼ばれ
+            // type系フィールドが除去された状態で返される。
+            let mut station_with_types = create_test_station(101, 1001, 100, Some(5000));
+            station_with_types.company_cd = Some(1);
+            station_with_types.has_train_types = true;
+            station_with_types.type_name = Some("快速".to_string());
+            station_with_types.type_name_k = Some("カイソク".to_string());
+            station_with_types.type_name_r = Some("Rapid".to_string());
+            station_with_types.type_cd = Some(1);
+            station_with_types.type_id = Some(1);
+            station_with_types.pass = Some(0);
+            station_with_types.color = Some("FF0000".to_string());
+            station_with_types.direction = Some(0);
+            station_with_types.kind = Some(0);
+
+            // 入力stationはtype系フィールドあり（enrichment対象）
+            let mut station = create_test_station(101, 1001, 100, Some(5000));
+            station.company_cd = Some(1);
+
+            let mut line = create_test_line(100);
+            line.station_g_cd = Some(1001);
+
+            let interactor = create_configurable_interactor(
+                vec![station_with_types],
+                vec![],
+                vec![line],
+                vec![],
+                vec![company],
+            );
+
+            let stations = vec![station];
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Rail, true)
+                .await
+                .expect("Should succeed");
+
+            assert_eq!(result.len(), 1);
+            let station_result = &result[0];
+
+            // lines, company, station_numbers should still be enriched
+            assert!(!station_result.lines.is_empty());
+            assert!(station_result.line.is_some());
+            assert!(!station_result.station_numbers.is_empty());
+
+            // train_type should be None since line_group_id is None for train_type_map lookup
+            assert!(station_result.train_type.is_none());
+
+            // Lines should have company populated
+            for line in &station_result.lines {
+                assert!(line.company.is_some());
+                assert!(!line.line_symbols.is_empty());
+            }
+
+            // skip_types_join=true なので lines[*].station のtype系フィールドは
+            // get_by_station_group_id_vec_no_types により除去されているべき
+            for line in &station_result.lines {
+                if let Some(ref nested_station) = line.station {
+                    assert!(
+                        nested_station.line_group_cd.is_none(),
+                        "nested station line_group_cd should be None with skip_types_join"
+                    );
+                    assert!(
+                        nested_station.type_name.is_none(),
+                        "nested station type_name should be None with skip_types_join"
+                    );
+                    assert!(
+                        nested_station.pass.is_none(),
+                        "nested station pass should be None with skip_types_join"
+                    );
+                    assert!(
+                        !nested_station.has_train_types,
+                        "nested station has_train_types should be false with skip_types_join"
+                    );
+                }
+            }
+
+            // station.line.station は入力stationのcloneなので、元の値を保持する
+            // （station_lookupからではなく直接cloneされるため）
+            let line_station = station_result
+                .line
+                .as_ref()
+                .unwrap()
+                .station
+                .as_ref()
+                .unwrap();
+            assert_eq!(
+                line_station.station_cd, 101,
+                "line.station should reference the correct station"
+            );
         }
 
         #[tokio::test]
@@ -2706,6 +2959,13 @@ mod tests {
             );
             assert_eq!(s1.train_type.as_ref().unwrap().type_name, "快速");
             assert_eq!(s1.train_type.as_ref().unwrap().station_cd, Some(101));
+            // station.line.station.train_type も設定されていること
+            let line_station1 = s1.line.as_ref().unwrap().station.as_ref().unwrap();
+            assert!(
+                line_station1.train_type.is_some(),
+                "station 101 line.station should have train_type"
+            );
+            assert_eq!(line_station1.train_type.as_ref().unwrap().type_name, "快速");
 
             let s2 = result.iter().find(|s| s.station_cd == 201).unwrap();
             assert!(
@@ -2714,6 +2974,13 @@ mod tests {
             );
             assert_eq!(s2.train_type.as_ref().unwrap().type_name, "特急");
             assert_eq!(s2.train_type.as_ref().unwrap().station_cd, Some(201));
+            // station.line.station.train_type も設定されていること
+            let line_station2 = s2.line.as_ref().unwrap().station.as_ref().unwrap();
+            assert!(
+                line_station2.train_type.is_some(),
+                "station 201 line.station should have train_type"
+            );
+            assert_eq!(line_station2.train_type.as_ref().unwrap().type_name, "特急");
         }
 
         #[tokio::test]
@@ -2766,6 +3033,20 @@ mod tests {
                 station_result.train_type.as_ref().unwrap().type_name,
                 "快速"
             );
+
+            // station.line.station.train_type も設定されていること
+            let line_station = station_result
+                .line
+                .as_ref()
+                .unwrap()
+                .station
+                .as_ref()
+                .unwrap();
+            assert!(
+                line_station.train_type.is_some(),
+                "line.station should have train_type"
+            );
+            assert_eq!(line_station.train_type.as_ref().unwrap().type_name, "快速");
 
             // nested stations in lines[] should also have train_type
             for line in &station_result.lines {
