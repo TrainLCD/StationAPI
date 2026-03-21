@@ -713,6 +713,7 @@ mod tests {
             stations: Vec<Station>,
             _line_group_id: Option<u32>,
             _transport_type: TransportTypeFilter,
+            _skip_types_join: bool,
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(stations)
         }
