@@ -60,12 +60,6 @@ pub trait QueryUseCase: Send + Sync + 'static {
         &self,
         company_id_vec: &[u32],
     ) -> Result<Vec<Company>, UseCaseError>;
-    async fn update_station_vec_with_attributes(
-        &self,
-        stations: Vec<Station>,
-        line_group_id: Option<u32>,
-        transport_type: TransportTypeFilter,
-    ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_lines_by_station_group_id(
         &self,
         station_group_id: u32,
