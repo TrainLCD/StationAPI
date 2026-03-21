@@ -52,16 +52,16 @@ Do you like this project? Join our Discord community!
 
 ## Monitoring
 
-Prometheus + Grafana による gRPC メトリクスの可視化環境が同梱されています。
+A Prometheus + Grafana environment for visualizing gRPC metrics is included.
 
 ```bash
 docker compose up -d api prometheus grafana
 ```
 
-- **Grafana**: http://localhost:3001 (ログイン: `admin` / `admin`)
+- **Grafana**: http://localhost:3001 (login: `admin` / `admin`)
 - **Prometheus**: http://localhost:9090
 
-Grafana には「StationAPI gRPC Metrics」ダッシュボードが自動でプロビジョニングされ、リクエストレート、エラーレート、レイテンシパーセンタイル等を確認できます。
+Grafana comes with a pre-provisioned "StationAPI gRPC Metrics" dashboard, where you can monitor request rates, error rates, latency percentiles, and more.
 
 ## Development
 
