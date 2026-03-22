@@ -39,7 +39,18 @@ where
     }
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
-        let method = req.uri().path().to_owned();
+        let path = req.uri().path();
+
+        // Only record metrics for valid gRPC paths (e.g. /app.trainlcd.grpc.StationAPI/Method)
+        // to avoid cardinality explosion from bot/scanner requests like /$(pwd)/netlify.toml
+        let method = if path.starts_with("/app.trainlcd.grpc.")
+            || path.starts_with("/grpc.health.")
+            || path.starts_with("/grpc.reflection.")
+        {
+            path.to_owned()
+        } else {
+            "unknown".to_owned()
+        };
 
         counter!("grpc_requests_started_total", "method" => method.clone()).increment(1);
 
