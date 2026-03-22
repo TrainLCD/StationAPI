@@ -124,6 +124,19 @@ impl LineRepository for MyLineRepository {
         let mut conn = self.pool.acquire().await?;
         InternalLineRepository::get_by_station_group_id_vec(&station_group_id_vec, &mut conn).await
     }
+    async fn get_by_station_group_id_vec_no_types(
+        &self,
+        station_group_id_vec: &[u32],
+    ) -> Result<Vec<Line>, DomainError> {
+        let station_group_id_vec: Vec<i64> =
+            station_group_id_vec.iter().map(|x| *x as i64).collect();
+        let mut conn = self.pool.acquire().await?;
+        InternalLineRepository::get_by_station_group_id_vec_no_types(
+            &station_group_id_vec,
+            &mut conn,
+        )
+        .await
+    }
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Line>, DomainError> {
         let line_group_id: i64 = line_group_id as i64;
         let mut conn = self.pool.acquire().await?;
@@ -443,6 +456,70 @@ impl InternalLineRepository {
                 (sst.line_group_cd IS NOT NULL AND sst.pass <> 1)
                 OR sst.line_group_cd IS NULL
             )"
+        );
+
+        let mut query = sqlx::query_as::<_, LineRow>(&query_str);
+        for id in station_group_id_vec {
+            query = query.bind(id);
+        }
+
+        let rows = query.fetch_all(conn).await?;
+        let lines: Vec<Line> = rows.into_iter().map(|row| row.into()).collect();
+
+        Ok(lines)
+    }
+
+    async fn get_by_station_group_id_vec_no_types(
+        station_group_id_vec: &[i64],
+        conn: &mut PgConnection,
+    ) -> Result<Vec<Line>, DomainError> {
+        if station_group_id_vec.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let params = (1..=station_group_id_vec.len())
+            .map(|i| format!("${i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let query_str = format!(
+            "SELECT DISTINCT ON (l.line_cd, s.station_g_cd)
+                l.line_cd,
+                l.company_cd,
+                l.line_type,
+                l.line_symbol1,
+                l.line_symbol2,
+                l.line_symbol3,
+                l.line_symbol4,
+                l.line_symbol1_color,
+                l.line_symbol2_color,
+                l.line_symbol3_color,
+                l.line_symbol4_color,
+                l.line_symbol1_shape,
+                l.line_symbol2_shape,
+                l.line_symbol3_shape,
+                l.line_symbol4_shape,
+                l.e_status,
+                l.e_sort,
+                COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
+                s.station_cd,
+                s.station_g_cd,
+                NULL::int AS line_group_cd,
+                NULL::int AS type_cd,
+                COALESCE(a.line_name, l.line_name) AS line_name,
+                COALESCE(a.line_name_k, l.line_name_k) AS line_name_k,
+                COALESCE(a.line_name_h, l.line_name_h) AS line_name_h,
+                COALESCE(a.line_name_r, l.line_name_r) AS line_name_r,
+                COALESCE(a.line_name_zh, l.line_name_zh) AS line_name_zh,
+                COALESCE(a.line_name_ko, l.line_name_ko) AS line_name_ko,
+                COALESCE(a.line_color_c, l.line_color_c) AS line_color_c,
+                l.transport_type
+            FROM lines AS l
+            JOIN stations AS s ON s.station_g_cd IN ( {params} )
+            AND s.e_status = 0
+            AND s.line_cd = l.line_cd
+            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+            LEFT JOIN aliases AS a ON la.alias_cd = a.id
+            WHERE l.e_status = 0"
         );
 
         let mut query = sqlx::query_as::<_, LineRow>(&query_str);

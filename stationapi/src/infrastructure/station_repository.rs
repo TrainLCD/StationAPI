@@ -81,6 +81,138 @@ struct StationRow {
     pub transport_type: Option<i32>,
 }
 
+#[derive(sqlx::FromRow, Clone)]
+struct BusStopWithSourceRow {
+    pub source_g_cd: i32,
+    pub station_cd: i32,
+    pub station_g_cd: i32,
+    pub station_name: String,
+    pub station_name_k: String,
+    pub station_name_r: Option<String>,
+    #[allow(dead_code)]
+    pub station_name_rn: Option<String>,
+    pub station_name_zh: Option<String>,
+    pub station_name_ko: Option<String>,
+    pub station_number1: Option<String>,
+    pub station_number2: Option<String>,
+    pub station_number3: Option<String>,
+    pub station_number4: Option<String>,
+    pub three_letter_code: Option<String>,
+    pub line_cd: i32,
+    pub pref_cd: i32,
+    pub post: String,
+    pub address: String,
+    pub lon: f64,
+    pub lat: f64,
+    pub open_ymd: String,
+    pub close_ymd: String,
+    pub e_status: i32,
+    pub e_sort: i32,
+    pub company_cd: Option<i32>,
+    pub line_name: Option<String>,
+    pub line_name_k: Option<String>,
+    pub line_name_h: Option<String>,
+    pub line_name_r: Option<String>,
+    pub line_name_zh: Option<String>,
+    pub line_name_ko: Option<String>,
+    pub line_color_c: Option<String>,
+    pub line_type: Option<i32>,
+    pub line_symbol1: Option<String>,
+    pub line_symbol2: Option<String>,
+    pub line_symbol3: Option<String>,
+    pub line_symbol4: Option<String>,
+    pub line_symbol1_color: Option<String>,
+    pub line_symbol2_color: Option<String>,
+    pub line_symbol3_color: Option<String>,
+    pub line_symbol4_color: Option<String>,
+    pub line_symbol1_shape: Option<String>,
+    pub line_symbol2_shape: Option<String>,
+    pub line_symbol3_shape: Option<String>,
+    pub line_symbol4_shape: Option<String>,
+    pub average_distance: Option<f64>,
+    pub type_id: Option<i32>,
+    pub sst_id: Option<i32>,
+    pub type_cd: Option<i32>,
+    pub line_group_cd: Option<i32>,
+    pub pass: Option<i32>,
+    pub type_name: Option<String>,
+    pub type_name_k: Option<String>,
+    pub type_name_r: Option<String>,
+    pub type_name_zh: Option<String>,
+    pub type_name_ko: Option<String>,
+    pub color: Option<String>,
+    pub direction: Option<i32>,
+    pub kind: Option<i32>,
+    pub transport_type: Option<i32>,
+}
+
+impl From<BusStopWithSourceRow> for Station {
+    fn from(row: BusStopWithSourceRow) -> Self {
+        let station_row = StationRow {
+            station_cd: row.station_cd,
+            station_g_cd: row.station_g_cd,
+            station_name: row.station_name,
+            station_name_k: row.station_name_k,
+            station_name_r: row.station_name_r,
+            station_name_rn: row.station_name_rn,
+            station_name_zh: row.station_name_zh,
+            station_name_ko: row.station_name_ko,
+            station_number1: row.station_number1,
+            station_number2: row.station_number2,
+            station_number3: row.station_number3,
+            station_number4: row.station_number4,
+            three_letter_code: row.three_letter_code,
+            line_cd: row.line_cd,
+            pref_cd: row.pref_cd,
+            post: row.post,
+            address: row.address,
+            lon: row.lon,
+            lat: row.lat,
+            open_ymd: row.open_ymd,
+            close_ymd: row.close_ymd,
+            e_status: row.e_status,
+            e_sort: row.e_sort,
+            company_cd: row.company_cd,
+            line_name: row.line_name,
+            line_name_k: row.line_name_k,
+            line_name_h: row.line_name_h,
+            line_name_r: row.line_name_r,
+            line_name_zh: row.line_name_zh,
+            line_name_ko: row.line_name_ko,
+            line_color_c: row.line_color_c,
+            line_type: row.line_type,
+            line_symbol1: row.line_symbol1,
+            line_symbol2: row.line_symbol2,
+            line_symbol3: row.line_symbol3,
+            line_symbol4: row.line_symbol4,
+            line_symbol1_color: row.line_symbol1_color,
+            line_symbol2_color: row.line_symbol2_color,
+            line_symbol3_color: row.line_symbol3_color,
+            line_symbol4_color: row.line_symbol4_color,
+            line_symbol1_shape: row.line_symbol1_shape,
+            line_symbol2_shape: row.line_symbol2_shape,
+            line_symbol3_shape: row.line_symbol3_shape,
+            line_symbol4_shape: row.line_symbol4_shape,
+            average_distance: row.average_distance,
+            type_id: row.type_id,
+            sst_id: row.sst_id,
+            type_cd: row.type_cd,
+            line_group_cd: row.line_group_cd,
+            pass: row.pass,
+            type_name: row.type_name,
+            type_name_k: row.type_name_k,
+            type_name_r: row.type_name_r,
+            type_name_zh: row.type_name_zh,
+            type_name_ko: row.type_name_ko,
+            color: row.color,
+            direction: row.direction,
+            kind: row.kind,
+            transport_type: row.transport_type,
+        };
+        station_row.into()
+    }
+}
+
 impl From<StationRow> for Station {
     fn from(row: StationRow) -> Self {
         let stop_condition = match row.pass.unwrap_or(0) {
@@ -289,6 +421,19 @@ impl StationRepository for MyStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::get_by_line_group_id_vec(line_group_ids, &mut conn).await
+    }
+
+    async fn get_bus_stops_near_stations(
+        &self,
+        coords: &[(u32, f64, f64)],
+        limit_per_station: u32,
+    ) -> Result<Vec<(u32, Station)>, DomainError> {
+        if coords.is_empty() {
+            return Ok(vec![]);
+        }
+        let mut conn = self.pool.acquire().await?;
+        InternalStationRepository::get_bus_stops_near_stations(coords, limit_per_station, &mut conn)
+            .await
     }
 
     async fn get_route_stops(
@@ -1126,6 +1271,117 @@ impl InternalStationRepository {
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(stations)
+    }
+
+    async fn get_bus_stops_near_stations(
+        coords: &[(u32, f64, f64)],
+        limit_per_station: u32,
+        conn: &mut PgConnection,
+    ) -> Result<Vec<(u32, Station)>, DomainError> {
+        if coords.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let query_str = r#"SELECT
+                ic.source_g_cd,
+                s.station_cd,
+                s.station_g_cd,
+                s.station_name,
+                s.station_name_k,
+                s.station_name_r,
+                s.station_name_rn,
+                s.station_name_zh,
+                s.station_name_ko,
+                s.station_number1,
+                s.station_number2,
+                s.station_number3,
+                s.station_number4,
+                s.three_letter_code,
+                s.line_cd,
+                s.pref_cd,
+                s.post,
+                s.address,
+                s.lon,
+                s.lat,
+                s.open_ymd,
+                s.close_ymd,
+                s.e_status,
+                s.e_sort,
+                l.company_cd,
+                COALESCE(NULLIF(COALESCE(a.line_name, l.line_name), ''), NULL) AS line_name,
+                COALESCE(NULLIF(COALESCE(a.line_name_k, l.line_name_k), ''), NULL) AS line_name_k,
+                COALESCE(NULLIF(COALESCE(a.line_name_h, l.line_name_h), ''), NULL) AS line_name_h,
+                COALESCE(NULLIF(COALESCE(a.line_name_r, l.line_name_r), ''), NULL) AS line_name_r,
+                COALESCE(NULLIF(COALESCE(a.line_name_zh, l.line_name_zh), ''), NULL) AS line_name_zh,
+                COALESCE(NULLIF(COALESCE(a.line_name_ko, l.line_name_ko), ''), NULL) AS line_name_ko,
+                COALESCE(NULLIF(COALESCE(a.line_color_c, l.line_color_c), ''), NULL) AS line_color_c,
+                l.line_type,
+                l.line_symbol1,
+                l.line_symbol2,
+                l.line_symbol3,
+                l.line_symbol4,
+                l.line_symbol1_color,
+                l.line_symbol2_color,
+                l.line_symbol3_color,
+                l.line_symbol4_color,
+                l.line_symbol1_shape,
+                l.line_symbol2_shape,
+                l.line_symbol3_shape,
+                l.line_symbol4_shape,
+                COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
+                NULL::int AS type_id,
+                NULL::int AS sst_id,
+                NULL::int AS type_cd,
+                NULL::int AS line_group_cd,
+                NULL::int AS pass,
+                NULL::text AS type_name,
+                NULL::text AS type_name_k,
+                NULL::text AS type_name_r,
+                NULL::text AS type_name_zh,
+                NULL::text AS type_name_ko,
+                NULL::text AS color,
+                NULL::int AS direction,
+                NULL::int AS kind,
+                s.transport_type
+            FROM (
+                SELECT unnest($1::int[]) AS source_g_cd,
+                       unnest($2::float8[]) AS lat,
+                       unnest($3::float8[]) AS lon
+            ) ic,
+            LATERAL (
+                SELECT s.*
+                FROM stations s
+                WHERE s.e_status = 0
+                AND COALESCE(s.transport_type, 0) = 2
+                ORDER BY point(s.lat, s.lon) <-> point(ic.lat, ic.lon)
+                LIMIT $4
+            ) s
+            JOIN lines AS l ON s.line_cd = l.line_cd
+            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+            LEFT JOIN aliases AS a ON a.id = la.alias_cd"#;
+
+        let source_g_cds: Vec<i32> = coords.iter().map(|(g, _, _)| *g as i32).collect();
+        let lats: Vec<f64> = coords.iter().map(|(_, lat, _)| *lat).collect();
+        let lons: Vec<f64> = coords.iter().map(|(_, _, lon)| *lon).collect();
+
+        let rows = sqlx::query_as::<_, BusStopWithSourceRow>(query_str)
+            .bind(&source_g_cds)
+            .bind(&lats)
+            .bind(&lons)
+            .bind(limit_per_station as i32)
+            .fetch_all(&mut *conn)
+            .await?;
+
+        let result: Vec<(u32, Station)> = rows
+            .into_iter()
+            .map(|row| {
+                let source_g_cd = row.source_g_cd as u32;
+                let station: Station = row.into();
+                (source_g_cd, station)
+            })
+            .collect();
+
+        Ok(result)
     }
 
     async fn get_by_coordinates(

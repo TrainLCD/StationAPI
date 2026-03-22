@@ -959,6 +959,31 @@ where
         Ok(stations)
     }
 
+    async fn get_lines_by_station_group_id_vec_no_types(
+        &self,
+        station_group_id_vec: &[u32],
+    ) -> Result<Vec<Line>, UseCaseError> {
+        let lines = self
+            .line_repository
+            .get_by_station_group_id_vec_no_types(station_group_id_vec)
+            .await?;
+
+        Ok(lines)
+    }
+
+    async fn get_bus_stops_near_stations(
+        &self,
+        coords: &[(u32, f64, f64)],
+        limit_per_station: u32,
+    ) -> Result<Vec<(u32, Station)>, UseCaseError> {
+        let result = self
+            .station_repository
+            .get_bus_stops_near_stations(coords, limit_per_station)
+            .await?;
+
+        Ok(result)
+    }
+
     async fn update_station_vec_with_attributes(
         &self,
         mut stations: Vec<Station>,
@@ -973,40 +998,108 @@ where
         station_group_ids.sort_unstable();
         station_group_ids.dedup();
 
+        // Determine if bus enrichment is needed
+        let should_include_bus_routes = transport_type == TransportTypeFilter::RailAndBus;
+
+        // Collect unique coordinates for batch bus stop lookup
+        let unique_bus_coords: Vec<(u32, f64, f64)> = if should_include_bus_routes {
+            let mut seen = std::collections::HashSet::new();
+            stations
+                .iter()
+                .filter(|s| s.transport_type == TransportType::Rail && seen.insert(s.station_g_cd))
+                .map(|s| (s.station_g_cd as u32, s.lat, s.lon))
+                .collect()
+        } else {
+            vec![]
+        };
+
         // Phase 1: independent queries in parallel
         // When skip_types_join is true, skip the expensive JOINs to
         // station_station_types and types tables (used by GetStationsByLineIdList)
-        let (stations_by_group_ids, lines) = if skip_types_join {
+        // Also batch-fetch bus stop candidates in parallel
+        let (stations_by_group_ids, lines, bus_candidates_flat) = if skip_types_join {
             tokio::try_join!(
                 self.get_stations_by_group_id_vec_no_types(&station_group_ids),
-                self.get_lines_by_station_group_id_vec(&station_group_ids),
+                self.get_lines_by_station_group_id_vec_no_types(&station_group_ids),
+                self.get_bus_stops_near_stations(&unique_bus_coords, 50),
             )?
         } else {
-            tokio::try_join!(
+            let (s, l) = tokio::try_join!(
                 self.get_stations_by_group_id_vec(&station_group_ids),
                 self.get_lines_by_station_group_id_vec(&station_group_ids),
-            )?
+            )?;
+            let bus = self
+                .get_bus_stops_near_stations(&unique_bus_coords, 50)
+                .await?;
+            (s, l, bus)
         };
+
+        // Build bus candidate cache from batch results
+        let mut bus_candidate_cache: std::collections::HashMap<i32, Vec<Station>> =
+            std::collections::HashMap::new();
+        for (source_g_cd, station) in bus_candidates_flat {
+            bus_candidate_cache
+                .entry(source_g_cd as i32)
+                .or_default()
+                .push(station);
+        }
+
+        // Collect all bus station group IDs for batch bus lines fetch
+        let mut all_bus_station_group_ids: Vec<u32> = bus_candidate_cache
+            .values()
+            .flat_map(|stops| stops.iter().map(|s| s.station_g_cd as u32))
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        all_bus_station_group_ids.sort_unstable();
 
         let station_ids = stations_by_group_ids
             .iter()
             .map(|station| station.station_cd as u32)
             .collect::<Vec<u32>>();
 
+        // Collect company IDs from rail lines
         let mut company_ids: Vec<u32> = lines.iter().map(|l| l.company_cd as u32).collect();
+
+        // Phase 2: dependent queries in parallel
+        // Fetch companies, train types, and all bus lines in one batch
+        let (companies, train_types, all_bus_lines) = tokio::try_join!(
+            self.find_company_by_id_vec(&company_ids),
+            self.get_train_types_by_station_id_vec(&station_ids, line_group_id),
+            self.get_lines_by_station_group_id_vec(&all_bus_station_group_ids),
+        )?;
+
+        // Collect bus company IDs and fetch any missing companies
+        let bus_company_ids: Vec<u32> = all_bus_lines.iter().map(|l| l.company_cd as u32).collect();
+        company_ids.extend(bus_company_ids);
         company_ids.sort_unstable();
         company_ids.dedup();
 
-        // Phase 2: dependent queries in parallel
-        let (companies, train_types) = tokio::try_join!(
-            self.find_company_by_id_vec(&company_ids),
-            self.get_train_types_by_station_id_vec(&station_ids, line_group_id),
-        )?;
-
-        // Build HashMap for O(1) company lookup instead of O(n) linear search
-        // Owns the values so we can add bus companies later
+        // Build HashMap for O(1) company lookup
         let mut company_map: std::collections::HashMap<i32, Company> =
             companies.into_iter().map(|c| (c.company_cd, c)).collect();
+
+        // Fetch any bus companies not already in the map
+        let missing_company_ids: Vec<u32> = company_ids
+            .iter()
+            .filter(|id| !company_map.contains_key(&(**id as i32)))
+            .copied()
+            .collect();
+        if !missing_company_ids.is_empty() {
+            let extra_companies = self.find_company_by_id_vec(&missing_company_ids).await?;
+            for c in extra_companies {
+                company_map.insert(c.company_cd, c);
+            }
+        }
+
+        // Pre-index bus lines by station_g_cd for O(1) lookup
+        let mut bus_lines_by_g_cd: std::collections::HashMap<i32, Vec<&Line>> =
+            std::collections::HashMap::new();
+        for bus_line in &all_bus_lines {
+            if let Some(g_cd) = bus_line.station_g_cd {
+                bus_lines_by_g_cd.entry(g_cd).or_default().push(bus_line);
+            }
+        }
 
         // Build HashMap for O(1) train_type lookup by station_cd
         let train_type_map: std::collections::HashMap<i32, &TrainType> = train_types
@@ -1028,16 +1121,6 @@ where
                 lines_by_g_cd.entry(g_cd).or_default().push(idx);
             }
         }
-
-        // Cache nearby bus stop candidates by station_g_cd.
-        // Stations with the same station_g_cd are at the same physical location,
-        // so they share identical bus stop candidates.
-        let mut bus_candidate_cache: std::collections::HashMap<i32, Vec<Station>> =
-            std::collections::HashMap::new();
-        // Cache bus lines by station_group_ids to avoid repeated DB queries
-        // for the same set of bus stop groups.
-        let mut bus_lines_cache: std::collections::HashMap<Vec<u32>, Vec<Line>> =
-            std::collections::HashMap::new();
 
         for station in stations.iter_mut() {
             let mut line = self.extract_line_from_station(station);
@@ -1078,98 +1161,60 @@ where
                 })
                 .unwrap_or_default();
 
-            // For rail stations, add nearby bus routes to lines array
-            // Only add bus routes if transport_type is RailAndBus
-            let should_include_bus_routes = transport_type == TransportTypeFilter::RailAndBus;
+            // For rail stations, add nearby bus routes from pre-fetched data
             if station.transport_type == TransportType::Rail && should_include_bus_routes {
-                let cache_key = station.station_g_cd;
-                let candidates = if let Some(cached) = bus_candidate_cache.get(&cache_key) {
-                    cached.clone()
-                } else {
-                    let result = self
-                        .station_repository
-                        .get_by_coordinates(
-                            station.lat,
-                            station.lon,
-                            Some(50),
-                            Some(TransportType::Bus),
-                        )
-                        .await?;
-                    bus_candidate_cache.insert(cache_key, result.clone());
-                    result
-                };
-
-                // Apply 300m filter from this station's exact coordinates
-                let nearby_bus_stops: Vec<&Station> = candidates
-                    .iter()
-                    .filter(|bus_stop| {
-                        haversine_distance(station.lat, station.lon, bus_stop.lat, bus_stop.lon)
-                            <= NEARBY_BUS_STOP_RADIUS_METERS
-                    })
-                    .collect();
-
-                if !nearby_bus_stops.is_empty() {
-                    let mut bus_station_group_ids: Vec<u32> = nearby_bus_stops
+                if let Some(candidates) = bus_candidate_cache.get(&station.station_g_cd) {
+                    // Apply 300m filter from this station's exact coordinates
+                    let nearby_bus_stops: Vec<&Station> = candidates
                         .iter()
-                        .map(|s| s.station_g_cd as u32)
+                        .filter(|bus_stop| {
+                            haversine_distance(station.lat, station.lon, bus_stop.lat, bus_stop.lon)
+                                <= NEARBY_BUS_STOP_RADIUS_METERS
+                        })
                         .collect();
-                    bus_station_group_ids.sort_unstable();
-                    bus_station_group_ids.dedup();
 
-                    let mut bus_lines =
-                        if let Some(cached) = bus_lines_cache.get(&bus_station_group_ids) {
-                            cached.clone()
-                        } else {
-                            let result = self
-                                .line_repository
-                                .get_by_station_group_id_vec(&bus_station_group_ids)
-                                .await?;
-                            bus_lines_cache.insert(bus_station_group_ids, result.clone());
-                            result
-                        };
+                    if !nearby_bus_stops.is_empty() {
+                        let nearby_bus_g_cds: std::collections::HashSet<i32> =
+                            nearby_bus_stops.iter().map(|s| s.station_g_cd).collect();
 
-                    let mut seen_bus_line_cds = std::collections::HashSet::new();
-                    bus_lines.retain(|line| {
-                        line.transport_type == TransportType::Bus
-                            && seen_bus_line_cds.insert(line.line_cd)
-                    });
+                        // Collect bus lines from pre-fetched data for nearby bus stops
+                        let mut seen_bus_line_cds = std::collections::HashSet::new();
+                        let mut bus_lines: Vec<Line> = Vec::new();
+                        for &g_cd in &nearby_bus_g_cds {
+                            if let Some(lines_for_g_cd) = bus_lines_by_g_cd.get(&g_cd) {
+                                for &bus_line in lines_for_g_cd {
+                                    if bus_line.transport_type == TransportType::Bus
+                                        && seen_bus_line_cds.insert(bus_line.line_cd)
+                                    {
+                                        bus_lines.push(bus_line.clone());
+                                    }
+                                }
+                            }
+                        }
 
-                    let bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> =
-                        nearby_bus_stops
-                            .iter()
-                            .filter(|s| seen_bus_line_cds.contains(&s.line_cd))
-                            .map(|s| (s.line_cd, *s))
-                            .collect();
+                        let bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> =
+                            nearby_bus_stops
+                                .iter()
+                                .filter(|s| seen_bus_line_cds.contains(&s.line_cd))
+                                .map(|s| (s.line_cd, *s))
+                                .collect();
 
-                    for bus_line in bus_lines.iter_mut() {
-                        bus_line.line_symbols = self.get_line_symbols(bus_line);
-                        if let Some(&bus_stop) = bus_stop_by_line_cd.get(&bus_line.line_cd) {
-                            let mut station_copy = bus_stop.clone();
-                            station_copy.station_numbers = self.get_station_numbers(&station_copy);
-                            bus_line.station = Some(station_copy);
+                        for bus_line in bus_lines.iter_mut() {
+                            bus_line.line_symbols = self.get_line_symbols(bus_line);
+                            if let Some(&bus_stop) = bus_stop_by_line_cd.get(&bus_line.line_cd) {
+                                let mut station_copy = bus_stop.clone();
+                                station_copy.station_numbers =
+                                    self.get_station_numbers(&station_copy);
+                                bus_line.station = Some(station_copy);
+                            }
+                        }
+
+                        for bus_line in bus_lines {
+                            if seen_line_cds.insert(bus_line.line_cd) {
+                                station_lines.push(bus_line);
+                            }
                         }
                     }
-
-                    for bus_line in bus_lines {
-                        if seen_line_cds.insert(bus_line.line_cd) {
-                            station_lines.push(bus_line);
-                        }
-                    }
-                }
-            }
-
-            // Fetch any missing companies (e.g., bus-only operators not in initial lines)
-            let missing_company_ids: Vec<u32> = station_lines
-                .iter()
-                .filter(|l| !company_map.contains_key(&l.company_cd))
-                .map(|l| l.company_cd as u32)
-                .collect::<std::collections::HashSet<u32>>()
-                .into_iter()
-                .collect();
-            if !missing_company_ids.is_empty() {
-                let extra_companies = self.find_company_by_id_vec(&missing_company_ids).await?;
-                for c in extra_companies {
-                    company_map.insert(c.company_cd, c);
                 }
             }
 
@@ -1533,6 +1578,13 @@ mod tests {
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
+            async fn get_bus_stops_near_stations(
+                &self,
+                _: &[(u32, f64, f64)],
+                _: u32,
+            ) -> Result<Vec<(u32, Station)>, DomainError> {
+                Ok(vec![])
+            }
             async fn get_by_name(
                 &self,
                 _: String,
@@ -1595,6 +1647,12 @@ mod tests {
                 Ok(vec![])
             }
             async fn get_by_station_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec_no_types(
                 &self,
                 _: &[u32],
             ) -> Result<Vec<Line>, DomainError> {
@@ -1973,6 +2031,27 @@ mod tests {
                     Ok(vec![])
                 }
             }
+            async fn get_bus_stops_near_stations(
+                &self,
+                coords: &[(u32, f64, f64)],
+                limit_per_station: u32,
+            ) -> Result<Vec<(u32, Station)>, DomainError> {
+                let mut result = Vec::new();
+                for &(source_g_cd, lat, lon) in coords {
+                    let stops = self
+                        .get_by_coordinates(
+                            lat,
+                            lon,
+                            Some(limit_per_station),
+                            Some(TransportType::Bus),
+                        )
+                        .await?;
+                    for stop in stops {
+                        result.push((source_g_cd, stop));
+                    }
+                }
+                Ok(result)
+            }
             async fn get_by_name(
                 &self,
                 _: String,
@@ -2052,6 +2131,12 @@ mod tests {
                 _: &[u32],
             ) -> Result<Vec<Line>, DomainError> {
                 Ok(self.lines_by_station_group.clone())
+            }
+            async fn get_by_station_group_id_vec_no_types(
+                &self,
+                station_group_id_vec: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                self.get_by_station_group_id_vec(station_group_id_vec).await
             }
         }
 
