@@ -47,6 +47,11 @@ pub trait StationRepository: Send + Sync + 'static {
         &self,
         line_group_ids: &[u32],
     ) -> Result<Vec<Station>, DomainError>;
+    async fn get_bus_stops_near_stations(
+        &self,
+        coords: &[(u32, f64, f64)], // (station_g_cd, lat, lon)
+        limit_per_station: u32,
+    ) -> Result<Vec<(u32, Station)>, DomainError>;
     async fn get_route_stops(
         &self,
         from_station_id: u32,
@@ -192,6 +197,23 @@ mod tests {
                 result.truncate(limit as usize);
             }
 
+            Ok(result)
+        }
+
+        async fn get_bus_stops_near_stations(
+            &self,
+            coords: &[(u32, f64, f64)],
+            limit_per_station: u32,
+        ) -> Result<Vec<(u32, Station)>, DomainError> {
+            let mut result = Vec::new();
+            for &(source_g_cd, lat, lon) in coords {
+                let stops = self
+                    .get_by_coordinates(lat, lon, Some(limit_per_station), Some(TransportType::Bus))
+                    .await?;
+                for stop in stops {
+                    result.push((source_g_cd, stop));
+                }
+            }
             Ok(result)
         }
 
