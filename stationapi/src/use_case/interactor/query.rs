@@ -959,18 +959,6 @@ where
         Ok(stations)
     }
 
-    async fn get_lines_by_station_group_id_vec_no_types(
-        &self,
-        station_group_id_vec: &[u32],
-    ) -> Result<Vec<Line>, UseCaseError> {
-        let lines = self
-            .line_repository
-            .get_by_station_group_id_vec_no_types(station_group_id_vec)
-            .await?;
-
-        Ok(lines)
-    }
-
     async fn get_bus_stops_near_stations(
         &self,
         coords: &[(u32, f64, f64)],
@@ -1020,7 +1008,7 @@ where
         let (stations_by_group_ids, lines, bus_candidates_flat) = if skip_types_join {
             tokio::try_join!(
                 self.get_stations_by_group_id_vec_no_types(&station_group_ids),
-                self.get_lines_by_station_group_id_vec_no_types(&station_group_ids),
+                self.get_lines_by_station_group_id_vec(&station_group_ids),
                 self.get_bus_stops_near_stations(&unique_bus_coords, 50),
             )?
         } else {
@@ -1174,30 +1162,38 @@ where
                         .collect();
 
                     if !nearby_bus_stops.is_empty() {
-                        let nearby_bus_g_cds: std::collections::HashSet<i32> =
-                            nearby_bus_stops.iter().map(|s| s.station_g_cd).collect();
-
-                        // Collect bus lines from pre-fetched data for nearby bus stops
+                        // Collect bus lines from pre-fetched data, iterating
+                        // nearby_bus_stops in order (distance-sorted) to preserve
+                        // deterministic ordering.
+                        let mut seen_bus_g_cds = std::collections::HashSet::new();
                         let mut seen_bus_line_cds = std::collections::HashSet::new();
                         let mut bus_lines: Vec<Line> = Vec::new();
-                        for &g_cd in &nearby_bus_g_cds {
-                            if let Some(lines_for_g_cd) = bus_lines_by_g_cd.get(&g_cd) {
-                                for &bus_line in lines_for_g_cd {
-                                    if bus_line.transport_type == TransportType::Bus
-                                        && seen_bus_line_cds.insert(bus_line.line_cd)
-                                    {
-                                        bus_lines.push(bus_line.clone());
+                        for bus_stop in &nearby_bus_stops {
+                            if seen_bus_g_cds.insert(bus_stop.station_g_cd) {
+                                if let Some(lines_for_g_cd) =
+                                    bus_lines_by_g_cd.get(&bus_stop.station_g_cd)
+                                {
+                                    for &bus_line in lines_for_g_cd {
+                                        if bus_line.transport_type == TransportType::Bus
+                                            && seen_bus_line_cds.insert(bus_line.line_cd)
+                                        {
+                                            bus_lines.push(bus_line.clone());
+                                        }
                                     }
                                 }
                             }
                         }
 
-                        let bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> =
-                            nearby_bus_stops
-                                .iter()
-                                .filter(|s| seen_bus_line_cds.contains(&s.line_cd))
-                                .map(|s| (s.line_cd, *s))
-                                .collect();
+                        // Build stop-per-line map; first (closest) stop wins
+                        let mut bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> =
+                            std::collections::HashMap::new();
+                        for bus_stop in &nearby_bus_stops {
+                            if seen_bus_line_cds.contains(&bus_stop.line_cd) {
+                                bus_stop_by_line_cd
+                                    .entry(bus_stop.line_cd)
+                                    .or_insert(bus_stop);
+                            }
+                        }
 
                         for bus_line in bus_lines.iter_mut() {
                             bus_line.line_symbols = self.get_line_symbols(bus_line);
