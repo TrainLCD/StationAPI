@@ -15,6 +15,10 @@ pub trait LineRepository: Send + Sync + 'static {
         &self,
         station_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError>;
+    async fn get_by_station_group_id_vec_no_types(
+        &self,
+        station_group_id_vec: &[u32],
+    ) -> Result<Vec<Line>, DomainError>;
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Line>, DomainError>;
     async fn get_by_line_group_id_vec(
         &self,
@@ -227,6 +231,13 @@ mod tests {
                 }
             }
             Ok(result)
+        }
+
+        async fn get_by_station_group_id_vec_no_types(
+            &self,
+            station_group_id_vec: &[u32],
+        ) -> Result<Vec<Line>, DomainError> {
+            self.get_by_station_group_id_vec(station_group_id_vec).await
         }
 
         async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Line>, DomainError> {
