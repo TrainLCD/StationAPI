@@ -39,7 +39,12 @@ where
     }
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
-        let method = req.uri().path().to_owned();
+        let path = req.uri().path();
+
+        // Map each gRPC path prefix to a fixed bucket name and extract only the
+        // canonical method token (alphanumeric + dots/slashes/underscores) to
+        // prevent unbounded label cardinality from raw path strings.
+        let method = normalize_grpc_method(path);
 
         counter!("grpc_requests_started_total", "method" => method.clone()).increment(1);
 
@@ -49,6 +54,37 @@ where
             start: Instant::now(),
         }
     }
+}
+
+/// Normalizes a request path into a bounded metric label.
+///
+/// Known gRPC prefixes are mapped to fixed bucket names with only a validated
+/// method token appended (characters limited to alphanumeric, `.`, `/`, `_`).
+/// Any path that does not match a known prefix or contains unexpected
+/// characters is labelled `"unknown"`.
+fn normalize_grpc_method(path: &str) -> String {
+    const PREFIXES: &[(&str, &str)] = &[
+        ("/app.trainlcd.grpc.", "trainlcd"),
+        ("/grpc.health.", "grpc_health"),
+        ("/grpc.reflection.", "grpc_reflection"),
+    ];
+
+    for &(prefix, bucket) in PREFIXES {
+        if let Some(rest) = path.strip_prefix(prefix) {
+            // Validate that the remainder contains only safe characters
+            if !rest.is_empty()
+                && rest
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '/' || c == '_')
+            {
+                return format!("{}/{}", bucket, rest);
+            }
+            // Prefix matched but method token is missing or invalid
+            return bucket.to_owned();
+        }
+    }
+
+    "unknown".to_owned()
 }
 
 pin_project! {
