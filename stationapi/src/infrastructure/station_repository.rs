@@ -1358,7 +1358,8 @@ impl InternalStationRepository {
             ) s
             JOIN lines AS l ON s.line_cd = l.line_cd
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
-            LEFT JOIN aliases AS a ON a.id = la.alias_cd"#;
+            LEFT JOIN aliases AS a ON a.id = la.alias_cd
+            ORDER BY ic.source_g_cd, point(s.lat, s.lon) <-> point(ic.lat, ic.lon)"#;
 
         let source_g_cds: Vec<i32> = coords.iter().map(|(g, _, _)| *g as i32).collect();
         let lats: Vec<f64> = coords.iter().map(|(_, lat, _)| *lat).collect();
