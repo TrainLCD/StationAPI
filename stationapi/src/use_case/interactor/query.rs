@@ -959,6 +959,18 @@ where
         Ok(stations)
     }
 
+    async fn get_lines_by_station_group_id_vec_no_types(
+        &self,
+        station_group_id_vec: &[u32],
+    ) -> Result<Vec<Line>, UseCaseError> {
+        let lines = self
+            .line_repository
+            .get_by_station_group_id_vec_no_types(station_group_id_vec)
+            .await?;
+
+        Ok(lines)
+    }
+
     async fn get_bus_stops_near_stations(
         &self,
         coords: &[(u32, f64, f64)],
@@ -1008,7 +1020,7 @@ where
         let (stations_by_group_ids, lines, bus_candidates_flat) = if skip_types_join {
             tokio::try_join!(
                 self.get_stations_by_group_id_vec_no_types(&station_group_ids),
-                self.get_lines_by_station_group_id_vec(&station_group_ids),
+                self.get_lines_by_station_group_id_vec_no_types(&station_group_ids),
                 self.get_bus_stops_near_stations(&unique_bus_coords, 50),
             )?
         } else {

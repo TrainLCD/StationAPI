@@ -519,7 +519,19 @@ impl InternalLineRepository {
             AND s.line_cd = l.line_cd
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
             LEFT JOIN aliases AS a ON la.alias_cd = a.id
-            WHERE l.e_status = 0"
+            WHERE l.e_status = 0
+            AND NOT EXISTS (
+                SELECT 1 FROM station_station_types sst
+                WHERE sst.station_cd = s.station_cd
+                AND sst.line_group_cd IS NOT NULL
+                AND sst.pass = 1
+                AND NOT EXISTS (
+                    SELECT 1 FROM station_station_types sst2
+                    WHERE sst2.station_cd = s.station_cd
+                    AND sst2.line_group_cd IS NOT NULL
+                    AND sst2.pass <> 1
+                )
+            )"
         );
 
         let mut query = sqlx::query_as::<_, LineRow>(&query_str);
