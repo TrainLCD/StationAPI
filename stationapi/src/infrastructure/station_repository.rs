@@ -1356,7 +1356,7 @@ impl InternalStationRepository {
                 ORDER BY point(s.lat, s.lon) <-> point(ic.lat, ic.lon)
                 LIMIT $4
             ) s
-            JOIN lines AS l ON s.line_cd = l.line_cd
+            JOIN lines AS l ON s.line_cd = l.line_cd AND l.e_status = 0
             LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
             LEFT JOIN aliases AS a ON a.id = la.alias_cd
             ORDER BY ic.source_g_cd, point(s.lat, s.lon) <-> point(ic.lat, ic.lon)"#;
