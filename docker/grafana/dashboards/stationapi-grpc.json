@@ -33,12 +33,16 @@
         }
       ],
       "options": {
-        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "max"]
+        },
         "tooltip": { "mode": "multi" }
       }
     },
     {
-      "title": "Error Rate (per second)",
+      "title": "Status Breakdown (per second)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -51,20 +55,23 @@
             "fillOpacity": 20,
             "pointSize": 5,
             "showPoints": "auto"
-          },
-          "color": { "mode": "fixed", "fixedColor": "red" }
+          }
         },
         "overrides": []
       },
       "targets": [
         {
-          "expr": "sum(rate(grpc_requests_total{status=\"error\"}[1m])) by (method)",
-          "legendFormat": "{{ method }}",
+          "expr": "sum(rate(grpc_requests_total[1m])) by (status)",
+          "legendFormat": "{{ status }}",
           "refId": "A"
         }
       ],
       "options": {
-        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "max"]
+        },
         "tooltip": { "mode": "multi" }
       }
     },
@@ -75,7 +82,7 @@
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "ms",
           "custom": {
             "drawStyle": "line",
             "lineInterpolation": "smooth",
@@ -104,7 +111,11 @@
         }
       ],
       "options": {
-        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "max"]
+        },
         "tooltip": { "mode": "multi" }
       }
     },
@@ -131,7 +142,7 @@
     {
       "title": "Total Requests (Started)",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 24 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": {
         "defaults": {
@@ -158,7 +169,7 @@
     {
       "title": "Total Requests (Completed)",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 24 },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": {
         "defaults": {
@@ -183,9 +194,9 @@
       }
     },
     {
-      "title": "Error Ratio",
+      "title": "Current Error Ratio",
       "type": "gauge",
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 24 },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": {
         "defaults": {
@@ -204,7 +215,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(grpc_requests_total{status=\"error\"}[5m])) / (sum(rate(grpc_requests_total[5m])) > 0) or vector(0)",
+          "expr": "(sum(rate(grpc_requests_total{status!=\"ok\"}[5m])) / clamp_min(sum(rate(grpc_requests_total[5m])), 1e-9)) or vector(0)",
           "legendFormat": "Error Ratio",
           "refId": "A"
         }
@@ -214,13 +225,13 @@
       }
     },
     {
-      "title": "Request Duration per Method",
+      "title": "Average Duration per Method",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "ms",
           "custom": {
             "drawStyle": "line",
             "lineInterpolation": "smooth",
@@ -233,13 +244,51 @@
       },
       "targets": [
         {
-          "expr": "rate(grpc_request_duration_seconds_sum[5m]) / rate(grpc_request_duration_seconds_count[5m])",
+          "expr": "sum(rate(grpc_request_duration_seconds_sum[5m])) by (method) / sum(rate(grpc_request_duration_seconds_count[5m])) by (method)",
           "legendFormat": "avg {{ method }}",
           "refId": "A"
         }
       ],
       "options": {
-        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "max"]
+        },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "title": "Requests by Method and Status",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 12,
+            "pointSize": 4,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(grpc_requests_total[5m])) by (method, status)",
+          "legendFormat": "{{ method }} / {{ status }}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["mean", "max"]
+        },
         "tooltip": { "mode": "multi" }
       }
     }
