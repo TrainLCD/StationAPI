@@ -95,17 +95,17 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(grpc_request_duration_seconds_bucket[5m])) by (le, method))",
+          "expr": "histogram_quantile(0.50, sum(rate(grpc_request_duration_seconds_bucket[5m])) by (le, method)) * 1000",
           "legendFormat": "p50 {{ method }}",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.90, sum(rate(grpc_request_duration_seconds_bucket[5m])) by (le, method))",
+          "expr": "histogram_quantile(0.90, sum(rate(grpc_request_duration_seconds_bucket[5m])) by (le, method)) * 1000",
           "legendFormat": "p90 {{ method }}",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(grpc_request_duration_seconds_bucket[5m])) by (le, method))",
+          "expr": "histogram_quantile(0.99, sum(rate(grpc_request_duration_seconds_bucket[5m])) by (le, method)) * 1000",
           "legendFormat": "p99 {{ method }}",
           "refId": "C"
         }
@@ -244,7 +244,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(grpc_request_duration_seconds_sum[5m])) by (method) / sum(rate(grpc_request_duration_seconds_count[5m])) by (method)",
+          "expr": "(sum(rate(grpc_request_duration_seconds_sum[5m])) by (method) / sum(rate(grpc_request_duration_seconds_count[5m])) by (method)) * 1000",
           "legendFormat": "avg {{ method }}",
           "refId": "A"
         }
