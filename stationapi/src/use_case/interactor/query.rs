@@ -298,8 +298,9 @@ where
             .collect();
 
         // lines, companies, station_numbers等を付与（train_typeはNoneで空になる）
+        // train_typeは後続のget_by_line_group_id_vecで取得するためJOIN不要
         let mut stations = self
-            .update_station_vec_with_attributes(stations, None, transport_type, false)
+            .update_station_vec_with_attributes(stations, None, transport_type, true)
             .await?;
 
         // 複数line_group_idの列車種別を一括取得してセット
