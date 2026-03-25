@@ -269,7 +269,7 @@ where
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(stations, None, transport_type, false)
+            .update_station_vec_with_attributes(stations, None, transport_type, true)
             .await?;
 
         Ok(stations)
