@@ -127,9 +127,32 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     });
 
     let db_url = &fetch_database_url();
+    const DEFAULT_MAX_CONNECTIONS: u32 = 20;
+    let max_connections: u32 = match std::env::var("DATABASE_MAX_CONNECTIONS") {
+        Ok(v) => match v.parse::<u32>() {
+            Ok(n) if (1..=1000).contains(&n) => n,
+            Ok(n) => {
+                tracing::warn!(
+                    "DATABASE_MAX_CONNECTIONS={} is out of range (1..=1000), using default {}",
+                    n,
+                    DEFAULT_MAX_CONNECTIONS
+                );
+                DEFAULT_MAX_CONNECTIONS
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to parse DATABASE_MAX_CONNECTIONS: {}, using default {}",
+                    e,
+                    DEFAULT_MAX_CONNECTIONS
+                );
+                DEFAULT_MAX_CONNECTIONS
+            }
+        },
+        Err(_) => DEFAULT_MAX_CONNECTIONS,
+    };
     let pool = Arc::new(
         match PgPoolOptions::new()
-            .max_connections(5)
+            .max_connections(max_connections)
             .connect(db_url)
             .await
         {
