@@ -72,7 +72,7 @@ where
             return Ok(None);
         }
         let stations = self
-            .update_station_vec_with_attributes(vec![station], None, transport_type, false)
+            .update_station_vec_with_attributes(vec![station], None, transport_type, true)
             .await?;
 
         Ok(stations.into_iter().next())
@@ -89,7 +89,7 @@ where
             .filter(|s| matches_transport_filter(s.transport_type, transport_type))
             .collect();
         let stations = self
-            .update_station_vec_with_attributes(stations, None, transport_type, false)
+            .update_station_vec_with_attributes(stations, None, transport_type, true)
             .await?;
 
         Ok(stations)
@@ -161,7 +161,7 @@ where
             .await?;
 
         let stations = self
-            .update_station_vec_with_attributes(stations, None, transport_type, false)
+            .update_station_vec_with_attributes(stations, None, transport_type, true)
             .await?;
 
         Ok(stations)
