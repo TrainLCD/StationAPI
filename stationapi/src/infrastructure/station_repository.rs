@@ -1343,7 +1343,7 @@ impl InternalStationRepository {
             COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
             NULL::int AS sst_id,
             NULL::int AS type_cd,
-            NULL::int AS line_group_cd,
+            (SELECT sst.line_group_cd FROM station_station_types sst WHERE sst.station_cd = s.station_cd AND sst.line_group_cd IS NOT NULL LIMIT 1)::int AS line_group_cd,
             NULL::int AS pass,
             NULL::int AS type_id,
             NULL::text AS type_name,
