@@ -203,15 +203,49 @@ where
         line_ids: &[u32],
         transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let stations = self.station_repository.get_by_line_id_vec(line_ids).await?;
+        // Fetch all stations at station groups matching the requested line IDs.
+        // This returns a superset that includes stations on other lines at the same
+        // physical locations, eliminating the need for a separate group station query.
+        let all_group_stations = self
+            .station_repository
+            .get_by_line_id_vec_with_group_stations(line_ids)
+            .await?;
 
-        let stations: Vec<Station> = stations
-            .into_iter()
-            .filter(|s| matches_transport_filter(s.transport_type, transport_type))
+        // Build input order map for sorting main stations by requested line_id order
+        let line_id_order: std::collections::HashMap<i32, usize> = line_ids
+            .iter()
+            .enumerate()
+            .map(|(i, &id)| (id as i32, i))
             .collect();
 
+        // Filter for main stations: only those on requested lines + matching transport type
+        let mut stations: Vec<Station> = all_group_stations
+            .iter()
+            .filter(|s| {
+                line_id_order.contains_key(&s.line_cd)
+                    && matches_transport_filter(s.transport_type, transport_type)
+            })
+            .cloned()
+            .collect();
+
+        // Sort by input line_id order, then by e_sort, station_cd (matching original query ORDER BY)
+        stations.sort_by(|a, b| {
+            let order_a = line_id_order.get(&a.line_cd).copied().unwrap_or(usize::MAX);
+            let order_b = line_id_order.get(&b.line_cd).copied().unwrap_or(usize::MAX);
+            order_a
+                .cmp(&order_b)
+                .then(a.e_sort.cmp(&b.e_sort))
+                .then(a.station_cd.cmp(&b.station_cd))
+        });
+
         let stations = self
-            .update_station_vec_with_attributes(stations, None, transport_type, true)
+            .update_station_vec_with_attributes_inner(
+                stations,
+                None,
+                transport_type,
+                true,
+                Some(all_group_stations),
+            )
             .await?;
 
         Ok(stations)
@@ -987,10 +1021,28 @@ where
 
     async fn update_station_vec_with_attributes(
         &self,
+        stations: Vec<Station>,
+        line_group_id: Option<u32>,
+        transport_type: TransportTypeFilter,
+        skip_types_join: bool,
+    ) -> Result<Vec<Station>, UseCaseError> {
+        self.update_station_vec_with_attributes_inner(
+            stations,
+            line_group_id,
+            transport_type,
+            skip_types_join,
+            None,
+        )
+        .await
+    }
+
+    async fn update_station_vec_with_attributes_inner(
+        &self,
         mut stations: Vec<Station>,
         line_group_id: Option<u32>,
         transport_type: TransportTypeFilter,
         skip_types_join: bool,
+        prefetched_group_stations: Option<Vec<Station>>,
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut station_group_ids: Vec<u32> = stations
             .iter()
@@ -1019,11 +1071,20 @@ where
         // station_station_types and types tables (used by GetStationsByLineIdList)
         // Also batch-fetch bus stop candidates in parallel
         let (stations_by_group_ids, lines, bus_candidates_flat) = if skip_types_join {
-            tokio::try_join!(
-                self.get_stations_by_group_id_vec_no_types(&station_group_ids),
-                self.get_lines_by_station_group_id_vec_no_types(&station_group_ids),
-                self.get_bus_stops_near_stations(&unique_bus_coords, 50),
-            )?
+            if let Some(prefetched) = prefetched_group_stations {
+                // Group stations already fetched by expanded primary query
+                let (lines, bus) = tokio::try_join!(
+                    self.get_lines_by_station_group_id_vec_no_types(&station_group_ids),
+                    self.get_bus_stops_near_stations(&unique_bus_coords, 50),
+                )?;
+                (prefetched, lines, bus)
+            } else {
+                tokio::try_join!(
+                    self.get_stations_by_group_id_vec_no_types(&station_group_ids),
+                    self.get_lines_by_station_group_id_vec_no_types(&station_group_ids),
+                    self.get_bus_stops_near_stations(&unique_bus_coords, 50),
+                )?
+            }
         } else {
             let (s, l) = tokio::try_join!(
                 self.get_stations_by_group_id_vec(&station_group_ids),
@@ -1563,6 +1624,12 @@ mod tests {
             async fn get_by_line_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
+            async fn get_by_line_id_vec_with_group_stations(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
             async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
@@ -1987,6 +2054,12 @@ mod tests {
             }
             async fn get_by_line_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
+            }
+            async fn get_by_line_id_vec_with_group_stations(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(self.stations_by_group.clone())
             }
             async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
