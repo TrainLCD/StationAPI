@@ -211,12 +211,13 @@ where
             .get_by_line_id_vec_with_group_stations(line_ids)
             .await?;
 
-        // Build input order map for sorting main stations by requested line_id order
-        let line_id_order: std::collections::HashMap<i32, usize> = line_ids
-            .iter()
-            .enumerate()
-            .map(|(i, &id)| (id as i32, i))
-            .collect();
+        // Build input order map for sorting main stations by requested line_id order.
+        // Preserve first-occurrence order for duplicate line IDs (matching SQL CASE WHEN behavior).
+        let mut line_id_order: std::collections::HashMap<i32, usize> =
+            std::collections::HashMap::new();
+        for (i, &id) in line_ids.iter().enumerate() {
+            line_id_order.entry(id as i32).or_insert(i);
+        }
 
         // Filter for main stations: only those on requested lines + matching transport type
         let mut stations: Vec<Station> = all_group_stations
