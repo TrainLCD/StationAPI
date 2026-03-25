@@ -96,6 +96,8 @@ DROP INDEX IF EXISTS public.idx_16421_station_station_types_station_cd;
 
 DROP INDEX IF EXISTS public.idx_16421_station_station_types_line_group_cd;
 
+DROP INDEX IF EXISTS public.idx_sst_station_linegroup_pass;
+
 DROP INDEX IF EXISTS public.idx_16407_lines_e_sort;
 
 DROP INDEX IF EXISTS public.idx_16407_lines_company_cd;
@@ -459,6 +461,12 @@ CREATE INDEX idx_16421_station_station_types_station_cd ON public.station_statio
 --
 
 CREATE INDEX idx_16421_station_station_types_type_cd ON public.station_station_types USING btree (type_cd);
+
+--
+-- Name: idx_sst_station_linegroup_pass; Type: INDEX; Schema: public; Owner: stationapi
+--
+
+CREATE INDEX idx_sst_station_linegroup_pass ON public.station_station_types USING btree (station_cd, line_group_cd, pass);
 
 --
 -- Name: idx_16426_stations_e_sort_station_cd; Type: INDEX; Schema: public; Owner: stationapi

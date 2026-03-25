@@ -127,9 +127,13 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     });
 
     let db_url = &fetch_database_url();
+    let max_connections: u32 = std::env::var("DATABASE_MAX_CONNECTIONS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20);
     let pool = Arc::new(
         match PgPoolOptions::new()
-            .max_connections(5)
+            .max_connections(max_connections)
             .connect(db_url)
             .await
         {
