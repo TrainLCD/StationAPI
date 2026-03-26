@@ -8,11 +8,12 @@
 
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
-The gRPC-Web API for provides nearby japanese train station.
+A gRPC-Web API that provides nearby Japanese train stations.
 
 ## Documentation
 
 - For automation agent and contributor workflows, see [AGENTS.md](AGENTS.md).
+- For contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 - For system architecture and design decisions, see [docs/architecture.md](docs/architecture.md).
 - For technical debt analysis and architectural concerns, see [docs/technical_debt.md](docs/technical_debt.md).
 
