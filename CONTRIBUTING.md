@@ -94,7 +94,7 @@ SQLX_OFFLINE=true cargo test
 
 ## 質問・相談
 
-- [Discord コミュニティ](https://discord.gg/trainlcd)で質問やディスカッションができます
+- [Discord コミュニティ](https://discord.gg/tsemdME9Nz)で質問やディスカッションができます
 - Issueでの質問も歓迎しています
 
 ## ライセンス
