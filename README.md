@@ -48,7 +48,7 @@ This project follows the [all-contributors](https://github.com/all-contributors/
 ## Join our community(Japanese only)
 
 Do you like this project? Join our Discord community!
-[https://discord.gg/qKT7zSGQre](https://discord.gg/qKT7zSGQre)
+[https://discord.gg/tsemdME9Nz](https://discord.gg/tsemdME9Nz)
 
 ## Monitoring
 
