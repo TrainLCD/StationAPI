@@ -459,7 +459,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99407,159,上高地線,カミコウチセン,アルピコ交通上高地線,Kamikochi Line,Kamikochi Line,上高地线,가미코치선,#465DAA,2,AK,,,,#465DAA,,,,ROUND,,,,0,99407,1086.699348
 99408,160,富山地鉄本線,トヤマチテツホンセン,富山地鉄本線,Toyama Chiho Railway Main Line,Toyama Chiho Railway Main Line,富山地铁本线,도야마 지방 철도 본선,#1D1686,2,T,,,,#1D1686,,,,SQUARE,,,,0,99408,1299.637637
 99409,160,富山地鉄立山線,トヤマチテツタテヤマセン,富山地鉄立山線,Toyama Chiho Railway Tateyama Line,Toyama Chiho Railway Tateyama Line,富山地铁立山线,도야마 지방 철도 다테야마선,#008000,2,T,,,,#008000,,,,SQUARE,,,,0,99409,1801.160048
-99410,160,富山地鉄不二越・上滝線,トヤマチテツフジコシ・カミダキセン,富山地鉄不二越・上滝線,Toyama Chiho Railway Fujikoshi-Kamidaki Line,Toyama Chiho Railway Fujikoshi-Kamidaki Line,富山地铁不二越・上的线,도야마 지방 철도 후지코시·가미다키선,#7E490A,2,T,,,,#7E490A,,,,SQUARE,,,,0,99410,1129.48993
+99410,160,富山地鉄不二越・上滝線,トヤマチテツフジコシ・カミダキセン,富山地鉄不二越・上滝線,Toyama Chiho Railway Fujikoshi-Kamidaki Line,Toyama Chiho Railway Fujikoshi-Kamidaki Line,富山地铁不二越・上泷线,도야마 지방 철도 후지코시·가미다키선,#7E490A,2,T,,,,#7E490A,,,,SQUARE,,,,0,99410,1129.48993
 99411,161,神岡鉄道神岡線,カミオカテツドウカミオカセン,神岡鉄道神岡線,Kamioka Railway Kamioka Line,Kamioka Railway Kamioka Line,神冈铁道神冈线,가미오카 철도 가미오카선,#DC4C14,2,,,,,,,,,,,,,2,99411,2665.108373
 99412,162,黒部峡谷鉄道本線,クロベキョウコクテツドウホンセン,黒部峡谷鉄道本線,Kurobe Gorge Main Line,Kurobe Gorge Main Line,黑部峡谷铁道本线,구로베 협곡 철도 본선,#EE7700,2,,,,,,,,,,,,,0,99412,5058.651672
 99413,160,富山地鉄市内線【１・２系統】,トヤマチテツシナイセン,富山地鉄市内線,Toyama City Tram Line Route 1/2,Toyama City Tram Line Route 1/2,富山地铁市内线【1・2系统】,도야마 지방 철도 시내선【1·2계통】,#EF1731,4,C,,,,#EF1731,,,,ROUND,,,,0,99413,349.5224301
