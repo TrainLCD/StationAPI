@@ -1,0 +1,33 @@
+name: "\U0001F4CA Data correction"
+description: データの修正・追加リクエスト
+labels: ["data"]
+assignees:
+  - TinyKitten
+body:
+  - type: markdown
+    attributes:
+      value: |
+        データの修正・追加リクエストありがとうございます。
+  - type: textarea
+    id: summary
+    attributes:
+      label: 概要
+      description: 修正・追加したいデータの内容を具体的にご記入ください
+      placeholder: |
+        例: ○○線の△△駅のナンバリングが誤っている
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: 参考情報
+      description: 正しいデータの根拠となるURL（公式サイト、Wikipedia等）があればご記入ください
+    validations:
+      required: false
+  - type: textarea
+    id: additional
+    attributes:
+      label: その他
+      description: その他追加の情報がございましたらご記入ください
+    validations:
+      required: false

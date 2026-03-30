@@ -287,7 +287,7 @@
 1. 既存のデータ例を参照
 2. `create_table.sql`でテーブル構造を確認
 3. 公式な鉄道会社の情報を参照
-4. 不明な場合は Issue で質問、または [Discord サーバ](https://discord.gg/vUW7Fg2XaR)で相談
+4. 不明な場合は Issue で質問、または [Discord サーバ](https://discord.gg/tsemdME9Nz)で相談
 
 ## 📚 参考リンク
 
