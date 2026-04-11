@@ -211,7 +211,7 @@ fn build_insert_columns(
 }
 
 #[cfg(test)]
-mod tests {
+mod import_tests {
     use super::build_insert_columns;
     use std::collections::HashSet;
 
