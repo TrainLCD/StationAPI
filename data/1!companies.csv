@@ -20,14 +20,15 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 23,33,京阪電鉄,ケイハンデンテツ,京阪電気鉄道株式会社,京阪,Keihan,Keihan Electric Railway,http://www.keihan.co.jp/,2,0,23
 24,34,阪急電鉄,ハンキュウデンテツ,阪急電鉄株式会社,阪急,Hankyu,Hankyu,http://rail.hankyu.co.jp/,2,0,24
 25,35,阪神電鉄,ハンシンデンテツ,阪神電気鉄道株式会社,阪神,Hanshin,Hanshin Electric Railway,http://rail.hanshin.co.jp/,2,0,25
-26,36,西日本鉄道,ニシニッポンテツドウ,西日本鉄道株式会社,西鉄,Nishitetsu,Nishi-Nippon Railroad,http://www.nishitetsu.co.jp/,2,0,26
-101,99,札幌市交通局,サッポロシコウツウキョク,札幌市交通局,札幌市営地下鉄,Sapporo City Transportation Bureau,Sapporo City Transportation Bureau,http://www.city.sapporo.jp/st/,0,0,101
-252,99,札幌市交通事業振興公社,サッポロシコウツウジギョウシンコウコウシャ,一般財団法人札幌市交通事業振興公社,札幌市電,Sapporo Streetcar,Sapporo Transportation Service Promotion Corporation,https://www.stsp.or.jp/,0,0,101
-102,99,函館市企業局交通部,ハコダテシキギョウキョクコウツウブ,函館市企業局交通部,函館市電,Hakodate City Tram Department,Hakodate City Tram Department,http://www.city.hakodate.hokkaido.jp/transport/,0,0,102
+26,36,西日本鉄道,ニシニホンテツドウ,西日本鉄道株式会社,西鉄,Nishitetsu,Nishi-Nippon Railroad,http://www.nishitetsu.co.jp/,2,0,26
+100,99,舞浜リゾートライン,マイハマリゾートライン,株式会社舞浜リゾートライン,舞浜リゾートライン,Disney Resort Line,Maihama Resort Line,https://www.mrc.olc.co.jp/index.html,0,0,100
+101,99,札幌市交通局,サッポロシコウツウキョク,札幌市交通局,札幌市交通局,Sapporo City Transportation Bureau,Sapporo City Transportation Bureau,http://www.city.sapporo.jp/st/,0,0,101
+252,99,札幌市交通事業振興公社,サッポロシコウツウジギョウシンコウコウシャ,一般財団法人札幌市交通事業振興公社,札幌市交通事業振興公社,Sapporo Streetcar,Sapporo Transportation Service Promotion Corporation,https://www.stsp.or.jp/,0,0,101
+102,99,函館市交通局,ハコダテシコウツウキョク,函館市企業局交通部,函館市電,Hakodate City Tram Department,Hakodate City Tram Department,http://www.city.hakodate.hokkaido.jp/transport/,0,0,102
 103,99,北海道ちほく高原鉄道,ホッカイドウチホクコウゲンテツドウ,北海道ちほく高原鉄道株式会社,北海道ちほく高原鉄道,Hokkaidō Chihoku Kōgen Railway,Hokkaidō Chihoku Kōgen Railway,,0,2,103
 248,99,道南いさりび鉄道,ドウナンイサリビテツドウ,道南いさりび鉄道株式会社,道南いさりび,South Hokkaido Railway,South Hokkaido Railway,http://www.shr-isaribi.jp,0,0,103
 104,99,津軽鉄道,ツガルテツドウ,津軽鉄道株式会社,津軽鉄道,Tsugaru Railway,Tsugaru Railway,http://tsutetsu.com/,0,0,104
-105,99,弘南鉄道,コウナンテツドウ,弘南鉄道,弘南鉄道,Konan Railway,Konan Railway,http://konantetsudo.jp/,0,0,105
+105,99,弘南鉄道,コウナンテツドウ,弘南鉄道株式会社,弘南鉄道,Konan Railway,Konan Railway,http://konantetsudo.jp/,0,0,105
 106,99,十和田観光電鉄,トワダカンコウデンデツ,十和田観光電鉄株式会社,十和田観光電鉄,Towada Kanko Electric Railway,Towada Kanko Electric Railway,http://www.toutetsu.co.jp/,0,2,106
 107,99,IGRいわて銀河鉄道,アイジーアールイワテギンガテツドウ,IGRいわて銀河鉄道株式会社,IGRいわて銀河鉄道,IGR,Iwate Ginga Railway,http://www.igr.jp/,0,0,107
 108,99,青い森鉄道,アオイモリテツドウ,青い森鉄道株式会社,青い森鉄道,Aoimori Railway,Aoimori Railway,http://aoimorirailway.com/,0,0,108
@@ -35,37 +36,37 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 110,99,秋田内陸縦貫鉄道,アキタナイリクジュウカンテツドウ,秋田内陸縦貫鉄道株式会社,秋田内陸縦貫鉄道,Akita Nairiku Jukan Tetsudo,Akita Nairiku Jukan Tetsudo,http://www.akita-nairiku.com/,0,0,110
 111,99,由利高原鉄道,ユリコウゲンテツドウ,由利高原鉄道株式会社,由利高原鉄道,Yuri Kōgen Railway,Yuri Kōgen Railway,http://www.obako5.com/,0,0,111
 112,99,山形鉄道,ヤマガタテツドウ,山形鉄道株式会社,山形鉄道,Yamagata Railway,Yamagata Railway,http://www.flower-liner.jp/,0,0,112
-113,99,くりはら田園鉄道,クリハラデンエンテツドウ,くりはら田園鉄道株式会社,栗原電鉄,Kurihara Den'en Railway,Kurihara Den'en Railway,,0,2,113
-114,99,阿武隈急行,アブクマキュウコウ,阿武隈急行株式会社,阿武隈急行,Abukuma Express,Abukuma Express,http://www.abukyu.co.jp/,0,0,114
-115,99,仙台市交通局,センダイシコウツウキョク,仙台市交通局,仙台市地下鉄,Sendai City Transportation Bureau,Sendai City Transportation Bureau,http://www.kotsu.city.sendai.jp/,0,0,115
+113,99,くりはら田園鉄道,クリハラデンエンテツドウ,くりはら田園鉄道株式会社,くりでん,Kurihara Den'en Railway,Kurihara Den'en Railway,,0,2,113
+114,99,阿武隈急行,アブクマキュウコウ,阿武隈急行株式会社,阿武急,Abukuma Express,Abukuma Express,http://www.abukyu.co.jp/,0,0,114
+115,99,仙台市交通局,センダイシコウツウキョク,仙台市交通局,仙台市交通局,Sendai City Transportation Bureau,Sendai City Transportation Bureau,http://www.kotsu.city.sendai.jp/,0,0,115
 116,99,福島交通,フクシマコウツウ,福島交通株式会社,福島交通,Fukushima Transportation,Fukushima Transportation,http://www.fukushima-koutu.co.jp/,0,0,116
 117,99,会津鉄道,アイヅテツドウ,会津鉄道株式会社,会津鉄道,Aizu Railway,Aizu Railway,http://www.aizutetsudo.jp/,0,0,117
 250,99,宇都宮ライトレール,ウツノミヤライトレール,宇都宮ライトレール株式会社,宇都宮ライトレール,Utsunomiya LRT,Utsunomiya Light Rail,https://www.miyarail.co.jp/,0,0,117
 118,99,仙台空港鉄道,センダイクウコウテツドウ,仙台空港鉄道株式会社,仙台空港鉄道,Sendai Airport Transit,Sendai Airport Transit,http://www.senat.co.jp/,0,0,118
-119,99,東京都交通局,トウキョウトコウツウキョク,東京都交通局,都営交通,Toei Transportation,Toei Transportation,http://www.kotsu.metro.tokyo.jp/,0,0,119
-120,99,秩父鉄道,チチブテツドウ,秩父鉄道株式会社,秩父鉄道,Chichibu Railway,Chichibu Railway,http://www.chichibu-railway.co.jp/,0,0,120
+119,99,東京都交通局,トウキョウトコウツウキョク,東京都交通局,東京都交通局,Toei Transportation,Toei Transportation,http://www.kotsu.metro.tokyo.jp/,0,0,119
+120,99,秩父鉄道,チチブテツドウ,秩父鉄道株式会社,秩鉄,Chichibu Railway,Chichibu Railway,http://www.chichibu-railway.co.jp/,0,0,120
 121,99,埼玉高速鉄道,サイタマコウソクテツドウ,埼玉高速鉄道株式会社,埼玉高速鉄道,Saitama Railway,Saitama Railway,http://www.s-rail.co.jp/,0,0,121
 122,99,いすみ鉄道,イスミテツドウ,いすみ鉄道株式会社,いすみ鉄道,Isumi Railway,Isumi Railway,http://www.isumirail.co.jp/,0,0,122
-123,99,首都圏新都市鉄道,シュトケンシントシテツドウ,首都圏新都市鉄道株式会社,つくばエクスプレス,Tsukuba Express,Metropolitan Intercity Railway Company,http://www.mir.co.jp/,0,0,123
-124,99,横浜高速鉄道,ヨコハマコウソクテツドウ,横浜高速鉄道株式会社,みなとみらい,Minatomirai,Yokohama Minatomirai Railway,http://www.mm21railway.co.jp/,0,0,124
+123,99,首都圏新都市鉄道,シュトケンシントシテツドウ,首都圏新都市鉄道株式会社,首都圏新都市鉄道,Tsukuba Express,Metropolitan Intercity Railway Company,http://www.mir.co.jp/,0,0,123
+124,99,横浜高速鉄道,ヨコハマコウソクテツドウ,横浜高速鉄道株式会社,横浜高速鉄道,Minatomirai,Yokohama Minatomirai Railway,http://www.mm21railway.co.jp/,0,0,124
 125,99,ゆりかもめ,ユリカモメ,株式会社ゆりかもめ,ゆりかもめ,Yurikamome,Yurikamome,http://www.yurikamome.co.jp/,0,0,125
 126,99,わたらせ渓谷鐵道,ワタラセケイコクテツドウ,わたらせ渓谷鐵道株式会社,わたらせ渓谷鐵道,Watarase Keikoku Railway,Watarase Keikoku Railway,http://www.watetsu.com/,0,0,126
 127,99,山万,ヤママン,山万株式会社,山万,Yamaman,Yamaman,http://www.yamaman.co.jp/,0,0,127
-128,99,伊豆箱根鉄道,イズハコネテツドウ,伊豆箱根鉄道株式会社,伊豆箱根鉄道,IZUHAKONE RAILWAY,IZUHAKONE RAILWAY,http://www.izuhakone.co.jp/,0,0,128
+128,99,伊豆箱根鉄道,イズハコネテツドウ,伊豆箱根鉄道株式会社,いずはこ,IZUHAKONE RAILWAY,IZUHAKONE RAILWAY,http://www.izuhakone.co.jp/,0,0,128
 129,99,ひたちなか海浜鉄道,ヒタチナカカイヒンテツドウ,ひたちなか海浜鉄道株式会社,ひたちなか海浜鉄道,Hitachinaka Seaside Railway,Hitachinaka Seaside Railway,http://www.hitachinaka-rail.co.jp/,0,0,129
-130,99,横浜市交通局,ヨコハマシコウツウキョク,横浜市交通局,横浜市営地下鉄,Yokohama City Transportation Bureau,Yokohama City Transportation Bureau,http://www.city.yokohama.lg.jp/koutuu/,0,0,130
+130,99,横浜市交通局,ヨコハマシコウツウキョク,横浜市交通局,横浜市交通局,Yokohama City Transportation Bureau,Yokohama City Transportation Bureau,http://www.city.yokohama.lg.jp/koutuu/,0,0,130
 131,99,横浜シーサイドライン,ヨコハマシーサイドライン,株式会社横浜シーサイドライン,横浜シーサイドライン,Yokohama Seaside,Yokohama Seaside,http://www.seasideline.co.jp/,0,0,131
 132,99,関東鉄道,カントウテツドウ,関東鉄道株式会社,関鉄,Kanto Railway,Kanto Railway,http://www.kantetsu.co.jp/,0,0,132
 133,99,江ノ島電鉄,エノシマデンテツ,江ノ島電鉄株式会社,江ノ電,Enoden,Enoshima Electric Railway,http://www.enoden.co.jp/,0,0,133
-134,99,埼玉新都市交通,サイタマシントシコウツウ,埼玉新都市交通株式会社,ニューシャトル,Saitama New Urban Transit,Saitama New Urban Transit,http://www5.ocn.ne.jp/~snut/,0,0,134
-135,99,鹿島鉄道,カシマテツドウ,鹿島鉄道株式会社,鹿鉄,Kashima Railway,Kashima Railway,http://www.kantetsu.co.jp/katetsu/,0,2,135
+134,99,埼玉新都市交通,サイタマシントシコウツウ,埼玉新都市交通株式会社,埼玉新都市交通,Saitama New Urban Transit,Saitama New Urban Transit,http://www5.ocn.ne.jp/~snut/,0,0,134
+135,99,鹿島鉄道,カシマテツドウ,鹿島鉄道株式会社,鹿島鉄道,Kashima Railway,Kashima Railway,http://www.kantetsu.co.jp/katetsu/,0,2,135
 136,99,鹿島臨海鉄道,カシマリンカイテツドウ,鹿島臨海鉄道株式会社,鹿島臨海鉄道,Kashima Rinkai Tetsudo,Kashima Rinkai Tetsudo,http://www.rintetsu.co.jp/,0,0,136
 137,99,芝山鉄道,シバヤマテツドウ,芝山鉄道株式会社,芝山鉄道,Shibayama Railway,Shibayama Railway,http://www.sibatetu.co.jp/,0,0,137
 138,99,小湊鐵道,コミナトテツドウ,小湊鐵道株式会社,小湊鐵道,Kominato Railway,Kominato Railway,http://www.kominato.co.jp/,0,0,138
 139,99,湘南モノレール,ショウナンモノレール,湘南モノレール株式会社,湘南モノレール,Shonan Monorail,Shonan Monorail,http://www.shonan-monorail.co.jp/,0,0,139
 140,99,上信電鉄,ジョウシンデンテツ,上信電鉄株式会社,上信電鉄,Joshin Dentetsu,Joshin Dentetsu,http://www.joshin-dentetsu.co.jp/,0,0,140
-141,99,上毛電気鉄道,ジョウモウデンキテツドウ,上毛電気鉄道株式会社,上毛電気鉄道,Joden,Jomo Electric Railway,http://www.jomorailway.com/,0,0,141
-142,99,新京成電鉄,シンケイセイデンテツ,新京成電鉄株式会社,新京成電鉄,Shin-Keisei,Shin-Keisei,http://www.shinkeisei.co.jp/,3,0,142
+141,99,上毛電気鉄道,ジョウモウデンキテツドウ,上毛電気鉄道株式会社,上電,Joden,Jomo Electric Railway,http://www.jomorailway.com/,0,0,141
+142,23,新京成電鉄,シンケイセイデンテツ,新京成電鉄株式会社,新京成電鉄,Shin-Keisei,Shin-Keisei,,2,2,142
 143,99,真岡鐵道,モオカテツドウ,真岡鐵道株式会社,真岡鐵道,Moka Railway,Moka Railway,http://www.moka-railway.co.jp/,0,0,143
 144,99,千葉都市モノレール,チバトシモノレール,千葉都市モノレール株式会社,千葉モノレール,Chiba Urban Monorail,Chiba Urban Monorail,http://www.chiba-monorail.co.jp/,0,0,144
 145,99,流鉄,リュウテツ,流鉄株式会社,流鉄,Ryutetsu,Ryutetsu,http://www.kanko.chuo.chiba.jp/kanko/3297/,0,0,145
@@ -74,19 +75,19 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 148,99,東京モノレール,トウキョウモノレール,東京モノレール株式会社,東京モノレール,Tokyo Monorail,Tokyo Monorail,http://www.tokyo-monorail.co.jp/,0,0,148
 149,99,東京臨海高速鉄道,トウキョウリンカイコウソクテツドウ,東京臨海高速鉄道株式会社,東京臨海高速鉄道,Rinkai,Tokyo Waterfront Area Rapid Transit,http://www.twr.co.jp/,0,0,149
 150,99,東葉高速鉄道,トウヨウコウソクテツドウ,東葉高速鉄道株式会社,東葉高速鉄道,Keiyo Railway,Keiyo Railway,http://www.toyokosoku.co.jp/,0,0,150
-151,99,小田急箱根,オダキュウハコネ,株式会社小田急箱根,小田急箱根,Odakyu Hakone,Odakyu Hakone,http://www.odakyu-hakone.jp/,0,0,151
+151,99,小田急箱根,オダキュウハコネ,株式会社小田急箱根,小田急箱根,Odakyu Hakone,Odakyu Hakone,https://www.odakyu-hakone.jp/,0,0,151
 152,99,北総鉄道,ホクソウテツドウ,北総鉄道株式会社,北総鉄道,Hokuso Railway,Hokuso Railway,http://www.hokuso-railway.co.jp/,0,0,152
 153,99,野岩鉄道,ヤガンテツドウ,野岩鉄道株式会社,野岩鉄道,YAGANTETSUDO RAILWAY,YAGANTETSUDO RAILWAY,http://www.yagan.co.jp/,0,0,153
 154,99,富士山麓電気鉄道,フジサンロクデンキテツドウ,富士山麓電気鉄道株式会社,富士急,FUJI KYUKO,FUJI KYUKO,http://www.fujikyu.co.jp/,0,0,154
 155,99,北越急行,ホクエツキュウコウ,北越急行株式会社,北越急行,Hokuetsu Express,Hokuetsu Express,http://www.hokuhoku.co.jp/,0,0,155
 156,99,しなの鉄道,シナノテツドウ,しなの鉄道株式会社,しな鉄,Shinano Railway,Shinano Railway,http://www.shinanorailway.co.jp/,0,0,156
 157,99,上田交通,ウエダコウツウ,上田交通株式会社,上田交通,Ueda Kotsu,Ueda Kotsu,http://www.ukg.co.jp/,0,0,157
-158,99,長野電鉄,ナガノデンテツ,長野電鉄株式会社,長野電鉄,Nagano Electric Railway,Nagano Electric Railway,http://www.nagaden-net.co.jp/,0,0,158
+158,99,長野電鉄,ナガノデンテツ,長野電鉄株式会社,長電,Nagano Electric Railway,Nagano Electric Railway,http://www.nagaden-net.co.jp/,0,0,158
 159,99,アルピコ交通,アルピココウツウ,アルピコ交通株式会社,アルピコ交通,ALPICO kotsu,ALPICO kotsu,http://www.alpico.co.jp/traffic/,0,0,159
 160,99,富山地方鉄道,トヤマチホウテツドウ,富山地方鉄道株式会社,富山地鉄,TOYAMACHIHO RAILROAD,TOYAMACHIHO RAILROAD,http://www.chitetsu.co.jp/,0,0,160
-161,99,神岡鉄道,カミオカテツドウ,神岡鉄道株式会社,神鉄,Kamioka Railway,Kamioka Railway,,0,2,161
+161,99,神岡鉄道,カミオカテツドウ,神岡鉄道株式会社,神岡鉄道,Kamioka Railway,Kamioka Railway,,0,2,161
 163,99,万葉線,マンヨウセン,万葉線株式会社,万葉線,Manyo,Manyo,http://www1.coralnet.or.jp/manyosen/,0,0,161
-162,99,黒部峡谷鉄道,クロベキョウコクテツドウ,黒部峡谷鉄道株式会社,黒鉄,THE KUROBE GORGE RAILWAY,THE KUROBE GORGE RAILWAY,http://www.kurotetu.co.jp/,0,0,162
+162,99,黒部峡谷鉄道,クロベキョウコクテツドウ,黒部峡谷鉄道株式会社,黒部峡谷鉄道,THE KUROBE GORGE RAILWAY,THE KUROBE GORGE RAILWAY,http://www.kurotetu.co.jp/,0,0,162
 164,99,富山ライトレール,トヤマライトレール,富山ライトレール株式会社,富山ライトレール,Toyama Light Rail,Toyama Light Rail,http://www.t-lr.co.jp/,0,2,162
 165,99,北陸鉄道,ホクリクテツドウ,北陸鉄道株式会社,北鉄,Hokuriku Railroad,Hokuriku Railroad,http://www.hokutetsu.co.jp/,0,0,163
 244,99,えちごトキめき鉄道,エチゴトキメキテツドウ,えちごトキめき鉄道株式会社,トキてつ,Echigo TOKImeki Railway,Echigo TOKImeki Railway,https://www.echigo-tokimeki.co.jp/,0,0,163
@@ -102,11 +103,11 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 172,99,天竜浜名湖鉄道,テンリュウハマナコテツドウ,天竜浜名湖鉄道株式会社,天竜浜名湖鉄道,Tenryu Hamanako Railroad,Tenryu Hamanako Railroad,http://www.tenhama.co.jp/,0,0,170
 173,99,遠州鉄道,エンシュウテツドウ,遠州鉄道株式会社,遠鉄,Enshu Railway,Enshu Railway,http://www.entetsu.co.jp/,0,0,171
 174,99,大井川鐵道,オオイガワテツドウ,大井川鐵道株式会社,大鐵,Ōigawa Railway,Ōigawa Railway,http://www.oigawa-railway.co.jp/,0,0,172
-175,99,名古屋臨海高速鉄道,ナゴヤリンカイコウソクテツドウ,名古屋臨海高速鉄道株式会社,名臨高,Nagoya Rinkai Rapid Transit,Nagoya Rinkai Rapid Transit,http://www.aonamiline.co.jp/,0,0,173
+175,99,名古屋臨海高速鉄道,ナゴヤリンカイコウソクテツドウ,名古屋臨海高速鉄道株式会社,名古屋臨海高速鉄道,Nagoya Rinkai Rapid Transit,Nagoya Rinkai Rapid Transit,http://www.aonamiline.co.jp/,0,0,173
 176,99,東海交通事業,トウカイコウツウジギョウ,株式会社東海交通事業,東海交通事業,Tokai Transport Service Company,Tokai Transport Service Company,http://www.tkj-i.co.jp/,0,0,174
 177,99,愛知環状鉄道,アイチカンジョウテツドウ,愛知環状鉄道株式会社,愛環,Aichi Loop,Aichi Loop,http://www.aikanrailway.co.jp/,0,0,175
 178,99,愛知高速交通,アイチコウソクコウツウ,愛知高速交通株式会社,愛知高速交通,Aichi Rapid Transit,Aichi Rapid Transit,http://www.linimo.jp/,0,0,176
-179,99,名古屋市交通局,ナゴヤシコウツウキョク,名古屋市交通局,名古屋市営地下鉄,Transportation Bureau City of Nagoya,Transportation Bureau City of Nagoya,http://www.kotsu.city.nagoya.jp/,0,0,177
+179,99,名古屋市交通局,ナゴヤシコウツウキョク,名古屋市交通局,名古屋市交通局,Transportation Bureau City of Nagoya,Transportation Bureau City of Nagoya,http://www.kotsu.city.nagoya.jp/,0,0,177
 180,99,桃花台新交通,トウカダイシンコウツウ,桃花台新交通株式会社,桃花台新交通,Tokadai New Transit,Tokadai New Transit,,0,2,178
 181,99,豊橋鉄道,トヨハシテツドウ,豊橋鉄道株式会社,豊鉄,Toyohashi Railroad,Toyohashi Railroad,http://www.toyotetsu.com/,0,0,179
 182,99,名古屋ガイドウェイバス,ナゴヤガイドウェイバス,名古屋ガイドウェイバス株式会社,名古屋ガイドウェイバス,Nagoya GuideWay-Bus,Nagoya GuideWay-Bus,http://www.guideway.co.jp/,0,0,180
@@ -123,16 +124,16 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 192,99,嵯峨野観光鉄道,サガノカンコウテツドウ,嵯峨野観光鉄道株式会社,嵯峨野トロッコ,Sagano Scenic Railway,Sagano Scenic Railway,http://www.sagano-kanko.co.jp/,0,0,190
 193,99,叡山電鉄,エイザンデンテツ,叡山電鉄株式会社,叡電,Eizan Electric Railway,Eizan Electric Railway,http://eizandensha.co.jp/,0,0,191
 194,99,京都丹後鉄道,キョウトタンゴテツドウ,WILLER TRAINS株式会社,丹鉄,Tantetsu,Kyoto Tango Railway,http://travel.willer.co.jp/campaign/tantetsu/,0,0,192
-195,99,京都市交通局,キョウトシコウツウキョク,京都市交通局,京都市営地下鉄,Kyoto City Transportation Bureau,Kyoto City Transportation Bureau,http://www.city.kyoto.lg.jp/kotsu/,0,0,193
+195,99,京都市交通局,キョウトシコウツウキョク,京都市交通局,京都市交通局,Kyoto City Transportation Bureau,Kyoto City Transportation Bureau,http://www.city.kyoto.lg.jp/kotsu/,0,0,193
 196,99,京福電気鉄道,ケイフクデンキテツドウ,京福電気鉄道株式会社,京福電気鉄道,Keifuku,Keifuku Electric Railroad,http://www.keifuku.co.jp/,0,0,194
 197,99,北大阪急行電鉄,キタオオサカキュウコウデンテツ,北大阪急行電鉄株式会社,北急,KITA-OSAKA KYUKO RAILWAY,KITA-OSAKA KYUKO RAILWAY,http://www.kita-kyu.co.jp/,3,0,195
-198,99,泉北高速鉄道,センボクコウソクテツドウ,泉北高速鉄道株式会社,泉北高速,Osaka Prefectural Urban Development,Osaka Prefectural Urban Development,http://www.otk-group.co.jp/,3,0,196
-199,99,水間鉄道,ミズマテツドウ,水間鉄道株式会社,水鉄,Mizuma Railway,Mizuma Railway,http://www.suitetsu.com/,0,0,197
+198,32,泉北高速鉄道,センボクコウソクテツドウ,泉北高速鉄道株式会社,泉北高速鉄道,Osaka Prefectural Urban Development,Osaka Prefectural Urban Development,,2,2,196
+199,99,水間鉄道,ミズマテツドウ,水間鉄道株式会社,水間鉄道,Mizuma Railway,Mizuma Railway,http://www.suitetsu.com/,0,0,197
 249,99,Osaka Metro,オオサカメトロ,大阪市高速電気軌道株式会社,大阪メトロ,Osaka Metro,Osaka Metro,http://www.osakametro.co.jp,2,0,197
 200,99,大阪市交通局,オオサカシコウツウキョク,大阪市交通局,大阪市交通局,Osaka Municipal Transportation Bureau,Osaka Municipal Transportation Bureau,http://www.city.osaka.lg.jp/toshikotsu/,0,2,198
 201,99,大阪モノレール株式会社,オオサカモノレール,大阪モノレール株式会社,大阪モノレール,Osaka Monorail,Osaka Monorail,http://www.osaka-monorail.co.jp/,0,0,199
 202,99,阪堺電気軌道,ハンカイデンキキドウ,阪堺電気軌道株式会社,阪堺,Hankai Tramway,Hankai Tramway,http://www.hankai.co.jp/,0,0,200
-203,99,神戸高速鉄道,コウベコウソクテツドウ,神戸高速鉄道株式会社,神戸高速鉄道,KOBE RAPID TRANSIT RAILWAY,KOBE RAPID TRANSIT RAILWAY,http://www.kobe-kousoku.jp/,3,0,201
+203,99,神戸高速鉄道,コウベコウソクテツドウ,神戸高速鉄道株式会社,神戸高速,KOBE RAPID TRANSIT RAILWAY,KOBE RAPID TRANSIT RAILWAY,http://www.kobe-kousoku.jp/,3,0,201
 204,99,神戸電鉄,コウベデンテツ,神戸電鉄株式会社,神鉄,Kobe Electric Railway,Kobe Electric Railway,http://www.shintetsu.co.jp/,0,0,202
 205,99,北神急行電鉄,ホクシンキュウコウデンテツ,北神急行電鉄株式会社,北神急行,Hokushinkyuko Railway,Hokushinkyuko Railway,http://www.hokushinkyuko.co.jp/,0,2,203
 206,99,山陽電気鉄道,サンヨウデンキテツドウ,山陽電気鉄道株式会社,山陽電車,Sanyo Electric Railway,Sanyo Electric Railway,http://www.sanyo-railway.co.jp/,3,0,204
@@ -141,10 +142,10 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 209,99,北条鉄道,ホウジョウテツドウ,北条鉄道株式会社,北条鉄道,Hojo Railway Company,Hojo Railway Company,http://www.hojorailway.jp/,0,0,207
 210,99,智頭急行,チズキュウコウ,智頭急行株式会社,智頭急,Chizu Express,Chizu Express,http://www.chizukyu.co.jp/,0,0,208
 211,99,神戸市交通局,コウベシコウツウキョク,神戸市交通局,神戸市交通局,Kobe City Transportation Bureau,Kobe City Transportation Bureau,http://www.city.kobe.lg.jp/,0,0,209
-212,99,神戸新交通,コウベシンコウツウ,神戸新交通株式会社,新神交,Kobe New Transit,Kobe New Transit,http://www.knt-liner.co.jp/,0,0,210
-213,99,紀州鉄道,キシュウテツドウ,紀州鉄道株式会社,紀鉄,Kishu Railway,Kishu Railway,http://www.kitetsu.co.jp/,0,0,211
+212,99,神戸新交通,コウベシンコウツウ,神戸新交通株式会社,神戸新交通,Kobe New Transit,Kobe New Transit,http://www.knt-liner.co.jp/,0,0,210
+213,99,紀州鉄道,キシュウテツドウ,紀州鉄道株式会社,紀州鉄道,Kishu Railway,Kishu Railway,http://www.kitetsu.co.jp/,0,0,211
 214,99,和歌山電鐵,ワカヤマデンテツ,和歌山電鐵株式会社,和歌山電鐵,WAKAYAMA ELECTRIC RAILWAY,WAKAYAMA ELECTRIC RAILWAY,http://www.wakayama-dentetsu.co.jp/,0,0,212
-215,99,若桜鉄道,サカサテツドウ,若桜鉄道株式会社,若鉄,Wakasa Railway,Wakasa Railway,http://www.infosakyu.ne.jp/~wakatetu/,0,0,213
+215,99,若桜鉄道,サカサテツドウ,若桜鉄道株式会社,若桜鉄道,Wakasa Railway,Wakasa Railway,http://www.infosakyu.ne.jp/~wakatetu/,0,0,213
 216,99,一畑電車,イチバタデンシャ,一畑電車株式会社,ばたでん,Ichibata Electric Railway,Ichibata Electric Railway,http://www.ichibata.co.jp/railway/,0,0,214
 217,99,水島臨海鉄道,ミズシマリンカイテツドウ,水島臨海鉄道株式会社,水島臨海鉄道,Mizushima Rinkai Railway,Mizushima Rinkai Railway,http://www.mizurin.co.jp/,0,0,215
 218,99,井原鉄道,イバラテツドウ,井原鉄道株式会社,井原鉄道,Ibara Railway,Ibara Railway,http://plus.harenet.ne.jp/~ibarasen/,0,0,216
@@ -153,7 +154,7 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 221,99,広島高速交通,ヒロシマコウソクコウツウ,広島高速交通株式会社,広島高速交通,Hiroshima Rapid Transit,Hiroshima Rapid Transit,http://astramline.co.jp/,0,0,219
 222,99,広島電鉄,ヒロシマデンテツ,広島電鉄株式会社,広電,Hiroshima Electric Railway,Hiroshima Electric Railway,http://www.hiroden.co.jp/,0,0,220
 223,99,錦川鉄道,ニシキガワテツドウ,錦川鉄道株式会社,錦川鉄道,NISHIKIGAWA TETUDOU,NISHIKIGAWA TETUDOU,http://nishikigawa.com/,0,0,221
-224,99,阿佐海岸鉄道,アサカイガンテツドウ,阿佐海岸鉄道株式会社,阿佐鉄,Asa Coast Railway Company,Asa Coast Railway Company,http://www.asatetu.v-co.jp/,0,0,222
+224,99,阿佐海岸鉄道,アサカイガンテツドウ,阿佐海岸鉄道株式会社,阿佐海岸鉄道,Asa Coast Railway Company,Asa Coast Railway Company,http://www.asatetu.v-co.jp/,0,0,222
 225,99,高松琴平電気鉄道,タカマツコトヒラデンキテツドウ,高松琴平電気鉄道株式会社,琴電,Kotoden,TAKAMATSU-KOTOHIRA ELECTRIC RAILROAD,http://www.kotoden.co.jp/,0,0,223
 226,99,伊予鉄道,イヨテツドウ,伊予鉄道株式会社,伊予鉄,Iyo Railway,Iyo Railway,http://www.iyotetsu.co.jp/,0,0,224
 227,99,土佐くろしお鉄道,トサクロシオテツドウ,土佐くろしお鉄道株式会社,土佐くろしお鉄道,Tosa Kuroshio Tetsudo,Tosa Kuroshio Tetsudo,http://www.tosakuro.co.jp/,0,0,225
@@ -172,4 +173,4 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 240,99,肥薩おれんじ鉄道,ヒサツオレンジテツドウ,肥薩おれんじ鉄道株式会社,肥薩おれんじ鉄道,Hisatsu Orange Railway,Hisatsu Orange Railway,http://www.hs-orange.com/,0,0,238
 241,99,熊本市交通局,クマモトシコウツウキョク,熊本市交通局,熊本市交通局,Kumamoto City Transportation Bureau,Kumamoto City Transportation Bureau,http://www.kotsu-kumamoto.jp/,0,0,239
 242,99,鹿児島市交通局,カゴシマコウツウキョク,鹿児島市交通局,鹿児島市交通局,Kagoshima City Transportation Bureau,Kagoshima City Transportation Bureau,http://www.kotsu-city-kagoshima.jp/,0,0,240
-243,99,沖縄都市モノレール,オキナワトシモノレール,沖縄都市モノレール株式会社,ゆいレール,Yui Rail,Okinawa Urban Monorail,http://www.yui-rail.co.jp/,0,0,241
+243,99,沖縄都市モノレール,オキナワトシモノレール,沖縄都市モノレール株式会社,沖縄都市モノレール,Yui Rail,Okinawa Urban Monorail,http://www.yui-rail.co.jp/,0,0,241
