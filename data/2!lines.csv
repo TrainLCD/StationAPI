@@ -280,7 +280,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 26007,16,東急世田谷線,トウキュウセタガヤセン,東急世田谷線,Tokyu Setagaya Line,Tokyu Setagaya Line,东急世田谷线,도큐 세타가야선,#FCC70D,4,SG,,,,#FCC70D,,,,REVERSED_SQUARE_DARK_TEXT,,,,0,26007,679.48258
 26008,16,東急こどもの国線,トウキュウコドモノクニセン,東急こどもの国線,Tokyu Kodomonokuni Line,Tokyu Kodomonokuni Line,东急子供之国线,도큐 고도모노쿠니선,#0068B7,2,KD,,,,#0068B7,,,,REVERSED_SQUARE,,,,0,26008,1719.44388
 26009,16,東急新横浜線,トウキュウシンヨコハマセン,東急新横浜線,Tokyu Shin-yokohama Line,Tokyu Shin-yokohama Line,东急新横滨线,도큐 신요코하마선,#890D84,2,SH,,,,#890D84,,,,REVERSED_SQUARE,,,,0,26009,3251.96596
-27001,17,京急本線,ケイキュウホンセン,京急本線,Keikyu Main Line,Keikyu Main Line,京急本线,게이큐 본선,#00CCFF,2,KK,A,,,#00CCFF,#E85298,,,KEIKYU,ROUND,,,0,27001,1288.54078
+27001,17,京急本線,ケイキュウホンセン,京急本線,Keikyu Main Line,Keikyu Main Line,京急本线,게이큐 본선,#00CCFF,2,KK,A,,,#00CCFF,#EC6E65,,,KEIKYU,ROUND,,,0,27001,1288.54078
 27002,17,京急空港線,ケイキュウクウコウセン,京急空港線,Keikyu Airport Line,Keikyu Airport Line,京急机场线,게이큐 공항선,#00CCFF,2,KK,,,,#00CCFF,,,,KEIKYU,,,,0,27002,1198.21904
 27003,17,京急大師線,ケイキュウダイシセン,京急大師線,Keikyu Daishi Line,Keikyu Daishi Line,京急大师线,게이큐 다이시선,#00CCFF,2,KK,,,,#00CCFF,,,,KEIKYU,,,,0,27003,822.28876
 27004,17,京急逗子線,ケイキュウズシセン,京急逗子線,Keikyu Zushi Line,Keikyu Zushi Line,京急逗子线,게이큐 즈시선,#00CCFF,2,KK,,,,#00CCFF,,,,KEIKYU,,,,0,27004,2100.61337
