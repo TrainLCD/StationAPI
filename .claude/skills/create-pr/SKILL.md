@@ -17,8 +17,8 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 | `head` | カレントブランチ（`git rev-parse --abbrev-ref HEAD`） |
 | `title` | 下の「タイトル推論ルール」参照 |
 | `summary` | 空なら「概要」「変更内容」本文はテンプレのコメントのみ残す |
-| `related_issue` | 空なら節のコメントのみ。`#N`（数値のみ）なら `Closes #N` を出力。`Closes #N` / `Fixes #N` / `Refs #N` の形式で指定された場合は接頭語を保ったまま出力。コミット件名から拾う場合も元の接頭語を維持する |
-| `skip_checks` | `false`（PR本文「テスト」節のチェック欄 3 項目を ON）。`true` なら全 OFF。**本文表示のみを制御するフラグで、Step 1 の `cargo fmt` / `clippy` / `test` 実行有無とは独立**（実行可否は「コードに変更があるか」で決める） |
+| `related_issue` | **ユーザー入力を最優先**。指定が `#N`（数値のみ）なら `Closes #N`、`Closes #N` / `Fixes #N` / `Refs #N` 形式ならその接頭語を保って出力。`related_issue` が空のときに限り、コミット件名から `Closes #N` / `Fixes #N` / `Refs #N` を抽出（接頭語を維持。`#N` 単体表記なら `Closes` を補う）。両方とも見つからなければ節のコメントのみ |
+| `skip_checks` | `false`（PR本文「テスト」節のチェック欄 3 項目を ON）。`true` なら全 OFF。**本文表示のみを制御するフラグで、Step 1 の `cargo fmt` / `clippy` / `test` の実際の実行は保証しない**（実行可否は「コードに変更があるか」で決める）。**Step 1 で `cargo` チェックを実行していない（=コード／データ変更なし）ケースでは、`skip_checks` の値に関わらず 3 項目すべて OFF にする** |
 | `labels` | 文字列配列、または未指定。**通常は未指定で OK**（`.github/workflows/pr_labeler.yml` がブランチ名と変更ファイルから自動付与する）。手動指定が必要な場合は `gh pr create --label <name>` で渡す（作成後に `gh pr edit --add-label` すると `pull_request: opened` トリガのワークフローに間に合わないため、必ず `gh pr create` 時に渡す） |
 
 ### タイトル推論ルール
@@ -149,8 +149,10 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    - 「概要」節: `summary` があれば挿入。無ければテンプレのコメントだけ残す。
    - 「変更の種類」節: 手順 3 の結果で各 `- [ ]` / `- [x]` を決定。**項目順序は必ずテンプレ通り**（バグ修正 / 新機能 / データの修正・追加 / リファクタリング / ドキュメント / CI/CD / その他）。
    - 「変更内容」節: コミット件名と変更ファイルから短い箇条書きを生成。`summary` があればそれを優先。データのみの PR では追加・修正した路線・駅などを箇条書きで列挙すると親切。
-   - 「テスト」節: `skip_checks` が真なら 3 項目すべて OFF、偽なら 3 項目すべて ON。テキストはテンプレのまま（`cargo fmt --all -- --check` / `cargo clippy -- -D warnings` / `cargo test`（`SQLX_OFFLINE=true`））。
-   - 「関連Issue」節: `related_issue` があれば、入力またはコミット件名から得た `Closes #N` / `Fixes #N` / `Refs #N` の接頭語をそのまま書く（数値 `N` だけが渡された場合のみ `Closes #N` を補う）。無ければコメントのみ。
+   - 「テスト」節:
+     - **Step 1 で `cargo` チェックを実行していない（コード／データ変更なし）場合は 3 項目すべて OFF**（`skip_checks` より優先）。本文末尾に「省略: コード変更なし」等の短い注記を残す。
+     - 上記に該当しない場合は `skip_checks` が真なら 3 項目すべて OFF、偽なら 3 項目すべて ON。テキストはテンプレのまま（`cargo fmt --all -- --check` / `cargo clippy -- -D warnings` / `cargo test`（`SQLX_OFFLINE=true`））。
+   - 「関連Issue」節: `related_issue` が指定されていればユーザー入力を最優先で出力（`#N` のみなら `Closes #N`、`Closes/Fixes/Refs #N` 形式なら接頭語を維持）。空のときに限りコミット件名から `Closes/Fixes/Refs #N` を抽出。どちらも無ければコメントのみ。
    - 「スクリーンショット」節: 常にコメントのみ（API レスポンスの diff など必要なら呼び出し側が後から編集する前提）。
 
    **更新モード**（既存 PR の本文を再生成）
@@ -163,7 +165,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    | 変更の種類 | **常に手順 3 の結果で上書き**（機械的判定）。 |
    | 変更内容 | 冒頭の箇条書きブロック（`-` で始まる連続行）を最新差分で再生成。その下に人間が書いた散文があれば残す。 |
    | テスト | **常に `skip_checks` に従う**（手順 4 の本文組み立てと同じルール）。 |
-   | 関連Issue | 既存内容を尊重。コミット件名に新規 `Closes #N` 等があれば追記。 |
+   | 関連Issue | 既存内容を尊重。コミット件名に `Closes/Fixes/Refs #N` があり、かつ既存本文中に同じ Issue 番号 `#N` を指す表現が存在しない場合のみ追記（重複は作らない。比較時は `Closes` / `closes` / `Fixes` / `fixes` / `Refs` / `refs` を同一視し、空白・記号差は無視して `#N` 単位で照合）。 |
    | スクリーンショット | 既存内容を尊重。自動では触らない。 |
 
    差し替え後の本文と既存本文の差分をユーザーに提示し、承認を得てから手順 5 へ進む。自動上書き節で人間の手入れらしき痕跡（テンプレのコメント以外の文章）がある場合は、どう扱うかをユーザーに確認する。
@@ -174,14 +176,25 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
    実装手順:
 
-   1. Write ツールで本文を一時ファイルに書き出す（例: `/tmp/pr-body-<slug>.md`）。ファイル名に使うブランチ名は `/` を `_` 等に置換してスラッグ化する（`feature/foo` → `feature_foo`）。生のブランチ名を直結するとサブディレクトリ解釈になり Write／削除が失敗する。バッククォートは **素のまま** 書く。escape しない。
+   1. Write ツールで本文を一時ファイルに書き出す（例: `/tmp/pr-body-<slug>.md`）。ファイル名に使う ref（ブランチ名・PR 番号など）は **ファイル名として安全な集合（`A-Za-z0-9._-`）にスラッグ化** する。具体的には:
+      - `/`・改行・制御文字・空白・非 ASCII などを `_` に置換
+      - 連続した `_` は 1 つに畳み、先頭・末尾の `_` は除去
+      - 必要なら長さを 100〜200 文字程度に切り詰める
+
+      生のブランチ名を直結するとサブディレクトリ解釈や制御文字混入で Write／削除が失敗する。バッククォートは **素のまま** 書く。escape しない。
    2. 下の `gh` コマンドをサブシェル内で `trap` と一緒に実行する。`gh` の成功・失敗に関わらず `EXIT` / `INT` / `TERM` のどれでも一時ファイルを確実に削除されるようにする（`&&` で `rm` を繋ぐだけだと失敗時に `/tmp` にゴミが残る）。
    3. `gh` 呼び出しと `rm`（を含む `trap`）は Bash tool の 1 呼び出し内で完結させる。別呼び出しで後片付けすると、前段の呼び出しがエラー／中断で終わった場合にクリーンアップが実行されない。
 
    **新規作成モード**
 
    ```bash
-   REF_SLUG="$(printf '%s' '<head>' | tr '/' '_')"
+   # ref 名をファイル名として安全な集合（A-Za-z0-9._-）にスラッグ化
+   REF_SLUG="$(printf '%s' '<head>' \
+     | tr -d '\r\n' \
+     | tr -c 'A-Za-z0-9._-' '_' \
+     | sed -E 's/_+/_/g; s/^_+//; s/_+$//' \
+     | cut -c1-100)"
+   REF_SLUG="${REF_SLUG:-pr}"
    BODY_FILE="/tmp/pr-body-${REF_SLUG}.md"
    (
      trap 'rm -f "$BODY_FILE"' EXIT INT TERM
