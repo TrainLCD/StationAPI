@@ -22,3 +22,9 @@ data:
   - changed-files:
       - any-glob-to-any-file:
           - "*.csv"
+deploy-prod:
+  - base-branch: ["^master$"]
+deploy-dev:
+  - base-branch: ["^dev$"]
+deploy-staging:
+  - base-branch: ["^staging$"]
