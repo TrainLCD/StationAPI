@@ -69,7 +69,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    git commit                       # コミットメッセージは日本語単文
    git push -u origin <inferred-branch>
    ```
-   - コミット前に下記の品質チェックを通す（`CONTRIBUTING.md` ルール、コードに変更が無ければ省略可）:
+   - コミット前に下記の品質チェックを通す（`CONTRIBUTING.md` ルール、手順 3 で定義する「コード本体パス」に変更が無ければ省略可）:
      - `cargo fmt --all -- --check`
      - `SQLX_OFFLINE=true cargo clippy -- -D warnings`
      - `SQLX_OFFLINE=true cargo test`
@@ -93,7 +93,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    git diff --name-only origin/<base>..origin/<head>
    ```
 
-   **大原則: 判定はアプリ挙動／データに対する変更かどうかで決める**。`stationapi/src/**`・`stationapi/proto/**`・`data_validator/**`・`data/**`・`docker/**`・`tools/**` が一切変わっていない場合、「バグ修正」「新機能」「リファクタリング」「データの修正・追加」は OFF（コミット件名に `fix` / `feat` / `追加` 等の語があっても）。スキル・設定・ドキュメントのメタ変更を「新機能」と誤分類しないための安全弁。
+   **大原則: 判定はアプリ挙動／データに対する変更かどうかで決める**。下の「コード本体パス」が一切変わっていない場合、「バグ修正」「新機能」「リファクタリング」は OFF（コミット件名に `fix` / `feat` 等の語があっても）。スキル・設定・ドキュメントのメタ変更を「新機能」と誤分類しないための安全弁。「データの修正・追加」は `data/**` の変更を独立に判定する（後述「変更ファイルパスベース」「コミット件名ベース」を参照）。
 
    この大原則のもとで、各項目を独立に評価（複数該当可、大文字小文字無視・部分一致）。
 
@@ -150,7 +150,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    - 「変更の種類」節: 手順 3 の結果で各 `- [ ]` / `- [x]` を決定。**項目順序は必ずテンプレ通り**（バグ修正 / 新機能 / データの修正・追加 / リファクタリング / ドキュメント / CI/CD / その他）。
    - 「変更内容」節: コミット件名と変更ファイルから短い箇条書きを生成。`summary` があればそれを優先。データのみの PR では追加・修正した路線・駅などを箇条書きで列挙すると親切。
    - 「テスト」節:
-     - **Step 1 で `cargo` チェックを実行していない（コード／データ変更なし）場合は 3 項目すべて OFF**（`skip_checks` より優先）。本文末尾に「省略: コード変更なし」等の短い注記を残す。
+     - **判定基準: 手順 3 の「コード本体パス」（`stationapi/src/**` ほか）に変更が無い場合は Step 1 の `cargo` チェックを省略したとみなし、3 項目すべて OFF**（`skip_checks` より優先）。本文末尾に「省略: コード変更なし」等の短い注記を残す。
      - 上記に該当しない場合は `skip_checks` が真なら 3 項目すべて OFF、偽なら 3 項目すべて ON。テキストはテンプレのまま（`cargo fmt --all -- --check` / `cargo clippy -- -D warnings` / `cargo test`（`SQLX_OFFLINE=true`））。
    - 「関連Issue」節: `related_issue` が指定されていればユーザー入力を最優先で出力（`#N` のみなら `Closes #N`、`Closes/Fixes/Refs #N` 形式なら接頭語を維持）。空のときに限りコミット件名から `Closes/Fixes/Refs #N` を抽出。どちらも無ければコメントのみ。
    - 「スクリーンショット」節: 常にコメントのみ（API レスポンスの diff など必要なら呼び出し側が後から編集する前提）。
