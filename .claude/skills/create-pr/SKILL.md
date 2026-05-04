@@ -17,8 +17,8 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 | `head` | カレントブランチ（`git rev-parse --abbrev-ref HEAD`） |
 | `title` | 下の「タイトル推論ルール」参照 |
 | `summary` | 空なら「概要」「変更内容」本文はテンプレのコメントのみ残す |
-| `related_issue` | 空なら節のコメントのみ。コミット件名に `Closes #N` / `Fixes #N` / `Refs #N` があれば拾う |
-| `skip_checks` | `false`（テスト 3 項目を ON）。`true` なら全 OFF |
+| `related_issue` | 空なら節のコメントのみ。`#N`（数値のみ）なら `Closes #N` を出力。`Closes #N` / `Fixes #N` / `Refs #N` の形式で指定された場合は接頭語を保ったまま出力。コミット件名から拾う場合も元の接頭語を維持する |
+| `skip_checks` | `false`（PR本文「テスト」節のチェック欄 3 項目を ON）。`true` なら全 OFF。**本文表示のみを制御するフラグで、Step 1 の `cargo fmt` / `clippy` / `test` 実行有無とは独立**（実行可否は「コードに変更があるか」で決める） |
 | `labels` | 文字列配列、または未指定。**通常は未指定で OK**（`.github/workflows/pr_labeler.yml` がブランチ名と変更ファイルから自動付与する）。手動指定が必要な場合は `gh pr create --label <name>` で渡す（作成後に `gh pr edit --add-label` すると `pull_request: opened` トリガのワークフローに間に合わないため、必ず `gh pr create` 時に渡す） |
 
 ### タイトル推論ルール
@@ -63,8 +63,10 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    ```bash
    git switch -c <inferred-branch>
    # 未コミットなら:
-   git add <files>          # 対話的ステージは避ける
-   git commit               # コミットメッセージは日本語単文
+   git add -u                       # 追跡済みの staged/unstaged をまとめてステージ
+   # 未追跡ファイルも退避対象なら明示的にパス指定で追加（`git add -A` / `.` は使わない）:
+   #   git add path/to/untracked-file ...
+   git commit                       # コミットメッセージは日本語単文
    git push -u origin <inferred-branch>
    ```
    - コミット前に下記の品質チェックを通す（`CONTRIBUTING.md` ルール、コードに変更が無ければ省略可）:
@@ -81,7 +83,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    - `git log --oneline origin/<base>..origin/<head>` で差分があることを確認。無ければ中断して報告。
    - `gh pr list --base <base> --head <head> --state open --json number,url,body` で既存 open PR を確認。
      - **存在しない場合**: 新規作成モード。以降、手順 5 で `gh pr create`。
-     - **存在する場合**: 更新モード。既存本文を最新差分で再生成する。以降、手順 5 で `gh pr edit`。タイトルは既存のものを尊重（ユーザー推論より優先）。
+     - **存在する場合**: 更新モード。既存本文を最新差分で再生成する。以降、手順 5 で `gh pr edit`。タイトルは既存を**原則尊重**（ユーザー推論より優先）。ただし手順 5 の整合性チェックで主題が大きくズレていると判断した場合のみ更新案を提示する。
 
 3. **変更の種類を判定**
 
@@ -148,7 +150,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    - 「変更の種類」節: 手順 3 の結果で各 `- [ ]` / `- [x]` を決定。**項目順序は必ずテンプレ通り**（バグ修正 / 新機能 / データの修正・追加 / リファクタリング / ドキュメント / CI/CD / その他）。
    - 「変更内容」節: コミット件名と変更ファイルから短い箇条書きを生成。`summary` があればそれを優先。データのみの PR では追加・修正した路線・駅などを箇条書きで列挙すると親切。
    - 「テスト」節: `skip_checks` が真なら 3 項目すべて OFF、偽なら 3 項目すべて ON。テキストはテンプレのまま（`cargo fmt --all -- --check` / `cargo clippy -- -D warnings` / `cargo test`（`SQLX_OFFLINE=true`））。
-   - 「関連Issue」節: `related_issue` があれば `Closes #N` を書く。無ければコメントのみ。
+   - 「関連Issue」節: `related_issue` があれば、入力またはコミット件名から得た `Closes #N` / `Fixes #N` / `Refs #N` の接頭語をそのまま書く（数値 `N` だけが渡された場合のみ `Closes #N` を補う）。無ければコメントのみ。
    - 「スクリーンショット」節: 常にコメントのみ（API レスポンスの diff など必要なら呼び出し側が後から編集する前提）。
 
    **更新モード**（既存 PR の本文を再生成）
@@ -172,14 +174,15 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
    実装手順:
 
-   1. Write ツールで本文を一時ファイルに書き出す（例: `/tmp/pr-body-<pr-or-branch>.md`）。バッククォートは **素のまま** 書く。escape しない。
+   1. Write ツールで本文を一時ファイルに書き出す（例: `/tmp/pr-body-<slug>.md`）。ファイル名に使うブランチ名は `/` を `_` 等に置換してスラッグ化する（`feature/foo` → `feature_foo`）。生のブランチ名を直結するとサブディレクトリ解釈になり Write／削除が失敗する。バッククォートは **素のまま** 書く。escape しない。
    2. 下の `gh` コマンドをサブシェル内で `trap` と一緒に実行する。`gh` の成功・失敗に関わらず `EXIT` / `INT` / `TERM` のどれでも一時ファイルを確実に削除されるようにする（`&&` で `rm` を繋ぐだけだと失敗時に `/tmp` にゴミが残る）。
    3. `gh` 呼び出しと `rm`（を含む `trap`）は Bash tool の 1 呼び出し内で完結させる。別呼び出しで後片付けすると、前段の呼び出しがエラー／中断で終わった場合にクリーンアップが実行されない。
 
    **新規作成モード**
 
    ```bash
-   BODY_FILE=/tmp/pr-body-<pr-or-branch>.md
+   REF_SLUG="$(printf '%s' '<head>' | tr '/' '_')"
+   BODY_FILE="/tmp/pr-body-${REF_SLUG}.md"
    (
      trap 'rm -f "$BODY_FILE"' EXIT INT TERM
      gh pr create \
@@ -199,7 +202,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    **更新モード**
 
    ```bash
-   BODY_FILE=/tmp/pr-body-<pr-number>.md
+   BODY_FILE="/tmp/pr-body-${pr_number}.md"
    (
      trap 'rm -f "$BODY_FILE"' EXIT INT TERM
      gh pr edit <pr-number> \
@@ -208,7 +211,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    )
    ```
 
-   - **タイトルは毎回スコープ整合性を再評価する**。手順 1 のタイトル推論ルールと最新のコミット群を照合し、現タイトルが新しい主題（追加路線・大きな機能変更など）を拾えていなければ更新案を提示してユーザー承認を取り、`--title` に含めて反映する。タイトルが最新差分と整合している場合は `--title` を付けない。
+   - **タイトルは原則として既存を維持する**。ただし毎回スコープ整合性を再評価し、手順 1 のタイトル推論ルールと最新のコミット群を照合する。現タイトルが新しい主題（追加路線・大きな機能変更など）を拾えていない**重大な不整合**がある場合のみ、更新案を提示してユーザー承認を取り `--title` で上書きする。整合している、または軽微な差分にとどまる場合は `--title` を付けない。
    - Assignee は既に付いていれば再指定しない（重複操作を避ける）。付いてなければ `--add-assignee TinyKitten`。
    - 実行後、PR URL と「タイトルを変更したか・どの節を書き換えたか・変更の種類チェック差分」を簡潔に報告する。
 
