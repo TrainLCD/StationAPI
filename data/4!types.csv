@@ -22,7 +22,7 @@ DEFAULT,100,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,2,,PARTIAL
 DEFAULT,101,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,2,,PARTIAL
 DEFAULT,102,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,,PARTIAL
 DEFAULT,103,特別快速,トクベツカイソク,Special Rapid,特别快车,특별쾌속,#DC143C,0,2,0,,COMPLETE
-DEFAULT,104,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#581882,0,2,0,,COMPLETE
+DEFAULT,104,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#581882,0,6,0,,COMPLETE
 DEFAULT,105,快速(赤),カイソク(アカ),Rapid(Red),快车,쾌속,#FF0000,0,2,0,,NOT
 DEFAULT,106,快速(緑),カイソク(ミドリ),Rapid(Green),快车,쾌속,#00FF00,0,2,0,,NOT
 DEFAULT,107,ホームライナー,ホームライナー,Home Liner,家用班轮,홈 라이너,#DC143C,0,2,0,,NOT
@@ -83,7 +83,7 @@ DEFAULT,161,特別快速大雪,トクベツカイソクタイセツ,Special Rapi
 DEFAULT,162,エキスポライナー,エキスポライナー,Expo Liner,世博会Liner,박람회 라이너,#0000ff,0,2,0,,COMPLETE
 DEFAULT,163,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,5,1,常磐線用,COMPLETE
 DEFAULT,164,特別快速,トクベツカイソク,Special Rapid,特别快车,특별쾌속,#DC143C,0,5,0,常磐線用,COMPLETE
-DEFAULT,165,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#DC143C,0,5,0,TX用,COMPLETE
+DEFAULT,165,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#DC143C,0,6,0,TX用,COMPLETE
 DEFAULT,166,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,5,0,TX用,COMPLETE
 DEFAULT,200,踊り子(池袋〜伊豆急下田),オドリコ,Odoriko(Ikebukuro to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
 DEFAULT,201,踊り子(東京〜伊豆急下田),オドリコ,Odoriko(Tokyo to Izukyū-shimoda),踊子,무희,#035D67,0,4,0,,COMPLETE
@@ -225,7 +225,7 @@ DEFAULT,332,アクセス特急,アクセストッキュウ,Access Express,访问
 DEFAULT,333,準急,ジュンキュウ,Semi-Express,准急,준급,#2A9B50,0,3,0,堺筋準急,PARTIAL
 DEFAULT,334,直通特急,チョクツウトッキュウ,Limited Express,直通特急,직통특급,#DD2E1E,0,4,0,山陽電車,COMPLETE
 DEFAULT,335,区間快速,クカンカイソク,Semi Rapid,区间快速,구간쾌속,#000084,0,5,0,TX用,COMPLETE
-DEFAULT,336,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#FFA500,0,2,0,廃止済み 104に移行,NOT
+DEFAULT,336,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#FFA500,0,6,0,廃止済み 104に移行,NOT
 DEFAULT,337,準特急,ジュントッキュウ,Semi-Limited Express,准特急,준특급,#FF6E00,0,4,0,,COMPLETE
 DEFAULT,338,区間急行,クカンキュウコウ,Sub Express,区间快速,구간급행,#009A41,0,3,0,南海電車用,COMPLETE
 DEFAULT,339,S-TRAIN(土休日運行),エストレイン,S-TRAIN(Holiday),S-TRAIN,S-TRAIN,#8EC21F,0,2,0,,COMPLETE
