@@ -81,7 +81,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 11319,2,宇都宮線,ウツノミヤセン,東北本線,Utsunomiya Line,Utsunomiya Line,宇都宫线,우쓰노미야선,#F68B1E,2,JU,,,,#F68B1E,,,,SQUARE,,,,0,11319,5545.35430
 11320,2,常磐快速線,ジョウバンカイソクセン,常磐線,Joban Rapid Line,Joban Rapid Line,常磐快速线,조반 쾌속선,#00B261,2,JJ,JL,,,#00B261,#A2A9B1,,,SQUARE,SQUARE,,,0,11320,2378.87911
 11321,2,埼京線,サイキョウセン,埼京線,Saikyo Line,Saikyo Line,埼京线,사이쿄선,#00B48D,2,JA,,,,#00B48D,,,,SQUARE,,,,0,11321,2673.04874
-11322,2,川越線,カワゴエセン,川越線,Kawagoe Line,Kawagoe Line,川越线,가와고에선,#00B48D,2,,,,,,,,,,,,,0,11322,3734.47187
+11322,2,川越線,カワゴエセン,川越線,Kawagoe Line,Kawagoe Line,川越线,가와고에선,#00B48D,2,JA,,,,#00B48D,,,,SQUARE,,,,0,11322,3734.47187
 11323,2,高崎線,タカサキセン,高崎線,Takasaki Line,Takasaki Line,高崎线,다카사키선,#F68B1E,2,JU,,,,#F68B1E,,,,SQUARE,,,,0,11323,4962.69548
 11324,2,外房線,ソトボウセン,外房線,Sotobo Line,Sotobo Line,外房线,소토보선,#DB4028,2,,,,,,,,,,,,,0,11324,3919.43568
 11325,2,内房線,ウチボウセン,内房線,Uchibo Line,Uchibo Line,内房线,우치보선,#00B9F1,2,,,,,,,,,,,,,0,11325,4276.52807
@@ -106,8 +106,8 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 11345,100,ディズニーリゾートライン,ディズニーリゾートライン,ディズニーリゾートライン,Disney Resort Line,Disney Resort Line,迪士尼度假区线,디즈니 리조트 라인,#004499,5,,,,,,,,,,,,,0,11343,1087.75721
 11401,2,小海線,コウミセン,小海線,Koumi Line,Koumi Line,小海线,고우미선,#008000,2,,,,,,,,,,,,,0,11401,2573.34299
 11402,3,身延線,ミノブセン,身延線,Minobu Line,Minobu Line,身延线,미노부선,#6F2D98,2,CC,,,,#6F2D98,,,,HALF_SQUARE_WITHOUT_ROUND,,,,0,11402,2438.67983
-11403,2,信越本線,シンエツホンセン,信越本線,Shin’etsu Main Line,Shin’etsu Main Line,信越本线,신에쓰 본선,#FFD400,2,SE,,,,#00B3E6,,,,ROUND,,,,0,11403,2632.98923
-11404,2,信越本線,シンエツホンセン,信越本線,Shin’etsu Main Line,Shin’etsu Main Line,信越本线,신에쓰 본선,#FFD400,2,,,,,,,,,,,,,0,11404,3690.56278
+11403,2,信越本線,シンエツホンセン,信越本線,Shin’etsu Main Line,Shin’etsu Main Line,信越本线,신에쓰 본선,#00B3E6,2,SE,,,,#00B3E6,,,,ROUND,,,,0,11403,2632.98923
+11404,2,信越本線,シンエツホンセン,信越本線,Shin’etsu Main Line,Shin’etsu Main Line,信越本线,신에쓰 본선,#00B3E6,2,,,,,,,,,,,,,0,11404,3690.56278
 11405,4,北陸本線,ホクリクホンセン,北陸本線,Hokuriku Main Line,Hokuriku Main Line,北陆本线,호쿠리쿠 본선,#FFD400,2,,,,,,,,,,,,,2,11405,0
 11406,2,白新線,ハクシンセン,白新線,Hakushin Line,Hakushin Line,白新线,하쿠신선,#F387B7,2,,,,,,,,,,,,,0,11406,3269.33853
 11407,2,飯山線,イイヤマセン,飯山線,Iiyama Line,Iiyama Line,饭山线,이야마선,#7BC24B,2,,,,,,,,,,,,,0,11407,3491.78175
