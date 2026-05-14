@@ -641,7 +641,7 @@ impl InternalStationRepository {
                 NULL::int AS type_id,
                 NULL::int AS sst_id,
                 NULL::int AS type_cd,
-                NULL::int AS line_group_cd,
+                (SELECT sst.line_group_cd FROM station_station_types sst WHERE sst.station_cd = s.station_cd AND sst.line_group_cd IS NOT NULL LIMIT 1)::int AS line_group_cd, -- has_train_types用
                 NULL::int AS pass,
                 NULL::text AS type_name,
                 NULL::text AS type_name_k,
@@ -852,7 +852,7 @@ impl InternalStationRepository {
               NULL::int AS type_id,
               NULL::int AS sst_id,
               NULL::int AS type_cd,
-              NULL::int AS line_group_cd,
+              (SELECT sst.line_group_cd FROM station_station_types sst WHERE sst.station_cd = s.station_cd AND sst.line_group_cd IS NOT NULL LIMIT 1)::int AS line_group_cd, -- has_train_types用
               NULL::int AS pass,
               NULL::text AS type_name,
               NULL::text AS type_name_k,
@@ -950,7 +950,7 @@ impl InternalStationRepository {
               NULL::int AS type_id,
               NULL::int AS sst_id,
               NULL::int AS type_cd,
-              NULL::int AS line_group_cd,
+              (SELECT sst.line_group_cd FROM station_station_types sst WHERE sst.station_cd = s.station_cd AND sst.line_group_cd IS NOT NULL LIMIT 1)::int AS line_group_cd, -- has_train_types用
               NULL::int AS pass,
               NULL::text AS type_name,
               NULL::text AS type_name_k,
@@ -1436,7 +1436,7 @@ impl InternalStationRepository {
                 NULL::int AS type_id,
                 NULL::int AS sst_id,
                 NULL::int AS type_cd,
-                NULL::int AS line_group_cd,
+                (SELECT sst.line_group_cd FROM station_station_types sst WHERE sst.station_cd = s.station_cd AND sst.line_group_cd IS NOT NULL LIMIT 1)::int AS line_group_cd, -- has_train_types用
                 NULL::int AS pass,
                 NULL::text AS type_name,
                 NULL::text AS type_name_k,
@@ -1549,7 +1549,7 @@ impl InternalStationRepository {
                 NULL::int AS type_id,
                 NULL::int AS sst_id,
                 NULL::int AS type_cd,
-                NULL::int AS line_group_cd,
+                (SELECT sst.line_group_cd FROM station_station_types sst WHERE sst.station_cd = s.station_cd AND sst.line_group_cd IS NOT NULL LIMIT 1)::int AS line_group_cd, -- has_train_types用
                 NULL::int AS pass,
                 NULL::text AS type_name,
                 NULL::text AS type_name_k,
