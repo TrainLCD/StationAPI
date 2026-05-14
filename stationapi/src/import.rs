@@ -2092,6 +2092,11 @@ async fn integrate_gtfs_trip_variations_to_types(
         stop_count: i64,
         first_stop_name: Option<String>,
         is_loop: Option<bool>,
+        // Sorted, '|'-joined list of distinct parent_stop_ids that this shape visits.
+        // Shapes that share the same `stop_set_key` cover the exact same physical
+        // stops — typically the up/down directions of the same physical route.
+        // We collapse them into a single TrainType with `direction = Both`.
+        stop_set_key: Option<String>,
     }
 
     // One representative trip per (route_id, shape_id). Pick by trip_id for determinism.
@@ -2103,6 +2108,10 @@ async fn integrate_gtfs_trip_variations_to_types(
     // multiple shapes that share the same trip_headsign — e.g. 池86 has 3 shapes whose
     // headsign is "池袋駅東口" (full loop, short-turn from 新宿伊勢丹前, サンシャインシティ
     // 発の延伸) — by prefixing with the starting stop or marking circular trips.
+    //
+    // stop_set_key is used to detect "same stops, different direction" shape pairs
+    // (e.g. shape A: 池袋→新宿伊勢丹前 and shape B: 新宿伊勢丹前→池袋 visit the same
+    // 13 stops) and fold them into one TrainType marked as bidirectional.
     let variations: Vec<VariationRow> = sqlx::query_as(
         r#"WITH per_variation AS (
                SELECT DISTINCT ON (gt.route_id, gt.shape_id)
@@ -2132,7 +2141,14 @@ async fn integrate_gtfs_trip_variations_to_types(
                       FROM gtfs_stop_times gst
                       JOIN gtfs_stops gs ON gs.stop_id = gst.stop_id
                      WHERE gst.trip_id = pv.representative_trip_id
-                     ORDER BY gst.stop_sequence DESC LIMIT 1) AS last_parent_id
+                     ORDER BY gst.stop_sequence DESC LIMIT 1) AS last_parent_id,
+                   (SELECT string_agg(parent_id, '|' ORDER BY parent_id)
+                      FROM (
+                          SELECT DISTINCT COALESCE(gs.parent_station, gs.stop_id) AS parent_id
+                            FROM gtfs_stop_times gst
+                            JOIN gtfs_stops gs ON gs.stop_id = gst.stop_id
+                           WHERE gst.trip_id = pv.representative_trip_id
+                      ) s) AS stop_set_key
                FROM per_variation pv
            )
            SELECT
@@ -2148,7 +2164,8 @@ async fn integrate_gtfs_trip_variations_to_types(
                  WHERE gst.trip_id = pv.representative_trip_id)::bigint AS stop_count,
                ep.first_stop_name,
                (ep.first_parent_id IS NOT NULL
-                 AND ep.first_parent_id = ep.last_parent_id) AS is_loop
+                 AND ep.first_parent_id = ep.last_parent_id) AS is_loop,
+               ep.stop_set_key
            FROM per_variation pv
            JOIN gtfs_routes gr ON gr.route_id = pv.route_id
            LEFT JOIN endpoints ep ON ep.representative_trip_id = pv.representative_trip_id
@@ -2158,8 +2175,44 @@ async fn integrate_gtfs_trip_variations_to_types(
     .await?;
 
     info!(
-        "Found {} bus trip variations to register as TrainTypes.",
+        "Found {} bus trip variations (pre-dedup).",
         variations.len()
+    );
+
+    // Fold variations that visit the exact same set of parent stops within the same
+    // route. Such shapes typically correspond to the up/down directions of the same
+    // physical route (e.g. 池86: shape 20003-1 池袋→新宿伊勢丹前 と shape 20003-2
+    // 新宿伊勢丹前→池袋 は同じ 13 停留所を逆順で走る) — clients should see one
+    // TrainType marked as bidirectional rather than two near-duplicates.
+    //
+    // The SQL already orders variations by `stop_count DESC`, so within each group the
+    // first occurrence is the canonical representative; later ones contribute only
+    // their direction_id and are otherwise discarded.
+    let mut group_of: HashMap<(String, String), usize> = HashMap::new();
+    let mut grouped_directions: Vec<Vec<Option<i32>>> = Vec::with_capacity(variations.len());
+    let mut representatives: Vec<&VariationRow> = Vec::with_capacity(variations.len());
+    for v in &variations {
+        // Fall back to a key based on shape_id when stop_set_key is missing, so a row
+        // without any stop_times still gets a unique slot.
+        let key = (
+            v.route_id.clone(),
+            v.stop_set_key
+                .clone()
+                .unwrap_or_else(|| format!("__shape:{}", v.shape_id)),
+        );
+        match group_of.get(&key) {
+            Some(&idx) => grouped_directions[idx].push(v.direction_id),
+            None => {
+                group_of.insert(key, representatives.len());
+                grouped_directions.push(vec![v.direction_id]);
+                representatives.push(v);
+            }
+        }
+    }
+
+    info!(
+        "Folded into {} unique TrainTypes (same-stop / opposite-direction pairs merged).",
+        representatives.len()
     );
 
     // Disambiguate duplicate type_names within the same route by appending the stop count.
@@ -2167,7 +2220,7 @@ async fn integrate_gtfs_trip_variations_to_types(
     let mut variation_count = 0;
     let mut sst_inserted = 0;
 
-    for v in &variations {
+    for (rep_idx, v) in representatives.iter().enumerate() {
         let type_cd = generate_bus_type_cd(&v.route_id, &v.shape_id);
         let line_group_cd = generate_bus_line_group_cd(&v.route_id, &v.shape_id);
 
@@ -2179,22 +2232,44 @@ async fn integrate_gtfs_trip_variations_to_types(
             .or_else(|| v.route_short_name.clone().filter(|s| !s.is_empty()));
         let first_stop = v.first_stop_name.clone().filter(|s| !s.is_empty());
 
+        // If multiple shapes share this stop set (= the route has explicit up and
+        // down variants), `direction = Both` is the only honest answer. Otherwise
+        // we keep whatever direction_id the representative trip carried — defaulting
+        // to 0 (TrainDirection::Both) when GTFS leaves it NULL.
+        let directions = &grouped_directions[rep_idx];
+        let direction = if directions.len() > 1 {
+            0 // Both — collapsed pair
+        } else {
+            v.direction_id.unwrap_or(0)
+        };
+        let is_bidirectional = directions.len() > 1;
+
         // Naming rule:
+        // - 双方向ペア (同じ停留所集合, direction 0/1) → "<A> ⇔ <B>" (両端駅)
         // - 循環トリップ (始発 parent == 終点 parent) → "<headsign> (循環)"
         // - それ以外で始発名と headsign が異なる → "<first_stop> → <headsign>"
         // - 始発名と headsign が同じ / どちらか欠落 → 取れた方を採用
         // - すべて欠落 → "shape <shape_id>" でフォールバック
-        let base_name = match (
-            v.is_loop.unwrap_or(false),
-            first_stop.as_deref(),
-            headsign.as_deref(),
-        ) {
-            (true, _, Some(h)) => format!("{} (循環)", h),
-            (true, Some(first), None) => format!("{} (循環)", first),
-            (false, Some(first), Some(h)) if first != h => format!("{} → {}", first, h),
-            (_, _, Some(h)) => h.to_string(),
-            (_, Some(first), None) => first.to_string(),
-            _ => format!("shape {}", v.shape_id),
+        let base_name = if is_bidirectional && !v.is_loop.unwrap_or(false) {
+            match (first_stop.as_deref(), headsign.as_deref()) {
+                (Some(first), Some(h)) if first != h => format!("{} ⇔ {}", first, h),
+                (_, Some(h)) => h.to_string(),
+                (Some(first), None) => first.to_string(),
+                _ => format!("shape {}", v.shape_id),
+            }
+        } else {
+            match (
+                v.is_loop.unwrap_or(false),
+                first_stop.as_deref(),
+                headsign.as_deref(),
+            ) {
+                (true, _, Some(h)) => format!("{} (循環)", h),
+                (true, Some(first), None) => format!("{} (循環)", first),
+                (false, Some(first), Some(h)) if first != h => format!("{} → {}", first, h),
+                (_, _, Some(h)) => h.to_string(),
+                (_, Some(first), None) => first.to_string(),
+                _ => format!("shape {}", v.shape_id),
+            }
         };
 
         // Disambiguate same-name variations within a route by appending stop count.
@@ -2232,7 +2307,7 @@ async fn integrate_gtfs_trip_variations_to_types(
         .bind(type_cd)
         .bind(&type_name)
         .bind(&color)
-        .bind(v.direction_id.unwrap_or(0))
+        .bind(direction)
         .bind(BUS_ROUTE_KIND)
         .execute(&mut *conn)
         .await?;

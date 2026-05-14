@@ -173,7 +173,7 @@ CREATE INDEX idx_performance_station_name_trgm ON stations
 | `companies` | 東京都交通局 (`company_cd=119`) を固定で利用 |
 | `lines` | GTFS `routes` を 1:1 で `lines` に登録。`line_cd` は `route_id` の fnv1a ハッシュで 100,000,000+ 空間に決定的に生成 |
 | `stations` | GTFS `stops` (親停留所) を `(stop_id, route_id)` 単位で `stations` に登録。`station_cd` / `station_g_cd` も 200,000,000+ 空間にハッシュ生成 |
-| `types` | GTFS の `(route_id, shape_id)` バリエーション (フルループ / 短ターン / 支線など) を `kind = TrainTypeKind::BusRoute (= 7)` の TrainType として登録。`type_name` は循環なら `<headsign> (循環)`、それ以外は `<始発停留所> → <headsign>` |
+| `types` | GTFS の `(route_id, shape_id)` バリエーション (フルループ / 短ターン / 支線など) を `kind = TrainTypeKind::BusRoute (= 7)` の TrainType として登録。**停留所集合が完全に同じ shape ペア (上下方向違いのみ) は 1 つの TrainType に畳み、`direction = Both` を設定**。`type_name` は循環なら `<headsign> (循環)`、双方向ペアなら `<A> ⇔ <B>`、片方向なら `<始発停留所> → <headsign>` |
 | `station_station_types` | 各バリエーションの代表 trip の停留所を `stop_sequence` 順に挿入し、`SERIAL id` がそのまま停留所順序として機能 |
 
 バス系統の代表シェイプ (canonical_shape) は `COUNT(DISTINCT stop_id) DESC → MAX(shape_dist_traveled) → direction_id` の順で決定します。詳しくは `import.rs:build_stop_route_mapping` のコメント参照。
