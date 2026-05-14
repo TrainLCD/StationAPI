@@ -1564,23 +1564,24 @@ async fn integrate_gtfs_routes_to_lines(
 ///
 /// # Ordering Strategy
 ///
-/// ## 1. shape_dist_traveled-based ordering (preferred)
-/// When `gtfs_stop_times.shape_dist_traveled` is populated for at least 80% of a
-/// route's stop_times, stops are ordered by that accumulated distance. The
-/// per-stop value is taken from a `direction_id=0` observation when available,
-/// otherwise from any direction. This avoids the unstable interpolation that the
-/// fallback strategy can produce for multi-variant routes (e.g. 池86).
+/// ## 1. Main trip selection
+/// Pick one representative trip per route. The selection prefers:
 ///
-/// ## 2. Main trip + variant interpolation (fallback)
-/// For routes where `shape_dist_traveled` coverage is below the 80% threshold:
+/// 1. Trips whose `shape_id` matches the route's canonical shape (the longest /
+///    most-stop-covering shape used by `direction_id=0` trips). This avoids
+///    picking a short-turn variant as the main trip even when it happens to
+///    have more rows in `gtfs_stop_times`.
+/// 2. `direction_id = 0`
+/// 3. Most unique stops
+/// 4. Longest `MAX(shape_dist_traveled)`
+/// 5. `trip_id` for a deterministic tiebreak
 ///
-/// ### 2a. Main trip sequence
-/// - Select a representative "main trip" per route (prefer direction_id=0, then
-///   most unique stops, then longest shape distance, then trip_id for stability)
-/// - Use stop_sequence from main trip directly
+/// The main trip's `stop_sequence` is strictly monotonic within that trip, so
+/// stops on it inherit a reliable canonical order without having to compare
+/// `shape_dist_traveled` across trips on different shapes.
 ///
-/// ### 2b. Variant stop estimation
-/// For stops only on variant trips:
+/// ## 2. Variant stop estimation
+/// For stops only on variant trips (not on the main trip):
 /// - Use LAG/LEAD to find neighboring stops on the variant trip
 /// - Look up neighbors' positions on the main trip
 /// - Interpolate position based on neighbor positions
@@ -1590,63 +1591,42 @@ async fn build_stop_route_mapping(
     conn: &mut PgConnection,
 ) -> Result<HashMap<String, Vec<(String, i32)>>, Box<dyn std::error::Error>> {
     // Strategy:
-    // 1. If a route has reliable shape_dist_traveled coverage (>= 80% of stop_times),
-    //    order its stops by shape distance directly (preferring direction_id=0). This
-    //    is robust against multi-variant routes like 池86 where the main-trip + variant
-    //    interpolation produces unstable ordering.
-    // 2. Otherwise fall back to: pick a representative "main" trip and place variant-only
-    //    stops by interpolating from their LAG/LEAD neighbors on the main trip.
+    // 1. Compute a canonical shape_id per route (longest direction_id=0 shape).
+    // 2. Pick a main trip per route, preferring trips on the canonical shape, then
+    //    direction_id=0 / most stops / longest distance. Its stop_sequence is the
+    //    canonical order. This avoids the earlier attempt's bug where
+    //    shape_dist_traveled was compared across trips with different shape_ids
+    //    (short-turn / branching shapes restart dist at 0, so comparing them
+    //    pulled mid-route stops to the front of multi-variant routes like 池86).
+    // 3. Variant-only stops (on trips with a different shape) are interpolated
+    //    against the main trip via LAG/LEAD neighbor lookup.
     let rows: Vec<(String, String, i32)> = sqlx::query_as(
-        r#"WITH RECURSIVE route_coverage AS (
-               -- Per-route coverage of shape_dist_traveled in stop_times
-               SELECT
+        r#"WITH RECURSIVE canonical_shape AS (
+               -- Pick one canonical shape_id per route. Used purely to bias main trip
+               -- selection: a trip on the canonical shape is preferred over a trip
+               -- with the same stop count on some short-turn / branching shape.
+               -- Prefer direction_id=0, then longest physical distance, then most
+               -- unique stops, then shape_id for a deterministic tiebreak.
+               SELECT DISTINCT ON (gt.route_id)
                    gt.route_id,
-                   COUNT(*) FILTER (WHERE gst.shape_dist_traveled IS NOT NULL)::FLOAT
-                       / NULLIF(COUNT(*), 0) AS coverage
+                   gt.shape_id
                FROM gtfs_trips gt
                JOIN gtfs_stop_times gst ON gt.trip_id = gst.trip_id
-               GROUP BY gt.route_id
-           ),
-           shape_routes AS (
-               SELECT route_id FROM route_coverage WHERE coverage >= 0.8
-           ),
-           legacy_routes AS (
-               SELECT route_id FROM route_coverage
-               WHERE coverage IS NULL OR coverage < 0.8
-           ),
-           -- Shape-distance-based ordering: one row per (parent_stop, route),
-           -- preferring direction_id=0 observations, then the smallest distance.
-           shape_stop_dist AS (
-               SELECT DISTINCT ON (COALESCE(gs.parent_station, gs.stop_id), gt.route_id)
-                   COALESCE(gs.parent_station, gs.stop_id) AS parent_stop_id,
-                   gt.route_id,
-                   gst.shape_dist_traveled AS dist
-               FROM gtfs_trips gt
-               JOIN gtfs_stop_times gst ON gt.trip_id = gst.trip_id
-               JOIN gtfs_stops gs ON gst.stop_id = gs.stop_id
-               WHERE gt.route_id IN (SELECT route_id FROM shape_routes)
-                 AND gst.shape_dist_traveled IS NOT NULL
-               ORDER BY COALESCE(gs.parent_station, gs.stop_id),
-                        gt.route_id,
-                        CASE WHEN gt.direction_id = 0 THEN 0
-                             WHEN gt.direction_id IS NULL THEN 1
-                             ELSE 2 END,
-                        gst.shape_dist_traveled
-           ),
-           shape_numbered AS (
-               SELECT
-                   parent_stop_id,
-                   route_id,
-                   ROW_NUMBER() OVER (
-                       PARTITION BY route_id
-                       ORDER BY dist, parent_stop_id
-                   )::INT AS stop_sequence
-               FROM shape_stop_dist
+               WHERE gt.shape_id IS NOT NULL
+               GROUP BY gt.route_id, gt.shape_id, gt.direction_id
+               ORDER BY gt.route_id,
+                        CASE WHEN gt.direction_id = 0 THEN 0 ELSE 1 END,
+                        MAX(gst.shape_dist_traveled) DESC NULLS LAST,
+                        COUNT(DISTINCT gst.stop_id) DESC,
+                        gt.shape_id
            ),
            main_trips AS (
-               -- Fallback: representative trip per legacy route.
-               -- Prefer direction_id=0, then most unique stops, then longest shape,
-               -- then trip_id for deterministic tiebreak.
+               -- One representative trip per route. Prefer a trip on the canonical
+               -- shape, then direction_id=0, then most unique stops, then longest
+               -- shape distance, then trip_id for determinism. The trip's
+               -- stop_sequence is strictly monotonic, so it produces a reliable
+               -- canonical order for every stop on it without cross-shape
+               -- comparison hazards. Variant-only stops are interpolated below.
                SELECT DISTINCT ON (gt.route_id)
                    gt.route_id,
                    gt.trip_id,
@@ -1654,9 +1634,11 @@ async fn build_stop_route_mapping(
                    COUNT(*) as stop_count
                FROM gtfs_trips gt
                JOIN gtfs_stop_times gst ON gt.trip_id = gst.trip_id
-               WHERE gt.route_id IN (SELECT route_id FROM legacy_routes)
-               GROUP BY gt.route_id, gt.trip_id, gt.direction_id
+               LEFT JOIN canonical_shape cs
+                   ON cs.route_id = gt.route_id AND cs.shape_id = gt.shape_id
+               GROUP BY gt.route_id, gt.trip_id, gt.direction_id, cs.shape_id
                ORDER BY gt.route_id,
+                        CASE WHEN cs.shape_id IS NOT NULL THEN 0 ELSE 1 END,
                         CASE WHEN gt.direction_id = 0 THEN 0 ELSE 1 END,
                         COUNT(DISTINCT gst.stop_id) DESC,
                         MAX(gst.shape_dist_traveled) DESC NULLS LAST,
@@ -1696,8 +1678,7 @@ async fn build_stop_route_mapping(
                FROM gtfs_trips gt
                JOIN gtfs_stop_times gst ON gt.trip_id = gst.trip_id
                JOIN gtfs_stops gs ON gst.stop_id = gs.stop_id
-               WHERE gt.route_id IN (SELECT route_id FROM legacy_routes)
-                 AND NOT EXISTS (
+               WHERE NOT EXISTS (
                    SELECT 1 FROM main_trips mt WHERE mt.trip_id = gt.trip_id
                )
            ),
@@ -1918,8 +1899,6 @@ async fn build_stop_route_mapping(
                    ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY seq, parent_stop_id)::INT as stop_sequence
                FROM unique_stops
            )
-           SELECT parent_stop_id, route_id, stop_sequence FROM shape_numbered
-           UNION ALL
            SELECT parent_stop_id, route_id, stop_sequence FROM numbered
            ORDER BY route_id, stop_sequence"#,
     )
