@@ -2204,19 +2204,24 @@ async fn integrate_gtfs_trip_variations_to_types(
         let mut sorted_stops = stops;
         sorted_stops.sort_by_key(|(_, seq)| *seq);
 
-        for (parent_stop_id, _) in &sorted_stops {
-            let station_cd = generate_bus_station_cd(parent_stop_id, &v.route_id);
-            sqlx::query(
-                r#"INSERT INTO station_station_types (
-                    station_cd, type_cd, line_group_cd, pass
-                ) VALUES ($1, $2, $3, 0)"#,
-            )
-            .bind(station_cd)
-            .bind(type_cd)
-            .bind(line_group_cd)
-            .execute(&mut *conn)
-            .await?;
-            sst_inserted += 1;
+        // Single multi-row INSERT keeps stop_sequence → SERIAL id ordering intact
+        // while avoiding the per-stop round-trip the previous loop incurred.
+        // All three values are i32, so no SQL escaping is needed.
+        if !sorted_stops.is_empty() {
+            let mut sql = String::from(
+                "INSERT INTO station_station_types (station_cd, type_cd, line_group_cd, pass) VALUES ",
+            );
+            let mut values: Vec<String> = Vec::with_capacity(sorted_stops.len());
+            for (parent_stop_id, _) in &sorted_stops {
+                let station_cd = generate_bus_station_cd(parent_stop_id, &v.route_id);
+                values.push(format!(
+                    "({}, {}, {}, 0)",
+                    station_cd, type_cd, line_group_cd
+                ));
+            }
+            sql.push_str(&values.join(","));
+            sqlx::query(&sql).execute(&mut *conn).await?;
+            sst_inserted += sorted_stops.len();
         }
     }
 
