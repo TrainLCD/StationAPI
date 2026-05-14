@@ -1564,11 +1564,22 @@ async fn integrate_gtfs_routes_to_lines(
 ///
 /// # Ordering Strategy
 ///
-/// ## 1. Main trip sequence
-/// - Select the trip with most stops as "main trip" (prefer direction_id=0)
+/// ## 1. shape_dist_traveled-based ordering (preferred)
+/// When `gtfs_stop_times.shape_dist_traveled` is populated for at least 80% of a
+/// route's stop_times, stops are ordered by that accumulated distance. The
+/// per-stop value is taken from a `direction_id=0` observation when available,
+/// otherwise from any direction. This avoids the unstable interpolation that the
+/// fallback strategy can produce for multi-variant routes (e.g. 池86).
+///
+/// ## 2. Main trip + variant interpolation (fallback)
+/// For routes where `shape_dist_traveled` coverage is below the 80% threshold:
+///
+/// ### 2a. Main trip sequence
+/// - Select a representative "main trip" per route (prefer direction_id=0, then
+///   most unique stops, then longest shape distance, then trip_id for stability)
 /// - Use stop_sequence from main trip directly
 ///
-/// ## 2. Variant stop estimation
+/// ### 2b. Variant stop estimation
 /// For stops only on variant trips:
 /// - Use LAG/LEAD to find neighboring stops on the variant trip
 /// - Look up neighbors' positions on the main trip
