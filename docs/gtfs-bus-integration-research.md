@@ -1,5 +1,7 @@
 # GTFS都営バスデータ導入に関する調査報告書
 
+> **追記 (2026-05)**: 本書は実装着手前に作成した調査・設計検討資料です。実際の統合方針 (transport_type 列の追加、bus 用 `station_cd` / `line_cd` / `type_cd` / `line_group_cd` の 100M+ / 200M+ ハッシュ生成、`(route_id, shape_id)` バリエーションを `TrainTypeKind::BusRoute = 7` の TrainType として登録する設計など) は実装段階で確定しています。最新の実装は [`architecture.md` のバス統合節](./architecture.md) と `src/import.rs` を参照してください。
+
 ## 概要
 
 本ドキュメントは、既存のStationAPI（日本の鉄道駅データを扱うgRPC API）に、GTFSフォーマットの都営バスデータを導入する際の懸念点をまとめたものである。

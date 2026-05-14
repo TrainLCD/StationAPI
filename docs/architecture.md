@@ -1,6 +1,6 @@
 # StationAPI アーキテクチャドキュメント
 
-> 最終更新: 2026年1月
+> 最終更新: 2026年5月
 
 ## 目次
 
@@ -164,17 +164,31 @@ CREATE INDEX idx_performance_station_name_trgm ON stations
 4. **変換ロジック**: `impl From<XxxRow> for Xxx` を更新
 5. **DTO**: gRPC メッセージへの変換を `use_case/dto/` で更新
 
+### バス (GTFS) データの統合
+
+`stations` / `lines` / `types` / `station_station_types` は鉄道とバスの両方を保持し、`stations.transport_type` / `lines.transport_type` (0: 鉄道, 1: バス) でフィルタリングします。バスデータの取り込みは `src/import.rs` の `integrate_gtfs_to_stations()` が起動時に実行し、ODPT 公開の Toei Bus GTFS を `gtfs_*` テーブルに展開してから既存テーブルへ統合します。
+
+| 鉄道側の概念 | バス側の対応 |
+|---|---|
+| `companies` | 東京都交通局 (`company_cd=119`) を固定で利用 |
+| `lines` | GTFS `routes` を 1:1 で `lines` に登録。`line_cd` は `route_id` の fnv1a ハッシュで 100,000,000+ 空間に決定的に生成 |
+| `stations` | GTFS `stops` (親停留所) を `(stop_id, route_id)` 単位で `stations` に登録。`station_cd` / `station_g_cd` も 200,000,000+ 空間にハッシュ生成 |
+| `types` | GTFS の `(route_id, shape_id)` バリエーション (フルループ / 短ターン / 支線など) を `kind = TrainTypeKind::BusRoute (= 7)` の TrainType として登録。**停留所集合が完全に同じ shape ペア (上下方向違いのみ) は 1 つの TrainType に畳み、`direction = Both` を設定**。`type_name` は循環なら `<headsign> (循環)`、双方向ペアなら `<A> ⇔ <B>`、片方向なら `<始発停留所> → <headsign>` |
+| `station_station_types` | 各バリエーションの代表 trip の停留所を `stop_sequence` 順に挿入し、`SERIAL id` がそのまま停留所順序として機能 |
+
+バス系統の代表シェイプ (canonical_shape) は `COUNT(DISTINCT stop_id) DESC → MAX(shape_dist_traveled) → direction_id` の順で決定します。詳しくは `import.rs:build_stop_route_mapping` のコメント参照。
+
 ---
 
 ## gRPC/スキーマ設計
 
 ### サービスエンドポイント
 
-`stationapi.proto` で14のエンドポイントを定義:
+`stationapi.proto` で17のエンドポイントを定義:
 
 | カテゴリ | メソッド |
 |---------|---------|
-| 駅検索 | `GetStationById`, `GetStationByIdList`, `GetStationsByGroupId`, `GetStationsByCoordinates`, `GetStationsByLineId`, `GetStationsByName`, `GetStationsByLineGroupId` |
+| 駅検索 | `GetStationById`, `GetStationByIdList`, `GetStationsByGroupId`, `GetStationsByCoordinates`, `GetStationsByLineId`, `GetStationsByLineIdList`, `GetStationsByName`, `GetStationsByLineGroupId`, `GetStationsByLineGroupIdList` |
 | 路線検索 | `GetLineById`, `GetLinesByIdList`, `GetLinesByName` |
 | 経路検索 | `GetRoutes`, `GetRoutesMinimal`, `GetConnectedRoutes` |
 | 列車種別 | `GetTrainTypesByStationId`, `GetRouteTypes` |
