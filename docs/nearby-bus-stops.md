@@ -105,6 +105,12 @@ const NEARBY_BUS_STOP_RADIUS_METERS: f64 = 300.0;
 async fn get_nearby_bus_lines(&self, ref_lat: f64, ref_lon: f64) -> Result<Vec<Line>, UseCaseError>
 ```
 
+## バス停の `has_train_types`
+
+バス停も鉄道駅と同様に `TrainType` を持ち、`Station.has_train_types` が `true` になります。これは GTFS インポート時に `(route_id, shape_id)` のバリエーション (循環ループ / 短ターン / サンシャインシティ経由など) ごとに `types` (`kind = TrainTypeKind::BusRoute (= 7)`) と `station_station_types` を生成しているためです。詳細は [`architecture.md` のバス統合節](./architecture.md) と `src/import.rs::integrate_gtfs_trip_variations_to_types` を参照してください。
+
+クライアントは `GetTrainTypesByStationId` でバス停の系統バリエーションを取得し、UI 上で「池袋駅東口 (循環)」「新宿伊勢丹前 → 池袋駅東口」のように切り替え表示できます。
+
 ## 注意事項
 
 - バス路線検索は最大50件のバス停候補を取得し、その中から300m以内のものをフィルタリング
