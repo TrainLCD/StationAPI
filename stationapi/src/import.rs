@@ -1603,11 +1603,14 @@ async fn integrate_gtfs_routes_to_lines(
 /// ## 1. Main trip selection
 /// Pick one representative trip per route. The selection prefers:
 ///
-/// 1. Trips whose `shape_id` matches the route's canonical shape (the longest /
-///    most-stop-covering shape used by `direction_id=0` trips). This avoids
-///    picking a short-turn variant as the main trip even when it happens to
-///    have more rows in `gtfs_stop_times`.
-/// 2. `direction_id = 0`
+/// 1. Trips whose `shape_id` matches the route's canonical shape, where the
+///    canonical shape is the one covering the most unique stops (with longest
+///    `MAX(shape_dist_traveled)` and `direction_id=0` as tiebreakers). This
+///    avoids picking a short-turn variant when the full route only exists on
+///    trips with `direction_id` NULL — as is the case for 池86, whose full
+///    loop is recorded with `direction_id` empty while the only `direction_id=0`
+///    trip is a 13-stop short turn (新宿伊勢丹前→池袋駅東口).
+/// 2. `direction_id = 0` (then NULL, then 1)
 /// 3. Most unique stops
 /// 4. Longest `MAX(shape_dist_traveled)`
 /// 5. `trip_id` for a deterministic tiebreak
@@ -1627,7 +1630,13 @@ async fn build_stop_route_mapping(
     conn: &mut PgConnection,
 ) -> Result<HashMap<String, Vec<(String, i32)>>, Box<dyn std::error::Error>> {
     // Strategy:
-    // 1. Compute a canonical shape_id per route (longest direction_id=0 shape).
+    // 1. Compute a canonical shape_id per route: the shape covering the most unique
+    //    stops, with longest shape_dist_traveled and direction_id=0 as tiebreakers.
+    //    Length comes first because some routes (e.g. 池86) record their full route
+    //    only under direction_id NULL while a short-turn variant is the sole
+    //    direction_id=0 trip — preferring direction_id=0 first would pin the main
+    //    trip to that 13-stop short turn and push the full-route stops (渋谷駅東口,
+    //    宮下公園, etc.) into the variant-interpolation path.
     // 2. Pick a main trip per route, preferring trips on the canonical shape, then
     //    direction_id=0 / most stops / longest distance. Its stop_sequence is the
     //    canonical order. This avoids the earlier attempt's bug where
@@ -1641,8 +1650,11 @@ async fn build_stop_route_mapping(
                -- Pick one canonical shape_id per route. Used purely to bias main trip
                -- selection: a trip on the canonical shape is preferred over a trip
                -- with the same stop count on some short-turn / branching shape.
-               -- Prefer direction_id=0, then longest physical distance, then most
-               -- unique stops, then shape_id for a deterministic tiebreak.
+               -- Prefer the shape with the most unique stops, then longest physical
+               -- distance, then direction_id=0 (then NULL, then 1), then shape_id for
+               -- a deterministic tiebreak. Stop count comes before direction because
+               -- e.g. 池86 records its full loop only under direction_id NULL while
+               -- the sole direction_id=0 trip is a 13-stop short turn.
                SELECT DISTINCT ON (gt.route_id)
                    gt.route_id,
                    gt.shape_id
@@ -1651,9 +1663,11 @@ async fn build_stop_route_mapping(
                WHERE gt.shape_id IS NOT NULL
                GROUP BY gt.route_id, gt.shape_id, gt.direction_id
                ORDER BY gt.route_id,
-                        CASE WHEN gt.direction_id = 0 THEN 0 ELSE 1 END,
-                        MAX(gst.shape_dist_traveled) DESC NULLS LAST,
                         COUNT(DISTINCT gst.stop_id) DESC,
+                        MAX(gst.shape_dist_traveled) DESC NULLS LAST,
+                        CASE WHEN gt.direction_id = 0 THEN 0
+                             WHEN gt.direction_id IS NULL THEN 1
+                             ELSE 2 END,
                         gt.shape_id
            ),
            main_trips AS (
