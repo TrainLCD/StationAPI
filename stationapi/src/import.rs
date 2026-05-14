@@ -2215,6 +2215,133 @@ async fn integrate_gtfs_trip_variations_to_types(
         representatives.len()
     );
 
+    // For circular trips, compute a "経由地" (via stop) so the type_name can show
+    // *what makes this loop distinct*, not just its start/end (which is the same
+    // for a loop and matches the headsign). We prefer a stop that other same-headsign
+    // loop variations in the route do NOT visit; if there is no sibling shape (or no
+    // unique stop), we fall back to the stop at the trip's midpoint.
+    let loop_trip_ids: Vec<String> = representatives
+        .iter()
+        .filter(|v| v.is_loop.unwrap_or(false))
+        .map(|v| v.representative_trip_id.clone())
+        .collect();
+
+    // trip_id -> ordered (parent_id, stop_name) for that trip, deduped by parent
+    // (first stop_sequence wins, so a loop's terminal duplicate is dropped).
+    let stops_per_loop_trip: HashMap<String, Vec<(String, String)>> = if loop_trip_ids.is_empty() {
+        HashMap::new()
+    } else {
+        let rows: Vec<(String, String, String, i32)> = sqlx::query_as(
+            r#"SELECT DISTINCT ON (gst.trip_id, COALESCE(gs.parent_station, gs.stop_id))
+                   gst.trip_id,
+                   COALESCE(gs.parent_station, gs.stop_id) AS parent_stop_id,
+                   gs.stop_name,
+                   gst.stop_sequence
+               FROM gtfs_stop_times gst
+               JOIN gtfs_stops gs ON gst.stop_id = gs.stop_id
+               WHERE gst.trip_id = ANY($1)
+               ORDER BY gst.trip_id, COALESCE(gs.parent_station, gs.stop_id), gst.stop_sequence"#,
+        )
+        .bind(&loop_trip_ids)
+        .fetch_all(&mut *conn)
+        .await?;
+
+        let mut buckets: HashMap<String, Vec<(String, String, i32)>> = HashMap::new();
+        for (trip_id, parent_id, stop_name, seq) in rows {
+            buckets
+                .entry(trip_id)
+                .or_default()
+                .push((parent_id, stop_name, seq));
+        }
+        buckets
+            .into_iter()
+            .map(|(trip_id, mut stops)| {
+                stops.sort_by_key(|(_, _, seq)| *seq);
+                (
+                    trip_id,
+                    stops
+                        .into_iter()
+                        .map(|(p, n, _)| (p, n))
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect()
+    };
+
+    // Compute the headsign string the naming loop will use (same priority chain).
+    let headsign_for = |v: &VariationRow| -> Option<String> {
+        v.trip_headsign
+            .clone()
+            .filter(|s| !s.is_empty())
+            .or_else(|| v.route_long_name.clone().filter(|s| !s.is_empty()))
+            .or_else(|| v.route_short_name.clone().filter(|s| !s.is_empty()))
+            .or_else(|| v.first_stop_name.clone().filter(|s| !s.is_empty()))
+    };
+
+    // Group loop reps by (route_id, headsign) so we can find sibling shapes.
+    let mut loop_groups: HashMap<(String, String), Vec<usize>> = HashMap::new();
+    for (rep_idx, v) in representatives.iter().enumerate() {
+        if !v.is_loop.unwrap_or(false) {
+            continue;
+        }
+        if let Some(hs) = headsign_for(v) {
+            loop_groups
+                .entry((v.route_id.clone(), hs))
+                .or_default()
+                .push(rep_idx);
+        }
+    }
+
+    // For each loop rep, pick a via-stop name (prefer unique-to-shape stops near midpoint).
+    let mut via_for_rep: HashMap<usize, String> = HashMap::new();
+    for ((_route_id, headsign_str), rep_idxs) in &loop_groups {
+        for (pos, &idx) in rep_idxs.iter().enumerate() {
+            let my_stops =
+                match stops_per_loop_trip.get(&representatives[idx].representative_trip_id) {
+                    Some(s) if s.len() >= 3 => s,
+                    _ => continue,
+                };
+
+            // Stops in my shape not visited by any sibling shape with the same headsign.
+            let unique_stops: Vec<&(String, String)> = my_stops
+                .iter()
+                .filter(|(parent, _)| {
+                    rep_idxs.iter().enumerate().all(|(j, &other_idx)| {
+                        if j == pos {
+                            return true;
+                        }
+                        stops_per_loop_trip
+                            .get(&representatives[other_idx].representative_trip_id)
+                            .map(|other| !other.iter().any(|(p, _)| p == parent))
+                            .unwrap_or(true)
+                    })
+                })
+                .collect();
+
+            let mid = my_stops.len() / 2;
+            let picked = if !unique_stops.is_empty() {
+                let mid_i = mid as i64;
+                unique_stops
+                    .iter()
+                    .min_by_key(|(parent, _)| {
+                        let pos_in_my =
+                            my_stops.iter().position(|(p, _)| p == parent).unwrap_or(0) as i64;
+                        (pos_in_my - mid_i).abs()
+                    })
+                    .map(|(_, name)| name.clone())
+            } else {
+                Some(my_stops[mid].1.clone())
+            };
+
+            if let Some(name) = picked {
+                // Skip if the via name is the same as the headsign — adds no info.
+                if name != *headsign_str {
+                    via_for_rep.insert(idx, name);
+                }
+            }
+        }
+    }
+
     // Disambiguate duplicate type_names within the same route by appending the stop count.
     let mut name_counter: HashMap<(String, String), i32> = HashMap::new();
     let mut variation_count = 0;
@@ -2246,10 +2373,18 @@ async fn integrate_gtfs_trip_variations_to_types(
 
         // Naming rule:
         // - 双方向ペア (同じ停留所集合, direction 0/1) → "<A> ⇔ <B>" (両端駅)
-        // - 循環トリップ (始発 parent == 終点 parent) → "<headsign> (循環)"
+        // - 循環トリップ (始発 parent == 終点 parent) → "<headsign>（<経由地>経由・循環）"
+        //   (経由地が取れなければ "<headsign> (循環)" にフォールバック)
         // - それ以外で始発名と headsign が異なる → "<first_stop> → <headsign>"
         // - 始発名と headsign が同じ / どちらか欠落 → 取れた方を採用
         // - すべて欠落 → "shape <shape_id>" でフォールバック
+        let loop_name = |label: &str| -> String {
+            match via_for_rep.get(&rep_idx) {
+                Some(via) => format!("{}（{}経由・循環）", label, via),
+                None => format!("{} (循環)", label),
+            }
+        };
+
         let base_name = if is_bidirectional && !v.is_loop.unwrap_or(false) {
             match (first_stop.as_deref(), headsign.as_deref()) {
                 (Some(first), Some(h)) if first != h => format!("{} ⇔ {}", first, h),
@@ -2263,8 +2398,8 @@ async fn integrate_gtfs_trip_variations_to_types(
                 first_stop.as_deref(),
                 headsign.as_deref(),
             ) {
-                (true, _, Some(h)) => format!("{} (循環)", h),
-                (true, Some(first), None) => format!("{} (循環)", first),
+                (true, _, Some(h)) => loop_name(h),
+                (true, Some(first), None) => loop_name(first),
                 (false, Some(first), Some(h)) if first != h => format!("{} → {}", first, h),
                 (_, _, Some(h)) => h.to_string(),
                 (_, Some(first), None) => first.to_string(),
