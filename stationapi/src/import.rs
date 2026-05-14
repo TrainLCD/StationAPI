@@ -2090,12 +2090,19 @@ async fn integrate_gtfs_trip_variations_to_types(
         route_long_name: Option<String>,
         route_color: Option<String>,
         stop_count: i64,
+        first_stop_name: Option<String>,
+        is_loop: Option<bool>,
     }
 
     // One representative trip per (route_id, shape_id). Pick by trip_id for determinism.
     // stop_count is the representative trip's stop_times count; ordering variations by it
     // (DESC) lets the longer / more comprehensive shapes get the un-suffixed name when we
     // disambiguate duplicate trip_headsigns.
+    //
+    // first_stop_name / is_loop are used by the type_name builder below to distinguish
+    // multiple shapes that share the same trip_headsign — e.g. 池86 has 3 shapes whose
+    // headsign is "池袋駅東口" (full loop, short-turn from 新宿伊勢丹前, サンシャインシティ
+    // 発の延伸) — by prefixing with the starting stop or marking circular trips.
     let variations: Vec<VariationRow> = sqlx::query_as(
         r#"WITH per_variation AS (
                SELECT DISTINCT ON (gt.route_id, gt.shape_id)
@@ -2107,6 +2114,26 @@ async fn integrate_gtfs_trip_variations_to_types(
                FROM gtfs_trips gt
                WHERE gt.shape_id IS NOT NULL
                ORDER BY gt.route_id, gt.shape_id, gt.trip_id
+           ),
+           endpoints AS (
+               SELECT
+                   pv.representative_trip_id,
+                   (SELECT COALESCE(gs.parent_station, gs.stop_id)
+                      FROM gtfs_stop_times gst
+                      JOIN gtfs_stops gs ON gs.stop_id = gst.stop_id
+                     WHERE gst.trip_id = pv.representative_trip_id
+                     ORDER BY gst.stop_sequence ASC LIMIT 1) AS first_parent_id,
+                   (SELECT gs.stop_name
+                      FROM gtfs_stop_times gst
+                      JOIN gtfs_stops gs ON gs.stop_id = gst.stop_id
+                     WHERE gst.trip_id = pv.representative_trip_id
+                     ORDER BY gst.stop_sequence ASC LIMIT 1) AS first_stop_name,
+                   (SELECT COALESCE(gs.parent_station, gs.stop_id)
+                      FROM gtfs_stop_times gst
+                      JOIN gtfs_stops gs ON gs.stop_id = gst.stop_id
+                     WHERE gst.trip_id = pv.representative_trip_id
+                     ORDER BY gst.stop_sequence DESC LIMIT 1) AS last_parent_id
+               FROM per_variation pv
            )
            SELECT
                pv.route_id,
@@ -2118,9 +2145,13 @@ async fn integrate_gtfs_trip_variations_to_types(
                gr.route_long_name,
                gr.route_color,
                (SELECT COUNT(*) FROM gtfs_stop_times gst
-                 WHERE gst.trip_id = pv.representative_trip_id)::bigint AS stop_count
+                 WHERE gst.trip_id = pv.representative_trip_id)::bigint AS stop_count,
+               ep.first_stop_name,
+               (ep.first_parent_id IS NOT NULL
+                 AND ep.first_parent_id = ep.last_parent_id) AS is_loop
            FROM per_variation pv
            JOIN gtfs_routes gr ON gr.route_id = pv.route_id
+           LEFT JOIN endpoints ep ON ep.representative_trip_id = pv.representative_trip_id
            ORDER BY pv.route_id, stop_count DESC, pv.shape_id"#,
     )
     .fetch_all(&mut *conn)
@@ -2140,14 +2171,35 @@ async fn integrate_gtfs_trip_variations_to_types(
         let type_cd = generate_bus_type_cd(&v.route_id, &v.shape_id);
         let line_group_cd = generate_bus_line_group_cd(&v.route_id, &v.shape_id);
 
-        let base_name = v
+        let headsign = v
             .trip_headsign
             .clone()
             .filter(|s| !s.is_empty())
             .or_else(|| v.route_long_name.clone().filter(|s| !s.is_empty()))
-            .or_else(|| v.route_short_name.clone().filter(|s| !s.is_empty()))
-            .unwrap_or_else(|| format!("shape {}", v.shape_id));
+            .or_else(|| v.route_short_name.clone().filter(|s| !s.is_empty()));
+        let first_stop = v.first_stop_name.clone().filter(|s| !s.is_empty());
 
+        // Naming rule:
+        // - 循環トリップ (始発 parent == 終点 parent) → "<headsign> (循環)"
+        // - それ以外で始発名と headsign が異なる → "<first_stop> → <headsign>"
+        // - 始発名と headsign が同じ / どちらか欠落 → 取れた方を採用
+        // - すべて欠落 → "shape <shape_id>" でフォールバック
+        let base_name = match (
+            v.is_loop.unwrap_or(false),
+            first_stop.as_deref(),
+            headsign.as_deref(),
+        ) {
+            (true, _, Some(h)) => format!("{} (循環)", h),
+            (true, Some(first), None) => format!("{} (循環)", first),
+            (false, Some(first), Some(h)) if first != h => format!("{} → {}", first, h),
+            (_, _, Some(h)) => h.to_string(),
+            (_, Some(first), None) => first.to_string(),
+            _ => format!("shape {}", v.shape_id),
+        };
+
+        // Disambiguate same-name variations within a route by appending stop count.
+        // stop_count DESC ordering in the SQL means the longest variation wins the
+        // un-suffixed name; shorter ones get "(N停)" appended.
         let counter = name_counter
             .entry((v.route_id.clone(), base_name.clone()))
             .or_insert(0);
