@@ -1385,6 +1385,25 @@ fn generate_bus_station_g_cd(stop_id: &str) -> i32 {
     200_000_000 + (hash % 100_000_000) as i32
 }
 
+/// Generate deterministic type_cd from (route_id, shape_id).
+/// Uses range starting at 100,000,000 to avoid conflicts with existing rail types.
+fn generate_bus_type_cd(route_id: &str, shape_id: &str) -> i32 {
+    let combined = format!("type-{}-{}", route_id, shape_id);
+    let hash = fnv1a_hash(combined.as_bytes());
+    100_000_000 + (hash % 100_000_000) as i32
+}
+
+/// Generate deterministic line_group_cd from (route_id, shape_id).
+/// Uses range starting at 100,000,000 to avoid conflicts with existing rail line groups.
+fn generate_bus_line_group_cd(route_id: &str, shape_id: &str) -> i32 {
+    let combined = format!("lg-{}-{}", route_id, shape_id);
+    let hash = fnv1a_hash(combined.as_bytes());
+    100_000_000 + (hash % 100_000_000) as i32
+}
+
+/// `types.kind` value for bus route variations. Matches `proto::TrainTypeKind::BusRoute`.
+const BUS_ROUTE_KIND: i32 = 7;
+
 /// Row type for reading gtfs_routes
 #[derive(sqlx::FromRow)]
 struct GtfsRouteRow {
@@ -1472,14 +1491,26 @@ pub async fn integrate_gtfs_to_stations() -> Result<(), Box<dyn std::error::Erro
     // Begin transaction - all changes will be rolled back if any step fails
     let mut tx = conn.begin().await?;
 
-    // Step 1: Clear existing bus data from stations/lines
+    // Step 1: Clear existing bus data from stations/lines/types/sst.
+    // station_station_types references both types (FK) and stations (FK), so delete
+    // bus sst rows before bus types and before stations.
+    sqlx::query(
+        "DELETE FROM station_station_types WHERE type_cd IN (SELECT type_cd FROM types WHERE kind = $1)",
+    )
+    .bind(BUS_ROUTE_KIND)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query("DELETE FROM types WHERE kind = $1")
+        .bind(BUS_ROUTE_KIND)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM stations WHERE transport_type = 1")
         .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM lines WHERE transport_type = 1")
         .execute(&mut *tx)
         .await?;
-    info!("Cleared existing bus data from stations/lines tables.");
+    info!("Cleared existing bus data from stations/lines/types/station_station_types tables.");
 
     // Step 2: Insert bus routes as lines
     integrate_gtfs_routes_to_lines(&mut tx).await?;
@@ -1492,6 +1523,11 @@ pub async fn integrate_gtfs_to_stations() -> Result<(), Box<dyn std::error::Erro
 
     // Step 5: Update cross-references in GTFS tables
     update_gtfs_crossreferences(&mut tx, &stop_route_map).await?;
+
+    // Step 6: Register each (route_id, shape_id) trip variation as a TrainType
+    // (kind=BusRoute) so clients can switch between bus operation patterns
+    // (e.g. 池86 のフルループ / サンシャインシティ経由 / 短ターン).
+    integrate_gtfs_trip_variations_to_types(&mut tx).await?;
 
     // Commit the transaction - all changes are now permanent
     // ANALYZE is run separately in main.rs after all GTFS imports complete
@@ -2015,6 +2051,168 @@ async fn update_gtfs_crossreferences(
     Ok(())
 }
 
+/// Register each (route_id, shape_id) trip variation as a TrainType row
+/// (`types.kind = BUS_ROUTE_KIND`) plus its stops in `station_station_types`.
+///
+/// One shape == one operational pattern of the bus line (e.g. for 池86: フルループ /
+/// サンシャインシティ経由 / 新宿伊勢丹前止まりの短ターン). Clients can use the
+/// resulting TrainTypes to switch between these patterns the same way a rail line
+/// switches between のぞみ / ひかり / こだま.
+///
+/// `station_station_types` rows are inserted in `stop_sequence` order so that the
+/// SERIAL `id` column preserves the trip ordering when read back via the
+/// `ORDER BY sst.id` query path used by the rail TrainType code.
+async fn integrate_gtfs_trip_variations_to_types(
+    conn: &mut PgConnection,
+) -> Result<(), Box<dyn std::error::Error>> {
+    #[derive(sqlx::FromRow)]
+    struct VariationRow {
+        route_id: String,
+        shape_id: String,
+        representative_trip_id: String,
+        direction_id: Option<i32>,
+        trip_headsign: Option<String>,
+        route_short_name: Option<String>,
+        route_long_name: Option<String>,
+        route_color: Option<String>,
+        stop_count: i64,
+    }
+
+    // One representative trip per (route_id, shape_id). Pick by trip_id for determinism.
+    // stop_count is the representative trip's stop_times count; ordering variations by it
+    // (DESC) lets the longer / more comprehensive shapes get the un-suffixed name when we
+    // disambiguate duplicate trip_headsigns.
+    let variations: Vec<VariationRow> = sqlx::query_as(
+        r#"WITH per_variation AS (
+               SELECT DISTINCT ON (gt.route_id, gt.shape_id)
+                   gt.route_id,
+                   gt.shape_id,
+                   gt.trip_id AS representative_trip_id,
+                   gt.direction_id,
+                   gt.trip_headsign
+               FROM gtfs_trips gt
+               WHERE gt.shape_id IS NOT NULL
+               ORDER BY gt.route_id, gt.shape_id, gt.trip_id
+           )
+           SELECT
+               pv.route_id,
+               pv.shape_id,
+               pv.representative_trip_id,
+               pv.direction_id,
+               pv.trip_headsign,
+               gr.route_short_name,
+               gr.route_long_name,
+               gr.route_color,
+               (SELECT COUNT(*) FROM gtfs_stop_times gst
+                 WHERE gst.trip_id = pv.representative_trip_id)::bigint AS stop_count
+           FROM per_variation pv
+           JOIN gtfs_routes gr ON gr.route_id = pv.route_id
+           ORDER BY pv.route_id, stop_count DESC, pv.shape_id"#,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+
+    info!(
+        "Found {} bus trip variations to register as TrainTypes.",
+        variations.len()
+    );
+
+    // Disambiguate duplicate type_names within the same route by appending the stop count.
+    let mut name_counter: HashMap<(String, String), i32> = HashMap::new();
+    let mut variation_count = 0;
+    let mut sst_inserted = 0;
+
+    for v in &variations {
+        let type_cd = generate_bus_type_cd(&v.route_id, &v.shape_id);
+        let line_group_cd = generate_bus_line_group_cd(&v.route_id, &v.shape_id);
+
+        let base_name = v
+            .trip_headsign
+            .clone()
+            .filter(|s| !s.is_empty())
+            .or_else(|| v.route_long_name.clone().filter(|s| !s.is_empty()))
+            .or_else(|| v.route_short_name.clone().filter(|s| !s.is_empty()))
+            .unwrap_or_else(|| format!("shape {}", v.shape_id));
+
+        let counter = name_counter
+            .entry((v.route_id.clone(), base_name.clone()))
+            .or_insert(0);
+        *counter += 1;
+        let type_name = if *counter > 1 {
+            format!("{} ({}停)", base_name, v.stop_count)
+        } else {
+            base_name.clone()
+        };
+
+        let color = v
+            .route_color
+            .as_ref()
+            .map(|c| {
+                if c.starts_with('#') {
+                    c.clone()
+                } else {
+                    format!("#{}", c)
+                }
+            })
+            .unwrap_or_else(|| "#000000".to_string());
+
+        sqlx::query(
+            r#"INSERT INTO types (
+                type_cd, type_name, type_name_k, type_name_r, type_name_zh, type_name_ko,
+                color, direction, kind, priority
+            ) VALUES ($1, $2, $2, '', '', '', $3, $4, $5, 0)
+            ON CONFLICT (type_cd) DO NOTHING"#,
+        )
+        .bind(type_cd)
+        .bind(&type_name)
+        .bind(&color)
+        .bind(v.direction_id.unwrap_or(0))
+        .bind(BUS_ROUTE_KIND)
+        .execute(&mut *conn)
+        .await?;
+        variation_count += 1;
+
+        // Fetch this trip's stops, deduplicated by parent_station, with the earliest
+        // stop_sequence per parent. Then sort by sequence in Rust to insert in trip order.
+        let stops: Vec<(String, i32)> = sqlx::query_as(
+            r#"SELECT DISTINCT ON (COALESCE(gs.parent_station, gs.stop_id))
+                   COALESCE(gs.parent_station, gs.stop_id) AS parent_stop_id,
+                   gst.stop_sequence
+               FROM gtfs_stop_times gst
+               JOIN gtfs_stops gs ON gst.stop_id = gs.stop_id
+               WHERE gst.trip_id = $1
+               ORDER BY COALESCE(gs.parent_station, gs.stop_id), gst.stop_sequence"#,
+        )
+        .bind(&v.representative_trip_id)
+        .fetch_all(&mut *conn)
+        .await?;
+
+        let mut sorted_stops = stops;
+        sorted_stops.sort_by_key(|(_, seq)| *seq);
+
+        for (parent_stop_id, _) in &sorted_stops {
+            let station_cd = generate_bus_station_cd(parent_stop_id, &v.route_id);
+            sqlx::query(
+                r#"INSERT INTO station_station_types (
+                    station_cd, type_cd, line_group_cd, pass
+                ) VALUES ($1, $2, $3, 0)"#,
+            )
+            .bind(station_cd)
+            .bind(type_cd)
+            .bind(line_group_cd)
+            .execute(&mut *conn)
+            .await?;
+            sst_inserted += 1;
+        }
+    }
+
+    info!(
+        "Integrated {} bus trip variations as TrainTypes ({} station_station_types rows).",
+        variation_count, sst_inserted
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2126,6 +2324,39 @@ mod tests {
         assert_eq!(
             generate_bus_station_g_cd("stop_001"),
             generate_bus_station_g_cd("stop_001")
+        );
+    }
+
+    #[test]
+    fn test_generate_bus_type_cd() {
+        let type_cd = generate_bus_type_cd("route_001", "shape_A");
+        // Should be in range 100,000,000 to 199,999,999
+        assert!(type_cd >= 100_000_000);
+        assert!(type_cd < 200_000_000);
+
+        // Deterministic
+        assert_eq!(type_cd, generate_bus_type_cd("route_001", "shape_A"));
+
+        // Different (route_id, shape_id) should produce different type_cd
+        assert_ne!(type_cd, generate_bus_type_cd("route_001", "shape_B"));
+        assert_ne!(type_cd, generate_bus_type_cd("route_002", "shape_A"));
+    }
+
+    #[test]
+    fn test_generate_bus_line_group_cd_distinct_from_type_cd() {
+        // line_group_cd and type_cd both live in 100M+ space; make sure the same
+        // (route_id, shape_id) maps them to different values so the FK + grouping
+        // semantics are independent.
+        let route = "152";
+        let shape = "20007-3";
+        assert_ne!(
+            generate_bus_type_cd(route, shape),
+            generate_bus_line_group_cd(route, shape)
+        );
+        // Deterministic
+        assert_eq!(
+            generate_bus_line_group_cd(route, shape),
+            generate_bus_line_group_cd(route, shape)
         );
     }
 
