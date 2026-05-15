@@ -1762,6 +1762,19 @@ async fn build_stop_route_mapping(
                         END,
                         vts.stop_sequence
            ),
+           -- Per-route upper bound for the prev/next recursion depth. The chain
+           -- can revisit each variant-only stop at most once (enforced by the
+           -- `visited` array), so the variant-only stop count plus a small
+           -- safety margin is a safe and tight cap. This replaces the previous
+           -- fixed limit of 10, which truncated chains on routes whose variant
+           -- detour spans 11+ stops before rejoining the main trip.
+           variant_chain_limit AS (
+               SELECT
+                   route_id,
+                   COUNT(*)::INT + 1 AS max_depth
+               FROM variant_only_with_neighbors
+               GROUP BY route_id
+           ),
            -- Recursive CTE to find the nearest main-trip stop by following prev chain
            prev_chain AS (
                -- Base case: start from each variant stop
@@ -1787,7 +1800,9 @@ async fn build_stop_route_mapping(
                JOIN variant_only_with_neighbors von2
                    ON pc.current_stop_id = von2.parent_stop_id
                    AND pc.route_id = von2.route_id
-               WHERE pc.depth < 10
+               JOIN variant_chain_limit vcl
+                   ON vcl.route_id = pc.route_id
+               WHERE pc.depth < vcl.max_depth
                    AND von2.prev_stop_id IS NOT NULL
                    AND NOT pc.current_stop_id::TEXT = ANY(pc.visited)
                    -- Stop if we already found a main-trip stop
@@ -1833,7 +1848,9 @@ async fn build_stop_route_mapping(
                JOIN variant_only_with_neighbors von2
                    ON nc.current_stop_id = von2.parent_stop_id
                    AND nc.route_id = von2.route_id
-               WHERE nc.depth < 10
+               JOIN variant_chain_limit vcl
+                   ON vcl.route_id = nc.route_id
+               WHERE nc.depth < vcl.max_depth
                    AND von2.next_stop_id IS NOT NULL
                    AND NOT nc.current_stop_id::TEXT = ANY(nc.visited)
                    AND NOT EXISTS (
@@ -3416,6 +3433,112 @@ mod tests {
                 ("M5".to_string(), 8),
             ],
             "V2 は再帰 CTE で両端 (M1, M5) を解決し、中央付近に挿入されるべき"
+        );
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_build_stop_route_mapping_long_variant_chain_dynamic_limit() {
+        // 12 連続の variant-only 停留所をはさむ系統で、再帰 CTE の深さ上限が
+        // 動的に拡張されることを確認する (issue #1513)。
+        //
+        // 旧実装は `depth < 10` で打ち切るため、V11/V12 のうち両端が variant の
+        // ものは prev_chain で M1 まで到達できず、`mtms.max_seq + 9999` の末尾
+        // フォールバックや「next のみ解決」ブランチに落ち、メイン系統の末尾
+        // 付近に押し出されてしまっていた。
+        //
+        // main_trip: M01..M15           (seq 1..15, shape_main, 15 unique stops)
+        // variant : M01, V01..V12, M15  (shape_variant, 14 unique stops)
+        //
+        // canonical_shape は stop 数で shape_main が勝ち、M01..M15 はそのまま
+        // main_trip_stops に並ぶ。V01 は prev=M01 で直接補間 (1.5)、V12 は
+        // next=M15 で直接補間 (14.5)。中央の V02..V11 は両側 variant なので
+        // prev_chain と next_chain の双方を踏破して M01/M15 を解決し、
+        // (1+15)/2 + (prev_depth - next_depth) * 0.01 で 7.91..8.09 に並ぶ。
+        let mut conn = stop_route_mapping_fixtures::open_conn().await;
+        let schema = stop_route_mapping_fixtures::setup_schema(&mut conn).await;
+
+        let main_stops: Vec<String> = (1..=15).map(|i| format!("M{:02}", i)).collect();
+        let variant_stops: Vec<String> = (1..=12).map(|i| format!("V{:02}", i)).collect();
+        for s in main_stops.iter().chain(variant_stops.iter()) {
+            stop_route_mapping_fixtures::insert_stop(&mut conn, s).await;
+        }
+
+        let main_trip_stops: Vec<(&str, Option<f64>)> = main_stops
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.as_str(), Some((i as f64) * 100.0)))
+            .collect();
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_main",
+            "R6",
+            Some(0),
+            Some("shape_main"),
+            &main_trip_stops,
+        )
+        .await;
+
+        // variant: M01 → V01..V12 → M15。distance は main 側より短くしておく
+        // (canonical の決定は stop 数優先なので shape_main が勝つ)。
+        let mut variant_trip: Vec<(&str, Option<f64>)> = Vec::with_capacity(14);
+        variant_trip.push(("M01", Some(0.0)));
+        for (i, v) in variant_stops.iter().enumerate() {
+            variant_trip.push((v.as_str(), Some(((i as f64) + 1.0) * 50.0)));
+        }
+        variant_trip.push(("M15", Some(((variant_stops.len() as f64) + 1.0) * 50.0)));
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_variant",
+            "R6",
+            Some(0),
+            Some("shape_variant"),
+            &variant_trip,
+        )
+        .await;
+
+        let mapping = build_stop_route_mapping(&mut conn).await.unwrap();
+        let actual = collect_route(&mapping, "R6");
+        stop_route_mapping_fixtures::drop_schema(&mut conn, &schema).await;
+
+        let expected: Vec<(String, i32)> = vec![
+            ("M01", 1),
+            ("V01", 2),
+            ("M02", 3),
+            ("M03", 4),
+            ("M04", 5),
+            ("M05", 6),
+            ("M06", 7),
+            ("M07", 8),
+            ("V02", 9),
+            ("V03", 10),
+            ("V04", 11),
+            ("V05", 12),
+            ("V06", 13),
+            ("M08", 14),
+            ("V07", 15),
+            ("V08", 16),
+            ("V09", 17),
+            ("V10", 18),
+            ("V11", 19),
+            ("M09", 20),
+            ("M10", 21),
+            ("M11", 22),
+            ("M12", 23),
+            ("M13", 24),
+            ("M14", 25),
+            ("V12", 26),
+            ("M15", 27),
+        ]
+        .into_iter()
+        .map(|(s, n)| (s.to_string(), n))
+        .collect();
+
+        assert_eq!(
+            actual, expected,
+            "12 段の variant チェーンでも V02..V11 が両端 (M01, M15) を再帰解決し、\
+             メイン系統の中央 (M07..M09 付近) に補間されるべき。旧 `depth < 10` では \
+             V11 が next のみ解決されて M14 付近 (~14.8) に流される回帰が発生する"
         );
     }
 
