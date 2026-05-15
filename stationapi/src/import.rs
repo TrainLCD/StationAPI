@@ -2463,17 +2463,17 @@ async fn integrate_gtfs_trip_variations_to_types(
         let is_bidirectional = directions.len() > 1;
 
         // Naming rule:
-        // - 双方向ペア (同じ停留所集合, direction 0/1) → "<A> ⇔ <B>" (両端駅) ※「行」は付けない
-        // - 循環トリップ (始発 parent == 終点 parent) → "<headsign>行（<経由地>経由・循環）"
-        //   (経由地が取れなければ "<headsign>行 (循環)" にフォールバック)
-        // - それ以外で始発名と headsign が異なる → "<first_stop> → <headsign>行"
-        // - 始発名と headsign が同じ / どちらか欠落 → headsign があれば "<headsign>行"、
-        //   無ければ "<first_stop>" (始発名は行き先ではないので「行」は付けない)
+        // - 双方向ペア (同じ停留所集合, direction 0/1) → "<A> ⇔ <B>" (両端駅)
+        // - 循環トリップ (始発 parent == 終点 parent) → "<headsign>（<経由地>経由・循環）"
+        //   (経由地が取れなければ "<headsign> (循環)" にフォールバック)
+        // - それ以外で始発名と headsign が異なる → "<first_stop> → <headsign>"
+        // - 始発名と headsign が同じ / どちらか欠落 → headsign があれば "<headsign>"、
+        //   無ければ "<first_stop>"
         // - すべて欠落 → "shape <shape_id>" でフォールバック
         let loop_name = |label: &str| -> String {
             match via_for_rep.get(&rep_idx) {
-                Some(via) => format!("{}行（{}経由・循環）", label, via),
-                None => format!("{}行 (循環)", label),
+                Some(via) => format!("{}（{}経由・循環）", label, via),
+                None => format!("{} (循環)", label),
             }
         };
         // Roman counterpart: "<label> via <via> (Loop)" / "<label> (Loop)". When the via
@@ -2507,9 +2507,9 @@ async fn integrate_gtfs_trip_variations_to_types(
                 (true, _, Some(h)) => loop_name(h),
                 (true, Some(first), None) => loop_name(first),
                 (false, Some(first), Some(h)) if first != h => {
-                    format!("{} → {}行", first, h)
+                    format!("{} → {}", first, h)
                 }
-                (_, _, Some(h)) => format!("{}行", h),
+                (_, _, Some(h)) => h.to_string(),
                 (_, Some(first), None) => first.to_string(),
                 _ => format!("shape {}", v.shape_id),
             }
