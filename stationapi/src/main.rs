@@ -80,22 +80,42 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
         .expect("Failed to install Prometheus exporter");
     info!("Prometheus metrics server listening on {}", metrics_addr);
 
+    // Create schema first so that CSV and GTFS imports can run against existing tables.
+    if let Err(e) = import::create_schema().await {
+        return Err(anyhow::anyhow!("Failed to create schema: {}", e));
+    }
+
+    // Run GTFS import in parallel with CSV import.
+    // GTFS errors are non-fatal; server continues to serve CSV-only data.
+    // The error from import_gtfs is not Send, so stringify it before returning from the task.
+    let gtfs_handle = tokio::spawn(async {
+        info!("Starting GTFS import in background (parallel with CSV)...");
+        import::import_gtfs().await.map_err(|e| e.to_string())
+    });
+
     if let Err(e) = import::import_csv().await {
         return Err(anyhow::anyhow!("Failed to import CSV: {}", e));
     }
 
-    // GTFS import is now done in background after server starts
-    // This allows the server to pass health checks quickly
-    tokio::spawn(async {
-        info!("Starting GTFS import in background...");
-
-        // Import GTFS data (ToeiBus)
-        if let Err(e) = import::import_gtfs().await {
-            warn!(
-                "Failed to import GTFS data: {}. Continuing without GTFS data.",
-                e
-            );
-            return;
+    // After CSV completes, wait for GTFS in background and run integration.
+    // This task lives past server startup; health check passes as soon as CSV is done.
+    tokio::spawn(async move {
+        match gtfs_handle.await {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                warn!(
+                    "Failed to import GTFS data: {}. Continuing without GTFS data.",
+                    e
+                );
+                return;
+            }
+            Err(e) => {
+                warn!(
+                    "GTFS import task panicked: {}. Continuing without GTFS data.",
+                    e
+                );
+                return;
+            }
         }
 
         // Integrate GTFS data into stations/lines tables
