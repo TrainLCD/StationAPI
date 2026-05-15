@@ -38,13 +38,13 @@ type StopTimeBatchRow = (
     Option<i32>,
 );
 
-/// Import CSV data from the data directory
-pub async fn import_csv() -> Result<(), Box<dyn std::error::Error>> {
+/// Create required extensions and tables before running data imports.
+/// Must be called before `import_csv` and `import_gtfs` can run in parallel.
+pub async fn create_schema() -> Result<(), Box<dyn std::error::Error>> {
     let db_url = fetch_database_url();
     let mut conn = PgConnection::connect(&db_url).await?;
     let data_path = Path::new("data");
 
-    // Ensure required extensions exist before running schema import
     sqlx::query("CREATE EXTENSION IF NOT EXISTS pg_trgm")
         .execute(&mut conn)
         .await?;
@@ -60,6 +60,19 @@ pub async fn import_csv() -> Result<(), Box<dyn std::error::Error>> {
     })?;
     let create_sql: String = String::from_utf8_lossy(&create_sql_content).parse()?;
     sqlx::raw_sql(&create_sql).execute(&mut conn).await?;
+
+    info!("Schema creation completed.");
+
+    Ok(())
+}
+
+/// Import CSV data from the data directory.
+/// Requires `create_schema` to have been called beforehand.
+pub async fn import_csv() -> Result<(), Box<dyn std::error::Error>> {
+    let db_url = fetch_database_url();
+    let mut conn = PgConnection::connect(&db_url).await?;
+    let data_path = Path::new("data");
+
     let entries = fs::read_dir(data_path).map_err(|e| {
         tracing::error!("Failed to read data directory: {}", e);
         Box::new(e) as Box<dyn std::error::Error>
