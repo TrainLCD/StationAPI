@@ -8,6 +8,7 @@ on:
     paths:
       - ".sqlx/**"
       - "data/**"
+      - "docker/**"
       - "scripts/**"
       - "stationapi/**"
       - "Cargo.lock"
