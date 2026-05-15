@@ -100,8 +100,15 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     // After CSV completes, wait for GTFS in background and run integration.
     // This task lives past server startup; health check passes as soon as CSV is done.
     tokio::spawn(async move {
+        info!("[post-csv] awaiting GTFS import handle...");
+        let gtfs_wait_start = std::time::Instant::now();
         match gtfs_handle.await {
-            Ok(Ok(())) => {}
+            Ok(Ok(())) => {
+                info!(
+                    "[post-csv] GTFS import completed, waited {:?}",
+                    gtfs_wait_start.elapsed()
+                );
+            }
             Ok(Err(e)) => {
                 warn!(
                     "Failed to import GTFS data: {}. Continuing without GTFS data.",
@@ -120,6 +127,7 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
 
         // Integrate GTFS data into stations/lines tables
         // This is wrapped in a transaction - if any step fails, all changes are rolled back
+        info!("[post-csv] starting GTFS integration");
         if let Err(e) = import::integrate_gtfs_to_stations().await {
             tracing::error!(
                 "Failed to integrate GTFS to stations (transaction rolled back): {}",
