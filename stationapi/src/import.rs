@@ -2995,4 +2995,520 @@ mod tests {
         assert_eq!(parse_gtfs_time("01:02:03"), Some("01:02:03".to_string()));
         assert_eq!(parse_gtfs_time("00:00:01"), Some("00:00:01".to_string()));
     }
+
+    // ============================================================================
+    // build_stop_route_mapping regression tests
+    //
+    // 実 PostgreSQL を前提とした回帰テスト。`build_stop_route_mapping()` が
+    // 読み取る 3 テーブル (gtfs_trips / gtfs_stop_times / gtfs_stops) を
+    // 隔離スキーマに最小構成で再現し、出力マッピングを assert する。
+    //
+    // 既定では `#[ignore]` で除外され、`integration-tests` feature を付けたとき
+    // のみ実行される。ローカルでの実行例:
+    //
+    //     export TEST_DATABASE_URL=postgres://test:test@localhost/stationapi_test
+    //     cargo test -p stationapi --features integration-tests \
+    //         build_stop_route_mapping
+    //
+    // テストは並列実行可能。各テストが per-process カウンタとナノ秒タイムスタンプ
+    // から生成したユニークなスキーマ名を使うので、複数スレッドで衝突しない。
+    // パニックでテストが中断するとスキーマがクリーンアップされず残るが、
+    // スキーマ名がユニークなので後続実行には影響しない (テスト DB を作り直す
+    // 際にまとめて消えるので運用上問題ない)。
+    // ============================================================================
+
+    mod stop_route_mapping_fixtures {
+        use sqlx::{Connection, Executor, PgConnection};
+        use std::env;
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        static SCHEMA_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+        pub fn unique_schema_name() -> String {
+            let id = SCHEMA_COUNTER.fetch_add(1, Ordering::SeqCst);
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0);
+            format!("brsm_test_{nanos}_{id}")
+        }
+
+        pub async fn open_conn() -> PgConnection {
+            let database_url = env::var("TEST_DATABASE_URL")
+                .unwrap_or_else(|_| "postgres://test:test@localhost/stationapi_test".to_string());
+            PgConnection::connect(&database_url)
+                .await
+                .expect("Failed to connect to test database. Set TEST_DATABASE_URL.")
+        }
+
+        /// 隔離スキーマと最小 GTFS テーブルを作成し、search_path を切り替える。
+        /// 戻り値のスキーマ名は呼び出し側が `drop_schema` で破棄すること。
+        pub async fn setup_schema(conn: &mut PgConnection) -> String {
+            let schema = unique_schema_name();
+            conn.execute(format!("CREATE SCHEMA \"{schema}\"").as_str())
+                .await
+                .expect("create schema");
+            conn.execute(format!("SET search_path TO \"{schema}\"").as_str())
+                .await
+                .expect("set search_path");
+            conn.execute(
+                r#"
+                CREATE TABLE gtfs_stops (
+                    stop_id VARCHAR(255) PRIMARY KEY,
+                    stop_name TEXT NOT NULL DEFAULT '',
+                    stop_lat DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    stop_lon DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    parent_station VARCHAR(255)
+                );
+                CREATE TABLE gtfs_trips (
+                    trip_id VARCHAR(255) PRIMARY KEY,
+                    route_id VARCHAR(255) NOT NULL,
+                    service_id VARCHAR(255) NOT NULL DEFAULT 'svc',
+                    direction_id INTEGER,
+                    shape_id VARCHAR(255)
+                );
+                CREATE TABLE gtfs_stop_times (
+                    id SERIAL PRIMARY KEY,
+                    trip_id VARCHAR(255) NOT NULL REFERENCES gtfs_trips(trip_id),
+                    stop_id VARCHAR(255) NOT NULL REFERENCES gtfs_stops(stop_id),
+                    stop_sequence INTEGER NOT NULL,
+                    shape_dist_traveled DOUBLE PRECISION
+                );
+                "#,
+            )
+            .await
+            .expect("create gtfs tables");
+            schema
+        }
+
+        pub async fn drop_schema(conn: &mut PgConnection, schema: &str) {
+            let _ = conn.execute("RESET search_path").await;
+            let _ = conn
+                .execute(format!("DROP SCHEMA \"{schema}\" CASCADE").as_str())
+                .await;
+        }
+
+        pub async fn insert_stop(conn: &mut PgConnection, stop_id: &str) {
+            sqlx::query("INSERT INTO gtfs_stops (stop_id, parent_station) VALUES ($1, NULL)")
+                .bind(stop_id)
+                .execute(&mut *conn)
+                .await
+                .expect("insert stop");
+        }
+
+        pub async fn insert_pole(conn: &mut PgConnection, stop_id: &str, parent_station: &str) {
+            sqlx::query("INSERT INTO gtfs_stops (stop_id, parent_station) VALUES ($1, $2)")
+                .bind(stop_id)
+                .bind(parent_station)
+                .execute(&mut *conn)
+                .await
+                .expect("insert pole");
+        }
+
+        /// trip と対応する stop_times を一括投入する。`stops` の要素は
+        /// `(stop_id, shape_dist_traveled)` で、`stop_sequence` は要素順に
+        /// 1 から自動採番される。
+        pub async fn insert_trip_with_stops(
+            conn: &mut PgConnection,
+            trip_id: &str,
+            route_id: &str,
+            direction_id: Option<i32>,
+            shape_id: Option<&str>,
+            stops: &[(&str, Option<f64>)],
+        ) {
+            sqlx::query(
+                "INSERT INTO gtfs_trips (trip_id, route_id, direction_id, shape_id) \
+                 VALUES ($1, $2, $3, $4)",
+            )
+            .bind(trip_id)
+            .bind(route_id)
+            .bind(direction_id)
+            .bind(shape_id)
+            .execute(&mut *conn)
+            .await
+            .expect("insert trip");
+            for (idx, (stop_id, dist)) in stops.iter().enumerate() {
+                sqlx::query(
+                    "INSERT INTO gtfs_stop_times \
+                       (trip_id, stop_id, stop_sequence, shape_dist_traveled) \
+                     VALUES ($1, $2, $3, $4)",
+                )
+                .bind(trip_id)
+                .bind(*stop_id)
+                .bind((idx as i32) + 1)
+                .bind(*dist)
+                .execute(&mut *conn)
+                .await
+                .expect("insert stop_time");
+            }
+        }
+    }
+
+    /// マッピングから特定の route_id について `(parent_stop_id, seq)` を
+    /// `seq` 昇順で抜き出すヘルパ。
+    fn collect_route(
+        mapping: &HashMap<String, Vec<(String, i32)>>,
+        route_id: &str,
+    ) -> Vec<(String, i32)> {
+        let mut out: Vec<(String, i32)> = mapping
+            .iter()
+            .filter_map(|(stop, entries)| {
+                entries
+                    .iter()
+                    .find(|(r, _)| r == route_id)
+                    .map(|(_, seq)| (stop.clone(), *seq))
+            })
+            .collect();
+        out.sort_by_key(|(_, seq)| *seq);
+        out
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_build_stop_route_mapping_ike86_canonical_shape() {
+        // 池86 風シナリオ: 同一 route_id に複数 shape_id があり、最多停留所の
+        // shape は direction_id=NULL、唯一の direction_id=0 trip は短縮便。
+        // canonical_shape は stops 数を最優先するので shape_full が選ばれ、
+        // main_trip も trip_full になるべき。
+        // (PR #1515 で導入された挙動の lock-in テスト。)
+        let mut conn = stop_route_mapping_fixtures::open_conn().await;
+        let schema = stop_route_mapping_fixtures::setup_schema(&mut conn).await;
+        for s in ["S01", "S02", "S03", "S04", "S05"] {
+            stop_route_mapping_fixtures::insert_stop(&mut conn, s).await;
+        }
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_full",
+            "IKE86",
+            None,
+            Some("shape_full"),
+            &[
+                ("S01", Some(0.0)),
+                ("S02", Some(100.0)),
+                ("S03", Some(200.0)),
+                ("S04", Some(300.0)),
+                ("S05", Some(400.0)),
+            ],
+        )
+        .await;
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_short",
+            "IKE86",
+            Some(0),
+            Some("shape_short"),
+            &[("S01", Some(0.0)), ("S02", Some(50.0))],
+        )
+        .await;
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_inbound",
+            "IKE86",
+            Some(1),
+            Some("shape_in"),
+            &[
+                ("S05", Some(0.0)),
+                ("S04", Some(100.0)),
+                ("S03", Some(200.0)),
+                ("S02", Some(300.0)),
+                ("S01", Some(400.0)),
+            ],
+        )
+        .await;
+
+        let mapping = build_stop_route_mapping(&mut conn).await.unwrap();
+        let actual = collect_route(&mapping, "IKE86");
+        stop_route_mapping_fixtures::drop_schema(&mut conn, &schema).await;
+
+        assert_eq!(
+            actual,
+            vec![
+                ("S01".to_string(), 1),
+                ("S02".to_string(), 2),
+                ("S03".to_string(), 3),
+                ("S04".to_string(), 4),
+                ("S05".to_string(), 5),
+            ],
+            "canonical_shape は stop 数最多の shape_full を選び、\
+             main_trip もそこから取られるべき"
+        );
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_build_stop_route_mapping_canonical_shape_direction_tiebreak() {
+        // stops 数と shape_dist_traveled が並ぶ場合、canonical_shape の
+        // タイブレークで direction_id=0 が NULL/1 に勝つことを確認する。
+        // shape_a は逆順、shape_b は順方向。canonical=shape_b になれば
+        // 結果は順方向になる。
+        let mut conn = stop_route_mapping_fixtures::open_conn().await;
+        let schema = stop_route_mapping_fixtures::setup_schema(&mut conn).await;
+        for s in ["S01", "S02", "S03"] {
+            stop_route_mapping_fixtures::insert_stop(&mut conn, s).await;
+        }
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_a",
+            "R1",
+            None,
+            Some("shape_a"),
+            &[
+                ("S03", Some(0.0)),
+                ("S02", Some(100.0)),
+                ("S01", Some(200.0)),
+            ],
+        )
+        .await;
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_b",
+            "R1",
+            Some(0),
+            Some("shape_b"),
+            &[
+                ("S01", Some(0.0)),
+                ("S02", Some(100.0)),
+                ("S03", Some(200.0)),
+            ],
+        )
+        .await;
+
+        let mapping = build_stop_route_mapping(&mut conn).await.unwrap();
+        let actual = collect_route(&mapping, "R1");
+        stop_route_mapping_fixtures::drop_schema(&mut conn, &schema).await;
+
+        assert_eq!(
+            actual,
+            vec![
+                ("S01".to_string(), 1),
+                ("S02".to_string(), 2),
+                ("S03".to_string(), 3),
+            ],
+            "direction_id=0 の shape_b が canonical に選ばれ、順方向順序になるべき"
+        );
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_build_stop_route_mapping_main_trip_prefers_direction_zero() {
+        // canonical_shape を共有する 2 つの trip があるとき、main_trip は
+        // direction_id=0 のものが選ばれる。逆方向の trip_dir1 と順方向の
+        // trip_dir0 を同じ shape_main に乗せ、結果が順方向になることを確認。
+        let mut conn = stop_route_mapping_fixtures::open_conn().await;
+        let schema = stop_route_mapping_fixtures::setup_schema(&mut conn).await;
+        for s in ["S01", "S02", "S03", "S04"] {
+            stop_route_mapping_fixtures::insert_stop(&mut conn, s).await;
+        }
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_dir1",
+            "R2",
+            Some(1),
+            Some("shape_main"),
+            &[
+                ("S04", Some(0.0)),
+                ("S03", Some(100.0)),
+                ("S02", Some(200.0)),
+                ("S01", Some(300.0)),
+            ],
+        )
+        .await;
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_dir0",
+            "R2",
+            Some(0),
+            Some("shape_main"),
+            &[
+                ("S01", Some(0.0)),
+                ("S02", Some(100.0)),
+                ("S03", Some(200.0)),
+                ("S04", Some(300.0)),
+            ],
+        )
+        .await;
+
+        let mapping = build_stop_route_mapping(&mut conn).await.unwrap();
+        let actual = collect_route(&mapping, "R2");
+        stop_route_mapping_fixtures::drop_schema(&mut conn, &schema).await;
+
+        assert_eq!(
+            actual,
+            vec![
+                ("S01".to_string(), 1),
+                ("S02".to_string(), 2),
+                ("S03".to_string(), 3),
+                ("S04".to_string(), 4),
+            ],
+            "main_trip は direction_id=0 の trip_dir0 を選び、結果は順方向になるべき"
+        );
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_build_stop_route_mapping_variant_chain_recursive_interpolation() {
+        // メイン系統に乗らない停留所が連鎖する場合、再帰 CTE で両端を解決して
+        // 中央付近の位置に補間できることを確認する。
+        //
+        // main_trip: M1, M2, M3, M4, M5            (seq 1..5)
+        // variant : M1, V1, V2, V3, M5
+        //   - V1: prev=M1(main), next=V2(variant)  → direct prev: 1 + 0.5 = 1.5
+        //   - V2: prev=V1(variant), next=V3(variant) → 再帰両端: (1+5)/2 = 3.0
+        //   - V3: prev=V2(variant), next=M5(main)  → direct next: 5 - 0.5 = 4.5
+        //
+        // 番号付け後 (ORDER BY seq, parent_stop_id):
+        //   M1=1, V1=2, M2=3, M3=4 ("M3" < "V2" の辞書順タイブレーク),
+        //   V2=5, M4=6, V3=7, M5=8
+        let mut conn = stop_route_mapping_fixtures::open_conn().await;
+        let schema = stop_route_mapping_fixtures::setup_schema(&mut conn).await;
+        for s in ["M1", "M2", "M3", "M4", "M5", "V1", "V2", "V3"] {
+            stop_route_mapping_fixtures::insert_stop(&mut conn, s).await;
+        }
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_main",
+            "R3",
+            Some(0),
+            Some("shape_main"),
+            &[
+                ("M1", Some(0.0)),
+                ("M2", Some(100.0)),
+                ("M3", Some(200.0)),
+                ("M4", Some(300.0)),
+                ("M5", Some(400.0)),
+            ],
+        )
+        .await;
+        // shape_variant の max_dist は shape_main (400) より低くしておく。
+        // 両 shape は同じ 5 停留所 だが MAX(shape_dist_traveled) が高い方が
+        // canonical_shape のタイブレークで勝つため、ここで意図的に
+        // shape_main を canonical にする。
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_variant",
+            "R3",
+            Some(0),
+            Some("shape_variant"),
+            &[
+                ("M1", Some(0.0)),
+                ("V1", Some(50.0)),
+                ("V2", Some(150.0)),
+                ("V3", Some(250.0)),
+                ("M5", Some(350.0)),
+            ],
+        )
+        .await;
+
+        let mapping = build_stop_route_mapping(&mut conn).await.unwrap();
+        let actual = collect_route(&mapping, "R3");
+        stop_route_mapping_fixtures::drop_schema(&mut conn, &schema).await;
+
+        assert_eq!(
+            actual,
+            vec![
+                ("M1".to_string(), 1),
+                ("V1".to_string(), 2),
+                ("M2".to_string(), 3),
+                ("M3".to_string(), 4),
+                ("V2".to_string(), 5),
+                ("M4".to_string(), 6),
+                ("V3".to_string(), 7),
+                ("M5".to_string(), 8),
+            ],
+            "V2 は再帰 CTE で両端 (M1, M5) を解決し、中央付近に挿入されるべき"
+        );
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_build_stop_route_mapping_null_shape_dist_traveled() {
+        // shape_dist_traveled が全行 NULL でも canonical/main の選択ロジックが
+        // フォールバックして動作することを確認する。stops 数で shape_long が
+        // canonical に選ばれ、その停留所順がそのまま結果になる。
+        let mut conn = stop_route_mapping_fixtures::open_conn().await;
+        let schema = stop_route_mapping_fixtures::setup_schema(&mut conn).await;
+        for s in ["S01", "S02", "S03", "S04"] {
+            stop_route_mapping_fixtures::insert_stop(&mut conn, s).await;
+        }
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_short",
+            "R4",
+            Some(0),
+            Some("shape_short"),
+            &[("S01", None), ("S02", None), ("S03", None)],
+        )
+        .await;
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_long",
+            "R4",
+            Some(0),
+            Some("shape_long"),
+            &[("S01", None), ("S02", None), ("S03", None), ("S04", None)],
+        )
+        .await;
+
+        let mapping = build_stop_route_mapping(&mut conn).await.unwrap();
+        let actual = collect_route(&mapping, "R4");
+        stop_route_mapping_fixtures::drop_schema(&mut conn, &schema).await;
+
+        assert_eq!(
+            actual,
+            vec![
+                ("S01".to_string(), 1),
+                ("S02".to_string(), 2),
+                ("S03".to_string(), 3),
+                ("S04".to_string(), 4),
+            ],
+            "shape_dist_traveled が NULL でも stops 数で shape_long が \
+             canonical に選ばれ、その順序が返るべき"
+        );
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_build_stop_route_mapping_parent_station_grouping() {
+        // 同一物理停留所の複数ポール (parent_station 経由) は
+        // `COALESCE(parent_station, stop_id)` で集約され、結果のキーは
+        // 親停留所 ID になることを確認する。
+        // P1, P2 が物理停留所。各 trip は別ポールを使うが、結果上は P1, P2
+        // として 1 レコードずつになる。
+        let mut conn = stop_route_mapping_fixtures::open_conn().await;
+        let schema = stop_route_mapping_fixtures::setup_schema(&mut conn).await;
+        stop_route_mapping_fixtures::insert_stop(&mut conn, "P1").await;
+        stop_route_mapping_fixtures::insert_stop(&mut conn, "P2").await;
+        stop_route_mapping_fixtures::insert_pole(&mut conn, "P1_a", "P1").await;
+        stop_route_mapping_fixtures::insert_pole(&mut conn, "P1_b", "P1").await;
+        stop_route_mapping_fixtures::insert_pole(&mut conn, "P2_a", "P2").await;
+        stop_route_mapping_fixtures::insert_pole(&mut conn, "P2_b", "P2").await;
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_ab",
+            "R5",
+            Some(0),
+            Some("shape_ab"),
+            &[("P1_a", Some(0.0)), ("P2_a", Some(100.0))],
+        )
+        .await;
+        stop_route_mapping_fixtures::insert_trip_with_stops(
+            &mut conn,
+            "trip_ba",
+            "R5",
+            Some(1),
+            Some("shape_ba"),
+            &[("P2_b", Some(0.0)), ("P1_b", Some(100.0))],
+        )
+        .await;
+
+        let mapping = build_stop_route_mapping(&mut conn).await.unwrap();
+        let actual = collect_route(&mapping, "R5");
+        stop_route_mapping_fixtures::drop_schema(&mut conn, &schema).await;
+
+        assert_eq!(
+            actual,
+            vec![("P1".to_string(), 1), ("P2".to_string(), 2)],
+            "結果は親停留所 ID (P1, P2) で集約され、ポール ID は混入しないべき"
+        );
+    }
 }
