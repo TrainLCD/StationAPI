@@ -1385,6 +1385,25 @@ fn generate_bus_station_g_cd(stop_id: &str) -> i32 {
     200_000_000 + (hash % 100_000_000) as i32
 }
 
+/// Generate deterministic type_cd from (route_id, shape_id).
+/// Uses range starting at 100,000,000 to avoid conflicts with existing rail types.
+fn generate_bus_type_cd(route_id: &str, shape_id: &str) -> i32 {
+    let combined = format!("type-{}-{}", route_id, shape_id);
+    let hash = fnv1a_hash(combined.as_bytes());
+    100_000_000 + (hash % 100_000_000) as i32
+}
+
+/// Generate deterministic line_group_cd from (route_id, shape_id).
+/// Uses range starting at 100,000,000 to avoid conflicts with existing rail line groups.
+fn generate_bus_line_group_cd(route_id: &str, shape_id: &str) -> i32 {
+    let combined = format!("lg-{}-{}", route_id, shape_id);
+    let hash = fnv1a_hash(combined.as_bytes());
+    100_000_000 + (hash % 100_000_000) as i32
+}
+
+/// `types.kind` value for bus route variations. Matches `proto::TrainTypeKind::BusRoute`.
+const BUS_ROUTE_KIND: i32 = 7;
+
 /// Row type for reading gtfs_routes
 #[derive(sqlx::FromRow)]
 struct GtfsRouteRow {
@@ -1472,14 +1491,26 @@ pub async fn integrate_gtfs_to_stations() -> Result<(), Box<dyn std::error::Erro
     // Begin transaction - all changes will be rolled back if any step fails
     let mut tx = conn.begin().await?;
 
-    // Step 1: Clear existing bus data from stations/lines
+    // Step 1: Clear existing bus data from stations/lines/types/sst.
+    // station_station_types references both types (FK) and stations (FK), so delete
+    // bus sst rows before bus types and before stations.
+    sqlx::query(
+        "DELETE FROM station_station_types WHERE type_cd IN (SELECT type_cd FROM types WHERE kind = $1)",
+    )
+    .bind(BUS_ROUTE_KIND)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query("DELETE FROM types WHERE kind = $1")
+        .bind(BUS_ROUTE_KIND)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM stations WHERE transport_type = 1")
         .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM lines WHERE transport_type = 1")
         .execute(&mut *tx)
         .await?;
-    info!("Cleared existing bus data from stations/lines tables.");
+    info!("Cleared existing bus data from stations/lines/types/station_station_types tables.");
 
     // Step 2: Insert bus routes as lines
     integrate_gtfs_routes_to_lines(&mut tx).await?;
@@ -1492,6 +1523,11 @@ pub async fn integrate_gtfs_to_stations() -> Result<(), Box<dyn std::error::Erro
 
     // Step 5: Update cross-references in GTFS tables
     update_gtfs_crossreferences(&mut tx, &stop_route_map).await?;
+
+    // Step 6: Register each (route_id, shape_id) trip variation as a TrainType
+    // (kind=BusRoute) so clients can switch between bus operation patterns
+    // (e.g. 池86 のフルループ / サンシャインシティ経由 / 短ターン).
+    integrate_gtfs_trip_variations_to_types(&mut tx).await?;
 
     // Commit the transaction - all changes are now permanent
     // ANALYZE is run separately in main.rs after all GTFS imports complete
@@ -1564,12 +1600,27 @@ async fn integrate_gtfs_routes_to_lines(
 ///
 /// # Ordering Strategy
 ///
-/// ## 1. Main trip sequence
-/// - Select the trip with most stops as "main trip" (prefer direction_id=0)
-/// - Use stop_sequence from main trip directly
+/// ## 1. Main trip selection
+/// Pick one representative trip per route. The selection prefers:
+///
+/// 1. Trips whose `shape_id` matches the route's canonical shape, where the
+///    canonical shape is the one covering the most unique stops (with longest
+///    `MAX(shape_dist_traveled)` and `direction_id=0` as tiebreakers). This
+///    avoids picking a short-turn variant when the full route only exists on
+///    trips with `direction_id` NULL — as is the case for 池86, whose full
+///    loop is recorded with `direction_id` empty while the only `direction_id=0`
+///    trip is a 13-stop short turn (新宿伊勢丹前→池袋駅東口).
+/// 2. `direction_id = 0` (then NULL, then 1)
+/// 3. Most unique stops
+/// 4. Longest `MAX(shape_dist_traveled)`
+/// 5. `trip_id` for a deterministic tiebreak
+///
+/// The main trip's `stop_sequence` is strictly monotonic within that trip, so
+/// stops on it inherit a reliable canonical order without having to compare
+/// `shape_dist_traveled` across trips on different shapes.
 ///
 /// ## 2. Variant stop estimation
-/// For stops only on variant trips:
+/// For stops only on variant trips (not on the main trip):
 /// - Use LAG/LEAD to find neighboring stops on the variant trip
 /// - Look up neighbors' positions on the main trip
 /// - Interpolate position based on neighbor positions
@@ -1579,13 +1630,53 @@ async fn build_stop_route_mapping(
     conn: &mut PgConnection,
 ) -> Result<HashMap<String, Vec<(String, i32)>>, Box<dyn std::error::Error>> {
     // Strategy:
-    // 1. Find the "main" trip for each route (most stops, prefer direction_id=0)
-    // 2. Use stop_sequence from main trip for stops on it
-    // 3. For variant-only stops, use LAG/LEAD to find neighbors, then look up their
-    //    main trip positions to estimate where the variant stop should go
+    // 1. Compute a canonical shape_id per route: the shape covering the most unique
+    //    stops, with longest shape_dist_traveled and direction_id=0 as tiebreakers.
+    //    Length comes first because some routes (e.g. 池86) record their full route
+    //    only under direction_id NULL while a short-turn variant is the sole
+    //    direction_id=0 trip — preferring direction_id=0 first would pin the main
+    //    trip to that 13-stop short turn and push the full-route stops (渋谷駅東口,
+    //    宮下公園, etc.) into the variant-interpolation path.
+    // 2. Pick a main trip per route, preferring trips on the canonical shape, then
+    //    direction_id=0 / most stops / longest distance. Its stop_sequence is the
+    //    canonical order. This avoids the earlier attempt's bug where
+    //    shape_dist_traveled was compared across trips with different shape_ids
+    //    (short-turn / branching shapes restart dist at 0, so comparing them
+    //    pulled mid-route stops to the front of multi-variant routes like 池86).
+    // 3. Variant-only stops (on trips with a different shape) are interpolated
+    //    against the main trip via LAG/LEAD neighbor lookup.
     let rows: Vec<(String, String, i32)> = sqlx::query_as(
-        r#"WITH RECURSIVE main_trips AS (
-               -- Find the trip with the most stops for each route (prefer direction_id=0)
+        r#"WITH RECURSIVE canonical_shape AS (
+               -- Pick one canonical shape_id per route. Used purely to bias main trip
+               -- selection: a trip on the canonical shape is preferred over a trip
+               -- with the same stop count on some short-turn / branching shape.
+               -- Prefer the shape with the most unique stops, then longest physical
+               -- distance, then direction_id=0 (then NULL, then 1), then shape_id for
+               -- a deterministic tiebreak. Stop count comes before direction because
+               -- e.g. 池86 records its full loop only under direction_id NULL while
+               -- the sole direction_id=0 trip is a 13-stop short turn.
+               SELECT DISTINCT ON (gt.route_id)
+                   gt.route_id,
+                   gt.shape_id
+               FROM gtfs_trips gt
+               JOIN gtfs_stop_times gst ON gt.trip_id = gst.trip_id
+               WHERE gt.shape_id IS NOT NULL
+               GROUP BY gt.route_id, gt.shape_id, gt.direction_id
+               ORDER BY gt.route_id,
+                        COUNT(DISTINCT gst.stop_id) DESC,
+                        MAX(gst.shape_dist_traveled) DESC NULLS LAST,
+                        CASE WHEN gt.direction_id = 0 THEN 0
+                             WHEN gt.direction_id IS NULL THEN 1
+                             ELSE 2 END,
+                        gt.shape_id
+           ),
+           main_trips AS (
+               -- One representative trip per route. Prefer a trip on the canonical
+               -- shape, then direction_id=0, then most unique stops, then longest
+               -- shape distance, then trip_id for determinism. The trip's
+               -- stop_sequence is strictly monotonic, so it produces a reliable
+               -- canonical order for every stop on it without cross-shape
+               -- comparison hazards. Variant-only stops are interpolated below.
                SELECT DISTINCT ON (gt.route_id)
                    gt.route_id,
                    gt.trip_id,
@@ -1593,10 +1684,16 @@ async fn build_stop_route_mapping(
                    COUNT(*) as stop_count
                FROM gtfs_trips gt
                JOIN gtfs_stop_times gst ON gt.trip_id = gst.trip_id
-               GROUP BY gt.route_id, gt.trip_id, gt.direction_id
+               LEFT JOIN canonical_shape cs
+                   ON cs.route_id = gt.route_id AND cs.shape_id = gt.shape_id
+               GROUP BY gt.route_id, gt.trip_id, gt.direction_id, cs.shape_id
                ORDER BY gt.route_id,
+                        CASE WHEN cs.shape_id IS NOT NULL THEN 0 ELSE 1 END,
                         CASE WHEN gt.direction_id = 0 THEN 0 ELSE 1 END,
-                        COUNT(*) DESC
+                        COUNT(DISTINCT gst.stop_id) DESC,
+                        MAX(gst.shape_dist_traveled) DESC NULLS LAST,
+                        COUNT(*) DESC,
+                        gt.trip_id
            ),
            main_trip_stops AS (
                -- Get stops from main trips with their sequence
@@ -1852,8 +1949,7 @@ async fn build_stop_route_mapping(
                    ROW_NUMBER() OVER (PARTITION BY route_id ORDER BY seq, parent_stop_id)::INT as stop_sequence
                FROM unique_stops
            )
-           SELECT parent_stop_id, route_id, stop_sequence
-           FROM numbered
+           SELECT parent_stop_id, route_id, stop_sequence FROM numbered
            ORDER BY route_id, stop_sequence"#,
     )
     .fetch_all(&mut *conn)
@@ -1969,6 +2065,562 @@ async fn update_gtfs_crossreferences(
     Ok(())
 }
 
+/// Register each (route_id, shape_id) trip variation as a TrainType row
+/// (`types.kind = BUS_ROUTE_KIND`) plus its stops in `station_station_types`.
+///
+/// One shape == one operational pattern of the bus line (e.g. for 池86: フルループ /
+/// サンシャインシティ経由 / 新宿伊勢丹前止まりの短ターン). Clients can use the
+/// resulting TrainTypes to switch between these patterns the same way a rail line
+/// switches between のぞみ / ひかり / こだま.
+///
+/// `station_station_types` rows are inserted in `stop_sequence` order so that the
+/// SERIAL `id` column preserves the trip ordering when read back via the
+/// `ORDER BY sst.id` query path used by the rail TrainType code.
+async fn integrate_gtfs_trip_variations_to_types(
+    conn: &mut PgConnection,
+) -> Result<(), Box<dyn std::error::Error>> {
+    #[derive(sqlx::FromRow)]
+    struct VariationRow {
+        route_id: String,
+        shape_id: String,
+        representative_trip_id: String,
+        direction_id: Option<i32>,
+        trip_headsign: Option<String>,
+        route_short_name: Option<String>,
+        route_long_name: Option<String>,
+        // English/romanized fallback for route_long_name (used when the trip has no
+        // headsign and we fall back to the long route name for the JA type_name).
+        route_long_name_r: Option<String>,
+        route_color: Option<String>,
+        stop_count: i64,
+        first_stop_name: Option<String>,
+        first_stop_name_r: Option<String>,
+        // Last stop's name (JA + roman). The JA value lets us check whether the
+        // headsign maps to the trip's terminal stop so we can borrow that stop's
+        // romanized name as the headsign roman.
+        last_stop_name: Option<String>,
+        last_stop_name_r: Option<String>,
+        is_loop: Option<bool>,
+        // Sorted, '|'-joined list of distinct parent_stop_ids that this shape visits.
+        // Shapes that share the same `stop_set_key` cover the exact same physical
+        // stops — typically the up/down directions of the same physical route.
+        // We collapse them into a single TrainType with `direction = Both`.
+        stop_set_key: Option<String>,
+    }
+
+    // One representative trip per (route_id, shape_id). Pick by trip_id for determinism.
+    // stop_count is the representative trip's stop_times count; ordering variations by it
+    // (DESC) lets the longer / more comprehensive shapes get the un-suffixed name when we
+    // disambiguate duplicate trip_headsigns.
+    //
+    // first_stop_name / is_loop are used by the type_name builder below to distinguish
+    // multiple shapes that share the same trip_headsign — e.g. 池86 has 3 shapes whose
+    // headsign is "池袋駅東口" (full loop, short-turn from 新宿伊勢丹前, サンシャインシティ
+    // 発の延伸) — by prefixing with the starting stop or marking circular trips.
+    //
+    // stop_set_key is used to detect "same stops, different direction" shape pairs
+    // (e.g. shape A: 池袋→新宿伊勢丹前 and shape B: 新宿伊勢丹前→池袋 visit the same
+    // 13 stops) and fold them into one TrainType marked as bidirectional.
+    let variations: Vec<VariationRow> = sqlx::query_as(
+        r#"WITH per_variation AS (
+               SELECT DISTINCT ON (gt.route_id, gt.shape_id)
+                   gt.route_id,
+                   gt.shape_id,
+                   gt.trip_id AS representative_trip_id,
+                   gt.direction_id,
+                   gt.trip_headsign
+               FROM gtfs_trips gt
+               WHERE gt.shape_id IS NOT NULL
+               ORDER BY gt.route_id, gt.shape_id, gt.trip_id
+           ),
+           endpoints AS (
+               SELECT
+                   pv.representative_trip_id,
+                   (SELECT COALESCE(gs.parent_station, gs.stop_id)
+                      FROM gtfs_stop_times gst
+                      JOIN gtfs_stops gs ON gs.stop_id = gst.stop_id
+                     WHERE gst.trip_id = pv.representative_trip_id
+                     ORDER BY gst.stop_sequence ASC LIMIT 1) AS first_parent_id,
+                   (SELECT gs.stop_name
+                      FROM gtfs_stop_times gst
+                      JOIN gtfs_stops gs ON gs.stop_id = gst.stop_id
+                     WHERE gst.trip_id = pv.representative_trip_id
+                     ORDER BY gst.stop_sequence ASC LIMIT 1) AS first_stop_name,
+                   (SELECT gs.stop_name_r
+                      FROM gtfs_stop_times gst
+                      JOIN gtfs_stops gs ON gs.stop_id = gst.stop_id
+                     WHERE gst.trip_id = pv.representative_trip_id
+                     ORDER BY gst.stop_sequence ASC LIMIT 1) AS first_stop_name_r,
+                   (SELECT COALESCE(gs.parent_station, gs.stop_id)
+                      FROM gtfs_stop_times gst
+                      JOIN gtfs_stops gs ON gs.stop_id = gst.stop_id
+                     WHERE gst.trip_id = pv.representative_trip_id
+                     ORDER BY gst.stop_sequence DESC LIMIT 1) AS last_parent_id,
+                   (SELECT gs.stop_name
+                      FROM gtfs_stop_times gst
+                      JOIN gtfs_stops gs ON gs.stop_id = gst.stop_id
+                     WHERE gst.trip_id = pv.representative_trip_id
+                     ORDER BY gst.stop_sequence DESC LIMIT 1) AS last_stop_name,
+                   (SELECT gs.stop_name_r
+                      FROM gtfs_stop_times gst
+                      JOIN gtfs_stops gs ON gs.stop_id = gst.stop_id
+                     WHERE gst.trip_id = pv.representative_trip_id
+                     ORDER BY gst.stop_sequence DESC LIMIT 1) AS last_stop_name_r,
+                   (SELECT string_agg(parent_id, '|' ORDER BY parent_id)
+                      FROM (
+                          SELECT DISTINCT COALESCE(gs.parent_station, gs.stop_id) AS parent_id
+                            FROM gtfs_stop_times gst
+                            JOIN gtfs_stops gs ON gs.stop_id = gst.stop_id
+                           WHERE gst.trip_id = pv.representative_trip_id
+                      ) s) AS stop_set_key
+               FROM per_variation pv
+           )
+           SELECT
+               pv.route_id,
+               pv.shape_id,
+               pv.representative_trip_id,
+               pv.direction_id,
+               pv.trip_headsign,
+               gr.route_short_name,
+               gr.route_long_name,
+               gr.route_long_name_r,
+               gr.route_color,
+               (SELECT COUNT(*) FROM gtfs_stop_times gst
+                 WHERE gst.trip_id = pv.representative_trip_id)::bigint AS stop_count,
+               ep.first_stop_name,
+               ep.first_stop_name_r,
+               ep.last_stop_name,
+               ep.last_stop_name_r,
+               (ep.first_parent_id IS NOT NULL
+                 AND ep.first_parent_id = ep.last_parent_id) AS is_loop,
+               ep.stop_set_key
+           FROM per_variation pv
+           JOIN gtfs_routes gr ON gr.route_id = pv.route_id
+           LEFT JOIN endpoints ep ON ep.representative_trip_id = pv.representative_trip_id
+           ORDER BY pv.route_id, stop_count DESC, pv.shape_id"#,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+
+    info!(
+        "Found {} bus trip variations (pre-dedup).",
+        variations.len()
+    );
+
+    // Fold variations that visit the exact same set of parent stops within the same
+    // route. Such shapes typically correspond to the up/down directions of the same
+    // physical route (e.g. 池86: shape 20003-1 池袋→新宿伊勢丹前 と shape 20003-2
+    // 新宿伊勢丹前→池袋 は同じ 13 停留所を逆順で走る) — clients should see one
+    // TrainType marked as bidirectional rather than two near-duplicates.
+    //
+    // The SQL already orders variations by `stop_count DESC`, so within each group the
+    // first occurrence is the canonical representative; later ones contribute only
+    // their direction_id and are otherwise discarded.
+    let mut group_of: HashMap<(String, String), usize> = HashMap::new();
+    let mut grouped_directions: Vec<Vec<Option<i32>>> = Vec::with_capacity(variations.len());
+    let mut representatives: Vec<&VariationRow> = Vec::with_capacity(variations.len());
+    for v in &variations {
+        // Fall back to a key based on shape_id when stop_set_key is missing, so a row
+        // without any stop_times still gets a unique slot.
+        let key = (
+            v.route_id.clone(),
+            v.stop_set_key
+                .clone()
+                .unwrap_or_else(|| format!("__shape:{}", v.shape_id)),
+        );
+        match group_of.get(&key) {
+            Some(&idx) => grouped_directions[idx].push(v.direction_id),
+            None => {
+                group_of.insert(key, representatives.len());
+                grouped_directions.push(vec![v.direction_id]);
+                representatives.push(v);
+            }
+        }
+    }
+
+    info!(
+        "Folded into {} unique TrainTypes (same-stop / opposite-direction pairs merged).",
+        representatives.len()
+    );
+
+    // For circular trips, compute a "経由地" (via stop) so the type_name can show
+    // *what makes this loop distinct*, not just its start/end (which is the same
+    // for a loop and matches the headsign). We prefer a stop that other same-headsign
+    // loop variations in the route do NOT visit; if there is no sibling shape (or no
+    // unique stop), we fall back to the stop at the trip's midpoint.
+    let loop_trip_ids: Vec<String> = representatives
+        .iter()
+        .filter(|v| v.is_loop.unwrap_or(false))
+        .map(|v| v.representative_trip_id.clone())
+        .collect();
+
+    // trip_id -> ordered (parent_id, stop_name, stop_name_r) for that trip, deduped by parent
+    // (first stop_sequence wins, so a loop's terminal duplicate is dropped). stop_name_r is
+    // carried through so the romanized type_name can borrow the via stop's English label.
+    let stops_per_loop_trip: HashMap<String, Vec<(String, String, Option<String>)>> =
+        if loop_trip_ids.is_empty() {
+            HashMap::new()
+        } else {
+            let rows: Vec<(String, String, String, Option<String>, i32)> = sqlx::query_as(
+                r#"SELECT DISTINCT ON (gst.trip_id, COALESCE(gs.parent_station, gs.stop_id))
+                       gst.trip_id,
+                       COALESCE(gs.parent_station, gs.stop_id) AS parent_stop_id,
+                       gs.stop_name,
+                       gs.stop_name_r,
+                       gst.stop_sequence
+                   FROM gtfs_stop_times gst
+                   JOIN gtfs_stops gs ON gst.stop_id = gs.stop_id
+                   WHERE gst.trip_id = ANY($1)
+                   ORDER BY gst.trip_id, COALESCE(gs.parent_station, gs.stop_id), gst.stop_sequence"#,
+            )
+            .bind(&loop_trip_ids)
+            .fetch_all(&mut *conn)
+            .await?;
+
+            // (parent_id, stop_name, stop_name_r, stop_sequence) tuples bucketed by trip_id.
+            type StopRow = (String, String, Option<String>, i32);
+            let mut buckets: HashMap<String, Vec<StopRow>> = HashMap::new();
+            for (trip_id, parent_id, stop_name, stop_name_r, seq) in rows {
+                buckets
+                    .entry(trip_id)
+                    .or_default()
+                    .push((parent_id, stop_name, stop_name_r, seq));
+            }
+            buckets
+                .into_iter()
+                .map(|(trip_id, mut stops)| {
+                    stops.sort_by_key(|(_, _, _, seq)| *seq);
+                    (
+                        trip_id,
+                        stops
+                            .into_iter()
+                            .map(|(p, n, nr, _)| (p, n, nr))
+                            .collect::<Vec<_>>(),
+                    )
+                })
+                .collect()
+        };
+
+    // Compute the headsign string the naming loop will use (same priority chain).
+    let headsign_for = |v: &VariationRow| -> Option<String> {
+        v.trip_headsign
+            .clone()
+            .filter(|s| !s.is_empty())
+            .or_else(|| v.route_long_name.clone().filter(|s| !s.is_empty()))
+            .or_else(|| v.route_short_name.clone().filter(|s| !s.is_empty()))
+            .or_else(|| v.first_stop_name.clone().filter(|s| !s.is_empty()))
+    };
+
+    // Group loop reps by (route_id, headsign) so we can find sibling shapes.
+    let mut loop_groups: HashMap<(String, String), Vec<usize>> = HashMap::new();
+    for (rep_idx, v) in representatives.iter().enumerate() {
+        if !v.is_loop.unwrap_or(false) {
+            continue;
+        }
+        if let Some(hs) = headsign_for(v) {
+            loop_groups
+                .entry((v.route_id.clone(), hs))
+                .or_default()
+                .push(rep_idx);
+        }
+    }
+
+    // For each loop rep, pick a via-stop (prefer unique-to-shape stops near midpoint).
+    // We carry both the JA name and the romanized name so the parallel type_name_r
+    // can show the same stop as `via X`.
+    let mut via_for_rep: HashMap<usize, String> = HashMap::new();
+    let mut via_roman_for_rep: HashMap<usize, String> = HashMap::new();
+    for ((_route_id, headsign_str), rep_idxs) in &loop_groups {
+        for (pos, &idx) in rep_idxs.iter().enumerate() {
+            let my_stops =
+                match stops_per_loop_trip.get(&representatives[idx].representative_trip_id) {
+                    Some(s) if s.len() >= 3 => s,
+                    _ => continue,
+                };
+
+            // Stops in my shape not visited by any sibling shape with the same headsign.
+            let unique_stops: Vec<&(String, String, Option<String>)> = my_stops
+                .iter()
+                .filter(|(parent, _, _)| {
+                    rep_idxs.iter().enumerate().all(|(j, &other_idx)| {
+                        if j == pos {
+                            return true;
+                        }
+                        stops_per_loop_trip
+                            .get(&representatives[other_idx].representative_trip_id)
+                            .map(|other| !other.iter().any(|(p, _, _)| p == parent))
+                            .unwrap_or(true)
+                    })
+                })
+                .collect();
+
+            let mid = my_stops.len() / 2;
+            let picked: Option<(String, Option<String>)> = if !unique_stops.is_empty() {
+                let mid_i = mid as i64;
+                unique_stops
+                    .iter()
+                    .min_by_key(|(parent, _, _)| {
+                        let pos_in_my = my_stops
+                            .iter()
+                            .position(|(p, _, _)| p == parent)
+                            .unwrap_or(0) as i64;
+                        (pos_in_my - mid_i).abs()
+                    })
+                    .map(|(_, name, name_r)| (name.clone(), name_r.clone()))
+            } else {
+                let (_, name, name_r) = &my_stops[mid];
+                Some((name.clone(), name_r.clone()))
+            };
+
+            if let Some((name, name_r)) = picked {
+                // Skip if the via name is the same as the headsign — adds no info.
+                if name != *headsign_str {
+                    via_for_rep.insert(idx, name);
+                    if let Some(nr) = name_r.filter(|s| !s.is_empty()) {
+                        via_roman_for_rep.insert(idx, nr);
+                    }
+                }
+            }
+        }
+    }
+
+    // Disambiguate duplicate type_names within the same route by appending the stop count.
+    let mut name_counter: HashMap<(String, String), i32> = HashMap::new();
+    let mut variation_count = 0;
+    let mut sst_inserted = 0;
+
+    for (rep_idx, v) in representatives.iter().enumerate() {
+        let type_cd = generate_bus_type_cd(&v.route_id, &v.shape_id);
+        let line_group_cd = generate_bus_line_group_cd(&v.route_id, &v.shape_id);
+
+        let headsign = v
+            .trip_headsign
+            .clone()
+            .filter(|s| !s.is_empty())
+            .or_else(|| v.route_long_name.clone().filter(|s| !s.is_empty()))
+            .or_else(|| v.route_short_name.clone().filter(|s| !s.is_empty()));
+        let first_stop = v.first_stop_name.clone().filter(|s| !s.is_empty());
+
+        // Romanized counterparts. trip_headsign has no _r column, so for the headsign
+        // roman we either borrow the terminal stop's roman (when the JA headsign equals
+        // the last stop name — the common case for loops and many one-way routes) or
+        // fall back to the route's long-name roman when the JA headsign came from there.
+        // If neither matches we leave it None, which collapses type_name_r to "" later.
+        let headsign_r: Option<String> = {
+            let ja = v.trip_headsign.as_deref().filter(|s| !s.is_empty());
+            let last_name = v.last_stop_name.as_deref();
+            let last_r = v.last_stop_name_r.as_deref().filter(|s| !s.is_empty());
+            let first_r = v.first_stop_name_r.as_deref().filter(|s| !s.is_empty());
+            let route_r = v.route_long_name_r.as_deref().filter(|s| !s.is_empty());
+            let route_long = v.route_long_name.as_deref().filter(|s| !s.is_empty());
+
+            match (ja, last_name, last_r) {
+                (Some(hs), Some(ln), Some(r)) if hs == ln => Some(r.to_string()),
+                _ => {
+                    // For loops, first stop == last stop, so the first stop's roman
+                    // is a safe stand-in for the headsign roman even if the JA strings
+                    // weren't byte-equal (whitespace/punctuation drift in translations).
+                    if v.is_loop.unwrap_or(false) && ja.is_some() {
+                        first_r.map(|s| s.to_string())
+                    } else if ja.is_none() && route_long.is_some() {
+                        // JA fell back to route_long_name — mirror with its roman.
+                        route_r.map(|s| s.to_string())
+                    } else {
+                        None
+                    }
+                }
+            }
+        };
+        let first_stop_r = v.first_stop_name_r.clone().filter(|s| !s.is_empty());
+
+        // If multiple shapes share this stop set (= the route has explicit up and
+        // down variants), `direction = Both` is the only honest answer. Otherwise
+        // we keep whatever direction_id the representative trip carried — defaulting
+        // to 0 (TrainDirection::Both) when GTFS leaves it NULL.
+        let directions = &grouped_directions[rep_idx];
+        let direction = if directions.len() > 1 {
+            0 // Both — collapsed pair
+        } else {
+            v.direction_id.unwrap_or(0)
+        };
+        let is_bidirectional = directions.len() > 1;
+
+        // Naming rule:
+        // - 双方向ペア (同じ停留所集合, direction 0/1) → "<A> ⇔ <B>" (両端駅) ※「行」は付けない
+        // - 循環トリップ (始発 parent == 終点 parent) → "<headsign>行（<経由地>経由・循環）"
+        //   (経由地が取れなければ "<headsign>行 (循環)" にフォールバック)
+        // - それ以外で始発名と headsign が異なる → "<first_stop> → <headsign>行"
+        // - 始発名と headsign が同じ / どちらか欠落 → headsign があれば "<headsign>行"、
+        //   無ければ "<first_stop>" (始発名は行き先ではないので「行」は付けない)
+        // - すべて欠落 → "shape <shape_id>" でフォールバック
+        let loop_name = |label: &str| -> String {
+            match via_for_rep.get(&rep_idx) {
+                Some(via) => format!("{}行（{}経由・循環）", label, via),
+                None => format!("{}行 (循環)", label),
+            }
+        };
+        // Roman counterpart: "<label> via <via> (Loop)" / "<label> (Loop)". When the via
+        // stop has no romanized name we drop the "via …" segment rather than fail the
+        // whole roman name; an empty result here means the caller will return None for
+        // the entire roman type_name (handled below).
+        let loop_name_r = |label_r: &str| -> Option<String> {
+            if label_r.is_empty() {
+                return None;
+            }
+            match via_roman_for_rep.get(&rep_idx) {
+                Some(via_r) => Some(format!("{} via {} (Loop)", label_r, via_r)),
+                None if via_for_rep.contains_key(&rep_idx) => None,
+                None => Some(format!("{} (Loop)", label_r)),
+            }
+        };
+
+        let base_name = if is_bidirectional && !v.is_loop.unwrap_or(false) {
+            match (first_stop.as_deref(), headsign.as_deref()) {
+                (Some(first), Some(h)) if first != h => format!("{} ⇔ {}", first, h),
+                (_, Some(h)) => h.to_string(),
+                (Some(first), None) => first.to_string(),
+                _ => format!("shape {}", v.shape_id),
+            }
+        } else {
+            match (
+                v.is_loop.unwrap_or(false),
+                first_stop.as_deref(),
+                headsign.as_deref(),
+            ) {
+                (true, _, Some(h)) => loop_name(h),
+                (true, Some(first), None) => loop_name(first),
+                (false, Some(first), Some(h)) if first != h => {
+                    format!("{} → {}行", first, h)
+                }
+                (_, _, Some(h)) => format!("{}行", h),
+                (_, Some(first), None) => first.to_string(),
+                _ => format!("shape {}", v.shape_id),
+            }
+        };
+
+        // Build the romanized name following the same case structure. Any branch that
+        // needs a missing roman piece returns None so the DB stores "" instead of a
+        // partially-Japanese roman label.
+        let base_name_r: Option<String> = if is_bidirectional && !v.is_loop.unwrap_or(false) {
+            match (first_stop_r.as_deref(), headsign_r.as_deref()) {
+                (Some(first_r), Some(h_r)) if first_r != h_r => {
+                    Some(format!("{} ⇔ {}", first_r, h_r))
+                }
+                (_, Some(h_r)) => Some(h_r.to_string()),
+                (Some(first_r), None) => Some(first_r.to_string()),
+                _ => None,
+            }
+        } else {
+            match (
+                v.is_loop.unwrap_or(false),
+                first_stop_r.as_deref(),
+                headsign_r.as_deref(),
+            ) {
+                (true, _, Some(h_r)) => loop_name_r(h_r),
+                (true, Some(first_r), None) => loop_name_r(first_r),
+                (false, Some(first_r), Some(h_r)) if first_r != h_r => {
+                    Some(format!("{} → {}", first_r, h_r))
+                }
+                (_, _, Some(h_r)) => Some(h_r.to_string()),
+                (_, Some(first_r), None) => Some(first_r.to_string()),
+                _ => None,
+            }
+        };
+
+        // Disambiguate same-name variations within a route by appending stop count.
+        // stop_count DESC ordering in the SQL means the longest variation wins the
+        // un-suffixed name; shorter ones get "(N停)" appended.
+        let counter = name_counter
+            .entry((v.route_id.clone(), base_name.clone()))
+            .or_insert(0);
+        *counter += 1;
+        let need_suffix = *counter > 1;
+        let type_name = if need_suffix {
+            format!("{} ({}停)", base_name, v.stop_count)
+        } else {
+            base_name.clone()
+        };
+        let type_name_r: String = match base_name_r {
+            Some(roman) if need_suffix => format!("{} ({} stops)", roman, v.stop_count),
+            Some(roman) => roman,
+            None => String::new(),
+        };
+
+        let color = v
+            .route_color
+            .as_ref()
+            .map(|c| {
+                if c.starts_with('#') {
+                    c.clone()
+                } else {
+                    format!("#{}", c)
+                }
+            })
+            .unwrap_or_else(|| "#000000".to_string());
+
+        sqlx::query(
+            r#"INSERT INTO types (
+                type_cd, type_name, type_name_k, type_name_r, type_name_zh, type_name_ko,
+                color, direction, kind, priority
+            ) VALUES ($1, $2, $2, $3, '', '', $4, $5, $6, 0)
+            ON CONFLICT (type_cd) DO NOTHING"#,
+        )
+        .bind(type_cd)
+        .bind(&type_name)
+        .bind(&type_name_r)
+        .bind(&color)
+        .bind(direction)
+        .bind(BUS_ROUTE_KIND)
+        .execute(&mut *conn)
+        .await?;
+        variation_count += 1;
+
+        // Fetch this trip's stops, deduplicated by parent_station, with the earliest
+        // stop_sequence per parent. Then sort by sequence in Rust to insert in trip order.
+        let stops: Vec<(String, i32)> = sqlx::query_as(
+            r#"SELECT DISTINCT ON (COALESCE(gs.parent_station, gs.stop_id))
+                   COALESCE(gs.parent_station, gs.stop_id) AS parent_stop_id,
+                   gst.stop_sequence
+               FROM gtfs_stop_times gst
+               JOIN gtfs_stops gs ON gst.stop_id = gs.stop_id
+               WHERE gst.trip_id = $1
+               ORDER BY COALESCE(gs.parent_station, gs.stop_id), gst.stop_sequence"#,
+        )
+        .bind(&v.representative_trip_id)
+        .fetch_all(&mut *conn)
+        .await?;
+
+        let mut sorted_stops = stops;
+        sorted_stops.sort_by_key(|(_, seq)| *seq);
+
+        // Single multi-row INSERT keeps stop_sequence → SERIAL id ordering intact
+        // while avoiding the per-stop round-trip the previous loop incurred.
+        // All three values are i32, so no SQL escaping is needed.
+        if !sorted_stops.is_empty() {
+            let mut sql = String::from(
+                "INSERT INTO station_station_types (station_cd, type_cd, line_group_cd, pass) VALUES ",
+            );
+            let mut values: Vec<String> = Vec::with_capacity(sorted_stops.len());
+            for (parent_stop_id, _) in &sorted_stops {
+                let station_cd = generate_bus_station_cd(parent_stop_id, &v.route_id);
+                values.push(format!(
+                    "({}, {}, {}, 0)",
+                    station_cd, type_cd, line_group_cd
+                ));
+            }
+            sql.push_str(&values.join(","));
+            sqlx::query(&sql).execute(&mut *conn).await?;
+            sst_inserted += sorted_stops.len();
+        }
+    }
+
+    info!(
+        "Integrated {} bus trip variations as TrainTypes ({} station_station_types rows).",
+        variation_count, sst_inserted
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2080,6 +2732,39 @@ mod tests {
         assert_eq!(
             generate_bus_station_g_cd("stop_001"),
             generate_bus_station_g_cd("stop_001")
+        );
+    }
+
+    #[test]
+    fn test_generate_bus_type_cd() {
+        let type_cd = generate_bus_type_cd("route_001", "shape_A");
+        // Should be in range 100,000,000 to 199,999,999
+        assert!(type_cd >= 100_000_000);
+        assert!(type_cd < 200_000_000);
+
+        // Deterministic
+        assert_eq!(type_cd, generate_bus_type_cd("route_001", "shape_A"));
+
+        // Different (route_id, shape_id) should produce different type_cd
+        assert_ne!(type_cd, generate_bus_type_cd("route_001", "shape_B"));
+        assert_ne!(type_cd, generate_bus_type_cd("route_002", "shape_A"));
+    }
+
+    #[test]
+    fn test_generate_bus_line_group_cd_distinct_from_type_cd() {
+        // line_group_cd and type_cd both live in 100M+ space; make sure the same
+        // (route_id, shape_id) maps them to different values so the FK + grouping
+        // semantics are independent.
+        let route = "152";
+        let shape = "20007-3";
+        assert_ne!(
+            generate_bus_type_cd(route, shape),
+            generate_bus_line_group_cd(route, shape)
+        );
+        // Deterministic
+        assert_eq!(
+            generate_bus_line_group_cd(route, shape),
+            generate_bus_line_group_cd(route, shape)
         );
     }
 
