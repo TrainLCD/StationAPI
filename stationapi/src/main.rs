@@ -100,8 +100,15 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
     // After CSV completes, wait for GTFS in background and run integration.
     // This task lives past server startup; health check passes as soon as CSV is done.
     tokio::spawn(async move {
+        info!("[post-csv] awaiting GTFS import handle...");
+        let gtfs_wait_start = std::time::Instant::now();
         match gtfs_handle.await {
-            Ok(Ok(())) => {}
+            Ok(Ok(())) => {
+                info!(
+                    "[post-csv] GTFS import completed, waited {:?}",
+                    gtfs_wait_start.elapsed()
+                );
+            }
             Ok(Err(e)) => {
                 warn!(
                     "Failed to import GTFS data: {}. Continuing without GTFS data.",
@@ -118,8 +125,45 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
             }
         }
 
+        // Refresh statistics on freshly-populated gtfs_* tables before running
+        // the heavy CTE query in integrate_gtfs_to_stations. Without this,
+        // PostgreSQL plans against empty-table statistics (from the CSV-side
+        // ANALYZE that ran while GTFS was still importing) and picks a plan
+        // that effectively hangs on build_stop_route_mapping.
+        info!("[post-csv] running ANALYZE on gtfs_* tables before integration");
+        let analyze_start = std::time::Instant::now();
+        let pre_db_url = fetch_database_url();
+        match sqlx::PgConnection::connect(&pre_db_url).await {
+            Ok(mut conn) => {
+                for table in [
+                    "gtfs_agencies",
+                    "gtfs_routes",
+                    "gtfs_stops",
+                    "gtfs_calendar",
+                    "gtfs_calendar_dates",
+                    "gtfs_shapes",
+                    "gtfs_trips",
+                    "gtfs_stop_times",
+                    "gtfs_feed_info",
+                ] {
+                    let sql = format!("ANALYZE {table}");
+                    if let Err(e) = sqlx::query(&sql).execute(&mut conn).await {
+                        warn!("Failed to ANALYZE {}: {}", table, e);
+                    }
+                }
+                info!(
+                    "[post-csv] gtfs_* ANALYZE done in {:?}",
+                    analyze_start.elapsed()
+                );
+            }
+            Err(e) => {
+                warn!("Failed to connect for pre-integrate ANALYZE: {}", e);
+            }
+        }
+
         // Integrate GTFS data into stations/lines tables
         // This is wrapped in a transaction - if any step fails, all changes are rolled back
+        info!("[post-csv] starting GTFS integration");
         if let Err(e) = import::integrate_gtfs_to_stations().await {
             tracing::error!(
                 "Failed to integrate GTFS to stations (transaction rolled back): {}",
