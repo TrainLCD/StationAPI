@@ -1456,7 +1456,7 @@ impl InternalStationRepository {
                 SELECT s.*
                 FROM stations s
                 WHERE s.e_status = 0
-                AND COALESCE(s.transport_type, 0) = $5
+                AND s.transport_type = $5
                 ORDER BY point(s.lat, s.lon) <-> point(ic.lat, ic.lon)
                 LIMIT $4
             ) s
