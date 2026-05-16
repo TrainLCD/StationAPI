@@ -108,6 +108,8 @@ DROP INDEX IF EXISTS public.idx_16403_line_aliases_alias_cd;
 
 DROP INDEX IF EXISTS public.idx_performance_stations_point;
 
+DROP INDEX IF EXISTS public.idx_performance_stations_bus_point;
+
 DROP INDEX IF EXISTS public.idx_performance_station_name_trgm;
 
 DROP INDEX IF EXISTS public.idx_performance_station_name_k_trgm;
@@ -501,6 +503,20 @@ BEGIN
             RAISE NOTICE 'Skipping GiST point index; required operator class is unavailable.';
         WHEN insufficient_privilege THEN
             RAISE NOTICE 'Skipping GiST point index; insufficient privileges.';
+    END;
+END
+$$;
+
+-- Partial GiST index for bus stop nearest-neighbor lookups (get_bus_stops_near_stations)
+DO $$
+BEGIN
+    BEGIN
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_performance_stations_bus_point ON public.stations USING gist ((point(lat, lon))) WHERE e_status = 0 AND transport_type = 1';
+    EXCEPTION
+        WHEN undefined_object THEN
+            RAISE NOTICE 'Skipping GiST bus point index; required operator class is unavailable.';
+        WHEN insufficient_privilege THEN
+            RAISE NOTICE 'Skipping GiST bus point index; insufficient privileges.';
     END;
 END
 $$;
