@@ -507,20 +507,6 @@ BEGIN
 END
 $$;
 
--- Partial GiST index for bus stop nearest-neighbor lookups (get_bus_stops_near_stations)
-DO $$
-BEGIN
-    BEGIN
-        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_performance_stations_bus_point ON public.stations USING gist ((point(lat, lon))) WHERE e_status = 0 AND transport_type = 1';
-    EXCEPTION
-        WHEN undefined_object THEN
-            RAISE NOTICE 'Skipping GiST bus point index; required operator class is unavailable.';
-        WHEN insufficient_privilege THEN
-            RAISE NOTICE 'Skipping GiST bus point index; insufficient privileges.';
-    END;
-END
-$$;
-
 DO $$
 BEGIN
     BEGIN
@@ -628,6 +614,20 @@ END $$;
 
 CREATE INDEX IF NOT EXISTS idx_stations_transport_type ON public.stations USING btree (transport_type);
 CREATE INDEX IF NOT EXISTS idx_lines_transport_type ON public.lines USING btree (transport_type);
+
+-- Partial GiST index for bus stop nearest-neighbor lookups (get_bus_stops_near_stations)
+DO $$
+BEGIN
+    BEGIN
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_performance_stations_bus_point ON public.stations USING gist ((point(lat, lon))) WHERE e_status = 0 AND transport_type = 1';
+    EXCEPTION
+        WHEN undefined_object THEN
+            RAISE NOTICE 'Skipping GiST bus point index; required operator class is unavailable.';
+        WHEN insufficient_privilege THEN
+            RAISE NOTICE 'Skipping GiST bus point index; insufficient privileges.';
+    END;
+END
+$$;
 
 -- ============================================================
 -- GTFS Tables
