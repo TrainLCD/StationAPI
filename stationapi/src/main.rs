@@ -80,26 +80,90 @@ async fn run() -> std::result::Result<(), anyhow::Error> {
         .expect("Failed to install Prometheus exporter");
     info!("Prometheus metrics server listening on {}", metrics_addr);
 
+    // Create schema first so that CSV and GTFS imports can run against existing tables.
+    if let Err(e) = import::create_schema().await {
+        return Err(anyhow::anyhow!("Failed to create schema: {}", e));
+    }
+
+    // Run GTFS import in parallel with CSV import.
+    // GTFS errors are non-fatal; server continues to serve CSV-only data.
+    // The error from import_gtfs is not Send, so stringify it before returning from the task.
+    let gtfs_handle = tokio::spawn(async {
+        info!("Starting GTFS import in background (parallel with CSV)...");
+        import::import_gtfs().await.map_err(|e| e.to_string())
+    });
+
     if let Err(e) = import::import_csv().await {
         return Err(anyhow::anyhow!("Failed to import CSV: {}", e));
     }
 
-    // GTFS import is now done in background after server starts
-    // This allows the server to pass health checks quickly
-    tokio::spawn(async {
-        info!("Starting GTFS import in background...");
+    // After CSV completes, wait for GTFS in background and run integration.
+    // This task lives past server startup; health check passes as soon as CSV is done.
+    tokio::spawn(async move {
+        info!("[post-csv] awaiting GTFS import handle...");
+        let gtfs_wait_start = std::time::Instant::now();
+        match gtfs_handle.await {
+            Ok(Ok(())) => {
+                info!(
+                    "[post-csv] GTFS import completed, waited {:?}",
+                    gtfs_wait_start.elapsed()
+                );
+            }
+            Ok(Err(e)) => {
+                warn!(
+                    "Failed to import GTFS data: {}. Continuing without GTFS data.",
+                    e
+                );
+                return;
+            }
+            Err(e) => {
+                warn!(
+                    "GTFS import task panicked: {}. Continuing without GTFS data.",
+                    e
+                );
+                return;
+            }
+        }
 
-        // Import GTFS data (ToeiBus)
-        if let Err(e) = import::import_gtfs().await {
-            warn!(
-                "Failed to import GTFS data: {}. Continuing without GTFS data.",
-                e
-            );
-            return;
+        // Refresh statistics on freshly-populated gtfs_* tables before running
+        // the heavy CTE query in integrate_gtfs_to_stations. Without this,
+        // PostgreSQL plans against empty-table statistics (from the CSV-side
+        // ANALYZE that ran while GTFS was still importing) and picks a plan
+        // that effectively hangs on build_stop_route_mapping.
+        info!("[post-csv] running ANALYZE on gtfs_* tables before integration");
+        let analyze_start = std::time::Instant::now();
+        let pre_db_url = fetch_database_url();
+        match sqlx::PgConnection::connect(&pre_db_url).await {
+            Ok(mut conn) => {
+                for table in [
+                    "gtfs_agencies",
+                    "gtfs_routes",
+                    "gtfs_stops",
+                    "gtfs_calendar",
+                    "gtfs_calendar_dates",
+                    "gtfs_shapes",
+                    "gtfs_trips",
+                    "gtfs_stop_times",
+                    "gtfs_feed_info",
+                ] {
+                    let sql = format!("ANALYZE {table}");
+                    if let Err(e) = sqlx::query(&sql).execute(&mut conn).await {
+                        warn!("Failed to ANALYZE {}: {}", table, e);
+                    }
+                }
+                info!(
+                    "[post-csv] gtfs_* ANALYZE done in {:?}",
+                    analyze_start.elapsed()
+                );
+            }
+            Err(e) => {
+                warn!("Failed to connect for pre-integrate ANALYZE: {}", e);
+            }
         }
 
         // Integrate GTFS data into stations/lines tables
         // This is wrapped in a transaction - if any step fails, all changes are rolled back
+        info!("[post-csv] starting GTFS integration");
         if let Err(e) = import::integrate_gtfs_to_stations().await {
             tracing::error!(
                 "Failed to integrate GTFS to stations (transaction rolled back): {}",

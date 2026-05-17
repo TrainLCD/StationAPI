@@ -22,6 +22,16 @@ services:
 
   psql:
     image: postgres:18
+    command:
+      - postgres
+      - -c
+      - shared_buffers=384MB
+      - -c
+      - work_mem=64MB
+      - -c
+      - maintenance_work_mem=256MB
+      - -c
+      - effective_cache_size=1GB
     environment:
       POSTGRES_USER: stationapi
       POSTGRES_PASSWORD: stationapi
