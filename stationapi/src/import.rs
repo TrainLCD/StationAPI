@@ -1609,11 +1609,11 @@ fn generate_bus_line_group_cd(route_id: &str, shape_id: &str) -> i32 {
     100_000_000 + (hash % 100_000_000) as i32
 }
 
-fn company_cd_for_gtfs_route(route_id: &str) -> i32 {
+fn company_cd_for_gtfs_route(route_id: &str) -> Option<i32> {
     if route_id.starts_with("seibu:") {
-        253 // Seibu Bus
+        Some(253) // Seibu Bus
     } else {
-        119 // Tokyo Metropolitan Bureau of Transportation
+        None // Unknown/unsupported prefix
     }
 }
 
@@ -1802,7 +1802,10 @@ async fn integrate_gtfs_routes_to_lines(
         .await?;
 
     for route in &routes {
-        let company_cd = company_cd_for_gtfs_route(&route.route_id);
+        let company_cd = match company_cd_for_gtfs_route(&route.route_id) {
+            Some(cd) => cd,
+            None => continue, // Skip routes with unknown/unsupported prefix
+        };
         let line_cd = generate_bus_line_cd(&route.route_id);
         let line_name = route
             .route_short_name
@@ -2972,8 +2975,8 @@ mod tests {
 
     #[test]
     fn test_company_cd_for_gtfs_route() {
-        assert_eq!(company_cd_for_gtfs_route("toei:route_001"), 119);
-        assert_eq!(company_cd_for_gtfs_route("seibu:route_001"), 253);
+        assert_eq!(company_cd_for_gtfs_route("toei:route_001"), None);
+        assert_eq!(company_cd_for_gtfs_route("seibu:route_001"), Some(253));
     }
 
     #[test]
