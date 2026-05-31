@@ -181,39 +181,97 @@ struct Translation {
     ko: Option<String>,      // Korean
 }
 
-/// GTFS download URL for Toei Bus
-const TOEI_BUS_GTFS_URL: &str =
-    "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip";
+#[derive(Clone, Copy)]
+struct GtfsFeed {
+    id: &'static str,
+    name: &'static str,
+    path: &'static str,
+    url: &'static str,
+    requires_consumer_key: bool,
+}
+
+const GTFS_FEEDS: &[GtfsFeed] = &[
+    GtfsFeed {
+        id: "toei",
+        name: "Toei Bus",
+        path: "data/ToeiBus-GTFS",
+        url: "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip",
+        requires_consumer_key: false,
+    },
+    GtfsFeed {
+        id: "seibu",
+        name: "Seibu Bus",
+        path: "data/SeibuBus-GTFS",
+        url: "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip",
+        requires_consumer_key: true,
+    },
+];
+
+const DEFAULT_GTFS_BUS_LINE_COLOR: &str = "#1f63c6";
+
+fn scoped_gtfs_id(feed: &GtfsFeed, id: &str) -> String {
+    format!("{}:{}", feed.id, id)
+}
+
+fn scoped_gtfs_id_opt(feed: &GtfsFeed, id: Option<&str>) -> Option<String> {
+    id.filter(|s| !s.is_empty())
+        .map(|s| scoped_gtfs_id(feed, s))
+}
+
+fn gtfs_download_url(feed: &GtfsFeed) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    if !feed.requires_consumer_key {
+        return Ok(feed.url.to_string());
+    }
+
+    let token = env::var("ODPT_ACCESS_TOKEN").map_err(|_| {
+        format!(
+            "{} GTFS requires ODPT_ACCESS_TOKEN in the environment",
+            feed.name
+        )
+    })?;
+
+    Ok(format!("{}?acl:consumerKey={}", feed.url, token))
+}
 
 /// Download and extract GTFS data from ODPT API
-fn download_gtfs() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let gtfs_path = Path::new("data/ToeiBus-GTFS");
+fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let gtfs_path = Path::new(feed.path);
 
     // Skip if directory already exists
     if gtfs_path.exists() {
-        info!("GTFS directory already exists, skipping download.");
+        info!(
+            "{} GTFS directory already exists, skipping download.",
+            feed.name
+        );
         return Ok(());
     }
 
-    info!("Downloading GTFS data from ODPT API...");
+    info!("Downloading {} GTFS data from ODPT API...", feed.name);
 
     // Download the ZIP file
     let request_start = std::time::Instant::now();
-    let response = reqwest::blocking::get(TOEI_BUS_GTFS_URL)?;
+    let response = reqwest::blocking::get(gtfs_download_url(&feed)?)?;
     info!(
-        "[gtfs-download] response received in {:?} (status={})",
+        "[gtfs-download:{}] response received in {:?} (status={})",
+        feed.id,
         request_start.elapsed(),
         response.status()
     );
 
     if !response.status().is_success() {
-        return Err(format!("Failed to download GTFS: HTTP {}", response.status()).into());
+        return Err(format!(
+            "Failed to download {} GTFS: HTTP {}",
+            feed.name,
+            response.status()
+        )
+        .into());
     }
 
     let body_start = std::time::Instant::now();
     let bytes = response.bytes()?;
     info!(
-        "[gtfs-download] body read in {:?} ({} bytes), extracting...",
+        "[gtfs-download:{}] body read in {:?} ({} bytes), extracting...",
+        feed.id,
         body_start.elapsed(),
         bytes.len()
     );
@@ -249,10 +307,10 @@ fn download_gtfs() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         file.read_to_end(&mut contents)?;
         fs::write(&output_path, &contents)?;
 
-        info!("Extracted: {}", output_name);
+        info!("Extracted {}: {}", feed.name, output_name);
     }
 
-    info!("GTFS extraction completed.");
+    info!("{} GTFS extraction completed.", feed.name);
     Ok(())
 }
 
@@ -271,29 +329,16 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
 
     // Download GTFS data if not present (use spawn_blocking to avoid blocking async runtime)
     let download_start = std::time::Instant::now();
-    tokio::task::spawn_blocking(download_gtfs)
-        .await
-        .map_err(|e| format!("Failed to spawn blocking task: {}", e))?
-        .map_err(|e| -> Box<dyn std::error::Error> { e })?;
+    for feed in GTFS_FEEDS {
+        let feed = *feed;
+        tokio::task::spawn_blocking(move || download_gtfs(feed))
+            .await
+            .map_err(|e| format!("Failed to spawn blocking task: {}", e))?
+            .map_err(|e| -> Box<dyn std::error::Error> { e })?;
+    }
     info!(
         "[gtfs] download/extract finished in {:?}",
         download_start.elapsed()
-    );
-
-    let gtfs_path = Path::new("data/ToeiBus-GTFS");
-
-    if !gtfs_path.exists() {
-        info!("GTFS directory not found, skipping GTFS import.");
-        return Ok(());
-    }
-
-    // Load translations for multi-language support (before transaction to avoid holding lock)
-    let translations_start = std::time::Instant::now();
-    let translations = load_gtfs_translations(gtfs_path)?;
-    info!(
-        "[gtfs] loaded {} translation entries in {:?}",
-        translations.len(),
-        translations_start.elapsed()
     );
 
     info!("[gtfs] connecting to database");
@@ -302,10 +347,7 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
     let mut conn = PgConnection::connect(&db_url).await?;
     info!("[gtfs] connected in {:?}", connect_start.elapsed());
 
-    info!(
-        "Starting GTFS import from {:?} (using transaction)...",
-        gtfs_path
-    );
+    info!("Starting GTFS import from configured feeds (using transaction)...");
 
     // Begin transaction - all changes will be rolled back if any step fails
     let mut tx = conn.begin().await?;
@@ -345,44 +387,100 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
         clear_start.elapsed()
     );
 
-    let step_start = std::time::Instant::now();
-    import_gtfs_agencies(&mut tx, gtfs_path).await?;
-    info!("[gtfs] agencies imported in {:?}", step_start.elapsed());
+    for feed in GTFS_FEEDS {
+        let gtfs_path = Path::new(feed.path);
+        if !gtfs_path.exists() {
+            info!(
+                "{} GTFS directory not found, skipping this feed.",
+                feed.name
+            );
+            continue;
+        }
 
-    let step_start = std::time::Instant::now();
-    import_gtfs_routes(&mut tx, gtfs_path).await?;
-    info!("[gtfs] routes imported in {:?}", step_start.elapsed());
+        info!("[gtfs:{}] importing from {:?}", feed.id, gtfs_path);
 
-    let step_start = std::time::Instant::now();
-    import_gtfs_stops(&mut tx, gtfs_path, &translations).await?;
-    info!("[gtfs] stops imported in {:?}", step_start.elapsed());
+        // Load translations for multi-language support (before per-feed inserts).
+        let translations_start = std::time::Instant::now();
+        let translations = load_gtfs_translations(gtfs_path)?;
+        info!(
+            "[gtfs:{}] loaded {} translation entries in {:?}",
+            feed.id,
+            translations.len(),
+            translations_start.elapsed()
+        );
 
-    let step_start = std::time::Instant::now();
-    import_gtfs_calendar(&mut tx, gtfs_path).await?;
-    info!("[gtfs] calendar imported in {:?}", step_start.elapsed());
+        let step_start = std::time::Instant::now();
+        import_gtfs_agencies(&mut tx, gtfs_path, feed).await?;
+        info!(
+            "[gtfs:{}] agencies imported in {:?}",
+            feed.id,
+            step_start.elapsed()
+        );
 
-    let step_start = std::time::Instant::now();
-    import_gtfs_calendar_dates(&mut tx, gtfs_path).await?;
-    info!(
-        "[gtfs] calendar_dates imported in {:?}",
-        step_start.elapsed()
-    );
+        let step_start = std::time::Instant::now();
+        import_gtfs_routes(&mut tx, gtfs_path, feed).await?;
+        info!(
+            "[gtfs:{}] routes imported in {:?}",
+            feed.id,
+            step_start.elapsed()
+        );
 
-    let step_start = std::time::Instant::now();
-    import_gtfs_shapes(&mut tx, gtfs_path).await?;
-    info!("[gtfs] shapes imported in {:?}", step_start.elapsed());
+        let step_start = std::time::Instant::now();
+        import_gtfs_stops(&mut tx, gtfs_path, feed, &translations).await?;
+        info!(
+            "[gtfs:{}] stops imported in {:?}",
+            feed.id,
+            step_start.elapsed()
+        );
 
-    let step_start = std::time::Instant::now();
-    import_gtfs_trips(&mut tx, gtfs_path).await?;
-    info!("[gtfs] trips imported in {:?}", step_start.elapsed());
+        let step_start = std::time::Instant::now();
+        import_gtfs_calendar(&mut tx, gtfs_path, feed).await?;
+        info!(
+            "[gtfs:{}] calendar imported in {:?}",
+            feed.id,
+            step_start.elapsed()
+        );
 
-    let step_start = std::time::Instant::now();
-    import_gtfs_stop_times(&mut tx, gtfs_path).await?;
-    info!("[gtfs] stop_times imported in {:?}", step_start.elapsed());
+        let step_start = std::time::Instant::now();
+        import_gtfs_calendar_dates(&mut tx, gtfs_path, feed).await?;
+        info!(
+            "[gtfs:{}] calendar_dates imported in {:?}",
+            feed.id,
+            step_start.elapsed()
+        );
 
-    let step_start = std::time::Instant::now();
-    import_gtfs_feed_info(&mut tx, gtfs_path).await?;
-    info!("[gtfs] feed_info imported in {:?}", step_start.elapsed());
+        let step_start = std::time::Instant::now();
+        import_gtfs_shapes(&mut tx, gtfs_path, feed).await?;
+        info!(
+            "[gtfs:{}] shapes imported in {:?}",
+            feed.id,
+            step_start.elapsed()
+        );
+
+        let step_start = std::time::Instant::now();
+        import_gtfs_trips(&mut tx, gtfs_path, feed).await?;
+        info!(
+            "[gtfs:{}] trips imported in {:?}",
+            feed.id,
+            step_start.elapsed()
+        );
+
+        let step_start = std::time::Instant::now();
+        import_gtfs_stop_times(&mut tx, gtfs_path, feed).await?;
+        info!(
+            "[gtfs:{}] stop_times imported in {:?}",
+            feed.id,
+            step_start.elapsed()
+        );
+
+        let step_start = std::time::Instant::now();
+        import_gtfs_feed_info(&mut tx, gtfs_path, feed).await?;
+        info!(
+            "[gtfs:{}] feed_info imported in {:?}",
+            feed.id,
+            step_start.elapsed()
+        );
+    }
 
     info!("[gtfs] committing transaction");
     let commit_start = std::time::Instant::now();
@@ -483,6 +581,7 @@ fn load_gtfs_translations(
 async fn import_gtfs_agencies(
     conn: &mut PgConnection,
     gtfs_path: &Path,
+    feed: &GtfsFeed,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let agency_path = gtfs_path.join("agency.txt");
     if !agency_path.exists() {
@@ -495,7 +594,7 @@ async fn import_gtfs_agencies(
     for result in rdr.records() {
         let record = result?;
         // agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_phone,agency_fare_url,agency_email
-        let agency_id = record.get(0).unwrap_or("");
+        let agency_id = scoped_gtfs_id(feed, record.get(0).unwrap_or(""));
         let agency_name = record.get(1).unwrap_or("");
         let agency_url = record.get(2).filter(|s| !s.is_empty());
         let agency_timezone = record.get(3).unwrap_or("Asia/Tokyo");
@@ -509,7 +608,7 @@ async fn import_gtfs_agencies(
                VALUES ($1, $2, $3, $4, $5, $6, $7)
                ON CONFLICT (agency_id) DO NOTHING"#,
         )
-        .bind(agency_id)
+        .bind(&agency_id)
         .bind(agency_name)
         .bind(agency_url)
         .bind(agency_timezone)
@@ -528,6 +627,7 @@ async fn import_gtfs_agencies(
 async fn import_gtfs_routes(
     conn: &mut PgConnection,
     gtfs_path: &Path,
+    feed: &GtfsFeed,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let routes_path = gtfs_path.join("routes.txt");
     if !routes_path.exists() {
@@ -540,8 +640,8 @@ async fn import_gtfs_routes(
     for result in rdr.records() {
         let record = result?;
         // route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_color,route_text_color,jp_parent_route_id
-        let route_id = record.get(0).unwrap_or("");
-        let agency_id = record.get(1).filter(|s| !s.is_empty());
+        let route_id = scoped_gtfs_id(feed, record.get(0).unwrap_or(""));
+        let agency_id = scoped_gtfs_id_opt(feed, record.get(1));
         let route_short_name = record.get(2).filter(|s| !s.is_empty());
         let route_long_name = record.get(3).filter(|s| !s.is_empty());
         let route_desc = record.get(4).filter(|s| !s.is_empty());
@@ -556,8 +656,8 @@ async fn import_gtfs_routes(
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                ON CONFLICT (route_id) DO NOTHING"#,
         )
-        .bind(route_id)
-        .bind(agency_id)
+        .bind(&route_id)
+        .bind(agency_id.as_deref())
         .bind(route_short_name)
         .bind(route_long_name)
         .bind(route_desc)
@@ -598,6 +698,7 @@ type StopBatchRow = (
 async fn import_gtfs_stops(
     conn: &mut PgConnection,
     gtfs_path: &Path,
+    feed: &GtfsFeed,
     translations: &HashMap<(String, String), Translation>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let stops_path = gtfs_path.join("stops.txt");
@@ -613,7 +714,8 @@ async fn import_gtfs_stops(
 
     for result in rdr.records() {
         let record = result?;
-        let stop_id = record.get(0).unwrap_or("").to_string();
+        let original_stop_id = record.get(0).unwrap_or("");
+        let stop_id = scoped_gtfs_id(feed, original_stop_id);
         let stop_code = record
             .get(1)
             .filter(|s| !s.is_empty())
@@ -637,7 +739,7 @@ async fn import_gtfs_stops(
         let parent_station = record
             .get(9)
             .filter(|s| !s.is_empty())
-            .map(|s| s.to_string());
+            .map(|s| scoped_gtfs_id(feed, s));
         let stop_timezone = record
             .get(10)
             .filter(|s| !s.is_empty())
@@ -652,7 +754,7 @@ async fn import_gtfs_stops(
             .map(|s| s.to_string());
 
         // Get translations
-        let key = ("stops".to_string(), stop_id.clone());
+        let key = ("stops".to_string(), original_stop_id.to_string());
         let translation = translations.get(&key);
 
         let stop_name_k = translation.and_then(|t| t.ja_hrkt.clone());
@@ -773,6 +875,7 @@ async fn insert_stops_batch(
 async fn import_gtfs_calendar(
     conn: &mut PgConnection,
     gtfs_path: &Path,
+    feed: &GtfsFeed,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let calendar_path = gtfs_path.join("calendar.txt");
     if !calendar_path.exists() {
@@ -785,7 +888,7 @@ async fn import_gtfs_calendar(
     for result in rdr.records() {
         let record = result?;
         // service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date
-        let service_id = record.get(0).unwrap_or("");
+        let service_id = scoped_gtfs_id(feed, record.get(0).unwrap_or(""));
         let monday: bool = record.get(1).unwrap_or("0") == "1";
         let tuesday: bool = record.get(2).unwrap_or("0") == "1";
         let wednesday: bool = record.get(3).unwrap_or("0") == "1";
@@ -806,7 +909,7 @@ async fn import_gtfs_calendar(
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                ON CONFLICT (service_id) DO NOTHING"#,
         )
-        .bind(service_id)
+        .bind(&service_id)
         .bind(monday)
         .bind(tuesday)
         .bind(wednesday)
@@ -828,6 +931,7 @@ async fn import_gtfs_calendar(
 async fn import_gtfs_calendar_dates(
     conn: &mut PgConnection,
     gtfs_path: &Path,
+    feed: &GtfsFeed,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let calendar_dates_path = gtfs_path.join("calendar_dates.txt");
     if !calendar_dates_path.exists() {
@@ -842,7 +946,7 @@ async fn import_gtfs_calendar_dates(
 
     for result in rdr.records() {
         let record = result?;
-        let service_id = record.get(0).unwrap_or("").to_string();
+        let service_id = scoped_gtfs_id(feed, record.get(0).unwrap_or(""));
         let date = record.get(1).unwrap_or("").to_string();
         let exception_type: i32 = record.get(2).unwrap_or("1").parse().unwrap_or(1);
 
@@ -897,6 +1001,7 @@ async fn insert_calendar_dates_batch(
 async fn import_gtfs_shapes(
     conn: &mut PgConnection,
     gtfs_path: &Path,
+    feed: &GtfsFeed,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let shapes_path = gtfs_path.join("shapes.txt");
     if !shapes_path.exists() {
@@ -911,7 +1016,7 @@ async fn import_gtfs_shapes(
     for result in rdr.records() {
         let record = result?;
         // shape_id,shape_pt_lat,shape_pt_lon,shape_pt_sequence,shape_dist_traveled
-        let shape_id = record.get(0).unwrap_or("").to_string();
+        let shape_id = scoped_gtfs_id(feed, record.get(0).unwrap_or(""));
         let shape_pt_lat: f64 = record.get(1).unwrap_or("0").parse().unwrap_or(0.0);
         let shape_pt_lon: f64 = record.get(2).unwrap_or("0").parse().unwrap_or(0.0);
         let shape_pt_sequence: i32 = record.get(3).unwrap_or("0").parse().unwrap_or(0);
@@ -985,6 +1090,7 @@ async fn insert_shapes_batch(
 async fn import_gtfs_trips(
     conn: &mut PgConnection,
     gtfs_path: &Path,
+    feed: &GtfsFeed,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let trips_path = gtfs_path.join("trips.txt");
     if !trips_path.exists() {
@@ -999,9 +1105,9 @@ async fn import_gtfs_trips(
 
     for result in rdr.records() {
         let record = result?;
-        let route_id = record.get(0).unwrap_or("").to_string();
-        let service_id = record.get(1).unwrap_or("").to_string();
-        let trip_id = record.get(2).unwrap_or("").to_string();
+        let route_id = scoped_gtfs_id(feed, record.get(0).unwrap_or(""));
+        let service_id = scoped_gtfs_id(feed, record.get(1).unwrap_or(""));
+        let trip_id = scoped_gtfs_id(feed, record.get(2).unwrap_or(""));
         let trip_headsign = record
             .get(3)
             .filter(|s| !s.is_empty())
@@ -1021,7 +1127,7 @@ async fn import_gtfs_trips(
         let shape_id = record
             .get(7)
             .filter(|s| !s.is_empty())
-            .map(|s| s.to_string());
+            .map(|s| scoped_gtfs_id(feed, s));
         let wheelchair_accessible: Option<i32> = record
             .get(8)
             .filter(|s| !s.is_empty())
@@ -1154,6 +1260,7 @@ async fn insert_trips_batch(
 async fn import_gtfs_stop_times(
     conn: &mut PgConnection,
     gtfs_path: &Path,
+    feed: &GtfsFeed,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let stop_times_path = gtfs_path.join("stop_times.txt");
     if !stop_times_path.exists() {
@@ -1171,10 +1278,10 @@ async fn import_gtfs_stop_times(
     for result in rdr.records() {
         let record = result?;
         // trip_id,arrival_time,departure_time,stop_id,stop_sequence,stop_headsign,pickup_type,drop_off_type,shape_dist_traveled,timepoint
-        let trip_id = record.get(0).unwrap_or("").to_string();
+        let trip_id = scoped_gtfs_id(feed, record.get(0).unwrap_or(""));
         let arrival_time = parse_gtfs_time(record.get(1).unwrap_or(""));
         let departure_time = parse_gtfs_time(record.get(2).unwrap_or(""));
-        let stop_id = record.get(3).unwrap_or("").to_string();
+        let stop_id = scoped_gtfs_id(feed, record.get(3).unwrap_or(""));
         let stop_sequence: i32 = record.get(4).unwrap_or("0").parse().unwrap_or(0);
         let stop_headsign = record
             .get(5)
@@ -1341,6 +1448,7 @@ async fn insert_stop_times_batch(
 async fn import_gtfs_feed_info(
     conn: &mut PgConnection,
     gtfs_path: &Path,
+    feed: &GtfsFeed,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let feed_info_path = gtfs_path.join("feed_info.txt");
     if !feed_info_path.exists() {
@@ -1353,7 +1461,7 @@ async fn import_gtfs_feed_info(
     for result in rdr.records() {
         let record = result?;
         // feed_publisher_name,feed_publisher_url,feed_lang,feed_start_date,feed_end_date,feed_version
-        let feed_publisher_name = record.get(0).unwrap_or("");
+        let feed_publisher_name = format!("{} ({})", record.get(0).unwrap_or(""), feed.name);
         let feed_publisher_url = record.get(1).filter(|s| !s.is_empty());
         let feed_lang = record.get(2).filter(|s| !s.is_empty());
         let feed_start_date = record
@@ -1467,6 +1575,14 @@ fn generate_bus_line_group_cd(route_id: &str, shape_id: &str) -> i32 {
     let combined = format!("lg-{}-{}", route_id, shape_id);
     let hash = fnv1a_hash(combined.as_bytes());
     100_000_000 + (hash % 100_000_000) as i32
+}
+
+fn company_cd_for_gtfs_route(route_id: &str) -> i32 {
+    if route_id.starts_with("seibu:") {
+        253 // Seibu Bus
+    } else {
+        119 // Tokyo Metropolitan Bureau of Transportation
+    }
 }
 
 /// `types.kind` value for bus route variations. Matches `proto::TrainTypeKind::BusRoute`.
@@ -1653,21 +1769,25 @@ async fn integrate_gtfs_routes_to_lines(
         .fetch_all(&mut *conn)
         .await?;
 
-    let company_cd = 119; // Tokyo Metropolitan Bureau of Transportation (東京都交通局)
-
     for route in &routes {
+        let company_cd = company_cd_for_gtfs_route(&route.route_id);
         let line_cd = generate_bus_line_cd(&route.route_id);
         let line_name = route
             .route_short_name
             .clone()
             .unwrap_or_else(|| route.route_long_name.clone().unwrap_or_default());
-        let line_color = route.route_color.as_ref().map(|c| {
-            if c.starts_with('#') {
-                c.clone()
-            } else {
-                format!("#{}", c)
-            }
-        });
+        let line_color = route
+            .route_color
+            .as_deref()
+            .filter(|c| !c.is_empty())
+            .map(|c| {
+                if c.starts_with('#') {
+                    c.to_string()
+                } else {
+                    format!("#{}", c)
+                }
+            })
+            .unwrap_or_else(|| DEFAULT_GTFS_BUS_LINE_COLOR.to_string());
 
         let line_name_r = route.route_long_name.clone().unwrap_or_default();
 
@@ -2816,6 +2936,12 @@ mod tests {
         // Different route_id should produce different line_cd
         let line_cd3 = generate_bus_line_cd("route_002");
         assert_ne!(line_cd, line_cd3);
+    }
+
+    #[test]
+    fn test_company_cd_for_gtfs_route() {
+        assert_eq!(company_cd_for_gtfs_route("toei:route_001"), 119);
+        assert_eq!(company_cd_for_gtfs_route("seibu:route_001"), 253);
     }
 
     #[test]

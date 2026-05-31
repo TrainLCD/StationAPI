@@ -20,9 +20,10 @@ This guide explains how automation agents and human contributors should work wit
 - Required environment variables:
   - `DATABASE_URL` – SQLx connection string (e.g., `postgres://stationapi:stationapi@localhost/stationapi`).
   - `DISABLE_GRPC_WEB` – `false` enables gRPC-Web; set to `true` for pure gRPC/HTTP2.
+  - `ODPT_ACCESS_TOKEN` – ODPT consumer key used to download authenticated GTFS feeds such as Seibu Bus.
   - `HOST` and `PORT` – listen address (defaults to `[::1]:50051`; Docker uses `0.0.0.0:50051`).
   - `.env.test` exports `TEST_DATABASE_URL`, `RUST_LOG`, `RUST_BACKTRACE`, and `RUST_TEST_THREADS=1` for integration tests.
-- Recommended: copy `.env` to `.env.local`, override local values, and rely on `dotenv::from_filename(".env.local")` during startup.
+- Recommended: keep shared defaults in `.env`, copy overrides to `.env.local`, and rely on startup loading both files.
 
 ## Running and Deploying
 - **Local development**
@@ -30,7 +31,7 @@ This guide explains how automation agents and human contributors should work wit
   2. `cargo run -p stationapi` rebuilds the schema from `data/create_table.sql`, imports every `data/*.csv`, and then boots the gRPC server. If extension creation fails, grant the needed privileges manually.
   3. Health checks respond to `grpc.health.v1.Health/Check`; gRPC Reflection is available for tooling such as `grpcurl`.
 - **Docker / Compose**
-  - `docker compose up --build` launches both the API and PostgreSQL containers. Source code mounts into `/app`, but hot reload is not provided; rebuild after code changes.
+  - `docker compose up --build` launches both the API and PostgreSQL containers. Compose passes `.env.local` to the API container, so put local runtime secrets such as `ODPT_ACCESS_TOKEN` there before starting the stack. Source code mounts into `/app`, but hot reload is not provided; rebuild after code changes.
   - Production images rely on `docker/api/Dockerfile`, which runs `cargo build -p stationapi --release` and copies `data/`.
 - **gRPC-Web**
   - The server accepts HTTP/1.1 and wraps handlers via `tonic_web::enable`. Disable this behavior by exporting `DISABLE_GRPC_WEB=true` to require HTTP/2 clients only.
@@ -53,7 +54,7 @@ This guide explains how automation agents and human contributors should work wit
 - **Lines** – `GetLineById`, `GetLinesByIdList`, `GetLinesByName`. Results include company data and computed line symbols based on repository helpers.
 - **Routes** – `GetRoutes`, `GetRoutesMinimal`. The minimal variant returns `RouteMinimalResponse` with deduplicated `LineMinimal` data; paging tokens are currently empty (pagination not implemented).
 - **Train types** – `GetTrainTypesByStationId`, `GetRouteTypes`. Train types aggregate by line group and include related lines plus optional train type metadata. Rail variants use `TrainTypeKind::{Default, Branch, Rapid, Express, LimitedExpress, HighSpeedRapid, CommuterRapid}` (0-6); bus variants use `BusRoute` (7), which represents a `(route_id, shape_id)` operation pattern (e.g. 循環 / 短ターン / 支線) generated automatically from the Toei Bus GTFS feed.
-- **GTFS bus integration** – At startup, `src/import.rs::integrate_gtfs_to_stations()` ingests the Toei Bus GTFS feed (downloaded from ODPT) into `gtfs_*` tables and then projects them onto the shared `stations` / `lines` / `types` / `station_station_types` tables. `transport_type` (0: rail, 1: bus) on both `stations` and `lines` keeps the two worlds queryable side by side. `line_cd` (100,000,000+), `station_cd` / `station_g_cd` (200,000,000+), and bus `type_cd` / `line_group_cd` (100,000,000+) are all deterministic fnv1a hashes that stay clear of the rail data ranges. Disable the entire bus pipeline with `DISABLE_BUS_FEATURE=true`.
+- **GTFS bus integration** – At startup, `src/import.rs::integrate_gtfs_to_stations()` ingests the Toei Bus and Seibu Bus GTFS feeds (downloaded from ODPT; Seibu requires `ODPT_ACCESS_TOKEN`) into `gtfs_*` tables and then projects them onto the shared `stations` / `lines` / `types` / `station_station_types` tables. `transport_type` (0: rail, 1: bus) on both `stations` and `lines` keeps the two worlds queryable side by side. GTFS IDs are namespaced per feed before import to avoid cross-operator collisions. `line_cd` (100,000,000+), `station_cd` / `station_g_cd` (200,000,000+), and bus `type_cd` / `line_group_cd` (100,000,000+) are all deterministic fnv1a hashes that stay clear of the rail data ranges. Disable the entire bus pipeline with `DISABLE_BUS_FEATURE=true`.
 - **TTS metadata** – `Station`, `StationMinimal`, `Line`, and `TrainType` expose `name_ipa` / `name_roman_ipa` plus `name_tts_segments` for multi-segment pronunciation output. Use `name_tts_segments` when clients need per-token SSML construction for mixed-language names such as `Kasai-Rinkai Park`.
 - **Connected routes** – `GetConnectedRoutes`. `QueryInteractor::get_connected_stations` is not implemented yet and returns an empty vector; update the use-case and infrastructure layers together when adding real logic.
 - Changes to the service contract require coordinated updates to `proto/stationapi.proto`, regenerated code via `tonic-build`, and corresponding adjustments in both presentation and use-case layers.
