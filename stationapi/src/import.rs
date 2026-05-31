@@ -188,6 +188,7 @@ struct GtfsFeed {
     path: &'static str,
     url: &'static str,
     requires_consumer_key: bool,
+    experimental: bool,
 }
 
 const GTFS_FEEDS: &[GtfsFeed] = &[
@@ -197,6 +198,7 @@ const GTFS_FEEDS: &[GtfsFeed] = &[
         path: "data/ToeiBus-GTFS",
         url: "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip",
         requires_consumer_key: false,
+        experimental: false,
     },
     GtfsFeed {
         id: "seibu",
@@ -204,10 +206,12 @@ const GTFS_FEEDS: &[GtfsFeed] = &[
         path: "data/SeibuBus-GTFS",
         url: "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip",
         requires_consumer_key: true,
+        experimental: true,
     },
 ];
 
 const DEFAULT_GTFS_BUS_LINE_COLOR: &str = "#1f63c6";
+const ENABLE_EXPERIMENTAL_BUS_FEATURE_ENV: &str = "ENABLE_EXPERIMENTAL_BUS_FEATURE";
 
 fn scoped_gtfs_id(feed: &GtfsFeed, id: &str) -> String {
     format!("{}:{}", feed.id, id)
@@ -231,6 +235,18 @@ fn gtfs_download_url(feed: &GtfsFeed) -> Result<String, Box<dyn std::error::Erro
     })?;
 
     Ok(format!("{}?acl:consumerKey={}", feed.url, token))
+}
+
+fn gtfs_feeds_for_experimental_enabled(enabled: bool) -> Vec<GtfsFeed> {
+    GTFS_FEEDS
+        .iter()
+        .copied()
+        .filter(|feed| !feed.experimental || enabled)
+        .collect()
+}
+
+fn enabled_gtfs_feeds() -> Vec<GtfsFeed> {
+    gtfs_feeds_for_experimental_enabled(is_experimental_bus_feature_enabled())
 }
 
 /// Download and extract GTFS data from ODPT API
@@ -326,11 +342,19 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     info!("[gtfs] bus feature enabled, starting download/extract");
+    let enabled_feeds = enabled_gtfs_feeds();
+    info!(
+        "[gtfs] enabled feeds: {}",
+        enabled_feeds
+            .iter()
+            .map(|feed| feed.name)
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
 
     // Download GTFS data if not present (use spawn_blocking to avoid blocking async runtime)
     let download_start = std::time::Instant::now();
-    for feed in GTFS_FEEDS {
-        let feed = *feed;
+    for feed in enabled_feeds.iter().copied() {
         tokio::task::spawn_blocking(move || download_gtfs(feed))
             .await
             .map_err(|e| format!("Failed to spawn blocking task: {}", e))?
@@ -387,7 +411,7 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
         clear_start.elapsed()
     );
 
-    for feed in GTFS_FEEDS {
+    for feed in &enabled_feeds {
         let gtfs_path = Path::new(feed.path);
         if !gtfs_path.exists() {
             info!(
@@ -1494,7 +1518,15 @@ async fn import_gtfs_feed_info(
 }
 
 fn is_bus_feature_disabled() -> bool {
-    match env::var("DISABLE_BUS_FEATURE") {
+    env_flag_enabled("DISABLE_BUS_FEATURE")
+}
+
+fn is_experimental_bus_feature_enabled() -> bool {
+    env_flag_enabled(ENABLE_EXPERIMENTAL_BUS_FEATURE_ENV)
+}
+
+fn env_flag_enabled(name: &str) -> bool {
+    match env::var(name) {
         Ok(s) => s.eq_ignore_ascii_case("true") || s == "1",
         Err(_) => false,
     }
@@ -3023,6 +3055,21 @@ mod tests {
     fn test_is_bus_feature_disabled() {
         // This test depends on environment variable, so we just verify it doesn't panic
         let _ = is_bus_feature_disabled();
+    }
+
+    #[test]
+    fn test_gtfs_feeds_for_experimental_enabled() {
+        let stable_feeds = gtfs_feeds_for_experimental_enabled(false);
+        assert_eq!(
+            stable_feeds.iter().map(|feed| feed.id).collect::<Vec<_>>(),
+            vec!["toei"]
+        );
+
+        let all_feeds = gtfs_feeds_for_experimental_enabled(true);
+        assert_eq!(
+            all_feeds.iter().map(|feed| feed.id).collect::<Vec<_>>(),
+            vec!["toei", "seibu"]
+        );
     }
 
     #[test]

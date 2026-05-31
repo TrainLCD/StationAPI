@@ -166,7 +166,7 @@ CREATE INDEX idx_performance_station_name_trgm ON stations
 
 ### バス (GTFS) データの統合
 
-`stations` / `lines` / `types` / `station_station_types` は鉄道とバスの両方を保持し、`stations.transport_type` / `lines.transport_type` (0: 鉄道, 1: バス) でフィルタリングします。バスデータの取り込みは `src/import.rs` の `integrate_gtfs_to_stations()` が起動時に実行し、ODPT 公開の Toei Bus / Seibu Bus GTFS を `gtfs_*` テーブルに展開してから既存テーブルへ統合します。Seibu Bus のダウンロードには `.env.local` の `ODPT_ACCESS_TOKEN` を使用します。
+`stations` / `lines` / `types` / `station_station_types` は鉄道とバスの両方を保持し、`stations.transport_type` / `lines.transport_type` (0: 鉄道, 1: バス) でフィルタリングします。バスデータの取り込みは `src/import.rs` の `integrate_gtfs_to_stations()` が起動時に実行し、ODPT 公開の GTFS を `gtfs_*` テーブルに展開してから既存テーブルへ統合します。既定では安定フィードの Toei Bus のみを使用し、`ENABLE_EXPERIMENTAL_BUS_FEATURE=true` の場合だけ Seibu Bus を含む全GTFSフィードを使用します。Seibu Bus のダウンロードには `.env.local` の `ODPT_ACCESS_TOKEN` を使用します。
 
 | 鉄道側の概念 | バス側の対応 |
 |---|---|
