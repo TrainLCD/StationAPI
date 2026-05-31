@@ -1610,7 +1610,9 @@ fn generate_bus_line_group_cd(route_id: &str, shape_id: &str) -> i32 {
 }
 
 fn company_cd_for_gtfs_route(route_id: &str) -> Option<i32> {
-    if route_id.starts_with("seibu:") {
+    if route_id.starts_with("toei:") {
+        Some(119) // Toei Transportation
+    } else if route_id.starts_with("seibu:") {
         Some(253) // Seibu Bus
     } else {
         None // Unknown/unsupported prefix
@@ -2975,8 +2977,9 @@ mod tests {
 
     #[test]
     fn test_company_cd_for_gtfs_route() {
-        assert_eq!(company_cd_for_gtfs_route("toei:route_001"), None);
+        assert_eq!(company_cd_for_gtfs_route("toei:route_001"), Some(119));
         assert_eq!(company_cd_for_gtfs_route("seibu:route_001"), Some(253));
+        assert_eq!(company_cd_for_gtfs_route("unknown:route_001"), None);
     }
 
     #[test]
