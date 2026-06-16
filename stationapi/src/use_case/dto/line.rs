@@ -391,7 +391,7 @@ mod tests {
         line.line_name_k = "セイブイケブクロセン".to_string();
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("se.ibɯ.ikebɯkɯɾosen".to_string()));
+        assert_eq!(grpc_line.name_ipa, Some("seːbɯ.ikebɯkɯɾosen".to_string()));
     }
 
     #[test]
@@ -403,7 +403,7 @@ mod tests {
         line.line_name_k = "トウカイドウホンセン".to_string();
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("to.ɯka.ido.ɯˈhonsen".to_string()));
+        assert_eq!(grpc_line.name_ipa, Some("toːka.idoːˈhonsen".to_string()));
     }
 
     #[test]
@@ -413,7 +413,7 @@ mod tests {
         line.line_name_k = "トウホクシンカンセン".to_string();
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("to.ɯhokɯɕinˈkansen".to_string()));
+        assert_eq!(grpc_line.name_ipa, Some("toːhokɯɕinˈkansen".to_string()));
     }
 
     #[test]
@@ -425,7 +425,7 @@ mod tests {
         let grpc_line: GrpcLine = line.into();
 
         // name_ipa は日本語読み (下げ核付き)、name_roman_ipa はローマ字 (英語) 読み。
-        assert_eq!(grpc_line.name_ipa, Some("ke.ise.ˈihonsen".to_string()));
+        assert_eq!(grpc_line.name_ipa, Some("keːseˈːhonsen".to_string()));
         assert_eq!(
             grpc_line.name_roman_ipa,
             Some("keːseː meɪn laɪn".to_string())
@@ -441,7 +441,7 @@ mod tests {
         line.line_name_r = None;
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("t͡ɕɯ.ɯ.ˈo.ɯ so.ɯbɯsen".to_string()));
+        assert_eq!(grpc_line.name_ipa, Some("t͡ɕɯː.ˈoː soːbɯsen".to_string()));
         assert!(!grpc_line.name_tts_segments.is_empty());
     }
 
