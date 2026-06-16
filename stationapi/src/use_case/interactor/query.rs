@@ -789,6 +789,7 @@ where
                         .collect();
 
                     let ipa = crate::domain::ipa::compute_ipa_cached(
+                        &row.station_name,
                         &row.station_name_k,
                         row.station_name_r.as_deref(),
                     );

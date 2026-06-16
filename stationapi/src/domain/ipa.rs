@@ -1,5 +1,24 @@
+use jpreprocess::{
+    kind::JPreprocessDictionaryKind, DefaultTokenizer, JPreprocess, SystemDictionaryConfig,
+};
 use std::collections::HashMap;
 use std::sync::{LazyLock, RwLock};
+
+/// Down-step (accent nucleus) marker inserted before the accented mora.
+/// Azure AI Speech honors the IPA primary-stress mark `ˈ` on the `<phoneme>`
+/// path, so we reuse the existing `alphabet=Ipa` output to convey Japanese
+/// pitch accent. See issue #1534.
+const ACCENT_NUCLEUS_MARKER: char = 'ˈ';
+
+/// OpenJTalk frontend (jpreprocess) loaded once with the bundled naist-jdic
+/// dictionary. `None` if the dictionary fails to load, in which case pitch
+/// accent estimation is silently skipped (readings stay accent-free).
+static JPREPROCESS: LazyLock<Option<JPreprocess<DefaultTokenizer>>> = LazyLock::new(|| {
+    SystemDictionaryConfig::Bundled(JPreprocessDictionaryKind::NaistJdic)
+        .load()
+        .map(|dict| JPreprocess::with_dictionaries(dict, None))
+        .ok()
+});
 
 /// Cached IPA computation result for a single name.
 #[derive(Clone, Debug)]
@@ -9,7 +28,11 @@ pub struct IpaResult {
     pub tts_segments: Vec<TtsNameSegment>,
 }
 
-type IpaCacheKey = (String, Option<String>);
+/// Cache key: (kanji surface, katakana reading, romanized name). The kanji
+/// surface participates because it is the primary input for pitch-accent
+/// estimation, so two entries that share a reading but differ in kanji may
+/// legitimately produce different accents.
+type IpaCacheKey = (String, String, Option<String>);
 
 static STATION_IPA_CACHE: LazyLock<RwLock<HashMap<IpaCacheKey, IpaResult>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
@@ -19,10 +42,14 @@ static LINE_IPA_CACHE: LazyLock<RwLock<HashMap<IpaCacheKey, IpaResult>>> =
 
 /// Compute all three IPA outputs in a single pass, eliminating the redundant
 /// double-computation of `station_name_to_tts_segments`.
-fn compute_ipa(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
-    let name_ipa = katakana_name_to_ipa(name_katakana);
-    let tts_segments = station_name_to_tts_segments(name_katakana, name_roman);
+fn compute_ipa(name_kanji: &str, name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
+    let accented = accented_katakana_ipa(name_kanji, name_katakana);
+    let name_ipa = non_empty_ipa(accented.clone());
+    let mut tts_segments = station_name_to_tts_segments(name_katakana, name_roman);
+    // name_roman_ipa は英語 (ローマ字) 読みを担うため、アクセント核を付与する前の
+    // 発音から組み立てる。
     let name_roman_ipa = non_empty_ipa(join_tts_segment_pronunciations(&tts_segments));
+    apply_accent_to_katakana_segment(&mut tts_segments, name_katakana, accented.as_deref());
     IpaResult {
         name_ipa,
         name_roman_ipa,
@@ -30,16 +57,38 @@ fn compute_ipa(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
     }
 }
 
-fn compute_line_ipa(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
+fn compute_line_ipa(name_kanji: &str, name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
     // name_ipa は日本語読み。路線名の「線」も日本語 (セン→seɴ) として読ませ、
     // 英語 (laɪn / meɪn laɪn など) を混入させない。英語読みは name_roman_ipa が担う。
-    let name_ipa = katakana_name_to_ipa(name_katakana);
-    let tts_segments = station_name_to_tts_segments(name_katakana, name_roman);
+    let accented = accented_katakana_ipa(name_kanji, name_katakana);
+    let name_ipa = non_empty_ipa(accented.clone());
+    let mut tts_segments = station_name_to_tts_segments(name_katakana, name_roman);
     let name_roman_ipa = station_name_to_ipa("", name_roman);
+    apply_accent_to_katakana_segment(&mut tts_segments, name_katakana, accented.as_deref());
     IpaResult {
         name_ipa,
         name_roman_ipa,
         tts_segments,
+    }
+}
+
+/// When the TTS segments are the katakana fallback (a single ja-JP segment whose
+/// surface is the katakana reading itself), replace its pronunciation with the
+/// accent-annotated IPA. Romanized/English segments are left untouched.
+fn apply_accent_to_katakana_segment(
+    segments: &mut [TtsNameSegment],
+    name_katakana: &str,
+    accented: Option<&str>,
+) {
+    let Some(accented) = accented.filter(|ipa| !ipa.is_empty()) else {
+        return;
+    };
+    if segments.len() == 1
+        && segments[0].lang == "ja-JP"
+        && segments[0].alphabet == TtsAlphabetKind::Ipa
+        && segments[0].surface == name_katakana
+    {
+        segments[0].pronunciation = accented.to_string();
     }
 }
 
@@ -59,28 +108,40 @@ fn cached_lookup(
 }
 
 /// Compute IPA for station/train-type names with memoization.
-pub fn compute_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
-    let key = (name_katakana.to_string(), name_roman.map(str::to_string));
+pub fn compute_ipa_cached(
+    name_kanji: &str,
+    name_katakana: &str,
+    name_roman: Option<&str>,
+) -> IpaResult {
+    let key = (
+        name_kanji.to_string(),
+        name_katakana.to_string(),
+        name_roman.map(str::to_string),
+    );
     cached_lookup(&STATION_IPA_CACHE, &key, || {
-        compute_ipa(name_katakana, name_roman)
+        compute_ipa(name_kanji, name_katakana, name_roman)
     })
 }
 
 /// Compute IPA for line names with memoization.
-pub fn compute_line_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
-    let key = (name_katakana.to_string(), name_roman.map(str::to_string));
+pub fn compute_line_ipa_cached(
+    name_kanji: &str,
+    name_katakana: &str,
+    name_roman: Option<&str>,
+) -> IpaResult {
+    let key = (
+        name_kanji.to_string(),
+        name_katakana.to_string(),
+        name_roman.map(str::to_string),
+    );
     cached_lookup(&LINE_IPA_CACHE, &key, || {
-        compute_line_ipa(name_katakana, name_roman)
+        compute_line_ipa(name_kanji, name_katakana, name_roman)
     })
 }
 
-/// Convert a katakana string to its IPA transcription.
+/// Parse a katakana string into the intermediate `Phoneme` sequence.
 /// Returns `None` if the input contains characters that cannot be converted.
-pub fn katakana_to_ipa(input: &str) -> Option<String> {
-    if input.is_empty() {
-        return Some(String::new());
-    }
-
+fn katakana_to_phonemes(input: &str) -> Option<Vec<Phoneme>> {
     let chars: Vec<char> = input.chars().collect();
     let len = chars.len();
     let mut result = Vec::new();
@@ -102,9 +163,25 @@ pub fn katakana_to_ipa(input: &str) -> Option<String> {
         i += 1;
     }
 
-    // 区切り文字由来の先頭・末尾・連続した空白を 1 つに正規化する。
-    let ipa = apply_phonological_rules(&result);
-    Some(ipa.split_whitespace().collect::<Vec<_>>().join(" "))
+    Some(result)
+}
+
+/// Collapse separator-derived leading/trailing/consecutive whitespace into a
+/// single space, matching the historical `katakana_to_ipa` normalization.
+fn normalize_ipa_whitespace(ipa: &str) -> String {
+    ipa.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Convert a katakana string to its IPA transcription.
+/// Returns `None` if the input contains characters that cannot be converted.
+pub fn katakana_to_ipa(input: &str) -> Option<String> {
+    if input.is_empty() {
+        return Some(String::new());
+    }
+
+    let phonemes = katakana_to_phonemes(input)?;
+    let ipa = apply_phonological_rules(&phonemes);
+    Some(normalize_ipa_whitespace(&ipa))
 }
 
 /// Convert a station name to IPA.
@@ -121,6 +198,149 @@ pub fn katakana_name_to_ipa(input: &str) -> Option<String> {
 
 pub fn non_empty_ipa(ipa: Option<String>) -> Option<String> {
     ipa.filter(|ipa| !ipa.is_empty())
+}
+
+/// Convert a katakana reading to IPA with the Japanese pitch-accent down-step
+/// marker (`ˈ`) inserted before each accent-nucleus mora. Falls back to the
+/// plain (accent-free) reading when accent information cannot be obtained or
+/// the estimated mora count does not line up with the reading.
+///
+/// Returns `None` only when the katakana cannot be converted at all (same
+/// contract as `katakana_to_ipa`).
+fn accented_katakana_ipa(name_kanji: &str, name_katakana: &str) -> Option<String> {
+    if name_katakana.is_empty() {
+        return Some(String::new());
+    }
+
+    let phonemes = katakana_to_phonemes(name_katakana)?;
+    let mut chars = insert_syllable_breaks_tagged(&phonemes_to_tagged_chars(&phonemes));
+    let mora_count = chars.iter().filter_map(|(_, tag)| *tag).max().unwrap_or(0);
+
+    let mut nuclei = pitch_accent_nuclei(name_kanji, name_katakana, mora_count);
+    if !nuclei.is_empty() {
+        nuclei.sort_unstable();
+        nuclei.dedup();
+        // 後ろのモーラから挿入し、先行モーラの位置がずれないようにする。
+        for &mora in nuclei.iter().rev() {
+            if let Some(pos) = chars.iter().position(|(_, tag)| *tag == Some(mora)) {
+                chars.insert(pos, (ACCENT_NUCLEUS_MARKER, Some(mora)));
+            }
+        }
+    }
+
+    let ipa: String = chars.into_iter().map(|(c, _)| c).collect();
+    Some(normalize_ipa_whitespace(&ipa))
+}
+
+/// Resolve the 1-indexed accent-nucleus mora positions for a reading.
+///
+/// Order of precedence:
+/// 1. A manual override keyed by katakana reading (correction layer for
+///    estimation mistakes, see [`accent_override`]).
+/// 2. jpreprocess estimation from the kanji surface (most accurate).
+/// 3. jpreprocess estimation from the katakana reading (guarantees the mora
+///    count lines up with our IPA, at the cost of some accent accuracy).
+///
+/// Any estimate whose mora count disagrees with `mora_count` is discarded so a
+/// misaligned nucleus is never placed; the reading then stays accent-free.
+fn pitch_accent_nuclei(name_kanji: &str, name_katakana: &str, mora_count: usize) -> Vec<usize> {
+    if mora_count == 0 {
+        return Vec::new();
+    }
+
+    if let Some(nuclei) = accent_override(name_katakana) {
+        return nuclei
+            .into_iter()
+            .filter(|&n| (1..=mora_count).contains(&n))
+            .collect();
+    }
+
+    let mut candidates: Vec<&str> = Vec::with_capacity(2);
+    if !name_kanji.is_empty() {
+        candidates.push(name_kanji);
+    }
+    candidates.push(name_katakana);
+
+    for text in candidates {
+        if let Some((total, nuclei)) = analyze_accent(text) {
+            if total == mora_count {
+                // 語末モーラの核（尾高型）は、後続の助詞がない孤立した名称読みでは
+                // 平板型と聞き分けられない。マーカーを付けると不自然な下降になるため
+                // 除外し、語中の下げ核（頭高・中高）のみ残す。issue #1534 の実機検証で
+                // 橋(尾高)は平板扱い(マーカーなし)が妥当と確認済み。
+                //
+                // 複合語は複数のアクセント句に分かれ核も複数推定されうるが、汎用 TTS で
+                // 1 名称に下げ核を複数置くと不自然になりやすい。issue #1534 の検証も単一
+                // 下降が対象のため、推定では先頭(主たる)の語中核 1 つだけを採用する。
+                // 複数核を意図的に置きたい場合は accent_override で明示する。
+                return nuclei
+                    .into_iter()
+                    .find(|&n| n < mora_count)
+                    .into_iter()
+                    .collect();
+            }
+        }
+    }
+
+    Vec::new()
+}
+
+/// Run jpreprocess on `text` and return `(total mora count, 1-indexed accent
+/// nucleus mora positions)`. Returns `None` when the dictionary is unavailable
+/// or analysis fails.
+fn analyze_accent(text: &str) -> Option<(usize, Vec<usize>)> {
+    let jpreprocess = JPREPROCESS.as_ref()?;
+    let labels = jpreprocess.extract_fullcontext(text).ok()?;
+
+    let mut total = 0usize;
+    let mut nuclei = Vec::new();
+    // A full-context label is emitted per phoneme. Within an accent phrase the
+    // mora's A1 value (`relative_accent_position` = accent type − mora position)
+    // decreases by one each mora and is unique per mora; combined with the
+    // accent-phrase index (`mora_position_forward`, which here numbers accent
+    // phrases within the breath group) the pair uniquely identifies a mora, so a
+    // change marks a new mora. Pauses/silences (no mora info) reset the tracker.
+    let mut prev_key: Option<(u8, i8)> = None;
+
+    for label in &labels {
+        let (Some(mora), Some(accent_phrase)) = (&label.mora, &label.accent_phrase_curr) else {
+            prev_key = None;
+            continue;
+        };
+        let key = (
+            accent_phrase.mora_position_forward,
+            mora.relative_accent_position,
+        );
+        if Some(key) != prev_key {
+            total += 1;
+            // A1 == 0 marks the accent nucleus mora (mora position == accent
+            // type). Heiban (accent type 0) never yields 0, so it correctly
+            // produces no nucleus.
+            if mora.relative_accent_position == 0 {
+                nuclei.push(total);
+            }
+            prev_key = Some(key);
+        }
+    }
+
+    Some((total, nuclei))
+}
+
+/// Manual accent-nucleus override keyed by katakana reading. This is the
+/// correction layer (issue #1534 案B): when jpreprocess mis-estimates an
+/// accent, list the correct 1-indexed nucleus mora positions here. An empty
+/// `Vec` forces heiban (no down-step). Returning `None` defers to estimation.
+fn accent_override(name_katakana: &str) -> Option<Vec<usize>> {
+    // (katakana reading, 1-indexed accent nucleus mora positions)
+    const OVERRIDES: &[(&str, &[usize])] = &[
+        // 練馬春日町: jpreprocess は漢字を未知語として尾高デフォルト(核なし)に倒す。
+        // 「ねりまかすが↓ちょう」と春日(かすが)の「が」(6 モーラ目)で下がるのが妥当。
+        ("ネリマカスガチョウ", &[6]),
+    ];
+    OVERRIDES
+        .iter()
+        .find(|(reading, _)| *reading == name_katakana)
+        .map(|(_, nuclei)| nuclei.to_vec())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1035,22 +1255,6 @@ fn strip_secondary_articulation(onset: &str) -> String {
     onset.replace('ʲ', "")
 }
 
-/// Get the last vowel character from an IPA string for long vowel extension.
-fn last_vowel(ipa: &str) -> Option<&'static str> {
-    for c in ipa.chars().rev() {
-        match c {
-            'a' => return Some("a"),
-            'i' => return Some("i"),
-            'ɯ' => return Some("ɯ"),
-            'e' => return Some("e"),
-            'o' => return Some("o"),
-            'u' => return Some("u"),
-            _ => continue,
-        }
-    }
-    None
-}
-
 /// Classify the place of articulation of the following phoneme for ン assimilation.
 fn nasal_for_following(next_ipa: &str) -> &'static str {
     // Check first meaningful character(s) of the following phoneme
@@ -1080,83 +1284,124 @@ fn nasal_for_following(next_ipa: &str) -> &'static str {
     }
 }
 
-/// Apply phonological rules: ン assimilation, ッ gemination, long vowels.
-fn apply_phonological_rules(phonemes: &[Phoneme]) -> String {
-    let mut output = String::new();
+/// Determine the consonant character that a geminate (ッ) doubles in front of
+/// the following phoneme. Returns `None` when nothing should be emitted
+/// (no following phoneme, or the following phoneme starts with a vowel).
+///
+/// For affricates (t͡ɕ, t͡s), only the stop portion (t) is geminated; for the
+/// voiced affricate dʑ the stop portion is d; for palatalized onsets (kʲ, gʲ,
+/// etc.) only the base consonant is geminated.
+fn geminate_onset_char(next_ipa: &str) -> Option<char> {
+    if next_ipa.starts_with("t͡ɕ") || next_ipa.starts_with("t͡s") {
+        Some('t')
+    } else if next_ipa.starts_with("dʑ") {
+        Some('d')
+    } else {
+        let (onset, _) = split_onset(next_ipa);
+        if onset.is_empty() {
+            None
+        } else {
+            strip_secondary_articulation(onset).chars().next()
+        }
+    }
+}
+
+/// Apply phonological rules (ン assimilation, ッ gemination, long vowels) while
+/// tracking, for every emitted character, the 1-indexed mora it belongs to.
+/// Separator-derived characters (spaces) carry `None`.
+///
+/// Each `Phoneme` corresponds to exactly one mora except separators: regular
+/// syllables, the moraic nasal (ン), the geminate (ッ) and the long vowel (ー)
+/// are all counted as one mora each, matching OpenJTalk's mora segmentation.
+/// This 1:1 correspondence is what lets the pitch-accent layer line up the mora
+/// indices returned by jpreprocess with positions in the IPA string.
+fn phonemes_to_tagged_chars(phonemes: &[Phoneme]) -> Vec<(char, Option<usize>)> {
+    let mut output: Vec<(char, Option<usize>)> = Vec::new();
+    let mut mora_index = 0usize;
     let len = phonemes.len();
     let mut i = 0;
 
     while i < len {
         match &phonemes[i] {
             Phoneme::Regular(ipa) => {
-                output.push_str(ipa);
-                i += 1;
+                if ipa.trim().is_empty() {
+                    // Separator (word boundary): not a mora.
+                    output.extend(ipa.chars().map(|c| (c, None)));
+                } else {
+                    mora_index += 1;
+                    output.extend(ipa.chars().map(|c| (c, Some(mora_index))));
+                }
             }
             Phoneme::MoraicNasal => {
-                // Look ahead for assimilation
-                if let Some(next_ipa) = find_next_regular(&phonemes[i + 1..]) {
-                    output.push_str(nasal_for_following(next_ipa));
-                } else {
-                    output.push('ɴ'); // word-final
-                }
-                i += 1;
+                mora_index += 1;
+                let nasal = match find_next_regular(&phonemes[i + 1..]) {
+                    Some(next_ipa) => nasal_for_following(next_ipa),
+                    None => "ɴ", // word-final
+                };
+                output.extend(nasal.chars().map(|c| (c, Some(mora_index))));
             }
             Phoneme::Geminate => {
-                // Double the onset of the following consonant.
-                // For affricates (t͡ɕ, t͡s), only the stop portion (t) is geminated.
-                // For palatalized onsets (kʲ, gʲ, etc.), only the base consonant is geminated.
+                mora_index += 1;
                 if let Some(next_ipa) = find_next_regular(&phonemes[i + 1..]) {
-                    if next_ipa.starts_with("t͡ɕ") || next_ipa.starts_with("t͡s") {
-                        output.push('t');
-                    } else if next_ipa.starts_with("dʑ") {
-                        output.push('d');
-                    } else {
-                        let (onset, _) = split_onset(next_ipa);
-                        if !onset.is_empty() {
-                            let base = strip_secondary_articulation(onset);
-                            if let Some(c) = base.chars().next() {
-                                output.push(c);
-                            }
-                        }
+                    if let Some(c) = geminate_onset_char(next_ipa) {
+                        output.push((c, Some(mora_index)));
                     }
                 }
-                i += 1;
             }
             Phoneme::LongVowel => {
-                // Lengthen the preceding vowel
-                if last_vowel(&output).is_some() {
-                    // Check if already has ː
-                    if !output.ends_with('ː') {
-                        output.push('ː');
-                    }
-                } else {
-                    output.push('ː');
+                mora_index += 1;
+                // Lengthen the preceding vowel unless it is already long.
+                let already_long = output.last().map(|(c, _)| *c == 'ː').unwrap_or(false);
+                if !already_long {
+                    output.push(('ː', Some(mora_index)));
                 }
-                i += 1;
             }
         }
+        i += 1;
     }
 
-    insert_syllable_breaks(&output)
+    output
+}
+
+/// Apply phonological rules: ン assimilation, ッ gemination, long vowels.
+fn apply_phonological_rules(phonemes: &[Phoneme]) -> String {
+    let raw: String = phonemes_to_tagged_chars(phonemes)
+        .into_iter()
+        .map(|(c, _)| c)
+        .collect();
+    insert_syllable_breaks(&raw)
+}
+
+/// Insert IPA syllable boundary markers (`.`) between consecutive vowels,
+/// preserving the per-character mora tags. The inserted `.` is attributed to
+/// the preceding character's mora so it never becomes the first character of
+/// the following mora (which matters when the accent marker is placed there).
+fn insert_syllable_breaks_tagged(input: &[(char, Option<usize>)]) -> Vec<(char, Option<usize>)> {
+    let mut result: Vec<(char, Option<usize>)> = Vec::with_capacity(input.len());
+    let mut prev_is_vowel = false;
+
+    for &(c, tag) in input {
+        let is_vowel = "aiɯeou".contains(c);
+        if is_vowel && prev_is_vowel {
+            let prev_tag = result.last().and_then(|(_, t)| *t);
+            result.push(('.', prev_tag));
+        }
+        result.push((c, tag));
+        prev_is_vowel = is_vowel;
+    }
+
+    result
 }
 
 /// Insert IPA syllable boundary markers (`.`) between consecutive vowels.
 /// This prevents Google TTS from interpreting cross-mora vowel sequences
 /// (e.g. `ei` in セイ) as English diphthongs (e.g. /eɪ/ → "ai").
 fn insert_syllable_breaks(input: &str) -> String {
-    let mut result = String::with_capacity(input.len());
-    let mut prev_is_vowel = false;
-
-    for c in input.chars() {
-        let is_vowel = "aiɯeou".contains(c);
-        if is_vowel && prev_is_vowel {
-            result.push('.');
-        }
-        result.push(c);
-        prev_is_vowel = is_vowel;
-    }
-
-    result
+    let tagged: Vec<(char, Option<usize>)> = input.chars().map(|c| (c, None)).collect();
+    insert_syllable_breaks_tagged(&tagged)
+        .into_iter()
+        .map(|(c, _)| c)
+        .collect()
 }
 
 /// Find the IPA string of the next Regular phoneme in the slice.
@@ -1392,6 +1637,48 @@ mod tests {
         assert_eq!(
             station_name_to_ipa("ハネダクウコウ", Some("Haneda Airport Terminal 10")),
             Some("haneda ɛɚpɔɹt tɚmɪnəl wʌnzɪɹoʊ".to_string())
+        );
+    }
+
+    #[test]
+    fn test_accent_marks_atamadaka_head_nucleus() {
+        // 頭高型 (accent type 1): 1 モーラ目の直前に下げ核マーカーが付く。
+        assert_eq!(
+            accented_katakana_ipa("箸", "ハシ"),
+            Some("ˈhaɕi".to_string())
+        );
+        assert_eq!(
+            accented_katakana_ipa("京都", "キョウト"),
+            Some("ˈkʲo.ɯto".to_string())
+        );
+    }
+
+    #[test]
+    fn test_accent_omits_marker_for_heiban() {
+        // 平板型: 下げ核なし。マーカーを付けない。
+        assert_eq!(
+            accented_katakana_ipa("渋谷", "シブヤ"),
+            Some("ɕibɯja".to_string())
+        );
+    }
+
+    #[test]
+    fn test_accent_omits_word_final_nucleus() {
+        // 尾高型 (核が語末モーラ) は孤立読みでは平板と区別できないためマーカーなし。
+        // 橋 (尾高) は issue #1534 の実機検証でも平板扱いが妥当とされた。
+        assert_eq!(
+            accented_katakana_ipa("橋", "ハシ"),
+            Some("haɕi".to_string())
+        );
+    }
+
+    #[test]
+    fn test_accent_override_applies_for_nerima_kasugacho() {
+        // jpreprocess が漢字を未知語として核なしに倒すケースを補正辞書で救済する。
+        // 「ねりまかすが↓ちょう」= 6 モーラ目 (ガ) の直前に下げ核。
+        assert_eq!(
+            accented_katakana_ipa("練馬春日町", "ネリマカスガチョウ"),
+            Some("neɾimakasɯˈgat͡ɕo.ɯ".to_string())
         );
     }
 
