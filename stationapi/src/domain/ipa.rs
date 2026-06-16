@@ -66,7 +66,7 @@ pub fn compute_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaR
     })
 }
 
-/// Compute IPA for line names (with suffix replacement) with memoization.
+/// Compute IPA for line names with memoization.
 pub fn compute_line_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
     let key = (name_katakana.to_string(), name_roman.map(str::to_string));
     cached_lookup(&LINE_IPA_CACHE, &key, || {
