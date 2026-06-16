@@ -102,7 +102,9 @@ pub fn katakana_to_ipa(input: &str) -> Option<String> {
         i += 1;
     }
 
-    Some(apply_phonological_rules(&result))
+    // 区切り文字由来の先頭・末尾・連続した空白を 1 つに正規化する。
+    let ipa = apply_phonological_rules(&result);
+    Some(ipa.split_whitespace().collect::<Vec<_>>().join(" "))
 }
 
 /// Convert a station name to IPA.
@@ -997,8 +999,10 @@ fn lookup_single(c: char) -> Option<Phoneme> {
         'ン' => return Some(Phoneme::MoraicNasal),
         'ッ' => return Some(Phoneme::Geminate),
         'ー' => return Some(Phoneme::LongVowel),
-        // 空白（全角・半角）はそのまま透過
-        '　' | ' ' => return Some(Phoneme::Regular(" ")),
+        // 区切り文字（全角・半角空白、中黒、括弧）は語の区切りとして空白に変換。
+        // 「チュウオウ・ソウブセン」「トウキョウサクラトラム（トデンアラカワセン）」など、
+        // これらを含む路線名で name_ipa 全体が None にならないようにする。
+        '　' | ' ' | '・' | '（' | '）' | '(' | ')' => return Some(Phoneme::Regular(" ")),
         _ => return None,
     };
     Some(Phoneme::Regular(ipa))
@@ -1482,6 +1486,18 @@ mod tests {
                 "failed for {roman}"
             );
         }
+    }
+
+    #[test]
+    fn test_nakaguro_treated_as_word_separator() {
+        // 中黒「・」は語の区切りとして空白に変換し、全体が None にならないようにする
+        assert_eq!(ipa("チュウオウ・ソウブ"), "t͡ɕɯ.ɯ.o.ɯ so.ɯbɯ");
+    }
+
+    #[test]
+    fn test_fullwidth_parentheses_treated_as_word_separator() {
+        // 全角括弧「（）」も空白として扱い、先頭・末尾・連続の空白は正規化される
+        assert_eq!(ipa("トラム（トデン）"), "toɾamɯ todeɴ");
     }
 
     #[test]
