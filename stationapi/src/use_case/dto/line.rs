@@ -424,6 +424,31 @@ mod tests {
     }
 
     #[test]
+    fn test_name_ipa_with_nakaguro_is_not_null() {
+        // 「・」を含む路線名でも name_ipa / name_tts_segments が null / 空にならない
+        let mut line = create_test_line(TransportType::Rail, None);
+        line.line_name_k = "チュウオウ・ソウブセン".to_string();
+        line.line_name_r = None;
+        let grpc_line: GrpcLine = line.into();
+
+        assert_eq!(grpc_line.name_ipa, Some("t͡ɕɯ.ɯ.o.ɯ so.ɯbɯseɴ".to_string()));
+        assert!(!grpc_line.name_tts_segments.is_empty());
+    }
+
+    #[test]
+    fn test_name_ipa_with_fullwidth_parentheses_is_not_null() {
+        // 全角括弧を含む路線名でも name_ipa / name_tts_segments が null / 空にならない
+        let mut line = create_test_line(TransportType::Rail, None);
+        line.line_name_k = "トウキョウサクラトラム（トデンアラカワセン）".to_string();
+        line.line_name_r = None;
+        let grpc_line: GrpcLine = line.into();
+
+        assert!(grpc_line.name_ipa.is_some());
+        assert!(!grpc_line.name_ipa.as_deref().unwrap().is_empty());
+        assert!(!grpc_line.name_tts_segments.is_empty());
+    }
+
+    #[test]
     fn test_name_ipa_empty_result_is_normalized_to_none() {
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "".to_string();
