@@ -147,7 +147,7 @@ mod tests {
 
         assert_eq!(
             grpc_station.name_roman_ipa,
-            Some("inage ka.igaɴ".to_string())
+            Some("inage ka.igan".to_string())
         );
     }
 

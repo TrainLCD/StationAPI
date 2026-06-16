@@ -58,7 +58,7 @@ fn compute_ipa(name_kanji: &str, name_katakana: &str, name_roman: Option<&str>) 
 }
 
 fn compute_line_ipa(name_kanji: &str, name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
-    // name_ipa は日本語読み。路線名の「線」も日本語 (セン→seɴ) として読ませ、
+    // name_ipa は日本語読み。路線名の「線」も日本語 (セン→sen) として読ませ、
     // 英語 (laɪn / meɪn laɪn など) を混入させない。英語読みは name_roman_ipa が担う。
     let accented = accented_katakana_ipa(name_kanji, name_katakana);
     let name_ipa = non_empty_ipa(accented.clone());
@@ -783,7 +783,7 @@ fn lookup_english_word_ipa(word: &str) -> Option<&'static str> {
         "j" => Some("dʒeɪ"),
         "juhatchome" => Some("dʑɯːhatt͡ɕoːme"),
         "kintestu" => Some("kintetsɯ"),
-        "kutchan" => Some("kɯtt͡ɕaɴ"),
+        "kutchan" => Some("kɯtt͡ɕan"),
         "linimo" => Some("linimo"),
         "minoh" => Some("minoː"),
         "newtown" => Some("njuːtaʊn"),
@@ -794,7 +794,7 @@ fn lookup_english_word_ipa(word: &str) -> Option<&'static str> {
         "peach" => Some("piːtʃ"),
         "retro" => Some("ɹɛtɹoʊ"),
         "rias" => Some("ɹiːəs"),
-        "shim" => Some("ɕiɴ"),
+        "shim" => Some("ɕin"),
         "side" => Some("saɪd"),
         "skyliner" => Some("skaɪlaɪnɚ"),
         "skyrail" => Some("skaɪɹeɪl"),
@@ -1280,7 +1280,10 @@ fn nasal_for_following(next_ipa: &str) -> &'static str {
     {
         "n" // alveolar assimilation (includes t͡ɕ, t͡s which start with t)
     } else {
-        "ɴ" // default: uvular nasal (word-final or before vowels)
+        // word-final or before vowels.
+        // 本来は声門/口蓋垂鼻音 ɴ だが、Azure ja-JP の <phoneme alphabet="ipa">
+        // が ɴ を音節化せず「ん」が脱落するため n に統一する (#1536)。
+        "n"
     }
 }
 
@@ -1336,7 +1339,7 @@ fn phonemes_to_tagged_chars(phonemes: &[Phoneme]) -> Vec<(char, Option<usize>)> 
                 mora_index += 1;
                 let nasal = match find_next_regular(&phonemes[i + 1..]) {
                     Some(next_ipa) => nasal_for_following(next_ipa),
-                    None => "ɴ", // word-final
+                    None => "n", // word-final (Azure が ɴ を鳴らさないため n に統一, #1536)
                 };
                 output.extend(nasal.chars().map(|c| (c, Some(mora_index))));
             }
@@ -1528,8 +1531,8 @@ mod tests {
 
     #[test]
     fn test_inagekaigan() {
-        // ン at word end → ɴ
-        assert_eq!(ipa("イナゲカイガン"), "inageka.igaɴ");
+        // ン at word end → n (Azure が ɴ を鳴らさないため, #1536)
+        assert_eq!(ipa("イナゲカイガン"), "inageka.igan");
     }
 
     #[test]
@@ -1574,7 +1577,7 @@ mod tests {
 
     #[test]
     fn test_koen() {
-        assert_eq!(ipa("コウエン"), "ko.ɯ.eɴ");
+        assert_eq!(ipa("コウエン"), "ko.ɯ.en");
     }
 
     #[test]
@@ -1718,7 +1721,7 @@ mod tests {
     fn test_station_name_ipa_splits_compound_kaigan_suffix() {
         assert_eq!(
             station_name_to_ipa("イナゲカイガン", Some("Inagekaigan")),
-            Some("inage ka.igaɴ".to_string())
+            Some("inage ka.igan".to_string())
         );
     }
 
@@ -1726,7 +1729,7 @@ mod tests {
     fn test_station_name_ipa_splits_other_compound_kaigan_suffix() {
         assert_eq!(
             station_name_to_ipa("オオモリカイガン", Some("Omorikaigan")),
-            Some("omoɾi ka.igaɴ".to_string())
+            Some("omoɾi ka.igan".to_string())
         );
     }
 
@@ -1784,7 +1787,7 @@ mod tests {
     #[test]
     fn test_fullwidth_parentheses_treated_as_word_separator() {
         // 全角括弧「（）」も空白として扱い、先頭・末尾・連続の空白は正規化される
-        assert_eq!(ipa("トラム（トデン）"), "toɾamɯ todeɴ");
+        assert_eq!(ipa("トラム（トデン）"), "toɾamɯ toden");
     }
 
     #[test]
