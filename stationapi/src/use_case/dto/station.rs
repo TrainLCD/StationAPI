@@ -147,7 +147,7 @@ mod tests {
 
         assert_eq!(
             grpc_station.name_roman_ipa,
-            Some("inage ka.igaɴ".to_string())
+            Some("inage ka.igan".to_string())
         );
     }
 
@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(grpc_station.name_tts_segments[0].separator, " ");
         assert_eq!(grpc_station.name_tts_segments[1].surface, "Rinkai");
         assert_eq!(grpc_station.name_tts_segments[1].fallback_text, "りんかい");
-        assert_eq!(grpc_station.name_tts_segments[1].pronunciation, "ɾiŋka.i");
+        assert_eq!(grpc_station.name_tts_segments[1].pronunciation, "ɾinka.i");
         assert_eq!(grpc_station.name_tts_segments[1].separator, " ");
         assert_eq!(grpc_station.name_tts_segments[2].surface, "Park");
         assert_eq!(grpc_station.name_tts_segments[2].fallback_text, "Park");

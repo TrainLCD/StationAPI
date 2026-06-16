@@ -58,7 +58,7 @@ fn compute_ipa(name_kanji: &str, name_katakana: &str, name_roman: Option<&str>) 
 }
 
 fn compute_line_ipa(name_kanji: &str, name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
-    // name_ipa は日本語読み。路線名の「線」も日本語 (セン→seɴ) として読ませ、
+    // name_ipa は日本語読み。路線名の「線」も日本語 (セン→sen) として読ませ、
     // 英語 (laɪn / meɪn laɪn など) を混入させない。英語読みは name_roman_ipa が担う。
     let accented = accented_katakana_ipa(name_kanji, name_katakana);
     let name_ipa = non_empty_ipa(accented.clone());
@@ -783,7 +783,7 @@ fn lookup_english_word_ipa(word: &str) -> Option<&'static str> {
         "j" => Some("dʒeɪ"),
         "juhatchome" => Some("dʑɯːhatt͡ɕoːme"),
         "kintestu" => Some("kintetsɯ"),
-        "kutchan" => Some("kɯtt͡ɕaɴ"),
+        "kutchan" => Some("kɯtt͡ɕan"),
         "linimo" => Some("linimo"),
         "minoh" => Some("minoː"),
         "newtown" => Some("njuːtaʊn"),
@@ -794,7 +794,7 @@ fn lookup_english_word_ipa(word: &str) -> Option<&'static str> {
         "peach" => Some("piːtʃ"),
         "retro" => Some("ɹɛtɹoʊ"),
         "rias" => Some("ɹiːəs"),
-        "shim" => Some("ɕiɴ"),
+        "shim" => Some("ɕin"),
         "side" => Some("saɪd"),
         "skyliner" => Some("skaɪlaɪnɚ"),
         "skyrail" => Some("skaɪɹeɪl"),
@@ -1256,31 +1256,16 @@ fn strip_secondary_articulation(onset: &str) -> String {
 }
 
 /// Classify the place of articulation of the following phoneme for ン assimilation.
+///
+/// Azure ja-JP の `<phoneme alphabet="ipa">` は非ASCIIの鼻音 (口蓋垂 `ɴ` /
+/// 口蓋 `ɲ` / 軟口蓋 `ŋ`) を音節化せず「ん」が脱落する (#1536)。そのため
+/// 本来 `ɲ` / `ŋ` / `ɴ` に同化する位置もすべて ASCII の `n` に統一し、
+/// 両唇音前の `m` だけを残す (`m` は ASCII で正しく発音される)。
 fn nasal_for_following(next_ipa: &str) -> &'static str {
-    // Check first meaningful character(s) of the following phoneme
     if next_ipa.starts_with('b') || next_ipa.starts_with('p') || next_ipa.starts_with('m') {
         "m" // bilabial assimilation
-    } else if next_ipa.starts_with('ɲ')
-        || next_ipa.starts_with("dʑ")
-        || next_ipa.starts_with('ɕ')
-        || next_ipa.starts_with("gʲ")
-        || next_ipa.starts_with("kʲ")
-        || next_ipa.starts_with('j')
-        || next_ipa.starts_with('ç')
-    {
-        "ɲ" // palatal assimilation
-    } else if next_ipa.starts_with('k') || next_ipa.starts_with('g') || next_ipa.starts_with('ŋ') {
-        "ŋ" // velar assimilation
-    } else if next_ipa.starts_with('n')
-        || next_ipa.starts_with('t')
-        || next_ipa.starts_with('d')
-        || next_ipa.starts_with('s')
-        || next_ipa.starts_with('z')
-        || next_ipa.starts_with('ɾ')
-    {
-        "n" // alveolar assimilation (includes t͡ɕ, t͡s which start with t)
     } else {
-        "ɴ" // default: uvular nasal (word-final or before vowels)
+        "n"
     }
 }
 
@@ -1334,11 +1319,19 @@ fn phonemes_to_tagged_chars(phonemes: &[Phoneme]) -> Vec<(char, Option<usize>)> 
             }
             Phoneme::MoraicNasal => {
                 mora_index += 1;
-                let nasal = match find_next_regular(&phonemes[i + 1..]) {
+                let next_regular = find_next_regular(&phonemes[i + 1..]);
+                let nasal = match next_regular {
                     Some(next_ipa) => nasal_for_following(next_ipa),
-                    None => "ɴ", // word-final
+                    None => "n", // word-final (Azure が ɴ を鳴らさないため n に統一, #1536)
                 };
                 output.extend(nasal.chars().map(|c| (c, Some(mora_index))));
+                // 母音・半母音 (ヤ行 j / ワ行 w) が続く撥音 (例: シンエゴタ,
+                // シンヨコハマ) は、音節境界 `.` を挟まないと Azure が n+母音を
+                // 「な行」等に融合させてしまう (しねごた)。撥音のモーラに `.` を
+                // 付与して「しん.えごた」のように独立させる (#1536)。
+                if next_regular.is_some_and(starts_with_vowel_or_semivowel) {
+                    output.push(('.', Some(mora_index)));
+                }
             }
             Phoneme::Geminate => {
                 mora_index += 1;
@@ -1372,6 +1365,19 @@ fn apply_phonological_rules(phonemes: &[Phoneme]) -> String {
     insert_syllable_breaks(&raw)
 }
 
+/// Whether `c` is one of the IPA vowel characters used by this module
+/// (`a i ɯ e o u`).
+fn is_ipa_vowel(c: char) -> bool {
+    "aiɯeou".contains(c)
+}
+
+/// Whether the phoneme starts with a vowel or a semivowel (ヤ行 `j` / ワ行 `w`).
+/// Used to decide whether a moraic nasal needs a trailing syllable break so the
+/// `n` stays a coda instead of merging into the following mora.
+fn starts_with_vowel_or_semivowel(ipa: &str) -> bool {
+    ipa.starts_with(is_ipa_vowel) || ipa.starts_with('j') || ipa.starts_with('w')
+}
+
 /// Insert IPA syllable boundary markers (`.`) between consecutive vowels,
 /// preserving the per-character mora tags. The inserted `.` is attributed to
 /// the preceding character's mora so it never becomes the first character of
@@ -1381,7 +1387,7 @@ fn insert_syllable_breaks_tagged(input: &[(char, Option<usize>)]) -> Vec<(char, 
     let mut prev_is_vowel = false;
 
     for &(c, tag) in input {
-        let is_vowel = "aiɯeou".contains(c);
+        let is_vowel = is_ipa_vowel(c);
         if is_vowel && prev_is_vowel {
             let prev_tag = result.last().and_then(|(_, t)| *t);
             result.push(('.', prev_tag));
@@ -1445,8 +1451,15 @@ mod tests {
 
     #[test]
     fn test_shinjuku() {
-        // ン before ジュ → ɲ, ジュ → dʑɯ
-        assert_eq!(ipa("シンジュク"), "ɕiɲdʑɯkɯ");
+        // ン before ジュ → n (Azure が ɲ を鳴らさないため, #1536), ジュ → dʑɯ
+        assert_eq!(ipa("シンジュク"), "ɕindʑɯkɯ");
+    }
+
+    #[test]
+    fn test_seibu_shinjuku_line_nasals_are_ascii_n() {
+        // 西武新宿線: 「新」(ン→ɲ) と「線」(語末ン→ɴ) の両方を n に統一し、
+        // Azure で双方の「ん」が鳴るようにする (#1536)。
+        assert_eq!(ipa("セイブシンジュクセン"), "se.ibɯɕindʑɯkɯsen");
     }
 
     #[test]
@@ -1528,8 +1541,17 @@ mod tests {
 
     #[test]
     fn test_inagekaigan() {
-        // ン at word end → ɴ
-        assert_eq!(ipa("イナゲカイガン"), "inageka.igaɴ");
+        // ン at word end → n (Azure が ɴ を鳴らさないため, #1536)
+        assert_eq!(ipa("イナゲカイガン"), "inageka.igan");
+    }
+
+    #[test]
+    fn test_moraic_nasal_before_vowel_keeps_syllable_break() {
+        // 母音前の撥音は n + 音節境界 `.` で独立させ、「な行」融合
+        // (シンエゴタ→しねごた) や ɴ 脱落 (しえごた) を防ぐ (#1536)。
+        assert_eq!(ipa("シンエゴタ"), "ɕin.egota");
+        // 千円: セ-ン-エ-ン → sen.en
+        assert_eq!(ipa("センエン"), "sen.en");
     }
 
     #[test]
@@ -1574,7 +1596,7 @@ mod tests {
 
     #[test]
     fn test_koen() {
-        assert_eq!(ipa("コウエン"), "ko.ɯ.eɴ");
+        assert_eq!(ipa("コウエン"), "ko.ɯ.en");
     }
 
     #[test]
@@ -1601,8 +1623,9 @@ mod tests {
 
     #[test]
     fn test_shin_yokohama() {
-        // ン before ヨ(j) → ɲ (palatal assimilation)
-        assert_eq!(ipa("シンヨコハマ"), "ɕiɲjokohama");
+        // ン before ヨ(j) → n + 音節境界。ɲ は Azure が鳴らさず、半母音 j の前は
+        // 音節境界 `.` を挟まないと「な行」に融合するため (#1536)。
+        assert_eq!(ipa("シンヨコハマ"), "ɕin.jokohama");
     }
 
     #[test]
@@ -1620,7 +1643,7 @@ mod tests {
     fn test_station_name_ipa_uses_official_english_wording() {
         assert_eq!(
             station_name_to_ipa("カサイリンカイコウエン", Some("Kasai-Rinkai Park")),
-            Some("kasa.i ɾiŋka.i pɑɹk".to_string())
+            Some("kasa.i ɾinka.i pɑɹk".to_string())
         );
     }
 
@@ -1718,7 +1741,7 @@ mod tests {
     fn test_station_name_ipa_splits_compound_kaigan_suffix() {
         assert_eq!(
             station_name_to_ipa("イナゲカイガン", Some("Inagekaigan")),
-            Some("inage ka.igaɴ".to_string())
+            Some("inage ka.igan".to_string())
         );
     }
 
@@ -1726,7 +1749,7 @@ mod tests {
     fn test_station_name_ipa_splits_other_compound_kaigan_suffix() {
         assert_eq!(
             station_name_to_ipa("オオモリカイガン", Some("Omorikaigan")),
-            Some("omoɾi ka.igaɴ".to_string())
+            Some("omoɾi ka.igan".to_string())
         );
     }
 
@@ -1784,7 +1807,7 @@ mod tests {
     #[test]
     fn test_fullwidth_parentheses_treated_as_word_separator() {
         // 全角括弧「（）」も空白として扱い、先頭・末尾・連続の空白は正規化される
-        assert_eq!(ipa("トラム（トデン）"), "toɾamɯ todeɴ");
+        assert_eq!(ipa("トラム（トデン）"), "toɾamɯ toden");
     }
 
     #[test]
