@@ -380,28 +380,23 @@ mod tests {
     // ============================================
 
     #[test]
-    fn test_name_ipa_sen_suffix_replaced_with_line() {
-        // name_ipa はカタカナ由来
+    fn test_name_ipa_sen_read_in_japanese() {
+        // name_ipa は日本語読み。「線」は seɴ として読み、英語 (laɪn) を混入させない。
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "セイブイケブクロセン".to_string();
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(
-            grpc_line.name_ipa,
-            Some("se.ibɯ.ikebɯkɯɾo laɪn".to_string())
-        );
+        assert_eq!(grpc_line.name_ipa, Some("se.ibɯ.ikebɯkɯɾoseɴ".to_string()));
     }
 
     #[test]
-    fn test_name_ipa_honsen_suffix_replaced_with_main_line() {
+    fn test_name_ipa_honsen_read_in_japanese() {
+        // 「本線」も日本語読み (honseɴ)。英語 (meɪn laɪn) を混入させない。
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "トウカイドウホンセン".to_string();
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(
-            grpc_line.name_ipa,
-            Some("to.ɯka.ido.ɯ meɪn laɪn".to_string())
-        );
+        assert_eq!(grpc_line.name_ipa, Some("to.ɯka.ido.ɯhonseɴ".to_string()));
     }
 
     #[test]
@@ -420,7 +415,8 @@ mod tests {
         line.line_name_r = Some("Keisei Main Line".to_string());
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("ke.ise.i meɪn laɪn".to_string()));
+        // name_ipa は日本語読み、name_roman_ipa はローマ字 (英語) 読み。
+        assert_eq!(grpc_line.name_ipa, Some("ke.ise.ihonseɴ".to_string()));
         assert_eq!(
             grpc_line.name_roman_ipa,
             Some("keːseː meɪn laɪn".to_string())
