@@ -18,7 +18,11 @@ impl From<TransportType> for i32 {
 
 impl From<Station> for GrpcStation {
     fn from(station: Station) -> Self {
-        let ipa = compute_ipa_cached(&station.station_name_k, station.station_name_r.as_deref());
+        let ipa = compute_ipa_cached(
+            &station.station_name,
+            &station.station_name_k,
+            station.station_name_r.as_deref(),
+        );
         let name_ipa = ipa.name_ipa;
         let name_roman_ipa = ipa.name_roman_ipa;
         let name_tts_segments = to_proto_tts_segments(ipa.tts_segments);
@@ -151,7 +155,36 @@ mod tests {
     fn test_station_name_roman_ipa_falls_back_to_katakana() {
         let grpc_station: GrpcStation = create_test_station("渋谷", "シブヤ", Some("???")).into();
 
+        // name_roman_ipa (英語読み) はアクセント核を付与しないため平板のまま。
         assert_eq!(grpc_station.name_roman_ipa, Some("ɕibɯja".to_string()));
+    }
+
+    #[test]
+    fn test_station_name_ipa_carries_pitch_accent() {
+        // ja-JP の name_ipa には下げ核マーカー ˈ が入る (issue #1534)。
+        // 練馬春日町: 「ねりまかすが↓ちょう」。
+        let grpc_station: GrpcStation =
+            create_test_station("練馬春日町", "ネリマカスガチョウ", None).into();
+
+        assert_eq!(
+            grpc_station.name_ipa,
+            Some("neɾimakasɯˈgat͡ɕo.ɯ".to_string())
+        );
+        // カタカナ由来 (ローマ字なし) の ja-JP セグメントにも同じアクセントが乗る。
+        assert_eq!(grpc_station.name_tts_segments.len(), 1);
+        assert_eq!(grpc_station.name_tts_segments[0].lang, "ja-JP");
+        assert_eq!(
+            grpc_station.name_tts_segments[0].pronunciation,
+            "neɾimakasɯˈgat͡ɕo.ɯ"
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_heiban_has_no_accent_marker() {
+        // 平板型の駅名にはマーカーが付かない。
+        let grpc_station: GrpcStation = create_test_station("渋谷", "シブヤ", None).into();
+
+        assert_eq!(grpc_station.name_ipa, Some("ɕibɯja".to_string()));
     }
 
     #[test]

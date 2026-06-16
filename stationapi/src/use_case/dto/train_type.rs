@@ -23,7 +23,7 @@ impl From<TrainType> for GrpcTrainType {
             lines,
             kind,
         } = train_type;
-        let ipa = compute_ipa_cached(&type_name_k, type_name_r.as_deref());
+        let ipa = compute_ipa_cached(&type_name, &type_name_k, type_name_r.as_deref());
         let name_ipa = ipa.name_ipa;
         let name_roman_ipa = ipa.name_roman_ipa;
         let name_tts_segments = to_proto_tts_segments(ipa.tts_segments);
