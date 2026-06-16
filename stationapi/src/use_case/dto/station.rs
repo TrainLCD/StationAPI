@@ -166,16 +166,13 @@ mod tests {
         let grpc_station: GrpcStation =
             create_test_station("練馬春日町", "ネリマカスガチョウ", None).into();
 
-        assert_eq!(
-            grpc_station.name_ipa,
-            Some("neɾimakasɯˈgat͡ɕo.ɯ".to_string())
-        );
+        assert_eq!(grpc_station.name_ipa, Some("neɾimakasɯˈgat͡ɕoː".to_string()));
         // カタカナ由来 (ローマ字なし) の ja-JP セグメントにも同じアクセントが乗る。
         assert_eq!(grpc_station.name_tts_segments.len(), 1);
         assert_eq!(grpc_station.name_tts_segments[0].lang, "ja-JP");
         assert_eq!(
             grpc_station.name_tts_segments[0].pronunciation,
-            "neɾimakasɯˈgat͡ɕo.ɯ"
+            "neɾimakasɯˈgat͡ɕoː"
         );
     }
 
@@ -198,7 +195,7 @@ mod tests {
 
         assert_eq!(
             grpc_station.name_roman_ipa,
-            Some("me.itet͡sɯ it͡ɕinomija".to_string())
+            Some("meːtet͡sɯ it͡ɕinomija".to_string())
         );
     }
 
@@ -218,7 +215,8 @@ mod tests {
         assert_eq!(grpc_station.name_tts_segments[0].separator, " ");
         assert_eq!(grpc_station.name_tts_segments[1].surface, "Rinkai");
         assert_eq!(grpc_station.name_tts_segments[1].fallback_text, "りんかい");
-        assert_eq!(grpc_station.name_tts_segments[1].pronunciation, "ɾinka.i");
+        // 語頭 (空白直後) のら行 Rinkai は ɾ→l
+        assert_eq!(grpc_station.name_tts_segments[1].pronunciation, "linka.i");
         assert_eq!(grpc_station.name_tts_segments[1].separator, " ");
         assert_eq!(grpc_station.name_tts_segments[2].surface, "Park");
         assert_eq!(grpc_station.name_tts_segments[2].fallback_text, "Park");

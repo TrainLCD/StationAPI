@@ -1305,6 +1305,8 @@ fn phonemes_to_tagged_chars(phonemes: &[Phoneme]) -> Vec<(char, Option<usize>)> 
     let mut mora_index = 0usize;
     let len = phonemes.len();
     let mut i = 0;
+    // 語頭 (名称先頭・区切り直後) かどうか。語頭のら行 `ɾ` を `l` に置換する判定に使う。
+    let mut at_word_start = true;
 
     while i < len {
         match &phonemes[i] {
@@ -1312,13 +1314,25 @@ fn phonemes_to_tagged_chars(phonemes: &[Phoneme]) -> Vec<(char, Option<usize>)> 
                 if ipa.trim().is_empty() {
                     // Separator (word boundary): not a mora.
                     output.extend(ipa.chars().map(|c| (c, None)));
+                    at_word_start = true;
                 } else {
                     mora_index += 1;
-                    output.extend(ipa.chars().map(|c| (c, Some(mora_index))));
+                    // 語頭のら行 ɾ は Azure ja-JP の `<phoneme alphabet="ipa">` で
+                    // 弱い弾き音になり「ら行」に聞こえにくいため、側面接近音 l に
+                    // 置換する (例: ロッポンギ ɾoppongi→loppongi)。語中の ɾ は弾き音
+                    // のままで自然に鳴るので置換しない。ɾʲ (リョ等) は基底の
+                    // ɾ のみ置換し拗音記号 ʲ は残す。
+                    let lateralize = at_word_start && ipa.starts_with('ɾ');
+                    for (idx, c) in ipa.chars().enumerate() {
+                        let c = if lateralize && idx == 0 { 'l' } else { c };
+                        output.push((c, Some(mora_index)));
+                    }
+                    at_word_start = false;
                 }
             }
             Phoneme::MoraicNasal => {
                 mora_index += 1;
+                at_word_start = false;
                 let next_regular = find_next_regular(&phonemes[i + 1..]);
                 let nasal = match next_regular {
                     Some(next_ipa) => nasal_for_following(next_ipa),
@@ -1335,6 +1349,7 @@ fn phonemes_to_tagged_chars(phonemes: &[Phoneme]) -> Vec<(char, Option<usize>)> 
             }
             Phoneme::Geminate => {
                 mora_index += 1;
+                at_word_start = false;
                 if let Some(next_ipa) = find_next_regular(&phonemes[i + 1..]) {
                     if let Some(c) = geminate_onset_char(next_ipa) {
                         output.push((c, Some(mora_index)));
@@ -1343,6 +1358,7 @@ fn phonemes_to_tagged_chars(phonemes: &[Phoneme]) -> Vec<(char, Option<usize>)> 
             }
             Phoneme::LongVowel => {
                 mora_index += 1;
+                at_word_start = false;
                 // Lengthen the preceding vowel unless it is already long.
                 let already_long = output.last().map(|(c, _)| *c == 'ː').unwrap_or(false);
                 if !already_long {
@@ -1378,22 +1394,53 @@ fn starts_with_vowel_or_semivowel(ipa: &str) -> bool {
     ipa.starts_with(is_ipa_vowel) || ipa.starts_with('j') || ipa.starts_with('w')
 }
 
+/// Whether a `prev`→`cur` vowel sequence forms a Japanese long vowel (長音) per
+/// kana orthography:
+///   ああ→aː  いい→iː  うう→ɯː  ええ/えい→eː  おお/おう→oː
+/// `えい` (e→i) and `おう` (o→ɯ) are the orthographic long vowels written with a
+/// trailing different kana, so they are included alongside the doubled vowels.
+/// Other vowel sequences (ウエ, アイ, アオ, オイ …) are genuine vowel hiatus and
+/// are NOT collapsed.
+fn forms_long_vowel(prev: char, cur: char) -> bool {
+    matches!(
+        (prev, cur),
+        ('a', 'a') | ('i', 'i') | ('ɯ', 'ɯ') | ('e', 'e') | ('e', 'i') | ('o', 'o') | ('o', 'ɯ')
+    )
+}
+
 /// Insert IPA syllable boundary markers (`.`) between consecutive vowels,
 /// preserving the per-character mora tags. The inserted `.` is attributed to
 /// the preceding character's mora so it never becomes the first character of
 /// the following mora (which matters when the accent marker is placed there).
+///
+/// 連続母音が日本語の長音 (おう/おお/えい等, [`forms_long_vowel`]) を成す場合は
+/// 音節境界 `.` ではなく長音記号 `ː` に置き換え、2 つ目の母音を伸ばす。Azure の
+/// ja-JP `<phoneme alphabet="ipa">` では `to.ɯkʲo.ɯ` のような母音分割よりも
+/// `toːkʲoː` の長音表記のほうが「とーきょー」と自然に読まれる。`ː` は
+/// 2 つ目の母音のモーラタグを引き継ぐので、ピッチアクセント層のモーラ数整合は
+/// 保たれる (長音 `ー` の扱いと同じ)。
 fn insert_syllable_breaks_tagged(input: &[(char, Option<usize>)]) -> Vec<(char, Option<usize>)> {
     let mut result: Vec<(char, Option<usize>)> = Vec::with_capacity(input.len());
-    let mut prev_is_vowel = false;
+    // 直前の母音の「基底」文字。長音化しても基底母音を保持し、続く母音と再判定する。
+    let mut prev_vowel: Option<char> = None;
 
     for &(c, tag) in input {
-        let is_vowel = is_ipa_vowel(c);
-        if is_vowel && prev_is_vowel {
-            let prev_tag = result.last().and_then(|(_, t)| *t);
-            result.push(('.', prev_tag));
+        if is_ipa_vowel(c) {
+            if let Some(prev) = prev_vowel {
+                if forms_long_vowel(prev, c) {
+                    // 2 つ目の母音は ː に置換して伸ばす。基底母音 (prev) は維持。
+                    result.push(('ː', tag));
+                    continue;
+                }
+                let prev_tag = result.last().and_then(|(_, t)| *t);
+                result.push(('.', prev_tag));
+            }
+            result.push((c, tag));
+            prev_vowel = Some(c);
+        } else {
+            result.push((c, tag));
+            prev_vowel = None;
         }
-        result.push((c, tag));
-        prev_is_vowel = is_vowel;
     }
 
     result
@@ -1459,17 +1506,19 @@ mod tests {
     fn test_seibu_shinjuku_line_nasals_are_ascii_n() {
         // 西武新宿線: 「新」(ン→ɲ) と「線」(語末ン→ɴ) の両方を n に統一し、
         // Azure で双方の「ん」が鳴るようにする (#1536)。
-        assert_eq!(ipa("セイブシンジュクセン"), "se.ibɯɕindʑɯkɯsen");
+        assert_eq!(ipa("セイブシンジュクセン"), "seːbɯɕindʑɯkɯsen");
     }
 
     #[test]
     fn test_osaka() {
-        assert_eq!(ipa("オオサカ"), "o.osaka");
+        // オオ → 長音 oː (Azure 向け長音統一)
+        assert_eq!(ipa("オオサカ"), "oːsaka");
     }
 
     #[test]
     fn test_kyoto() {
-        assert_eq!(ipa("キョウト"), "kʲo.ɯto");
+        // キョウ → 長音 kʲoː (おう→oː)
+        assert_eq!(ipa("キョウト"), "kʲoːto");
     }
 
     #[test]
@@ -1494,7 +1543,8 @@ mod tests {
 
     #[test]
     fn test_ryogoku() {
-        assert_eq!(ipa("リョウゴク"), "ɾʲo.ɯgokɯ");
+        // 語頭ら行 ɾʲ→lʲ かつ リョウ→長音 lʲoː
+        assert_eq!(ipa("リョウゴク"), "lʲoːgokɯ");
     }
 
     #[test]
@@ -1505,7 +1555,8 @@ mod tests {
 
     #[test]
     fn test_keisei() {
-        assert_eq!(ipa("ケイセイ"), "ke.ise.i");
+        // ケイ・セイ → 長音 keː seː (えい→eː)
+        assert_eq!(ipa("ケイセイ"), "keːseː");
     }
 
     #[test]
@@ -1515,13 +1566,14 @@ mod tests {
 
     #[test]
     fn test_meitetsu() {
-        // ツ is consistently t͡sɯ (affricate with tie bar)
-        assert_eq!(ipa("メイテツ"), "me.itet͡sɯ");
+        // ツ is consistently t͡sɯ (affricate with tie bar)。メイ→長音 meː (えい→eː)
+        assert_eq!(ipa("メイテツ"), "meːtet͡sɯ");
     }
 
     #[test]
     fn test_seibu() {
-        assert_eq!(ipa("セイブ"), "se.ibɯ");
+        // セイ → 長音 seː (えい→eː)
+        assert_eq!(ipa("セイブ"), "seːbɯ");
     }
 
     #[test]
@@ -1586,27 +1638,50 @@ mod tests {
 
     #[test]
     fn test_itchome() {
-        assert_eq!(ipa("イッチョウメ"), "itt͡ɕo.ɯme");
+        // チョウ → 長音 t͡ɕoː (おう→oː)
+        assert_eq!(ipa("イッチョウメ"), "itt͡ɕoːme");
     }
 
     #[test]
     fn test_sanchome() {
-        assert_eq!(ipa("サンチョウメ"), "sant͡ɕo.ɯme");
+        // チョウ → 長音 t͡ɕoː (おう→oː)
+        assert_eq!(ipa("サンチョウメ"), "sant͡ɕoːme");
     }
 
     #[test]
     fn test_koen() {
-        assert_eq!(ipa("コウエン"), "ko.ɯ.en");
+        // コウ → 長音 koː、エ は別母音なので音節境界を残す koː.en
+        assert_eq!(ipa("コウエン"), "koː.en");
     }
 
     #[test]
     fn test_tokyo() {
-        assert_eq!(ipa("トウキョウ"), "to.ɯkʲo.ɯ");
+        // トウ・キョウ → 長音 toː kʲoː (おう→oː)
+        assert_eq!(ipa("トウキョウ"), "toːkʲoː");
     }
 
     #[test]
     fn test_nagoya() {
         assert_eq!(ipa("ナゴヤ"), "nagoja");
+    }
+
+    #[test]
+    fn test_roppongi_word_initial_r_is_lateralized() {
+        // 語頭のら行 ɾ は Azure ja-JP で弾き音が弱く不自然なため l に置換。
+        // 語中の ɾ (ない) はそのまま。
+        assert_eq!(ipa("ロッポンギ"), "loppongi");
+    }
+
+    #[test]
+    fn test_word_initial_r_after_separator_is_lateralized() {
+        // 区切り直後 (= 後続語の語頭) のら行も l に置換。
+        assert_eq!(ipa("シン・リンカイ"), "ɕin linka.i");
+    }
+
+    #[test]
+    fn test_medial_r_stays_flap() {
+        // 語中のら行は弾き音 ɾ のまま (toɾide / t͡sɯɾɯmi)。
+        assert_eq!(ipa("トリデ"), "toɾide");
     }
 
     #[test]
@@ -1640,10 +1715,27 @@ mod tests {
     }
 
     #[test]
+    fn test_macron_romaji_converges_with_katakana_long_vowel() {
+        // マクロン付きローマ字 Ōsaka は ō→オウ と再構成されるが、長音統一により
+        // オオサカ (カタカナ) と同じ oːsaka に収束する。以前は o.ɯsaka と
+        // 誤った母音分割になっていた。
+        assert_eq!(
+            station_name_to_ipa("オオサカ", Some("Ōsaka")),
+            Some("oːsaka".to_string())
+        );
+        // トウキョウ (おう長音) も toːkʲoː。
+        assert_eq!(
+            station_name_to_ipa("トウキョウ", Some("Tōkyō")),
+            Some("toːkʲoː".to_string())
+        );
+    }
+
+    #[test]
     fn test_station_name_ipa_uses_official_english_wording() {
         assert_eq!(
             station_name_to_ipa("カサイリンカイコウエン", Some("Kasai-Rinkai Park")),
-            Some("kasa.i ɾinka.i pɑɹk".to_string())
+            // 語頭 (空白直後) のら行 Rinkai は ɾ→l
+            Some("kasa.i linka.i pɑɹk".to_string())
         );
     }
 
@@ -1672,7 +1764,7 @@ mod tests {
         );
         assert_eq!(
             accented_katakana_ipa("京都", "キョウト"),
-            Some("ˈkʲo.ɯto".to_string())
+            Some("ˈkʲoːto".to_string())
         );
     }
 
@@ -1701,7 +1793,7 @@ mod tests {
         // 「ねりまかすが↓ちょう」= 6 モーラ目 (ガ) の直前に下げ核。
         assert_eq!(
             accented_katakana_ipa("練馬春日町", "ネリマカスガチョウ"),
-            Some("neɾimakasɯˈgat͡ɕo.ɯ".to_string())
+            Some("neɾimakasɯˈgat͡ɕoː".to_string())
         );
     }
 
@@ -1717,7 +1809,7 @@ mod tests {
     fn test_station_name_ipa_supports_mixed_english_facility_words() {
         assert_eq!(
             station_name_to_ipa("トウキョウビッグサイト", Some("Tōkyō Big Sight")),
-            Some("to.ɯkʲo.ɯ bɪg saɪt".to_string())
+            Some("toːkʲoː bɪg saɪt".to_string())
         );
     }
 
@@ -1773,20 +1865,20 @@ mod tests {
     fn test_station_name_ipa_supports_spaced_romanized_names_from_csv() {
         assert_eq!(
             station_name_to_ipa("メイテツイチノミヤ", Some("Meitetsu Ichinomiya")),
-            Some("me.itet͡sɯ it͡ɕinomija".to_string())
+            Some("meːtet͡sɯ it͡ɕinomija".to_string())
         );
     }
 
     #[test]
     fn test_station_name_ipa_supports_meitetsu_prefixed_station_names_from_csv() {
         let cases = [
-            ("メイテツナゴヤ", "Meitetsu Nagoya", "me.itet͡sɯ nagoja"),
+            ("メイテツナゴヤ", "Meitetsu Nagoya", "meːtet͡sɯ nagoja"),
             (
                 "メイテツイチノミヤ",
                 "Meitetsu Ichinomiya",
-                "me.itet͡sɯ it͡ɕinomija",
+                "meːtet͡sɯ it͡ɕinomija",
             ),
-            ("メイテツギフ", "Meitetsu Gifu", "me.itet͡sɯ giɸɯ"),
+            ("メイテツギフ", "Meitetsu Gifu", "meːtet͡sɯ giɸɯ"),
         ];
 
         for (katakana, roman, expected) in cases {
@@ -1801,7 +1893,7 @@ mod tests {
     #[test]
     fn test_nakaguro_treated_as_word_separator() {
         // 中黒「・」は語の区切りとして空白に変換し、全体が None にならないようにする
-        assert_eq!(ipa("チュウオウ・ソウブ"), "t͡ɕɯ.ɯ.o.ɯ so.ɯbɯ");
+        assert_eq!(ipa("チュウオウ・ソウブ"), "t͡ɕɯː.oː soːbɯ");
     }
 
     #[test]
@@ -1815,7 +1907,7 @@ mod tests {
         // Full-width space between words should be preserved
         assert_eq!(
             ipa("ドッキョウダイガクマエ　ソウカマツバラ"),
-            "dokkʲo.ɯda.igakɯma.e so.ɯkamat͡sɯbaɾa"
+            "dokkʲoːda.igakɯma.e soːkamat͡sɯbaɾa"
         );
     }
 
@@ -1824,7 +1916,7 @@ mod tests {
         // Half-width (ASCII) space between words should also be accepted
         assert_eq!(
             ipa("ドッキョウダイガクマエ ソウカマツバラ"),
-            "dokkʲo.ɯda.igakɯma.e so.ɯkamat͡sɯbaɾa"
+            "dokkʲoːda.igakɯma.e soːkamat͡sɯbaɾa"
         );
     }
 }
