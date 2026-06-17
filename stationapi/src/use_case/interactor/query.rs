@@ -911,8 +911,12 @@ where
 
         // Track seen line_group_cds to avoid duplicates
         let mut seen_line_group_cds = HashSet::new();
-        // Track seen stop signatures to drop locally redundant train types
-        let mut seen_segment_signatures: HashSet<Vec<i32>> = HashSet::new();
+        // Track seen (kind, stop signature) pairs to drop locally redundant train types.
+        // Two train types are redundant only when they share both the same `kind` and the
+        // same stops across the segment. A local and a limited express that happen to stop
+        // at the same stations have different kinds and are still distinct services, so
+        // both are kept.
+        let mut seen_segment_signatures: HashSet<(Option<i32>, Vec<i32>)> = HashSet::new();
 
         for mut train_type in train_types {
             let Some(lgc) = train_type.line_group_cd else {
@@ -921,11 +925,11 @@ where
             if !seen_line_group_cds.insert(lgc) {
                 continue;
             }
-            // Skip train types whose stops within the requested segment are identical to
-            // a train type we've already emitted.
+            // Skip train types whose stops within the requested segment are identical to a
+            // train type of the same kind we've already emitted.
             if let Some(group_stops) = stops_by_line_group.get(&lgc) {
                 if let Some(signature) = segment_stop_signature(group_stops, from_g_cd, to_g_cd) {
-                    if !seen_segment_signatures.insert(signature) {
+                    if !seen_segment_signatures.insert((train_type.kind, signature)) {
                         continue;
                     }
                 }
@@ -2005,6 +2009,11 @@ mod tests {
 
         /// Build a train type bound to a line group (type_cd unique per group).
         fn create_train_type(line_group_cd: i32) -> TrainType {
+            create_train_type_with_kind(line_group_cd, 0)
+        }
+
+        /// Build a train type bound to a line group with an explicit `kind`.
+        fn create_train_type_with_kind(line_group_cd: i32, kind: i32) -> TrainType {
             TrainType::new(
                 Some(line_group_cd),
                 None,
@@ -2018,7 +2027,7 @@ mod tests {
                 None,
                 "#000000".to_string(),
                 Some(0),
-                Some(0),
+                Some(kind),
             )
         }
 
@@ -2138,6 +2147,57 @@ mod tests {
             );
 
             let result = interactor.get_train_types(1, 4, Some(99)).await.unwrap();
+
+            assert_eq!(result.len(), 2);
+            assert_eq!(line_group_cds(&result), vec![100, 300]);
+        }
+
+        #[tokio::test]
+        async fn test_get_train_types_keeps_both_when_kind_differs() {
+            // 100 (limited express, kind=4) and 200 (local, kind=0) stop at exactly the
+            // same stations over the segment but have different kinds, so they are distinct
+            // services and both must be kept. 300 has a distinct stopping pattern → kept.
+            let interactor = build_interactor(
+                full_route_stops(),
+                vec![],
+                vec![
+                    create_train_type_with_kind(100, 4),
+                    create_train_type_with_kind(200, 0),
+                    create_train_type_with_kind(300, 0),
+                ],
+                vec![
+                    create_line_for_group(100),
+                    create_line_for_group(200),
+                    create_line_for_group(300),
+                ],
+            );
+
+            let result = interactor.get_train_types(1, 4, None).await.unwrap();
+
+            assert_eq!(result.len(), 3);
+            assert_eq!(line_group_cds(&result), vec![100, 200, 300]);
+        }
+
+        #[tokio::test]
+        async fn test_get_train_types_dedupes_identical_stops_and_kind() {
+            // When the stops AND the kind are identical, the first encountered survives
+            // (here 100), matching the pre-existing "keep first" behavior.
+            let interactor = build_interactor(
+                full_route_stops(),
+                vec![],
+                vec![
+                    create_train_type_with_kind(100, 2),
+                    create_train_type_with_kind(200, 2),
+                    create_train_type_with_kind(300, 0),
+                ],
+                vec![
+                    create_line_for_group(100),
+                    create_line_for_group(200),
+                    create_line_for_group(300),
+                ],
+            );
+
+            let result = interactor.get_train_types(1, 4, None).await.unwrap();
 
             assert_eq!(result.len(), 2);
             assert_eq!(line_group_cds(&result), vec![100, 300]);
