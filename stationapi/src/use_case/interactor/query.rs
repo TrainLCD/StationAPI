@@ -878,16 +878,43 @@ where
             .filter_map(|tt| tt.type_cd.map(|cd| (cd, tt.clone())))
             .collect();
 
+        // Build the set of stops (excluding pass-through stations) for each line group
+        // within the requested from→to segment. This lets us drop train types that are
+        // locally redundant, i.e. that stop at exactly the same stations between the two
+        // endpoints even though they are distinct services across their full route.
+        let from_g_cd = from_station_id as i32;
+        let to_g_cd = to_station_id as i32;
+
+        let mut stops_by_line_group: std::collections::HashMap<i32, Vec<&Station>> =
+            std::collections::HashMap::new();
+        for stop in &stops {
+            if let Some(lgc) = stop.line_group_cd {
+                stops_by_line_group.entry(lgc).or_default().push(stop);
+            }
+        }
+
         // Track seen line_group_cds to avoid duplicates
         let mut seen_line_group_cds = HashSet::new();
+        // Track seen stop signatures to drop locally redundant train types
+        let mut seen_segment_signatures: HashSet<Vec<i32>> = HashSet::new();
 
         for mut train_type in train_types {
-            if let Some(lgc) = train_type.line_group_cd {
-                if !seen_line_group_cds.insert(lgc) {
-                    continue;
-                }
-            } else {
+            let Some(lgc) = train_type.line_group_cd else {
                 continue;
+            };
+            if !seen_line_group_cds.insert(lgc) {
+                continue;
+            }
+            // Skip train types whose stops within the requested segment are identical to
+            // a train type we've already emitted.
+            if let Some(group_stops) = stops_by_line_group.get(&lgc) {
+                if let Some(signature) =
+                    segment_stop_signature(group_stops, from_g_cd, to_g_cd)
+                {
+                    if !seen_segment_signatures.insert(signature) {
+                        continue;
+                    }
+                }
             }
 
             let mut seen_line_cds = HashSet::new();
@@ -1408,6 +1435,38 @@ where
     }
 }
 
+/// Build a signature describing the stations a train type actually stops at within the
+/// requested from→to segment.
+///
+/// `group_stops` are the route stops belonging to a single line group, in route order.
+/// The signature is the sorted set of `station_g_cd`s between the two endpoints
+/// (inclusive) that are not passed through (`pass != 1`). Two train types sharing the
+/// same signature stop at exactly the same stations across the segment and are therefore
+/// locally redundant. Returns `None` when either endpoint is not part of the line group.
+fn segment_stop_signature(
+    group_stops: &[&Station],
+    from_g_cd: i32,
+    to_g_cd: i32,
+) -> Option<Vec<i32>> {
+    let from_pos = group_stops
+        .iter()
+        .position(|s| s.station_g_cd == from_g_cd)?;
+    let to_pos = group_stops.iter().position(|s| s.station_g_cd == to_g_cd)?;
+    let (start, end) = if from_pos <= to_pos {
+        (from_pos, to_pos)
+    } else {
+        (to_pos, from_pos)
+    };
+    let mut signature: Vec<i32> = group_stops[start..=end]
+        .iter()
+        .filter(|s| s.pass != Some(1))
+        .map(|s| s.station_g_cd)
+        .collect();
+    signature.sort_unstable();
+    signature.dedup();
+    Some(signature)
+}
+
 /// Calculate the distance between two points on Earth using the Haversine formula.
 /// Returns the distance in meters.
 fn haversine_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
@@ -1585,6 +1644,130 @@ mod tests {
         // Points outside 300m radius
         let distance = haversine_distance(35.6812, 139.7671, 35.6900, 139.7671);
         assert!(distance > NEARBY_BUS_STOP_RADIUS_METERS);
+    }
+
+    // ========================================
+    // segment_stop_signature tests
+    // ========================================
+
+    /// Helper to build a route stop with a stop condition (`pass`) for a line group.
+    fn create_stop(station_g_cd: i32, line_group_cd: i32, pass: Option<i32>) -> Station {
+        let mut station = create_test_station(station_g_cd, station_g_cd, 1, Some(line_group_cd));
+        station.pass = pass;
+        station
+    }
+
+    #[test]
+    fn test_segment_stop_signature_identical_stops_match() {
+        // Two line groups that stop at exactly the same stations between 1 and 4.
+        let local_stops = vec![
+            create_stop(1, 100, Some(0)),
+            create_stop(2, 100, Some(0)),
+            create_stop(3, 100, Some(0)),
+            create_stop(4, 100, Some(0)),
+        ];
+        let express_stops = vec![
+            create_stop(1, 200, Some(0)),
+            create_stop(2, 200, Some(0)),
+            create_stop(3, 200, Some(0)),
+            create_stop(4, 200, Some(0)),
+        ];
+
+        let local_refs: Vec<&Station> = local_stops.iter().collect();
+        let express_refs: Vec<&Station> = express_stops.iter().collect();
+
+        let local_sig = segment_stop_signature(&local_refs, 1, 4).unwrap();
+        let express_sig = segment_stop_signature(&express_refs, 1, 4).unwrap();
+
+        assert_eq!(local_sig, express_sig);
+    }
+
+    #[test]
+    fn test_segment_stop_signature_excludes_pass_through() {
+        // Station 3 is passed through (pass == 1) and must not be part of the signature.
+        let stops = vec![
+            create_stop(1, 100, Some(0)),
+            create_stop(2, 100, Some(0)),
+            create_stop(3, 100, Some(1)),
+            create_stop(4, 100, Some(0)),
+        ];
+        let refs: Vec<&Station> = stops.iter().collect();
+
+        let sig = segment_stop_signature(&refs, 1, 4).unwrap();
+        assert_eq!(sig, vec![1, 2, 4]);
+    }
+
+    #[test]
+    fn test_segment_stop_signature_differs_when_stops_differ() {
+        // Skips station 2.
+        let express_stops = vec![
+            create_stop(1, 100, Some(0)),
+            create_stop(2, 100, Some(1)),
+            create_stop(3, 100, Some(0)),
+            create_stop(4, 100, Some(0)),
+        ];
+        // Stops everywhere.
+        let local_stops = vec![
+            create_stop(1, 200, Some(0)),
+            create_stop(2, 200, Some(0)),
+            create_stop(3, 200, Some(0)),
+            create_stop(4, 200, Some(0)),
+        ];
+        let express_refs: Vec<&Station> = express_stops.iter().collect();
+        let local_refs: Vec<&Station> = local_stops.iter().collect();
+
+        assert_ne!(
+            segment_stop_signature(&express_refs, 1, 4).unwrap(),
+            segment_stop_signature(&local_refs, 1, 4).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_segment_stop_signature_restricted_to_segment() {
+        // Differences outside the 2→3 segment must be ignored.
+        let stops_a = vec![
+            create_stop(1, 100, Some(0)),
+            create_stop(2, 100, Some(0)),
+            create_stop(3, 100, Some(0)),
+            create_stop(4, 100, Some(0)),
+        ];
+        let stops_b = vec![
+            create_stop(1, 200, Some(1)),
+            create_stop(2, 200, Some(0)),
+            create_stop(3, 200, Some(0)),
+            create_stop(5, 200, Some(0)),
+        ];
+        let refs_a: Vec<&Station> = stops_a.iter().collect();
+        let refs_b: Vec<&Station> = stops_b.iter().collect();
+
+        assert_eq!(
+            segment_stop_signature(&refs_a, 2, 3).unwrap(),
+            segment_stop_signature(&refs_b, 2, 3).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_segment_stop_signature_direction_independent() {
+        let stops = vec![
+            create_stop(1, 100, Some(0)),
+            create_stop(2, 100, Some(0)),
+            create_stop(3, 100, Some(0)),
+        ];
+        let refs: Vec<&Station> = stops.iter().collect();
+
+        // Querying from 3→1 yields the same signature as 1→3.
+        assert_eq!(
+            segment_stop_signature(&refs, 1, 3).unwrap(),
+            segment_stop_signature(&refs, 3, 1).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_segment_stop_signature_missing_endpoint_returns_none() {
+        let stops = vec![create_stop(1, 100, Some(0)), create_stop(2, 100, Some(0))];
+        let refs: Vec<&Station> = stops.iter().collect();
+
+        assert!(segment_stop_signature(&refs, 1, 99).is_none());
     }
 
     // ========================================
