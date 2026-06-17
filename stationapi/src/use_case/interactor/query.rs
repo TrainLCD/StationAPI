@@ -908,9 +908,7 @@ where
             // Skip train types whose stops within the requested segment are identical to
             // a train type we've already emitted.
             if let Some(group_stops) = stops_by_line_group.get(&lgc) {
-                if let Some(signature) =
-                    segment_stop_signature(group_stops, from_g_cd, to_g_cd)
-                {
+                if let Some(signature) = segment_stop_signature(group_stops, from_g_cd, to_g_cd) {
                     if !seen_segment_signatures.insert(signature) {
                         continue;
                     }
