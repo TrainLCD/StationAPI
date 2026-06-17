@@ -885,9 +885,25 @@ where
         let from_g_cd = from_station_id as i32;
         let to_g_cd = to_station_id as i32;
 
+        // `via_line_id` is only a route filter: when set, `stops` is restricted to the
+        // stations on that line, so each line group's stops would be incomplete and the
+        // dedup comparison (which needs the full from→to stopping pattern) would fall
+        // back to the per-line_group filter. Re-fetch the unrestricted route stops for
+        // the dedup signature so the behavior is identical with or without `via_line_id`.
+        let dedup_stops_storage;
+        let dedup_stops: &[Station] = if via_line_id.is_some() {
+            dedup_stops_storage = self
+                .station_repository
+                .get_route_stops(from_station_id, to_station_id, None)
+                .await?;
+            &dedup_stops_storage
+        } else {
+            &stops
+        };
+
         let mut stops_by_line_group: std::collections::HashMap<i32, Vec<&Station>> =
             std::collections::HashMap::new();
-        for stop in &stops {
+        for stop in dedup_stops {
             if let Some(lgc) = stop.line_group_cd {
                 stops_by_line_group.entry(lgc).or_default().push(stop);
             }
