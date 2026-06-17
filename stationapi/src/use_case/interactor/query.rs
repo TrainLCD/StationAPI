@@ -1785,6 +1785,366 @@ mod tests {
     }
 
     // ========================================
+    // get_train_types dedup integration tests
+    // ========================================
+
+    mod get_train_types_tests {
+        use super::*;
+        use crate::domain::{
+            entity::company::Company,
+            error::DomainError,
+            repository::{
+                company_repository::CompanyRepository, line_repository::LineRepository,
+                station_repository::StationRepository, train_type_repository::TrainTypeRepository,
+            },
+        };
+        use crate::use_case::traits::query::QueryUseCase;
+
+        /// Station repository whose `get_route_stops` returns different stops depending
+        /// on whether `via_line_id` is set, mirroring the real query that restricts the
+        /// result to the requested line.
+        struct DedupMockStationRepository {
+            stops_unrestricted: Vec<Station>,
+            stops_via: Vec<Station>,
+        }
+
+        #[async_trait::async_trait]
+        impl StationRepository for DedupMockStationRepository {
+            async fn get_route_stops(
+                &self,
+                _: u32,
+                _: u32,
+                via_line_id: Option<u32>,
+            ) -> Result<Vec<Station>, DomainError> {
+                if via_line_id.is_some() {
+                    Ok(self.stops_via.clone())
+                } else {
+                    Ok(self.stops_unrestricted.clone())
+                }
+            }
+            async fn find_by_id(&self, _: u32) -> Result<Option<Station>, DomainError> {
+                Ok(None)
+            }
+            async fn get_by_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_id(
+                &self,
+                _: u32,
+                _: Option<u32>,
+                _: Option<u32>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_id_vec_with_group_stations(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec_no_types(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_coordinates(
+                &self,
+                _: f64,
+                _: f64,
+                _: Option<u32>,
+                _: Option<TransportType>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_bus_stops_near_stations(
+                &self,
+                _: &[(u32, f64, f64)],
+                _: u32,
+            ) -> Result<Vec<(u32, Station)>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_name(
+                &self,
+                _: String,
+                _: Option<u32>,
+                _: Option<u32>,
+                _: Option<TransportType>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        struct DedupMockLineRepository {
+            lines: Vec<Line>,
+        }
+
+        #[async_trait::async_trait]
+        impl LineRepository for DedupMockLineRepository {
+            async fn get_by_line_group_id_vec(&self, _: &[u32]) -> Result<Vec<Line>, DomainError> {
+                Ok(self.lines.clone())
+            }
+            async fn find_by_id(&self, _: u32) -> Result<Option<Line>, DomainError> {
+                Ok(None)
+            }
+            async fn find_by_station_id(&self, _: u32) -> Result<Option<Line>, DomainError> {
+                Ok(None)
+            }
+            async fn get_by_ids(&self, _: &[u32]) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_name(
+                &self,
+                _: String,
+                _: Option<u32>,
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id_vec_for_routes(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec_no_types(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        struct DedupMockTrainTypeRepository {
+            train_types: Vec<TrainType>,
+        }
+
+        #[async_trait::async_trait]
+        impl TrainTypeRepository for DedupMockTrainTypeRepository {
+            async fn get_by_line_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(self.train_types.clone())
+            }
+            async fn find_by_line_group_id_and_line_id(
+                &self,
+                _: u32,
+                _: u32,
+            ) -> Result<Option<TrainType>, DomainError> {
+                Ok(None)
+            }
+            async fn find_by_line_group_id_and_line_id_vec(
+                &self,
+                _: &[(u32, u32)],
+            ) -> Result<std::collections::HashMap<(u32, u32), TrainType>, DomainError> {
+                Ok(std::collections::HashMap::new())
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_id(&self, _: u32) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_id_vec(
+                &self,
+                _: &[u32],
+                _: Option<u32>,
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_types_by_station_id_vec(
+                &self,
+                _: &[u32],
+                _: Option<u32>,
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        struct DedupMockCompanyRepository;
+
+        #[async_trait::async_trait]
+        impl CompanyRepository for DedupMockCompanyRepository {
+            async fn find_by_id_vec(&self, _: &[u32]) -> Result<Vec<Company>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        /// Build a train type bound to a line group (type_cd unique per group).
+        fn create_train_type(line_group_cd: i32) -> TrainType {
+            TrainType::new(
+                Some(line_group_cd),
+                None,
+                Some(line_group_cd),
+                Some(line_group_cd),
+                Some(0),
+                format!("種別{line_group_cd}"),
+                format!("シュベツ{line_group_cd}"),
+                None,
+                None,
+                None,
+                "#000000".to_string(),
+                Some(0),
+                Some(0),
+            )
+        }
+
+        /// Build a line bound to a line group.
+        fn create_line_for_group(line_group_cd: i32) -> Line {
+            let mut line = create_test_line(line_group_cd);
+            line.line_group_cd = Some(line_group_cd);
+            line.type_cd = Some(line_group_cd);
+            line
+        }
+
+        fn build_interactor(
+            stops_unrestricted: Vec<Station>,
+            stops_via: Vec<Station>,
+            train_types: Vec<TrainType>,
+            lines: Vec<Line>,
+        ) -> QueryInteractor<
+            DedupMockStationRepository,
+            DedupMockLineRepository,
+            DedupMockTrainTypeRepository,
+            DedupMockCompanyRepository,
+        > {
+            QueryInteractor {
+                station_repository: DedupMockStationRepository {
+                    stops_unrestricted,
+                    stops_via,
+                },
+                line_repository: DedupMockLineRepository { lines },
+                train_type_repository: DedupMockTrainTypeRepository { train_types },
+                company_repository: DedupMockCompanyRepository,
+            }
+        }
+
+        /// Full route stops (stations 1..=4) for the three line groups used in the tests.
+        /// Line groups 100 and 200 stop at every station (identical pattern); 300 passes
+        /// through station 2, giving it a distinct stopping pattern.
+        fn full_route_stops() -> Vec<Station> {
+            vec![
+                create_stop(1, 100, Some(0)),
+                create_stop(2, 100, Some(0)),
+                create_stop(3, 100, Some(0)),
+                create_stop(4, 100, Some(0)),
+                create_stop(1, 200, Some(0)),
+                create_stop(2, 200, Some(0)),
+                create_stop(3, 200, Some(0)),
+                create_stop(4, 200, Some(0)),
+                create_stop(1, 300, Some(0)),
+                create_stop(2, 300, Some(1)),
+                create_stop(3, 300, Some(0)),
+                create_stop(4, 300, Some(0)),
+            ]
+        }
+
+        fn line_group_cds(train_types: &[TrainType]) -> Vec<i32> {
+            let mut cds: Vec<i32> = train_types
+                .iter()
+                .filter_map(|tt| tt.line_group_cd)
+                .collect();
+            cds.sort_unstable();
+            cds
+        }
+
+        #[tokio::test]
+        async fn test_get_train_types_dedupes_identical_segment_stops() {
+            // 100 and 200 share the same stops over the segment → collapse to one (100,
+            // the first encountered). 300 has a different stopping pattern → kept.
+            let interactor = build_interactor(
+                full_route_stops(),
+                vec![],
+                vec![
+                    create_train_type(100),
+                    create_train_type(200),
+                    create_train_type(300),
+                ],
+                vec![
+                    create_line_for_group(100),
+                    create_line_for_group(200),
+                    create_line_for_group(300),
+                ],
+            );
+
+            let result = interactor.get_train_types(1, 4, None).await.unwrap();
+
+            assert_eq!(result.len(), 2);
+            assert_eq!(line_group_cds(&result), vec![100, 300]);
+        }
+
+        #[tokio::test]
+        async fn test_get_train_types_dedupes_with_via_line_id() {
+            // With via_line_id set, the primary stops are restricted to stations 1 and 2
+            // (station 4, the `to` endpoint, is missing). If dedup used these restricted
+            // stops the signature could not be computed and both 100 and 200 would be
+            // kept. The unrestricted re-fetch must keep dedup working → 100 and 200
+            // collapse, leaving 100 and 300.
+            let restricted_stops = vec![
+                create_stop(1, 100, Some(0)),
+                create_stop(2, 100, Some(0)),
+                create_stop(1, 200, Some(0)),
+                create_stop(2, 200, Some(0)),
+                create_stop(1, 300, Some(0)),
+                create_stop(2, 300, Some(1)),
+            ];
+
+            let interactor = build_interactor(
+                full_route_stops(),
+                restricted_stops,
+                vec![
+                    create_train_type(100),
+                    create_train_type(200),
+                    create_train_type(300),
+                ],
+                vec![
+                    create_line_for_group(100),
+                    create_line_for_group(200),
+                    create_line_for_group(300),
+                ],
+            );
+
+            let result = interactor.get_train_types(1, 4, Some(99)).await.unwrap();
+
+            assert_eq!(result.len(), 2);
+            assert_eq!(line_group_cds(&result), vec![100, 300]);
+        }
+    }
+
+    // ========================================
     // build_route_tree_map tests
     // ========================================
 
