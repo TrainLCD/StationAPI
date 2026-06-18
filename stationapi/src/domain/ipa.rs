@@ -1091,32 +1091,17 @@ fn phonemes_to_raw_ipa(phonemes: &[Phoneme]) -> String {
     let mut output = String::new();
     let len = phonemes.len();
     let mut i = 0;
-    // 語頭 (名称先頭・区切り直後) かどうか。語頭のら行 `ɾ` を `l` に置換する判定に使う。
-    let mut at_word_start = true;
 
     while i < len {
         match &phonemes[i] {
             Phoneme::Regular(ipa) => {
-                if ipa.trim().is_empty() {
-                    // Separator (word boundary).
-                    output.push_str(ipa);
-                    at_word_start = true;
-                } else {
-                    // 語頭のら行 ɾ は Azure ja-JP の `<phoneme alphabet="ipa">` で
-                    // 弱い弾き音になり「ら行」に聞こえにくいため、側面接近音 l に
-                    // 置換する (例: ロッポンギ ɾoppongi→loppongi)。語中の ɾ は弾き音
-                    // のままで自然に鳴るので置換しない。ɾʲ (リョ等) は基底の
-                    // ɾ のみ置換し拗音記号 ʲ は残す。
-                    let lateralize = at_word_start && ipa.starts_with('ɾ');
-                    for (idx, c) in ipa.chars().enumerate() {
-                        let c = if lateralize && idx == 0 { 'l' } else { c };
-                        output.push(c);
-                    }
-                    at_word_start = false;
-                }
+                // ら行は弾き音 ɾ をそのまま使う (語頭も語中も同じ)。ɾ は Azure ja-JP の
+                // `<phoneme alphabet="ipa">` でも発音できるため、聞こえ方の都合で l に
+                // 置換する加工は行わず素直な IPA を出力する。区切り文字 (空白) も
+                // そのまま出力する。
+                output.push_str(ipa);
             }
             Phoneme::MoraicNasal => {
-                at_word_start = false;
                 let next_regular = find_next_regular(&phonemes[i + 1..]);
                 let nasal = match next_regular {
                     Some(next_ipa) => nasal_for_following(next_ipa),
@@ -1132,7 +1117,6 @@ fn phonemes_to_raw_ipa(phonemes: &[Phoneme]) -> String {
                 }
             }
             Phoneme::Geminate => {
-                at_word_start = false;
                 if let Some(next_ipa) = find_next_regular(&phonemes[i + 1..]) {
                     if let Some(c) = geminate_onset_char(next_ipa) {
                         output.push(c);
@@ -1140,7 +1124,6 @@ fn phonemes_to_raw_ipa(phonemes: &[Phoneme]) -> String {
                 }
             }
             Phoneme::LongVowel => {
-                at_word_start = false;
                 // Lengthen the preceding vowel unless it is already long.
                 let already_long = output.ends_with('ː');
                 if !already_long {
@@ -1321,8 +1304,8 @@ mod tests {
 
     #[test]
     fn test_ryogoku() {
-        // 語頭ら行 ɾʲ→lʲ かつ リョウ→長音 lʲoː
-        assert_eq!(ipa("リョウゴク"), "lʲoːgokɯ");
+        // ら行はそのまま ɾʲ、リョウ→長音 ɾʲoː
+        assert_eq!(ipa("リョウゴク"), "ɾʲoːgokɯ");
     }
 
     #[test]
@@ -1444,21 +1427,20 @@ mod tests {
     }
 
     #[test]
-    fn test_roppongi_word_initial_r_is_lateralized() {
-        // 語頭のら行 ɾ は Azure ja-JP で弾き音が弱く不自然なため l に置換。
-        // 語中の ɾ (ない) はそのまま。
-        assert_eq!(ipa("ロッポンギ"), "loppongi");
+    fn test_roppongi_word_initial_r_stays_flap() {
+        // 語頭のら行も弾き音 ɾ のまま。l への置換は行わない。
+        assert_eq!(ipa("ロッポンギ"), "ɾoppongi");
     }
 
     #[test]
-    fn test_word_initial_r_after_separator_is_lateralized() {
-        // 区切り直後 (= 後続語の語頭) のら行も l に置換。
-        assert_eq!(ipa("シン・リンカイ"), "ɕin linka.i");
+    fn test_word_initial_r_after_separator_stays_flap() {
+        // 区切り直後 (= 後続語の語頭) のら行も ɾ のまま。
+        assert_eq!(ipa("シン・リンカイ"), "ɕin ɾinka.i");
     }
 
     #[test]
     fn test_medial_r_stays_flap() {
-        // 語中のら行は弾き音 ɾ のまま (toɾide / t͡sɯɾɯmi)。
+        // 語中のら行も弾き音 ɾ のまま (toɾide / t͡sɯɾɯmi)。
         assert_eq!(ipa("トリデ"), "toɾide");
     }
 
@@ -1512,8 +1494,8 @@ mod tests {
     fn test_station_name_ipa_uses_official_english_wording() {
         assert_eq!(
             station_name_to_ipa("カサイリンカイコウエン", Some("Kasai-Rinkai Park")),
-            // 語頭 (空白直後) のら行 Rinkai は ɾ→l
-            Some("kasa.i linka.i pɑɹk".to_string())
+            // ら行はそのまま ɾ (Rinkai → ɾinka.i)
+            Some("kasa.i ɾinka.i pɑɹk".to_string())
         );
     }
 

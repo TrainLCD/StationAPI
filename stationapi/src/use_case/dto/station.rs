@@ -209,8 +209,8 @@ mod tests {
         assert_eq!(grpc_station.name_tts_segments[0].separator, " ");
         assert_eq!(grpc_station.name_tts_segments[1].surface, "Rinkai");
         assert_eq!(grpc_station.name_tts_segments[1].fallback_text, "りんかい");
-        // 語頭 (空白直後) のら行 Rinkai は ɾ→l
-        assert_eq!(grpc_station.name_tts_segments[1].pronunciation, "linka.i");
+        // ら行はそのまま ɾ (Rinkai → ɾinka.i)
+        assert_eq!(grpc_station.name_tts_segments[1].pronunciation, "ɾinka.i");
         assert_eq!(grpc_station.name_tts_segments[1].separator, " ");
         assert_eq!(grpc_station.name_tts_segments[2].surface, "Park");
         assert_eq!(grpc_station.name_tts_segments[2].fallback_text, "Park");
