@@ -35,9 +35,6 @@ metrics-exporter-prometheus = "0.16"
 pin-project-lite = "0.2"
 http = "1"
 tower = { version = "0.5", features = ["util"] }
-# 日本語のピッチアクセント(下げ核)推定に使用する OpenJTalk フロントエンドの Rust 実装。
-# naist-jdic 辞書を同梱し、フルコンテキストラベルからアクセント核位置を取得する。
-jpreprocess = { version = "0.15.0", features = ["naist-jdic"] }
 
 [build-dependencies]
 tonic-build = "0.12.3"
