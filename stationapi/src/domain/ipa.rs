@@ -1142,7 +1142,7 @@ fn phonemes_to_raw_ipa(phonemes: &[Phoneme]) -> String {
             Phoneme::LongVowel => {
                 at_word_start = false;
                 // Lengthen the preceding vowel unless it is already long.
-                let already_long = output.chars().last() == Some('ː');
+                let already_long = output.ends_with('ː');
                 if !already_long {
                     output.push('ː');
                 }
