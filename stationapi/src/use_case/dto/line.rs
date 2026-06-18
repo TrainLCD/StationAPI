@@ -9,11 +9,7 @@ use crate::{
 
 impl From<Line> for GrpcLine {
     fn from(line: Line) -> Self {
-        let ipa = compute_line_ipa_cached(
-            &line.line_name,
-            &line.line_name_k,
-            line.line_name_r.as_deref(),
-        );
+        let ipa = compute_line_ipa_cached(&line.line_name_k, line.line_name_r.as_deref());
         let name_ipa = ipa.name_ipa;
         let name_roman_ipa = ipa.name_roman_ipa;
         let name_tts_segments = to_proto_tts_segments(ipa.tts_segments);
@@ -397,13 +393,12 @@ mod tests {
     #[test]
     fn test_name_ipa_honsen_read_in_japanese() {
         // 「本線」も日本語読み (honsen)。英語 (meɪn laɪn) を混入させない。
-        // name_ipa にはピッチアクセントの下げ核マーカー ˈ が入る (issue #1534)。
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name = "東海道本線".to_string();
         line.line_name_k = "トウカイドウホンセン".to_string();
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("toːka.idoːˈhonsen".to_string()));
+        assert_eq!(grpc_line.name_ipa, Some("toːka.idoːhonsen".to_string()));
     }
 
     #[test]
@@ -413,7 +408,7 @@ mod tests {
         line.line_name_k = "トウホクシンカンセン".to_string();
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("toːhokɯɕinˈkansen".to_string()));
+        assert_eq!(grpc_line.name_ipa, Some("toːhokɯɕinkansen".to_string()));
     }
 
     #[test]
@@ -424,8 +419,8 @@ mod tests {
         line.line_name_r = Some("Keisei Main Line".to_string());
         let grpc_line: GrpcLine = line.into();
 
-        // name_ipa は日本語読み (下げ核付き)、name_roman_ipa はローマ字 (英語) 読み。
-        assert_eq!(grpc_line.name_ipa, Some("keːseˈːhonsen".to_string()));
+        // name_ipa は日本語読み、name_roman_ipa はローマ字 (英語) 読み。
+        assert_eq!(grpc_line.name_ipa, Some("keːseːhonsen".to_string()));
         assert_eq!(
             grpc_line.name_roman_ipa,
             Some("keːseː meɪn laɪn".to_string())
@@ -441,7 +436,7 @@ mod tests {
         line.line_name_r = None;
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("t͡ɕɯː.ˈoː soːbɯsen".to_string()));
+        assert_eq!(grpc_line.name_ipa, Some("t͡ɕɯː.oː soːbɯsen".to_string()));
         assert!(!grpc_line.name_tts_segments.is_empty());
     }
 
