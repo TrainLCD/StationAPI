@@ -1198,22 +1198,37 @@ fn insert_syllable_breaks(input: &str) -> String {
     let mut result = String::with_capacity(input.len());
     // 直前の母音の「基底」文字。長音化しても基底母音を保持し、続く母音と再判定する。
     let mut prev_vowel: Option<char> = None;
+    // 直前の母音が (長音記号 ː で) 既に伸ばされているか。伸ばされた母音の直後に
+    // さらに長音化を重ねない (二重 ː を防ぐ) ための状態。
+    let mut prev_vowel_lengthened = false;
 
     for c in input.chars() {
+        // 入力中に既に存在する長音記号 ː (カタカナ「ー」由来) は、直前母音の状態を
+        // 維持したまま通す。これにより `エーアイ` → `eː.a.i` のように、長音直後に
+        // 別母音が続く場合も音節境界 `.` を落とさない。
+        if c == 'ː' {
+            result.push(c);
+            prev_vowel_lengthened = prev_vowel.is_some();
+            continue;
+        }
+
         if is_ipa_vowel(c) {
             if let Some(prev) = prev_vowel {
-                if forms_long_vowel(prev, c) {
+                if !prev_vowel_lengthened && forms_long_vowel(prev, c) {
                     // 2 つ目の母音は ː に置換して伸ばす。基底母音 (prev) は維持。
                     result.push('ː');
+                    prev_vowel_lengthened = true;
                     continue;
                 }
                 result.push('.');
             }
             result.push(c);
             prev_vowel = Some(c);
+            prev_vowel_lengthened = false;
         } else {
             result.push(c);
             prev_vowel = None;
+            prev_vowel_lengthened = false;
         }
     }
 
@@ -1639,5 +1654,14 @@ mod tests {
             ipa("ドッキョウダイガクマエ ソウカマツバラ"),
             "dokkʲoːda.igakɯma.e soːkamat͡sɯbaɾa"
         );
+    }
+
+    #[test]
+    fn test_long_vowel_mark_before_distinct_vowel_keeps_break() {
+        // 長音「ー」由来の ː の直後に別母音が続く場合も、母音境界 `.` を落とさない。
+        // エ-ー-ア-イ → eː.a.i (eːa.i のように境界が消えないこと)。
+        assert_eq!(ipa("エーアイ"), "eː.a.i");
+        // 長音の直後が子音の場合は余計な境界を入れない。
+        assert_eq!(ipa("コーヒー"), "koːçiː");
     }
 }
