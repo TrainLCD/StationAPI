@@ -161,13 +161,15 @@ mod tests {
         let grpc_station: GrpcStation =
             create_test_station("練馬春日町", "ネリマカスガチョウ", None).into();
 
+        // name_ipa は日本語音声用なので honest な ɾ を維持する。
         assert_eq!(grpc_station.name_ipa, Some("neɾimakasɯgat͡ɕoː".to_string()));
-        // カタカナ由来 (ローマ字なし) の ja-JP セグメントも同じ発音になる。
+        // tts_segments は英語音声で読む英語読みトラックなので、同じカタカナ由来でも
+        // ら行は l に置換される (ɾ→l)。
         assert_eq!(grpc_station.name_tts_segments.len(), 1);
         assert_eq!(grpc_station.name_tts_segments[0].lang, "ja-JP");
         assert_eq!(
             grpc_station.name_tts_segments[0].pronunciation,
-            "neɾimakasɯgat͡ɕoː"
+            "nelimakasɯgat͡ɕoː"
         );
     }
 
@@ -209,8 +211,8 @@ mod tests {
         assert_eq!(grpc_station.name_tts_segments[0].separator, " ");
         assert_eq!(grpc_station.name_tts_segments[1].surface, "Rinkai");
         assert_eq!(grpc_station.name_tts_segments[1].fallback_text, "りんかい");
-        // ら行はそのまま ɾ (Rinkai → ɾinka.i)
-        assert_eq!(grpc_station.name_tts_segments[1].pronunciation, "ɾinka.i");
+        // 英語読みトラックなのでら行は l (Rinkai → linka.i)
+        assert_eq!(grpc_station.name_tts_segments[1].pronunciation, "linka.i");
         assert_eq!(grpc_station.name_tts_segments[1].separator, " ");
         assert_eq!(grpc_station.name_tts_segments[2].surface, "Park");
         assert_eq!(grpc_station.name_tts_segments[2].fallback_text, "Park");

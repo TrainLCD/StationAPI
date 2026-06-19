@@ -158,13 +158,32 @@ pub fn station_name_to_tts_segments(
     name_katakana: &str,
     name_roman: Option<&str>,
 ) -> Vec<TtsNameSegment> {
-    name_roman
+    let mut segments = name_roman
         .map(str::trim)
         .filter(|name| !name.is_empty())
         .and_then(romanized_name_to_tts_segments)
         .filter(|segments| !segments.is_empty())
         .or_else(|| katakana_name_to_tts_segments(name_katakana))
-        .unwrap_or_default()
+        .unwrap_or_default();
+
+    // tts_segments と、これらを連結した name_roman_ipa は英語音声 (Azure Dragon HD 等)
+    // で読み上げる「英語読み」トラック。ら行の弾き音 ɾ は英語ではフラップ /t/・/d/
+    // (water /ˈwɔːɾɚ/ の t) として実現され、「ら行」ではなく「た/だ/ち」に化ける
+    // (にほんおおどおり → にほんおおどおち)。そのためこのトラックに限り ら行を
+    // 側面接近音 l に置換する (例: トリデ toɾide→tolide)。英単語の R は別記号 ɹ を
+    // 使うので影響しない。日本語音声で読む name_ipa (katakana_to_ipa) は honest な ɾ の
+    // まま残し、将来 ja-JP 音声で読む場合に備える。
+    for segment in &mut segments {
+        segment.pronunciation = lateralize_ra_row(&segment.pronunciation);
+    }
+
+    segments
+}
+
+/// 英語読みトラックのら行 ɾ を側面接近音 l に置換する。英単語の R (ɹ) は対象外。
+/// 英語音声では ɾ が英語のフラップ /t/ として鳴り「ら行」に聞こえないため。
+fn lateralize_ra_row(pronunciation: &str) -> String {
+    pronunciation.replace('ɾ', "l")
 }
 
 fn join_tts_segment_pronunciations(segments: &[TtsNameSegment]) -> Option<String> {
@@ -1095,10 +1114,11 @@ fn phonemes_to_raw_ipa(phonemes: &[Phoneme]) -> String {
     while i < len {
         match &phonemes[i] {
             Phoneme::Regular(ipa) => {
-                // ら行は弾き音 ɾ をそのまま使う (語頭も語中も同じ)。ɾ は Azure ja-JP の
-                // `<phoneme alphabet="ipa">` でも発音できるため、聞こえ方の都合で l に
-                // 置換する加工は行わず素直な IPA を出力する。区切り文字 (空白) も
-                // そのまま出力する。
+                // この層は honest な IPA をそのまま出力する (ら行は弾き音 ɾ のまま)。
+                // 出力は日本語音声で読む name_ipa にそのまま使う。英語音声で読む
+                // name_roman_ipa / tts_segments では ɾ が英語のフラップ /t/ に化ける
+                // ため、station_name_to_tts_segments の lateralize_ra_row でら行を l に
+                // 置換する。区切り文字 (空白) もそのまま出力する。
                 output.push_str(ipa);
             }
             Phoneme::MoraicNasal => {
@@ -1428,20 +1448,33 @@ mod tests {
 
     #[test]
     fn test_roppongi_word_initial_r_stays_flap() {
-        // 語頭のら行も弾き音 ɾ のまま。l への置換は行わない。
+        // name_ipa 用の katakana_to_ipa は honest な ɾ を維持する (語頭も同じ)。
+        // 英語読みトラックの l 置換は station_name_to_ipa 側で行う。
         assert_eq!(ipa("ロッポンギ"), "ɾoppongi");
     }
 
     #[test]
     fn test_word_initial_r_after_separator_stays_flap() {
-        // 区切り直後 (= 後続語の語頭) のら行も ɾ のまま。
+        // 区切り直後 (= 後続語の語頭) のら行も katakana_to_ipa では ɾ のまま。
         assert_eq!(ipa("シン・リンカイ"), "ɕin ɾinka.i");
     }
 
     #[test]
     fn test_medial_r_stays_flap() {
-        // 語中のら行も弾き音 ɾ のまま (toɾide / t͡sɯɾɯmi)。
+        // 語中のら行も katakana_to_ipa では弾き音 ɾ のまま (toɾide / t͡sɯɾɯmi)。
         assert_eq!(ipa("トリデ"), "toɾide");
+    }
+
+    #[test]
+    fn test_romanized_track_lateralizes_ra_row() {
+        // 英語読みトラック (station_name_to_ipa = name_roman_ipa / tts_segments) は
+        // 英語音声で読むため、ら行を l に置換する。語頭・語中・語末いずれも対象。
+        assert_eq!(
+            station_name_to_ipa("トリデ", Some("Toride")),
+            Some("tolide".to_string())
+        );
+        // 一方 name_ipa 用の katakana_to_ipa は同じ語でも honest な ɾ を維持する。
+        assert_eq!(katakana_to_ipa("トリデ"), Some("toɾide".to_string()));
     }
 
     #[test]
@@ -1494,8 +1527,8 @@ mod tests {
     fn test_station_name_ipa_uses_official_english_wording() {
         assert_eq!(
             station_name_to_ipa("カサイリンカイコウエン", Some("Kasai-Rinkai Park")),
-            // ら行はそのまま ɾ (Rinkai → ɾinka.i)
-            Some("kasa.i ɾinka.i pɑɹk".to_string())
+            // 英語読みトラックなのでら行は l (Rinkai → linka.i)
+            Some("kasa.i linka.i pɑɹk".to_string())
         );
     }
 
@@ -1503,7 +1536,7 @@ mod tests {
     fn test_station_name_ipa_supports_english_and_digits() {
         assert_eq!(
             station_name_to_ipa("ナリタクウコウ", Some("Narita Airport Terminal 1")),
-            Some("naɾita ɛɚpɔɹt tɚmɪnəl wʌn".to_string())
+            Some("nalita ɛɚpɔɹt tɚmɪnəl wʌn".to_string())
         );
     }
 
@@ -1559,7 +1592,7 @@ mod tests {
     fn test_station_name_ipa_splits_other_compound_kaigan_suffix() {
         assert_eq!(
             station_name_to_ipa("オオモリカイガン", Some("Omorikaigan")),
-            Some("omoɾi ka.igan".to_string())
+            Some("omoli ka.igan".to_string())
         );
     }
 
