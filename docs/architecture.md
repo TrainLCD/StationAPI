@@ -166,13 +166,13 @@ CREATE INDEX idx_performance_station_name_trgm ON stations
 
 ### バス (GTFS) データの統合
 
-`stations` / `lines` / `types` / `station_station_types` は鉄道とバスの両方を保持し、`stations.transport_type` / `lines.transport_type` (0: 鉄道, 1: バス) でフィルタリングします。バスデータの取り込みは `src/import.rs` の `integrate_gtfs_to_stations()` が起動時に実行し、ODPT 公開の Toei Bus GTFS を `gtfs_*` テーブルに展開してから既存テーブルへ統合します。
+`stations` / `lines` / `types` / `station_station_types` は鉄道とバスの両方を保持し、`stations.transport_type` / `lines.transport_type` (0: 鉄道, 1: バス) でフィルタリングします。バスデータの取り込みは `src/import.rs` の `integrate_gtfs_to_stations()` が起動時に実行し、ODPT 公開の GTFS を `gtfs_*` テーブルに展開してから既存テーブルへ統合します。既定では安定フィードの Toei Bus のみを使用し、`ENABLE_EXPERIMENTAL_BUS_FEATURE=true` の場合だけ Seibu Bus を含む全GTFSフィードを使用します。Seibu Bus のダウンロードには `.env.local` の `ODPT_ACCESS_TOKEN` を使用します。
 
 | 鉄道側の概念 | バス側の対応 |
 |---|---|
-| `companies` | 東京都交通局 (`company_cd=119`) を固定で利用 |
-| `lines` | GTFS `routes` を 1:1 で `lines` に登録。`line_cd` は `route_id` の fnv1a ハッシュで 100,000,000+ 空間に決定的に生成 |
-| `stations` | GTFS `stops` (親停留所) を `(stop_id, route_id)` 単位で `stations` に登録。`station_cd` / `station_g_cd` も 200,000,000+ 空間にハッシュ生成 |
+| `companies` | GTFS フィードごとに会社を決定。Toei Bus は東京都交通局 (`company_cd=119`)、Seibu Bus は西武バス (`company_cd=253`) |
+| `lines` | GTFS `routes` を 1:1 で `lines` に登録。`line_cd` はフィード接頭辞付き `route_id` の fnv1a ハッシュで 100,000,000+ 空間に決定的に生成 |
+| `stations` | GTFS `stops` (親停留所) を `(stop_id, route_id)` 単位で `stations` に登録。`station_cd` / `station_g_cd` もフィード接頭辞付き ID から 200,000,000+ 空間にハッシュ生成 |
 | `types` | GTFS の `(route_id, shape_id)` バリエーション (フルループ / 短ターン / 支線など) を `kind = TrainTypeKind::BusRoute (= 7)` の TrainType として登録。**停留所集合が完全に同じ shape ペア (上下方向違いのみ) は 1 つの TrainType に畳み、`direction = Both` を設定**。`type_name` は循環なら `<headsign> (循環)`、双方向ペアなら `<A> ⇔ <B>`、片方向なら `<始発停留所> → <headsign>` |
 | `station_station_types` | 各バリエーションの代表 trip の停留所を `stop_sequence` 順に挿入し、`SERIAL id` がそのまま停留所順序として機能 |
 

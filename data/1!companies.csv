@@ -7,6 +7,7 @@ company_cd,rr_cd,company_name,company_name_k,company_name_h,company_name_r,compa
 6,11,JR九州,ジェイアールキュウシュウ,九州旅客鉄道株式会社,JR九州,JR Kyushu,JR Kyushu,http://www.jrkyushu.co.jp/,1,0,6
 11,21,東武鉄道,トウブテツドウ,東武鉄道株式会社,東武,Tobu,Tobu Railway,http://www.tobu.co.jp/,2,0,11
 12,22,西武鉄道,セイブテツドウ,西武鉄道株式会社,西武,Seibu,Seibu Railway,http://www.seibu-group.co.jp/railways/,2,0,12
+253,99,西武バス,セイブバス,西武バス株式会社,西武バス,Seibu Bus,Seibu Bus,https://www.seibubus.co.jp/,0,0,12
 13,23,京成電鉄,ケイセイデンテツ,京成電鉄株式会社,京成,Keisei,Keisei Electric Railway,http://www.keisei.co.jp/,2,0,13
 14,24,京王電鉄,ケイオウデンテツ,京王電鉄株式会社,京王,Keio,Keio,http://www.keio.co.jp/,2,0,14
 15,25,小田急電鉄,オダキュウデンテツ,小田急電鉄株式会社,小田急,Odakyu,Odakyu Electric Railway,http://www.odakyu.jp/,2,0,15
