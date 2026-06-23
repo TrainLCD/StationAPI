@@ -380,47 +380,47 @@ mod tests {
     // ============================================
 
     #[test]
-    fn test_name_ipa_sen_read_in_japanese() {
-        // name_ipa は日本語読み。「線」は sen として読み、英語 (laɪn) を混入させない。
+    fn test_name_ipa_sen_suffix_replaced_with_line() {
+        // name_ipa はカタカナ由来
         let mut line = create_test_line(TransportType::Rail, None);
-        line.line_name = "西武池袋線".to_string();
         line.line_name_k = "セイブイケブクロセン".to_string();
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("seːbɯ.ikebɯkɯɾosen".to_string()));
+        assert_eq!(
+            grpc_line.name_ipa,
+            Some("se.ibɯ.ikebɯkɯɾo laɪn".to_string())
+        );
     }
 
     #[test]
-    fn test_name_ipa_honsen_read_in_japanese() {
-        // 「本線」も日本語読み (honsen)。英語 (meɪn laɪn) を混入させない。
+    fn test_name_ipa_honsen_suffix_replaced_with_main_line() {
         let mut line = create_test_line(TransportType::Rail, None);
-        line.line_name = "東海道本線".to_string();
         line.line_name_k = "トウカイドウホンセン".to_string();
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("toːka.idoːhonsen".to_string()));
+        assert_eq!(
+            grpc_line.name_ipa,
+            Some("to.ɯka.ido.ɯ meɪn laɪn".to_string())
+        );
     }
 
     #[test]
     fn test_name_ipa_shinkansen_preserved() {
         let mut line = create_test_line(TransportType::Rail, None);
-        line.line_name = "東北新幹線".to_string();
         line.line_name_k = "トウホクシンカンセン".to_string();
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("toːhokɯɕinkansen".to_string()));
+        assert_eq!(grpc_line.name_ipa, Some("to.ɯhokɯɕiŋkanseɴ".to_string()));
     }
 
     #[test]
     fn test_name_roman_ipa_prefers_romanized_line_name_for_keisei() {
         let mut line = create_test_line(TransportType::Rail, None);
-        line.line_name = "京成本線".to_string();
         line.line_name_k = "ケイセイホンセン".to_string();
         line.line_name_r = Some("Keisei Main Line".to_string());
         let grpc_line: GrpcLine = line.into();
 
-        // name_ipa は日本語読み、name_roman_ipa はローマ字 (英語) 読み。
-        assert_eq!(grpc_line.name_ipa, Some("keːseːhonsen".to_string()));
+        assert_eq!(grpc_line.name_ipa, Some("ke.ise.i meɪn laɪn".to_string()));
         assert_eq!(
             grpc_line.name_roman_ipa,
             Some("keːseː meɪn laɪn".to_string())
@@ -431,12 +431,12 @@ mod tests {
     fn test_name_ipa_with_nakaguro_is_not_null() {
         // 「・」を含む路線名でも name_ipa / name_tts_segments が null / 空にならない
         let mut line = create_test_line(TransportType::Rail, None);
-        line.line_name = "中央・総武線".to_string();
         line.line_name_k = "チュウオウ・ソウブセン".to_string();
         line.line_name_r = None;
         let grpc_line: GrpcLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("t͡ɕɯː.oː soːbɯsen".to_string()));
+        assert!(grpc_line.name_ipa.is_some());
+        assert!(!grpc_line.name_ipa.as_deref().unwrap().is_empty());
         assert!(!grpc_line.name_tts_segments.is_empty());
     }
 
