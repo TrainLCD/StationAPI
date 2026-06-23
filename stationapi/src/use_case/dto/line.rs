@@ -435,8 +435,12 @@ mod tests {
         line.line_name_r = None;
         let grpc_line: GrpcLine = line.into();
 
-        assert!(grpc_line.name_ipa.is_some());
-        assert!(!grpc_line.name_ipa.as_deref().unwrap().is_empty());
+        // 「・」が空白へ正規化され（連続空白も残さず）、「線」→ " laɪn" 置換も維持される。
+        let ipa = grpc_line.name_ipa.expect("name_ipa should be present");
+        assert!(!ipa.is_empty());
+        assert!(ipa.contains(" laɪn"));
+        assert!(!ipa.contains("  "));
+        assert!(!ipa.contains('・'));
         assert!(!grpc_line.name_tts_segments.is_empty());
     }
 
