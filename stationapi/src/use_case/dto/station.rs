@@ -185,7 +185,8 @@ mod tests {
         assert_eq!(grpc_station.name_tts_segments[0].separator, " ");
         assert_eq!(grpc_station.name_tts_segments[1].surface, "Rinkai");
         assert_eq!(grpc_station.name_tts_segments[1].fallback_text, "りんかい");
-        assert_eq!(grpc_station.name_tts_segments[1].pronunciation, "ɾiŋka.i");
+        // 英語読みトラック (tts_segments) なのでら行は l (Rinkai → liŋka.i)
+        assert_eq!(grpc_station.name_tts_segments[1].pronunciation, "liŋka.i");
         assert_eq!(grpc_station.name_tts_segments[1].separator, " ");
         assert_eq!(grpc_station.name_tts_segments[2].surface, "Park");
         assert_eq!(grpc_station.name_tts_segments[2].fallback_text, "Park");
