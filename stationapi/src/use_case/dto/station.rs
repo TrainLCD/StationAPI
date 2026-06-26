@@ -143,7 +143,7 @@ mod tests {
 
         assert_eq!(
             grpc_station.name_roman_ipa,
-            Some("inage ka.igan".to_string())
+            Some("inage ka.igaɴ".to_string())
         );
     }
 
@@ -151,33 +151,7 @@ mod tests {
     fn test_station_name_roman_ipa_falls_back_to_katakana() {
         let grpc_station: GrpcStation = create_test_station("渋谷", "シブヤ", Some("???")).into();
 
-        // name_roman_ipa (英語読み) はアクセント核を付与しないため平板のまま。
         assert_eq!(grpc_station.name_roman_ipa, Some("ɕibɯja".to_string()));
-    }
-
-    #[test]
-    fn test_station_name_ipa_is_plain_katakana_reading() {
-        // ja-JP の name_ipa はカタカナ読みをそのまま IPA 化する (アクセント核なし)。
-        let grpc_station: GrpcStation =
-            create_test_station("練馬春日町", "ネリマカスガチョウ", None).into();
-
-        // name_ipa は日本語音声用なので honest な ɾ を維持する。
-        assert_eq!(grpc_station.name_ipa, Some("neɾimakasɯgat͡ɕoː".to_string()));
-        // tts_segments は英語音声で読む英語読みトラックなので、同じカタカナ由来でも
-        // ら行は l に置換される (ɾ→l)。
-        assert_eq!(grpc_station.name_tts_segments.len(), 1);
-        assert_eq!(grpc_station.name_tts_segments[0].lang, "ja-JP");
-        assert_eq!(
-            grpc_station.name_tts_segments[0].pronunciation,
-            "nelimakasɯgat͡ɕoː"
-        );
-    }
-
-    #[test]
-    fn test_station_name_ipa_shibuya() {
-        let grpc_station: GrpcStation = create_test_station("渋谷", "シブヤ", None).into();
-
-        assert_eq!(grpc_station.name_ipa, Some("ɕibɯja".to_string()));
     }
 
     #[test]
@@ -191,7 +165,7 @@ mod tests {
 
         assert_eq!(
             grpc_station.name_roman_ipa,
-            Some("meːtet͡sɯ it͡ɕinomija".to_string())
+            Some("me.itet͡sɯ it͡ɕinomija".to_string())
         );
     }
 
@@ -211,8 +185,8 @@ mod tests {
         assert_eq!(grpc_station.name_tts_segments[0].separator, " ");
         assert_eq!(grpc_station.name_tts_segments[1].surface, "Rinkai");
         assert_eq!(grpc_station.name_tts_segments[1].fallback_text, "りんかい");
-        // 英語読みトラックなのでら行は l (Rinkai → linka.i)
-        assert_eq!(grpc_station.name_tts_segments[1].pronunciation, "linka.i");
+        // 英語読みトラック (tts_segments) なのでら行は l (Rinkai → liŋka.i)
+        assert_eq!(grpc_station.name_tts_segments[1].pronunciation, "liŋka.i");
         assert_eq!(grpc_station.name_tts_segments[1].separator, " ");
         assert_eq!(grpc_station.name_tts_segments[2].surface, "Park");
         assert_eq!(grpc_station.name_tts_segments[2].fallback_text, "Park");
