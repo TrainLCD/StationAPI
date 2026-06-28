@@ -145,7 +145,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 11605,4,湖西線,コセイセン,湖西線,Kosei Line,Kosei Line,湖西线,고세이선,#576290,2,B,,,,#00ACD1,,,,REVERSED_SQUARE_WEST,,,,0,11605,4214.12406
 11607,4,大和路線,ヤマトジセン,関西本線,Yamatoji Line,Yamatoji Line,大和路线,야마토지선,#009933,2,Q,,,,#009933,,,,REVERSED_SQUARE_WEST,,,,0,11607,2780.43249
 11608,4,JR神戸線,ジェーアールコウベセン,山陽本線,Kobe Line,Kobe Line,神户线,고베선,#0072BC,2,A,,,,#0072BC,,,,REVERSED_SQUARE_WEST,,,,0,11608,3164.34054
-11609,4,山陽本線,サンヨウホンセン,山陽本線,San’yo Main Line,San’yo Main Line,山阳本线,산요 본선,#0072BC,2,S,A,,,#C1D612,#0072BC,,,REVERSED_SQUARE_WEST,,,,0,11609,5630.49753
+11609,4,山陽本線,サンヨウホンセン,山陽本線,San’yo Main Line,San’yo Main Line,山阳本线,산요 본선,#0072BC,2,A,S,,,#0072BC,#C1D612,,,REVERSED_SQUARE_WEST,REVERSED_SQUARE_WEST,,,0,11609,5630.49753
 11610,4,山陽本線,サンヨウホンセン,山陽本線,San’yo Main Line,San’yo Main Line,山阳本线,산요 본선,#0072BC,2,W,X,,,#F5A200,#00A0E9,,,REVERSED_SQUARE_WEST,REVERSED_SQUARE_WEST,,,0,11610,5100.06466
 11611,4,山陽本線,サンヨウホンセン,山陽本線,San’yo Main Line,San’yo Main Line,山阳本线,산요 본선,#0072BC,2,G,R,,,#60AD3B,#CB342E,,,REVERSED_SQUARE_WEST,REVERSED_SQUARE_WEST,,,0,11611,4223.01203
 11612,4,山陽本線,サンヨウホンセン,山陽本線,San'yo Main Line,San'yo Main Line,山阳本线,산요 본선,#0072BC,2,JA,,,,#E24148,,,,HALF_SQUARE,,,,0,11612,5412.42792
