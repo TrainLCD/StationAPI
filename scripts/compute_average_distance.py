@@ -199,11 +199,17 @@ def _pick_relation(rels: list[dict], coords, line_name: str):
         ways = _rel_ways(rel)
         if not ways:
             continue
-        pts = [p for w in ways for p in w]
         total = 0.0
         mx = 0.0
         for c in coords:
-            d = min(haversine(c[0], c[1], p[0], p[1]) for p in pts)
+            # 駅から線路への距離は頂点ではなく線分への投影距離で測る。
+            # 頂点だけだと長い線分の途中にある駅を過大に遠いと誤判定し、
+            # 有効な relation を取りこぼして不要なフォールバックを招くため。
+            d = min(
+                _project_to_segment(c[0], c[1], w[i], w[i + 1])[0]
+                for w in ways
+                for i in range(len(w) - 1)
+            )
             total += d
             mx = max(mx, d)
         if mx > MATCH_MAX_M:
@@ -405,7 +411,10 @@ def compute_line(line_cd: str, line_name: str, line_type: str, coords) -> LineRe
             )
             if rd is None or rd > sd * MAX_RATIO or rd < sd * MIN_RATIO:
                 failed += 1
-                seg_dist.append(sd)  # 失敗区間は直線距離で代替
+                # 経路探索できない区間は旧来式(直線距離 x 固定係数)で軌道距離を推定する。
+                # 直線距離をそのまま使うと実距離の下限になり、平均が過小評価されるため。
+                factor = FALLBACK_FACTOR.get(line_type, 1.15)
+                seg_dist.append(sd * factor)
             else:
                 # 実距離は直線距離を下回らない（駅は線路から横にずれているため
                 # 投影間の線路沿い距離が僅かに直線を下回ることがあるが、物理的下限で丸める）
@@ -499,7 +508,7 @@ def main() -> int:
     args = ap.parse_args()
 
     lines = load_lines()
-    lines_meta = {l["line_cd"]: l for l in lines}
+    lines_meta = {line["line_cd"]: line for line in lines}
     by_line = load_stations_by_line()
 
     if args.validate:
@@ -526,8 +535,12 @@ def main() -> int:
         return 0
 
     if args.apply:
-        active = [l for l in lines if l["e_status"] == "0" and len(by_line.get(l["line_cd"], [])) >= 2]
-        targets = [l["line_cd"] for l in active]
+        active = [
+            line
+            for line in lines
+            if line["e_status"] == "0" and len(by_line.get(line["line_cd"], [])) >= 2
+        ]
+        targets = [line["line_cd"] for line in active]
         results = run(targets, lines_meta, by_line)
         n_osm = sum(1 for r in results.values() if r.method == "osm")
         n_fb = sum(1 for r in results.values() if r.method == "fallback")
