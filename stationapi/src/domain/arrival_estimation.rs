@@ -176,9 +176,12 @@ fn detour_factors_by_line(
         let cur = stops[i];
         let prev = stops[i - 1];
         // average_distance / line_type は line_cd 単位で同じなので最初に見たものを採用。
-        let entry = acc
-            .entry(cur.line_cd)
-            .or_insert((0.0, 0, cur.average_distance.unwrap_or(0.0), cur.line_type));
+        let entry = acc.entry(cur.line_cd).or_insert((
+            0.0,
+            0,
+            cur.average_distance.unwrap_or(0.0),
+            cur.line_type,
+        ));
         // 同一路線が連続するペアだけを直線平均の母数にする。
         if prev.line_cd == cur.line_cd {
             entry.0 += straight_km[i];
@@ -188,11 +191,7 @@ fn detour_factors_by_line(
 
     acc.into_iter()
         .map(|(line_cd, (sum, count, avg_distance, line_type))| {
-            let mean_straight = if count > 0 {
-                sum / count as f64
-            } else {
-                0.0
-            };
+            let mean_straight = if count > 0 { sum / count as f64 } else { 0.0 };
             (
                 line_cd,
                 detour_factor_for(avg_distance, mean_straight, line_type, params),
@@ -216,9 +215,12 @@ pub fn estimate_arrival_minutes(
     // 各駅 i について「前駅との直線距離(km)」。straight_km[0] は未使用(0)。
     let mut straight_km = vec![0.0_f64; n];
     for i in 1..n {
-        straight_km[i] =
-            haversine_distance(stops[i - 1].lat, stops[i - 1].lon, stops[i].lat, stops[i].lon)
-                / 1000.0;
+        straight_km[i] = haversine_distance(
+            stops[i - 1].lat,
+            stops[i - 1].lon,
+            stops[i].lat,
+            stops[i].lon,
+        ) / 1000.0;
     }
 
     // line_cd ごとの迂回係数。
