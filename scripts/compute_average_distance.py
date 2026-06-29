@@ -91,6 +91,7 @@ def haversine(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
 # Overpass 取得（リトライ＋エンドポイント切替＋ローカルキャッシュ）
 # ---------------------------------------------------------------------------
 def _cache_path(key: str) -> str:
+    """Overpass クエリ文字列に対応するキャッシュファイルのパスを返す。"""
     import hashlib
 
     h = hashlib.sha1(key.encode()).hexdigest()
@@ -130,11 +131,13 @@ def overpass(query: str, *, tries: int = 6) -> dict:
 # データ読み込み
 # ---------------------------------------------------------------------------
 def load_lines() -> list[dict]:
+    """data/2!lines.csv を辞書のリストとして読み込む。"""
     with open(LINES_CSV, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
 def load_stations_by_line() -> dict[str, list[dict]]:
+    """稼働駅(e_status=0)を line_cd ごとにまとめた辞書を返す。"""
     by_line: dict[str, list[dict]] = {}
     with open(STATIONS_CSV, newline="", encoding="utf-8") as f:
         for s in csv.DictReader(f):
@@ -144,6 +147,7 @@ def load_stations_by_line() -> dict[str, list[dict]]:
 
 
 def line_station_coords(stations: list[dict]) -> list[tuple[float, float, str]]:
+    """駅リストを e_sort 順に並べ、(経度, 緯度, 駅名) のリストにして返す。"""
     sts = sorted(stations, key=lambda s: int(s["e_sort"]))
     return [(float(s["lon"]), float(s["lat"]), s["station_name"]) for s in sts]
 
@@ -155,6 +159,7 @@ ROUTE_FILTER = '["route"~"^(train|railway|subway|light_rail|monorail|tram)$"]'
 
 
 def _name_tokens(name: str) -> str:
+    """路線名比較用の簡易正規化(JR 表記や全角括弧の揺れを吸収する)。"""
     # 比較用に括弧書き等を緩く扱うための簡易正規化
     return name.replace("JR", "").replace("（", "(").replace("）", ")")
 
@@ -262,10 +267,12 @@ def find_best_relation(coords: list[tuple[float, float, str]], line_name: str):
 # グラフ構築 & 経路探索
 # ---------------------------------------------------------------------------
 def _nid(p):
+    """座標を丸めてグラフのノード ID に正規化する。"""
     return (round(p[0], 7), round(p[1], 7))
 
 
 def build_graph(ways: list[list[tuple[float, float]]]) -> dict:
+    """way 群から、辺重みを隣接頂点間ハバサイン距離とする無向グラフを構築する。"""
     adj: dict[tuple[float, float], list[tuple[tuple[float, float], float]]] = {}
     for w in ways:
         for i in range(len(w) - 1):
@@ -384,6 +391,7 @@ class LineResult:
 
 
 def compute_line(line_cd: str, line_name: str, line_type: str, coords) -> LineResult:
+    """1 路線の平均駅間距離を算出する。OSM 実距離を優先し、不可なら従来式へフォールバックする。"""
     res = LineResult(line_cd, line_name)
     straight = [
         haversine(coords[i][0], coords[i][1], coords[i + 1][0], coords[i + 1][1])
@@ -441,11 +449,13 @@ def compute_line(line_cd: str, line_name: str, line_type: str, coords) -> LineRe
 # CSV 書き換え
 # ---------------------------------------------------------------------------
 def format_distance(value: float) -> str:
+    """距離値を既存 CSV と同程度の桁数の文字列に整形する。"""
     # 既存CSVは小数を含む（例: 31785.47337）。同程度の桁で出力する。
     return f"{value:.5f}".rstrip("0").rstrip(".")
 
 
 def apply_to_csv(results: dict[str, LineResult]) -> int:
+    """算出結果で data/2!lines.csv の average_distance 列だけを書き換え、更新セル数を返す。"""
     with open(LINES_CSV, newline="", encoding="utf-8") as f:
         reader = csv.reader(f)
         rows = list(reader)
@@ -476,6 +486,7 @@ def apply_to_csv(results: dict[str, LineResult]) -> int:
 # メイン
 # ---------------------------------------------------------------------------
 def run(line_cds: list[str], lines_meta: dict[str, dict], by_line: dict) -> dict[str, LineResult]:
+    """指定した line_cd 群を順に計算し、line_cd -> LineResult の辞書を返す。"""
     results: dict[str, LineResult] = {}
     total = len(line_cds)
     for i, cd in enumerate(line_cds, 1):
@@ -500,6 +511,7 @@ def run(line_cds: list[str], lines_meta: dict[str, dict], by_line: dict) -> dict
 
 
 def main() -> int:
+    """CLI エントリポイント。--validate / --lines / --apply を切り替える。"""
     ap = argparse.ArgumentParser(description=__doc__)
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--validate", action="store_true", help="既知路線で較正のみ（CSV不変）")
