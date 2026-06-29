@@ -11,8 +11,10 @@ use crate::{
         GetStationByCoordinatesRequest, GetStationByGroupIdRequest, GetStationByIdListRequest,
         GetStationByIdRequest, GetStationByLineIdListRequest, GetStationByLineIdRequest,
         GetStationsByLineGroupIdListRequest, GetStationsByLineGroupIdRequest,
-        GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleLineResponse,
-        MultipleStationResponse, MultipleTrainTypeResponse, Route, RouteMinimalResponse,
+        GetStationsByNameRequest, GetTrainTypesByStationIdRequest,
+        EstimatedArrivalResponse, EstimatedArrivalRoute, EstimatedArrivalStop,
+        MultipleLineResponse, MultipleStationResponse, MultipleTrainTypeResponse,
+        Route, RouteMinimalResponse,
         RouteResponse, RouteTypeResponse, SingleLineResponse, SingleStationResponse,
         TransportType as GrpcTransportType,
     },
@@ -423,6 +425,52 @@ impl StationApi for MyApi {
             Err(err) => {
                 return Err(PresentationalError::OtherError(anyhow::anyhow!(err).into()).into())
             }
+        }
+    }
+
+    async fn estimate_arrival_times(
+        &self,
+        request: tonic::Request<GetRouteRequest>,
+    ) -> Result<tonic::Response<EstimatedArrivalResponse>, tonic::Status> {
+        let from_id = request.get_ref().from_station_group_id;
+        let to_id = request.get_ref().to_station_group_id;
+        let via_line_id = request.get_ref().via_line_id;
+
+        match self
+            .query_use_case
+            .estimate_route_arrival_times(from_id, to_id, via_line_id)
+            .await
+        {
+            Ok(estimated_stops) => {
+                let mut routes: Vec<EstimatedArrivalRoute> = Vec::new();
+
+                for stop in &estimated_stops {
+                    let route_id = stop.line_group_cd.unwrap_or(0) as u32;
+                    let proto_stop = EstimatedArrivalStop {
+                        station_id: stop.station_cd as u32,
+                        station_group_id: stop.station_g_cd as u32,
+                        cumulative_minutes: stop.cumulative_minutes,
+                        stops_here: stop.stops_here,
+                    };
+
+                    if let Some(last) = routes.last_mut() {
+                        if last.id == route_id {
+                            last.stops.push(proto_stop);
+                            continue;
+                        }
+                    }
+                    routes.push(EstimatedArrivalRoute {
+                        id: route_id,
+                        stops: vec![proto_stop],
+                    });
+                }
+
+                Ok(Response::new(EstimatedArrivalResponse {
+                    routes,
+                    next_page_token: "".to_string(),
+                }))
+            }
+            Err(err) => Err(PresentationalError::from(err).into()),
         }
     }
 }
