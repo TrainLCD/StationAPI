@@ -35,7 +35,11 @@ const LIMITED_EXPRESS_KIND_MAX_SPEED: f64 = 36.111_111_111_1; // 130 km/h
 /// - `is_bus`: バス路線なら true（路線種別に関わらずバス用プロファイルを返す）。
 /// - `kind`: proto `TrainTypeKind` の i32 値。kind 固有の上限がある場合は路線種別の
 ///   最高速度より優先する（MobileApp: `maxSpeed = TRAIN_TYPE_KIND_MAX_SPEEDS[kind] ?? lineTypeMax`）。
-pub fn resolve_speed_profile(line_type: Option<i32>, is_bus: bool, kind: Option<i32>) -> SpeedProfile {
+pub fn resolve_speed_profile(
+    line_type: Option<i32>,
+    is_bus: bool,
+    kind: Option<i32>,
+) -> SpeedProfile {
     if is_bus {
         return SpeedProfile {
             max_speed: BUS_MAX_SPEED,
@@ -72,7 +76,6 @@ pub fn resolve_speed_profile(line_type: Option<i32>, is_bus: bool, kind: Option<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proto::{LineType, TrainTypeKind};
 
     #[test]
     fn bus_overrides_line_type() {
