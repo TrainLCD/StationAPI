@@ -23,7 +23,6 @@ fn filter_to_db_type(filter: TransportTypeFilter) -> Option<TransportType> {
 
 use crate::{
     domain::{
-        arrival_estimation::{estimate_arrival_minutes, EstimatedStop, EstimationParams},
         entity::{
             company::Company,
             gtfs::{TransportType, TransportTypeFilter},
@@ -1085,41 +1084,6 @@ where
         Ok(vec![])
     }
 
-    async fn estimate_route_arrival_times(
-        &self,
-        from_station_id: u32,
-        to_station_id: u32,
-        via_line_id: Option<u32>,
-    ) -> Result<Vec<EstimatedStop>, UseCaseError> {
-        let stops = self
-            .station_repository
-            .get_route_stops(from_station_id, to_station_id, via_line_id)
-            .await?;
-
-        // 経路は運用上 line_group_cd を跨がないが、get_route_stops は複数の
-        // 候補経路(line_group)を返しうるので、グループごとに推定して連結する。
-        // 各グループ内は始点→終点の順序(e_sort, station_cd)が保たれている。
-        // BTreeMap なので連結順は line_group_cd 昇順で決定的。
-        let route_row_tree_map = self.build_route_tree_map(&stops);
-        let params = EstimationParams::default();
-
-        let mut result: Vec<EstimatedStop> = Vec::new();
-        for (_line_group_cd, group_stops) in route_row_tree_map.iter() {
-            // get_routes / get_routes_minimal と同様に、要求された駅(始点・終点)を
-            // 含まない候補グループは到着予測の対象外として除外する。
-            let includes_requested_station = group_stops.iter().any(|stop| {
-                stop.station_g_cd as u32 == from_station_id
-                    || stop.station_g_cd as u32 == to_station_id
-            });
-            if !includes_requested_station {
-                continue;
-            }
-
-            result.extend(estimate_arrival_minutes(group_stops, &params));
-        }
-
-        Ok(result)
-    }
 }
 
 impl<SR, LR, TR, CR> QueryInteractor<SR, LR, TR, CR>
