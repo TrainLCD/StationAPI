@@ -12,10 +12,10 @@ use crate::{
         GetStationByCoordinatesRequest, GetStationByGroupIdRequest, GetStationByIdListRequest,
         GetStationByIdRequest, GetStationByLineIdListRequest, GetStationByLineIdRequest,
         GetStationsByLineGroupIdListRequest, GetStationsByLineGroupIdRequest,
-        GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleLineResponse,
-        MultipleStationResponse, MultipleTrainTypeResponse, Route, RouteMinimalResponse,
-        RouteResponse, RouteTypeResponse, SingleLineResponse, SingleStationResponse,
-        TransportType as GrpcTransportType,
+        GetStationsByNameRequest, GetTrainRouteRequest, GetTrainTypesByStationIdRequest,
+        MultipleLineResponse, MultipleStationResponse, MultipleTrainTypeResponse, Route,
+        RouteMinimalResponse, RouteResponse, RouteTypeResponse, SingleLineResponse,
+        SingleStationResponse, TrainRouteResponse, TransportType as GrpcTransportType,
     },
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
@@ -424,6 +424,27 @@ impl StationApi for MyApi {
             Err(err) => {
                 return Err(PresentationalError::OtherError(anyhow::anyhow!(err).into()).into())
             }
+        }
+    }
+
+    async fn get_train_route(
+        &self,
+        request: tonic::Request<GetTrainRouteRequest>,
+    ) -> Result<tonic::Response<TrainRouteResponse>, tonic::Status> {
+        let req = request.get_ref();
+        let from_id = req.from_station_group_id;
+        let to_id = req.to_station_group_id;
+        let line_group_id = req
+            .line_group_id
+            .ok_or_else(|| tonic::Status::invalid_argument("line_group_id is required"))?;
+
+        match self
+            .query_use_case
+            .get_train_route(from_id, to_id, line_group_id)
+            .await
+        {
+            Ok(segments) => Ok(Response::new(TrainRouteResponse { segments })),
+            Err(err) => Err(PresentationalError::from(err).into()),
         }
     }
 
@@ -876,6 +897,15 @@ mod tests {
             _to_station_id: u32,
             _via_line_id: Option<u32>,
         ) -> Result<Vec<TrainType>, UseCaseError> {
+            Ok(vec![])
+        }
+
+        async fn get_train_route(
+            &self,
+            _from_station_group_id: u32,
+            _to_station_group_id: u32,
+            _line_group_id: u32,
+        ) -> Result<Vec<crate::proto::TrainRouteSegment>, UseCaseError> {
             Ok(vec![])
         }
 

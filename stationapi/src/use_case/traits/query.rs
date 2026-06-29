@@ -8,7 +8,7 @@ use crate::{
             station::Station, station_number::StationNumber, train_type::TrainType,
         },
     },
-    proto::{Route, RouteMinimalResponse},
+    proto::{Route, RouteMinimalResponse, TrainRouteSegment},
     use_case::error::UseCaseError,
 };
 
@@ -111,6 +111,12 @@ pub trait QueryUseCase: Send + Sync + 'static {
         to_station_id: u32,
         via_line_id: Option<u32>,
     ) -> Result<Vec<TrainType>, UseCaseError>;
+    async fn get_train_route(
+        &self,
+        from_station_group_id: u32,
+        to_station_group_id: u32,
+        line_group_id: u32,
+    ) -> Result<Vec<TrainRouteSegment>, UseCaseError>;
     async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError>;
     async fn get_lines_by_id_vec(&self, line_ids: &[u32]) -> Result<Vec<Line>, UseCaseError>;
     async fn get_lines_by_name(
