@@ -1035,11 +1035,22 @@ where
         // 経路は運用上 line_group_cd を跨がないが、get_route_stops は複数の
         // 候補経路(line_group)を返しうるので、グループごとに推定して連結する。
         // 各グループ内は始点→終点の順序(e_sort, station_cd)が保たれている。
+        // BTreeMap なので連結順は line_group_cd 昇順で決定的。
         let route_row_tree_map = self.build_route_tree_map(&stops);
         let params = EstimationParams::default();
 
         let mut result: Vec<EstimatedStop> = Vec::new();
         for (_line_group_cd, group_stops) in route_row_tree_map.iter() {
+            // get_routes / get_routes_minimal と同様に、要求された駅(始点・終点)を
+            // 含まない候補グループは到着予測の対象外として除外する。
+            let includes_requested_station = group_stops.iter().any(|stop| {
+                stop.station_g_cd as u32 == from_station_id
+                    || stop.station_g_cd as u32 == to_station_id
+            });
+            if !includes_requested_station {
+                continue;
+            }
+
             result.extend(estimate_arrival_minutes(group_stops, &params));
         }
 
@@ -2262,6 +2273,46 @@ mod tests {
             assert!(est[1].cumulative_minutes > est[0].cumulative_minutes);
             assert!(est[2].cumulative_minutes > est[1].cumulative_minutes);
             assert!(est[3].cumulative_minutes > est[2].cumulative_minutes);
+            // 全駅が同一経路(line_group_cd=500)に属する。
+            assert!(est.iter().all(|e| e.line_group_cd == Some(500)));
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_multiple_candidates_filtered_and_ordered() {
+            // 候補経路が 3 つ返るケース:
+            // - group 500 / 600 は始点(g_cd=1)・終点(g_cd=4)を含む → 対象
+            // - group 700 は無関係な駅(g_cd=5,6)のみ → get_routes 同様に除外される
+            let stops = vec![
+                // group 600(あえて 500 より先に積み、連結順が走査順ではなく
+                // line_group_cd 昇順で決定的になることを確認する)
+                create_geo_stop(1, 100, 600, 35.000, 139.0, Some(0)),
+                create_geo_stop(4, 100, 600, 35.048, 139.0, Some(0)),
+                // group 500
+                create_geo_stop(1, 100, 500, 35.000, 139.0, Some(0)),
+                create_geo_stop(4, 100, 500, 35.048, 139.0, Some(0)),
+                // group 700(始点・終点を含まない → 除外）
+                create_geo_stop(5, 100, 700, 35.100, 139.0, Some(0)),
+                create_geo_stop(6, 100, 700, 35.116, 139.0, Some(0)),
+            ];
+
+            let interactor = build_interactor(stops, vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(1, 4, None)
+                .await
+                .unwrap();
+
+            // 700 は除外、500 と 600 の各 2 駅で計 4 件。
+            assert_eq!(est.len(), 4);
+            // 連結順は line_group_cd 昇順(BTreeMap)で決定的: 500 → 600。
+            let groups: Vec<Option<i32>> = est.iter().map(|e| e.line_group_cd).collect();
+            assert_eq!(groups, vec![Some(500), Some(500), Some(600), Some(600)]);
+            // 除外された 700 の駅は含まれない。
+            assert!(est
+                .iter()
+                .all(|e| e.station_g_cd != 5 && e.station_g_cd != 6));
+            // 各経路の始点は 0 分から始まる。
+            assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+            assert!((est[2].cumulative_minutes - 0.0).abs() < 1e-9);
         }
     }
 

@@ -31,7 +31,11 @@ use crate::proto::StopCondition;
 pub struct EstimatedStop {
     pub station_cd: i32,
     pub station_g_cd: i32,
-    /// 始点からの累積到着時間(分)。通過駅は区間内の距離比で線形補間した通過時刻。
+    /// この駅が属する経路(line_group_cd)。複数候補経路をフラットな Vec で返す際に、
+    /// 呼び出し側が経路境界を復元できるようにする。line_group_cd が無い駅は line_cd。
+    pub line_group_cd: Option<i32>,
+    /// 始点からの累積到着時間(分)。通過駅は停車駅間を速度プロファイル別に分割した
+    /// 走行時間の積み上げで求めた通過時刻。
     pub cumulative_minutes: f64,
     /// その駅に停車するか(false = 通過)。
     pub stops_here: bool,
@@ -200,6 +204,52 @@ fn detour_factors_by_line(
         .collect()
 }
 
+/// 停車駅間(`seg`)の各駅(通過駅・終点停車駅)へ到着時刻(分)を割り当てる。
+///
+/// `seg` は `(みなし走行距離 m, 最高速度 km/h, result index, 停車駅か)` のサブ区間列で、
+/// 末尾要素が次の停車駅に対応する。列車は始点停車駅で 0 から加速し終点停車駅で 0 まで減速する。
+/// 途中の通過駅では停車・加減速をしないが、直通で `line_cd` / 速度が変わるためサブ区間ごとに
+/// 巡航時間を速度別に積む。単一サブ区間のときは加減速まで含む運動学モデル(短区間は三角形)で
+/// 厳密に計算する。複数サブ区間の境界での速度遷移は簡易的に瞬時とみなす。
+fn assign_segment_times(
+    result: &mut [EstimatedStop],
+    seg: &[(f64, f64, usize, bool)],
+    departure_minutes: f64,
+    params: &EstimationParams,
+) {
+    if seg.is_empty() {
+        return;
+    }
+    if seg.len() == 1 {
+        let (track_m, v_kmh, idx, _) = seg[0];
+        result[idx].cumulative_minutes =
+            departure_minutes + segment_run_minutes(track_m, v_kmh, params);
+        return;
+    }
+
+    // 複数サブ区間: 始点加速 + 各サブ区間の巡航 + 終点減速。
+    let v_first = seg[0].1 / 3.6; // m/s
+    let v_last = seg[seg.len() - 1].1 / 3.6;
+    let accel_penalty_sec = v_first / (2.0 * params.accel);
+    let decel_penalty_sec = v_last / (2.0 * params.decel);
+
+    let mut cruise_sec = 0.0;
+    for &(track_m, v_kmh, idx, is_stop) in seg.iter() {
+        let v = v_kmh / 3.6;
+        if v > 0.0 {
+            cruise_sec += track_m / v;
+        }
+        let seconds = if is_stop {
+            // 終点停車駅: 加速 + 全巡航 + 減速。
+            accel_penalty_sec + cruise_sec + decel_penalty_sec
+        } else {
+            // 通過駅: 加速 + ここまでの巡航(減速はまだ)。
+            accel_penalty_sec + cruise_sec
+        };
+        result[idx].cumulative_minutes = departure_minutes + seconds / 60.0;
+    }
+}
+
 /// 順序付き駅リスト(単一 `line_group_cd` の経路)に対し、始点からの累積到着時間(分)を推定する。
 ///
 /// `stops` は始点→終点の順に並んでいること。返り値は入力と同じ順・同じ要素数。
@@ -239,55 +289,46 @@ pub fn estimate_arrival_minutes(
         .map(|(i, s)| is_stop(s, i == 0 || i == n - 1))
         .collect();
 
+    let line_group_of =
+        |station: &Station| -> Option<i32> { station.line_group_cd.or(Some(station.line_cd)) };
+
     let mut result: Vec<EstimatedStop> = Vec::with_capacity(n);
 
     // 始点。
     result.push(EstimatedStop {
         station_cd: stops[0].station_cd,
         station_g_cd: stops[0].station_g_cd,
+        line_group_cd: line_group_of(stops[0]),
         cumulative_minutes: 0.0,
         stops_here: stops_here[0],
     });
 
     // 直前の停車駅を出発した時刻(分)。始点は即時出発なので 0。
     let mut last_departure = 0.0_f64;
-    // 直前の停車駅以降に溜めた「みなし走行距離(メートル)」と、通過駅の暫定情報。
-    let mut seg_distance_m = 0.0_f64;
-    // (result index, その駅までの区間内累積みなし距離(メートル))
-    let mut pending: Vec<(usize, f64)> = Vec::new();
+    // 現在の停車間セグメントに溜めるサブ区間。
+    // (みなし走行距離 m, 最高速度 km/h, result index, 停車駅か)
+    let mut seg: Vec<(f64, f64, usize, bool)> = Vec::new();
 
     for i in 1..n {
         let track_m = straight_km[i] * detour_of(stops[i]) * 1000.0;
-        seg_distance_m += track_m;
+        let v_kmh = max_speed_kmh(stops[i].line_type, stops[i].kind);
 
-        // 暫定で push(後で cumulative を確定)。
         let idx = result.len();
         result.push(EstimatedStop {
             station_cd: stops[i].station_cd,
             station_g_cd: stops[i].station_g_cd,
+            line_group_cd: line_group_of(stops[i]),
             cumulative_minutes: 0.0,
             stops_here: stops_here[i],
         });
+        seg.push((track_m, v_kmh, idx, stops_here[i]));
 
         if stops_here[i] {
-            // 停車駅に到達 → この停車間セグメントの走行時間を確定。
-            let v_max = max_speed_kmh(stops[i].line_type, stops[i].kind);
-            let run = segment_run_minutes(seg_distance_m, v_max, params);
+            // 停車駅に到達 → 速度プロファイル別サブ区間で走行時間を積み上げ、
+            // 区間内の各駅(通過駅・終点停車駅)へ到着時刻を割り当てる。
+            assign_segment_times(&mut result, &seg, last_departure, params);
 
-            // 区間内の通過駅へ距離比で到達時刻を割り当てる。
-            for &(p_idx, p_dist) in pending.iter() {
-                let frac = if seg_distance_m > 0.0 {
-                    p_dist / seg_distance_m
-                } else {
-                    1.0
-                };
-                result[p_idx].cumulative_minutes = last_departure + run * frac;
-            }
-
-            // 停車駅本体の到着時刻。
-            let arrival = last_departure + run;
-            result[idx].cumulative_minutes = arrival;
-
+            let arrival = result[idx].cumulative_minutes;
             // 中間停車駅(終点以外)では停車時間を加えて次区間の出発時刻にする。
             last_departure = if i == n - 1 {
                 arrival
@@ -295,11 +336,7 @@ pub fn estimate_arrival_minutes(
                 arrival + params.dwell_minutes
             };
 
-            seg_distance_m = 0.0;
-            pending.clear();
-        } else {
-            // 通過駅 → 後で補間するため、現区間の累積みなし距離を記録。
-            pending.push((idx, seg_distance_m));
+            seg.clear();
         }
     }
 
@@ -484,6 +521,61 @@ mod tests {
         let all_stop_refs: Vec<&Station> = all_stop_stations.iter().collect();
         let all_stop = estimate_arrival_minutes(&all_stop_refs, &p);
         assert!(est[2].cumulative_minutes < all_stop[2].cumulative_minutes);
+    }
+
+    #[test]
+    fn line_group_cd_is_propagated() {
+        let p = EstimationParams::default();
+        let mut stations = three_collinear_stations();
+        for s in stations.iter_mut() {
+            s.line_group_cd = Some(777);
+        }
+        let refs: Vec<&Station> = stations.iter().collect();
+        let est = estimate_arrival_minutes(&refs, &p);
+        assert!(est.iter().all(|e| e.line_group_cd == Some(777)));
+
+        // line_group_cd が無い場合は line_cd にフォールバック。
+        let mut no_group = three_collinear_stations();
+        for s in no_group.iter_mut() {
+            s.line_group_cd = None;
+        }
+        let refs2: Vec<&Station> = no_group.iter().collect();
+        let est2 = estimate_arrival_minutes(&refs2, &p);
+        assert!(est2.iter().all(|e| e.line_group_cd == Some(100)));
+    }
+
+    #[test]
+    fn speed_profile_splits_within_pass_through_segment() {
+        let p = EstimationParams::default();
+
+        // 始点→通過→終点。通過駅で line_cd が変わる直通区間。
+        // どちらも在来線(普通)。
+        let mut slow = three_collinear_stations();
+        slow[1].pass = Some(1);
+        slow[2].line_cd = 200; // 直通で line_cd が変わる
+        let slow_refs: Vec<&Station> = slow.iter().collect();
+        let slow_est = estimate_arrival_minutes(&slow_refs, &p);
+
+        // 後半サブ区間(通過→終点)だけ高速種別(kind != 0 → 100km/h)にする。
+        let mut fast = three_collinear_stations();
+        fast[1].pass = Some(1);
+        fast[2].line_cd = 200;
+        fast[2].kind = Some(1); // 速達種別 → 後半サブ区間の v_max を上げる
+        let fast_refs: Vec<&Station> = fast.iter().collect();
+        let fast_est = estimate_arrival_minutes(&fast_refs, &p);
+
+        // 後半サブ区間が速くなったぶん、終点到着が早くなる(=区間ごとに速度が効いている)。
+        assert!(
+            fast_est[2].cumulative_minutes < slow_est[2].cumulative_minutes,
+            "fast {} should be < slow {}",
+            fast_est[2].cumulative_minutes,
+            slow_est[2].cumulative_minutes
+        );
+        // 通過駅(前半サブ区間のみ)の通過時刻は速度を変えていないので不変。
+        approx(
+            fast_est[1].cumulative_minutes,
+            slow_est[1].cumulative_minutes,
+        );
     }
 
     #[test]
