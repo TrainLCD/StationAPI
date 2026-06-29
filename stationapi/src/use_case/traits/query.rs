@@ -5,7 +5,7 @@ use crate::{
         company::Company, gtfs::TransportTypeFilter, line::Line, line_symbol::LineSymbol,
         station::Station, station_number::StationNumber, train_type::TrainType,
     },
-    proto::{Route, RouteMinimalResponse},
+    proto::{Route, RouteMinimalResponse, TrainRouteSegment},
     use_case::error::UseCaseError,
 };
 
@@ -108,6 +108,15 @@ pub trait QueryUseCase: Send + Sync + 'static {
         to_station_id: u32,
         via_line_id: Option<u32>,
     ) -> Result<Vec<TrainType>, UseCaseError>;
+    /// 指定した列車種別 (`line_group_id`) について A→B 間の各駅を順序通り返し、
+    /// 各駅に停車/通過・直前駅からの距離(m)・最高速度/加減速度(SI 単位) を付与する。
+    /// MobileApp の `useSimulationMode` が端末内で行っていた経路・速度準備を 1 リクエストに集約する。
+    async fn get_train_route(
+        &self,
+        from_station_group_id: u32,
+        to_station_group_id: u32,
+        line_group_id: u32,
+    ) -> Result<Vec<TrainRouteSegment>, UseCaseError>;
     async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError>;
     async fn get_lines_by_id_vec(&self, line_ids: &[u32]) -> Result<Vec<Line>, UseCaseError>;
     async fn get_lines_by_name(

@@ -39,7 +39,9 @@ use crate::{
         },
     },
     proto::{self, Route},
-    use_case::{error::UseCaseError, traits::query::QueryUseCase},
+    use_case::{
+        dto::simulation::resolve_speed_profile, error::UseCaseError, traits::query::QueryUseCase,
+    },
 };
 use async_trait::async_trait;
 
@@ -987,6 +989,74 @@ where
             result.push(train_type);
         }
         Ok(result)
+    }
+
+    async fn get_train_route(
+        &self,
+        from_station_group_id: u32,
+        to_station_group_id: u32,
+        line_group_id: u32,
+    ) -> Result<Vec<proto::TrainRouteSegment>, UseCaseError> {
+        // 1. 指定種別(line_group_id)の順序付き全駅（通過駅含む）を取得。
+        //    緯度経度・stop_condition・line_type・train_type(kind)・station_g_cd を持つ。
+        let stations = self
+            .get_stations_by_line_group_id(line_group_id, TransportTypeFilter::RailAndBus)
+            .await?;
+
+        // 2. A駅 / B駅 の位置(index)を group_id で特定。
+        let from_idx = stations
+            .iter()
+            .position(|s| s.station_g_cd as u32 == from_station_group_id)
+            .ok_or_else(|| UseCaseError::NotFound {
+                entity_type: "station in line group",
+                entity_id: from_station_group_id.to_string(),
+            })?;
+        let to_idx = stations
+            .iter()
+            .position(|s| s.station_g_cd as u32 == to_station_group_id)
+            .ok_or_else(|| UseCaseError::NotFound {
+                entity_type: "station in line group",
+                entity_id: to_station_group_id.to_string(),
+            })?;
+
+        // 3. A→B の向きに合わせて区間を切り出す（逆向きなら反転）。
+        let sliced: Vec<Station> = if from_idx <= to_idx {
+            stations[from_idx..=to_idx].to_vec()
+        } else {
+            let mut v = stations[to_idx..=from_idx].to_vec();
+            v.reverse();
+            v
+        };
+
+        // 4. 各駅へ走行メタ（停車/通過・直前駅からの距離・速度プロファイル）を付与。
+        let mut segments: Vec<proto::TrainRouteSegment> = Vec::with_capacity(sliced.len());
+        let mut prev_coord: Option<(f64, f64)> = None;
+        for station in sliced {
+            // 通過駅(pass=1 = StopCondition::Not)以外は停車扱い。
+            let stops = station.stop_condition != proto::StopCondition::Not;
+
+            let distance_from_previous = match prev_coord {
+                Some((plat, plon)) => haversine_distance(plat, plon, station.lat, station.lon),
+                None => 0.0,
+            };
+            prev_coord = Some((station.lat, station.lon));
+
+            let is_bus = station.transport_type == TransportType::Bus;
+            let kind = station.train_type.as_ref().and_then(|tt| tt.kind);
+            let profile = resolve_speed_profile(station.line_type, is_bus, kind);
+
+            let grpc_station: proto::Station = station.into();
+            segments.push(proto::TrainRouteSegment {
+                station: Some(grpc_station),
+                stops,
+                distance_from_previous,
+                max_speed: profile.max_speed,
+                max_acceleration: profile.max_acceleration,
+                max_deceleration: profile.max_deceleration,
+            });
+        }
+
+        Ok(segments)
     }
 
     async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError> {
