@@ -1,9 +1,12 @@
 use async_trait::async_trait;
 
 use crate::{
-    domain::entity::{
-        company::Company, gtfs::TransportTypeFilter, line::Line, line_symbol::LineSymbol,
-        station::Station, station_number::StationNumber, train_type::TrainType,
+    domain::{
+        arrival_estimation::EstimatedStop,
+        entity::{
+            company::Company, gtfs::TransportTypeFilter, line::Line, line_symbol::LineSymbol,
+            station::Station, station_number::StationNumber, train_type::TrainType,
+        },
     },
     proto::{Route, RouteMinimalResponse},
     use_case::error::UseCaseError,
@@ -120,4 +123,13 @@ pub trait QueryUseCase: Send + Sync + 'static {
         from_station_id: u32,
         to_station_id: u32,
     ) -> Result<Vec<Station>, UseCaseError>;
+    /// 経路(from→to、直通サービス)の各駅について、始点からの予定到着時間
+    /// (累積分数)を推定して返す。`line_group_cd` ごとに 1 経路としてまとめ、
+    /// 各経路の推定結果を順に連結する。
+    async fn estimate_route_arrival_times(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+        via_line_id: Option<u32>,
+    ) -> Result<Vec<EstimatedStop>, UseCaseError>;
 }
