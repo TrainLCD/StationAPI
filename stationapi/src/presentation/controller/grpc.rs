@@ -453,7 +453,7 @@ impl StationApi for MyApi {
 
                     let route_id = stop.line_group_cd.unwrap_or(0) as u32;
                     let merge = stop.line_group_cd.is_some()
-                        && routes.last().map_or(false, |r| r.id == route_id);
+                        && routes.last().is_some_and(|r| r.id == route_id);
 
                     if merge {
                         routes.last_mut().unwrap().stops.push(proto_stop);
