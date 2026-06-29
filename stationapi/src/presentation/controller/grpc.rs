@@ -444,7 +444,6 @@ impl StationApi for MyApi {
                 let mut routes: Vec<EstimatedArrivalRoute> = Vec::new();
 
                 for stop in &estimated_stops {
-                    let route_id = stop.line_group_cd.unwrap_or(0) as u32;
                     let proto_stop = EstimatedArrivalStop {
                         station_id: stop.station_cd as u32,
                         station_group_id: stop.station_g_cd as u32,
@@ -452,16 +451,18 @@ impl StationApi for MyApi {
                         stops_here: stop.stops_here,
                     };
 
-                    if let Some(last) = routes.last_mut() {
-                        if last.id == route_id {
-                            last.stops.push(proto_stop);
-                            continue;
-                        }
+                    let route_id = stop.line_group_cd.unwrap_or(0) as u32;
+                    let merge = stop.line_group_cd.is_some()
+                        && routes.last().map_or(false, |r| r.id == route_id);
+
+                    if merge {
+                        routes.last_mut().unwrap().stops.push(proto_stop);
+                    } else {
+                        routes.push(EstimatedArrivalRoute {
+                            id: route_id,
+                            stops: vec![proto_stop],
+                        });
                     }
-                    routes.push(EstimatedArrivalRoute {
-                        id: route_id,
-                        stops: vec![proto_stop],
-                    });
                 }
 
                 Ok(Response::new(EstimatedArrivalResponse {
