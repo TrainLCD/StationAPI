@@ -854,6 +854,15 @@ mod tests {
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(vec![])
         }
+
+        async fn estimate_route_arrival_times(
+            &self,
+            _from_station_id: u32,
+            _to_station_id: u32,
+            _via_line_id: Option<u32>,
+        ) -> Result<Vec<crate::domain::arrival_estimation::EstimatedStop>, UseCaseError> {
+            Ok(vec![])
+        }
     }
 
     // ============================================
