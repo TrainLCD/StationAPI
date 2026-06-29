@@ -255,15 +255,15 @@ def find_best_relation(coords: list[tuple[float, float, str]], line_name: str):
 # ---------------------------------------------------------------------------
 # グラフ構築 & 経路探索
 # ---------------------------------------------------------------------------
+def _nid(p):
+    return (round(p[0], 7), round(p[1], 7))
+
+
 def build_graph(ways: list[list[tuple[float, float]]]) -> dict:
     adj: dict[tuple[float, float], list[tuple[tuple[float, float], float]]] = {}
-
-    def nid(p):
-        return (round(p[0], 7), round(p[1], 7))
-
     for w in ways:
         for i in range(len(w) - 1):
-            a, b = nid(w[i]), nid(w[i + 1])
+            a, b = _nid(w[i]), _nid(w[i + 1])
             if a == b:
                 continue
             d = haversine(w[i][0], w[i][1], w[i + 1][0], w[i + 1][1])
@@ -272,34 +272,85 @@ def build_graph(ways: list[list[tuple[float, float]]]) -> dict:
     return adj
 
 
-def snap_nodes(adj: dict, lon: float, lat: float, radius: float = SNAP_RADIUS_M):
-    """駅座標から radius(m) 以内の全ノードを返す（複線の両トラックを拾う）。
-    1つも無ければ最近傍ノードを1つだけ返す。"""
-    scored = sorted((haversine(lon, lat, n[0], n[1]), n) for n in adj)
-    within = [n for d, n in scored if d <= radius]
-    return within if within else [scored[0][1]]
+def _project_to_segment(lon0: float, lat0: float, p1, p2):
+    """駅(lon0,lat0)を線分 p1-p2 に投影し、(垂線距離m, 端点p1までの線路沿い距離m,
+    端点p2までの線路沿い距離m) を返す。短距離なので局所平面近似で計算する。"""
+    coslat = math.cos(math.radians(lat0))
+
+    def xy(p):
+        return ((p[0] - lon0) * coslat * 111320.0, (p[1] - lat0) * 110540.0)
+
+    ax, ay = xy(p1)
+    bx, by = xy(p2)
+    abx, aby = bx - ax, by - ay
+    l2 = abx * abx + aby * aby
+    if l2 == 0.0:
+        d = math.hypot(ax, ay)
+        return d, 0.0, 0.0
+    # 駅を原点とした投影パラメータ t（0..1にクランプ）
+    t = -(ax * abx + ay * aby) / l2
+    t = max(0.0, min(1.0, t))
+    px, py = ax + t * abx, ay + t * aby
+    perp = math.hypot(px, py)
+    seglen = math.sqrt(l2)
+    return perp, t * seglen, (1.0 - t) * seglen
 
 
-def multi_dijkstra(adj: dict, sources: list, targets: list, limit: float):
-    """多始点・多終点ダイクストラ。いずれかの target に到達した最短距離を返す。"""
-    target_set = set(targets)
+def snap_anchors(ways, lon: float, lat: float, radius: float = SNAP_RADIUS_M):
+    """駅を線路セグメントに投影し、到達アンカー {ノード: 投影点からの線路沿いオフセットm}
+    を返す。半径内のセグメントが無ければ最も近い1セグメントを採用する。
+    併せて最近傍セグメントへの垂線距離(スナップ品質)も返す。"""
+    anchors: dict[tuple[float, float], float] = {}
+    near_perp = float("inf")
+    near_anchor = None
+    for w in ways:
+        for i in range(len(w) - 1):
+            p1, p2 = w[i], w[i + 1]
+            perp, d1, d2 = _project_to_segment(lon, lat, p1, p2)
+            if perp < near_perp:
+                near_perp = perp
+                near_anchor = ((_nid(p1), d1), (_nid(p2), d2))
+            if perp <= radius:
+                n1, n2 = _nid(p1), _nid(p2)
+                if d1 < anchors.get(n1, float("inf")):
+                    anchors[n1] = d1
+                if d2 < anchors.get(n2, float("inf")):
+                    anchors[n2] = d2
+    if not anchors and near_anchor is not None:
+        for n, off in near_anchor:
+            if off < anchors.get(n, float("inf")):
+                anchors[n] = off
+    return list(anchors.items()), near_perp
+
+
+def route_anchors(adj: dict, src: list, dst: list, limit: float):
+    """投影アンカー間の線路沿い最短距離。src/dst は (ノード, オフセットm) のリスト。
+    各始点をオフセットで初期化し、終点到達時に終点オフセットを足した最小値を返す。"""
     dist = {}
     pq = []
-    for s in sources:
-        dist[s] = 0.0
-        heapq.heappush(pq, (0.0, s))
+    for n, off in src:
+        if off < dist.get(n, float("inf")):
+            dist[n] = off
+            heapq.heappush(pq, (off, n))
+    dst_off = {}
+    for n, off in dst:
+        if off < dst_off.get(n, float("inf")):
+            dst_off[n] = off
+    best = float("inf")
     while pq:
         d, u = heapq.heappop(pq)
-        if u in target_set:
-            return d
         if d > dist.get(u, float("inf")) or d > limit:
             continue
+        if d >= best:
+            break  # d は単調増加。これ以上 best を更新できない
+        if u in dst_off:
+            best = min(best, d + dst_off[u])
         for v, w in adj.get(u, []):
             nd = d + w
             if nd < dist.get(v, float("inf")):
                 dist[v] = nd
                 heapq.heappush(pq, (nd, v))
-    return None
+    return best if best < float("inf") else None
 
 
 # ---------------------------------------------------------------------------
@@ -344,19 +395,21 @@ def compute_line(line_cd: str, line_name: str, line_type: str, coords) -> LineRe
     if matched is not None:
         rel, ways, cov, mx = matched
         adj = build_graph(ways)
-        snapped = [snap_nodes(adj, c[0], c[1]) for c in coords]
+        snapped = [snap_anchors(ways, c[0], c[1])[0] for c in coords]
         seg_dist = []
         failed = 0
         for i in range(len(coords) - 1):
             sd = straight[i]
-            rd = multi_dijkstra(
+            rd = route_anchors(
                 adj, snapped[i], snapped[i + 1], max(sd * MAX_RATIO, sd + 5000)
             )
             if rd is None or rd > sd * MAX_RATIO or rd < sd * MIN_RATIO:
                 failed += 1
                 seg_dist.append(sd)  # 失敗区間は直線距離で代替
             else:
-                seg_dist.append(rd)
+                # 実距離は直線距離を下回らない（駅は線路から横にずれているため
+                # 投影間の線路沿い距離が僅かに直線を下回ることがあるが、物理的下限で丸める）
+                seg_dist.append(max(rd, sd))
         # 半数以上失敗した路線は信頼できないのでフォールバック扱いにする
         if seg_dist and failed <= len(seg_dist) / 2:
             res.average = sum(seg_dist) / len(seg_dist)
