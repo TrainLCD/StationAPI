@@ -450,7 +450,7 @@ def compute_line(line_cd: str, line_name: str, line_type: str, coords) -> LineRe
 # ---------------------------------------------------------------------------
 def format_distance(value: float) -> str:
     """距離値を既存 CSV と同程度の桁数の文字列に整形する。"""
-    # 既存CSVは小数を含む（例: 31785.47337）。同程度の桁で出力する。
+    # 既存CSVは小数を含む (例: 31785.47337)。同程度の桁で出力する。
     return f"{value:.5f}".rstrip("0").rstrip(".")
 
 
