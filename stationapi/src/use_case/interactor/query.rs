@@ -23,6 +23,7 @@ fn filter_to_db_type(filter: TransportTypeFilter) -> Option<TransportType> {
 
 use crate::{
     domain::{
+        arrival_estimation::{estimate_arrival_minutes, EstimatedStop, EstimationParams},
         entity::{
             company::Company,
             gtfs::{TransportType, TransportTypeFilter},
@@ -1084,6 +1085,35 @@ where
         Ok(vec![])
     }
 
+    async fn estimate_route_arrival_times(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+        via_line_id: Option<u32>,
+    ) -> Result<Vec<EstimatedStop>, UseCaseError> {
+        let stops = self
+            .station_repository
+            .get_route_stops(from_station_id, to_station_id, via_line_id)
+            .await?;
+
+        let route_row_tree_map = self.build_route_tree_map(&stops);
+        let params = EstimationParams::default();
+
+        let mut result: Vec<EstimatedStop> = Vec::new();
+        for (_line_group_cd, group_stops) in route_row_tree_map.iter() {
+            let includes_requested_station = group_stops.iter().any(|stop| {
+                stop.station_g_cd as u32 == from_station_id
+                    || stop.station_g_cd as u32 == to_station_id
+            });
+            if !includes_requested_station {
+                continue;
+            }
+
+            result.extend(estimate_arrival_minutes(group_stops, &params));
+        }
+
+        Ok(result)
+    }
 }
 
 impl<SR, LR, TR, CR> QueryInteractor<SR, LR, TR, CR>

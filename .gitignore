@@ -6,3 +6,4 @@ api_descriptor.pb
 tmp.sql
 .vscode/
 data/ToeiBus-GTFS/
+scripts/.osm_cache/

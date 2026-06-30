@@ -1,9 +1,12 @@
 use async_trait::async_trait;
 
 use crate::{
-    domain::entity::{
-        company::Company, gtfs::TransportTypeFilter, line::Line, line_symbol::LineSymbol,
-        station::Station, station_number::StationNumber, train_type::TrainType,
+    domain::{
+        arrival_estimation::EstimatedStop,
+        entity::{
+            company::Company, gtfs::TransportTypeFilter, line::Line, line_symbol::LineSymbol,
+            station::Station, station_number::StationNumber, train_type::TrainType,
+        },
     },
     proto::{Route, RouteMinimalResponse, TrainRouteSegment},
     use_case::error::UseCaseError,
@@ -126,4 +129,10 @@ pub trait QueryUseCase: Send + Sync + 'static {
         from_station_id: u32,
         to_station_id: u32,
     ) -> Result<Vec<Station>, UseCaseError>;
+    async fn estimate_route_arrival_times(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+        via_line_id: Option<u32>,
+    ) -> Result<Vec<EstimatedStop>, UseCaseError>;
 }

@@ -6,7 +6,8 @@ use crate::{
     },
     presentation::error::PresentationalError,
     proto::{
-        station_api_server::StationApi, GetConnectedStationsRequest, GetLineByIdRequest,
+        station_api_server::StationApi, EstimatedArrivalResponse, EstimatedArrivalRoute,
+        EstimatedArrivalStop, GetConnectedStationsRequest, GetLineByIdRequest,
         GetLinesByIdListRequest, GetLinesByNameRequest, GetRouteRequest,
         GetStationByCoordinatesRequest, GetStationByGroupIdRequest, GetStationByIdListRequest,
         GetStationByIdRequest, GetStationByLineIdListRequest, GetStationByLineIdRequest,
@@ -447,6 +448,52 @@ impl StationApi for MyApi {
         }
     }
 
+    async fn estimate_arrival_times(
+        &self,
+        request: tonic::Request<GetRouteRequest>,
+    ) -> Result<tonic::Response<EstimatedArrivalResponse>, tonic::Status> {
+        let from_id = request.get_ref().from_station_group_id;
+        let to_id = request.get_ref().to_station_group_id;
+        let via_line_id = request.get_ref().via_line_id;
+
+        match self
+            .query_use_case
+            .estimate_route_arrival_times(from_id, to_id, via_line_id)
+            .await
+        {
+            Ok(estimated_stops) => {
+                let mut routes: Vec<EstimatedArrivalRoute> = Vec::new();
+
+                for stop in &estimated_stops {
+                    let proto_stop = EstimatedArrivalStop {
+                        station_id: stop.station_cd as u32,
+                        station_group_id: stop.station_g_cd as u32,
+                        cumulative_minutes: stop.cumulative_minutes,
+                        stops_here: stop.stops_here,
+                    };
+
+                    let route_id = stop.line_group_cd.unwrap_or(0) as u32;
+                    let merge = stop.line_group_cd.is_some()
+                        && routes.last().is_some_and(|r| r.id == route_id);
+
+                    if merge {
+                        routes.last_mut().unwrap().stops.push(proto_stop);
+                    } else {
+                        routes.push(EstimatedArrivalRoute {
+                            id: route_id,
+                            stops: vec![proto_stop],
+                        });
+                    }
+                }
+
+                Ok(Response::new(EstimatedArrivalResponse {
+                    routes,
+                    next_page_token: "".to_string(),
+                }))
+            }
+            Err(err) => Err(PresentationalError::from(err).into()),
+        }
+    }
 }
 
 #[cfg(test)]
