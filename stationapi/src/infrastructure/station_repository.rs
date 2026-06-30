@@ -458,6 +458,22 @@ impl StationRepository for MyStationRepository {
         )
         .await
     }
+
+    async fn get_route_stops_by_station_cd(
+        &self,
+        from_station_cd: u32,
+        to_station_cd: u32,
+        via_line_ids: &[u32],
+    ) -> Result<Vec<Station>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalStationRepository::get_route_stops_by_station_cd(
+            from_station_cd,
+            to_station_cd,
+            via_line_ids,
+            &mut conn,
+        )
+        .await
+    }
 }
 
 struct InternalStationRepository {}
@@ -1942,6 +1958,297 @@ impl InternalStationRepository {
                     FROM
                         stations AS s
                     WHERE
+                        s.station_g_cd = $1
+                ),
+                to_cte AS (
+                    SELECT
+                        s.station_cd,
+                        s.line_cd
+                    FROM
+                        stations AS s
+                    WHERE
+                        s.station_g_cd = $2
+                ),
+                common_lines AS (
+                    SELECT DISTINCT s1.line_cd
+                    FROM stations s1
+                    WHERE s1.station_g_cd = $3
+                        AND s1.e_status = 0
+                        AND (array_length($5::int[], 1) IS NULL OR s1.line_cd = ANY($5))
+                        AND EXISTS (
+                        SELECT 1
+                        FROM stations s2
+                        WHERE s2.station_g_cd = $4
+                            AND s2.e_status = 0
+                            AND s2.line_cd = s1.line_cd
+                        )
+                ),
+                sst_cte_c1 AS (
+                    SELECT
+                        sst.line_group_cd
+                    FROM
+                        station_station_types AS sst
+                        JOIN from_cte ON sst.station_cd = from_cte.station_cd
+                    WHERE
+                        sst.pass <> 1
+                ),
+                sst_cte_c2 AS (
+                    SELECT
+                        sst.line_group_cd
+                    FROM
+                        station_station_types AS sst
+                        JOIN to_cte ON sst.station_cd = to_cte.station_cd
+                    WHERE
+                        sst.pass <> 1
+                ),
+                sst_cte AS (
+                    SELECT
+                        sst.id,
+                        sst.station_cd,
+                        sst.type_cd,
+                        sst.line_group_cd,
+                        sst.pass
+                    FROM
+                        station_station_types AS sst
+                        JOIN sst_cte_c1 ON sst.line_group_cd = sst_cte_c1.line_group_cd
+                        JOIN sst_cte_c2 ON sst.line_group_cd = sst_cte_c2.line_group_cd
+                )
+            SELECT
+            sta.station_cd,
+            sta.station_g_cd,
+            sta.station_name,
+            sta.station_name_k,
+            sta.station_name_r,
+            sta.station_name_rn,
+            sta.station_name_zh,
+            sta.station_name_ko,
+            sta.station_number1,
+            sta.station_number2,
+            sta.station_number3,
+            sta.station_number4,
+            sta.three_letter_code,
+            sta.line_cd,
+            sta.pref_cd,
+            sta.post,
+            sta.address,
+            sta.lon,
+            sta.lat,
+            sta.open_ymd,
+            sta.close_ymd,
+            sta.e_status,
+            sta.e_sort,
+            lin.company_cd,
+            COALESCE(NULLIF(COALESCE(a.line_name, lin.line_name), ''), NULL) AS line_name,
+            COALESCE(NULLIF(COALESCE(a.line_name_k, lin.line_name_k), ''), NULL) AS line_name_k,
+            COALESCE(NULLIF(COALESCE(a.line_name_h, lin.line_name_h), ''), NULL) AS line_name_h,
+            COALESCE(NULLIF(COALESCE(a.line_name_r, lin.line_name_r), ''), NULL) AS line_name_r,
+            COALESCE(NULLIF(COALESCE(a.line_name_zh, lin.line_name_zh), ''), NULL) AS line_name_zh,
+            COALESCE(NULLIF(COALESCE(a.line_name_ko, lin.line_name_ko), ''), NULL) AS line_name_ko,
+            COALESCE(NULLIF(COALESCE(a.line_color_c, lin.line_color_c), ''), NULL) AS line_color_c,
+            lin.line_type,
+            lin.line_symbol1,
+            lin.line_symbol2,
+            lin.line_symbol3,
+            lin.line_symbol4,
+            lin.line_symbol1_color,
+            lin.line_symbol2_color,
+            lin.line_symbol3_color,
+            lin.line_symbol4_color,
+            lin.line_symbol1_shape,
+            lin.line_symbol2_shape,
+            lin.line_symbol3_shape,
+            lin.line_symbol4_shape,
+            COALESCE(lin.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
+            COALESCE(sst.line_group_cd, NULL)::int AS line_group_cd, -- has_train_types用
+            NULL::int AS type_id,
+            NULL::int AS sst_id,
+            NULL::int AS type_cd,
+            NULL::int AS pass,
+            NULL::text AS type_name,
+            NULL::text AS type_name_k,
+            NULL::text AS type_name_r,
+            NULL::text AS type_name_zh,
+            NULL::text AS type_name_ko,
+            NULL::text AS color,
+            NULL::int AS direction,
+            NULL::int AS kind,
+            sta.transport_type
+            FROM
+                stations AS sta
+				JOIN common_lines AS cl ON sta.line_cd = cl.line_cd
+				JOIN lines AS lin ON lin.line_cd = cl.line_cd
+                LEFT JOIN sst_cte AS sst ON sst.station_cd = sta.station_cd
+                LEFT JOIN types AS tt ON tt.type_cd = sst.type_cd
+                LEFT JOIN line_aliases AS la ON la.station_cd = sta.station_cd
+                LEFT JOIN aliases AS a ON a.id = la.alias_cd
+            WHERE
+                sst.line_group_cd IS NULL
+                AND lin.e_status = 0
+                AND sta.e_status = 0
+                ORDER BY sta.e_sort, sta.station_cd"#,
+            from_station_id as i32,
+            to_station_id as i32,
+            from_station_id as i32,
+            to_station_id as i32,
+            &via_line_ids_i32,
+        )
+        .fetch_all(&mut *conn)
+        .await?;
+
+        let mut typed_rows = sqlx::query_as!(
+            StationRow,
+            r#"WITH
+                from_cte AS (
+                    SELECT
+                        s.station_cd,
+                        s.line_cd
+                    FROM
+                        stations AS s
+                    WHERE
+                        s.station_g_cd = $1
+                        AND s.e_status = 0
+                ),
+                to_cte AS (
+                    SELECT
+                        s.station_cd,
+                        s.line_cd
+                    FROM
+                        stations AS s
+                    WHERE
+                        s.station_g_cd = $2
+                        AND s.e_status = 0
+                ),
+                sst_cte_c1 AS (
+                    SELECT
+                        sst.line_group_cd
+                    FROM
+                        station_station_types AS sst
+                        JOIN from_cte ON sst.station_cd = from_cte.station_cd
+                    WHERE
+                        sst.pass <> 1
+                ),
+                sst_cte_c2 AS (
+                    SELECT
+                        sst.line_group_cd
+                    FROM
+                        station_station_types AS sst
+                        JOIN to_cte ON sst.station_cd = to_cte.station_cd
+                    WHERE
+                        sst.pass <> 1
+                ),
+                sst_cte AS (
+                    SELECT
+                        sst.id,
+                        sst.station_cd,
+                        sst.type_cd,
+                        sst.line_group_cd,
+                        sst.pass
+                    FROM
+                        station_station_types AS sst
+                        JOIN sst_cte_c1 ON sst.line_group_cd = sst_cte_c1.line_group_cd
+                        JOIN sst_cte_c2 ON sst.line_group_cd = sst_cte_c2.line_group_cd
+                )
+            SELECT
+                sta.station_cd,
+                sta.station_g_cd,
+                sta.station_name,
+                sta.station_name_k,
+                sta.station_name_r,
+                sta.station_name_rn,
+                sta.station_name_zh,
+                sta.station_name_ko,
+                sta.station_number1,
+                sta.station_number2,
+                sta.station_number3,
+                sta.station_number4,
+                sta.three_letter_code,
+                sta.line_cd,
+                sta.pref_cd,
+                sta.post,
+                sta.address,
+                sta.lon,
+                sta.lat,
+                sta.open_ymd,
+                sta.close_ymd,
+                sta.e_status,
+                sta.e_sort,
+                lin.company_cd,
+                COALESCE(NULLIF(COALESCE(a.line_name, lin.line_name), ''), NULL) AS line_name,
+                COALESCE(NULLIF(COALESCE(a.line_name_k, lin.line_name_k), ''), NULL) AS line_name_k,
+                COALESCE(NULLIF(COALESCE(a.line_name_h, lin.line_name_h), ''), NULL) AS line_name_h,
+                COALESCE(NULLIF(COALESCE(a.line_name_r, lin.line_name_r), ''), NULL) AS line_name_r,
+                COALESCE(NULLIF(COALESCE(a.line_name_zh, lin.line_name_zh), ''), NULL) AS line_name_zh,
+                COALESCE(NULLIF(COALESCE(a.line_name_ko, lin.line_name_ko), ''), NULL) AS line_name_ko,
+                COALESCE(NULLIF(COALESCE(a.line_color_c, lin.line_color_c), ''), NULL) AS line_color_c,
+                lin.line_type,
+                lin.line_symbol1,
+                lin.line_symbol2,
+                lin.line_symbol3,
+                lin.line_symbol4,
+                lin.line_symbol1_color,
+                lin.line_symbol2_color,
+                lin.line_symbol3_color,
+                lin.line_symbol4_color,
+                lin.line_symbol1_shape,
+                lin.line_symbol2_shape,
+                lin.line_symbol3_shape,
+                lin.line_symbol4_shape,
+                COALESCE(lin.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
+                tt.id AS type_id,
+                sst.id AS sst_id,
+                sst.type_cd,
+                sst.line_group_cd,
+                sst.pass,
+                tt.type_name,
+                tt.type_name_k,
+                tt.type_name_r,
+                tt.type_name_zh,
+                tt.type_name_ko,
+                tt.color,
+                tt.direction,
+                tt.kind,
+                sta.transport_type
+            FROM
+                stations AS sta
+                LEFT JOIN sst_cte AS sst ON sst.station_cd = sta.station_cd
+                JOIN types AS tt ON tt.type_cd = sst.type_cd
+                JOIN lines AS lin ON lin.line_cd = sta.line_cd AND lin.e_status = 0
+                LEFT JOIN line_aliases AS la ON la.station_cd = sta.station_cd
+                LEFT JOIN aliases AS a ON a.id = la.alias_cd
+            WHERE
+                sta.e_status = 0
+                AND (array_length($3::int[], 1) IS NULL OR sta.line_cd = ANY($3))
+            ORDER BY sst.id"#,
+            from_station_id as i32,
+            to_station_id as i32,
+            &via_line_ids_i32,
+        )
+        .fetch_all(conn)
+        .await?;
+
+        rows.append(&mut typed_rows);
+        let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
+
+        Ok(stations)
+    }
+
+    async fn get_route_stops_by_station_cd(
+        from_station_cd: u32,
+        to_station_cd: u32,
+        via_line_ids: &[u32],
+        conn: &mut PgConnection,
+    ) -> Result<Vec<Station>, DomainError> {
+        let via_line_ids_i32: Vec<i32> = via_line_ids.iter().map(|&id| id as i32).collect();
+        let mut rows = sqlx::query_as!(
+            StationRow,
+            r#"WITH
+                from_cte AS (
+                    SELECT
+                        s.station_cd,
+                        s.line_cd
+                    FROM
+                        stations AS s
+                    WHERE
                         s.station_cd = $1
                 ),
                 to_cte AS (
@@ -2070,10 +2377,10 @@ impl InternalStationRepository {
                 AND lin.e_status = 0
                 AND sta.e_status = 0
                 ORDER BY sta.e_sort, sta.station_cd"#,
-            from_station_id as i32,
-            to_station_id as i32,
-            from_station_id as i32,
-            to_station_id as i32,
+            from_station_cd as i32,
+            to_station_cd as i32,
+            from_station_cd as i32,
+            to_station_cd as i32,
             &via_line_ids_i32,
         )
         .fetch_all(&mut *conn)
@@ -2203,8 +2510,8 @@ impl InternalStationRepository {
                 sta.e_status = 0
                 AND (array_length($3::int[], 1) IS NULL OR sta.line_cd = ANY($3))
             ORDER BY sst.id"#,
-            from_station_id as i32,
-            to_station_id as i32,
+            from_station_cd as i32,
+            to_station_cd as i32,
             &via_line_ids_i32,
         )
         .fetch_all(conn)

@@ -1096,7 +1096,7 @@ where
     ) -> Result<Vec<EstimatedStop>, UseCaseError> {
         let stops = self
             .station_repository
-            .get_route_stops(from_station_id, to_station_id, via_line_ids)
+            .get_route_stops_by_station_cd(from_station_id, to_station_id, via_line_ids)
             .await?;
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
@@ -1984,6 +1984,14 @@ mod tests {
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
+            async fn get_route_stops_by_station_cd(
+                &self,
+                from: u32,
+                to: u32,
+                via: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                self.get_route_stops(from, to, via).await
+            }
         }
 
         struct DedupMockLineRepository {
@@ -2478,6 +2486,14 @@ mod tests {
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
+            async fn get_route_stops_by_station_cd(
+                &self,
+                _: u32,
+                _: u32,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
         }
 
         #[async_trait::async_trait]
@@ -2944,6 +2960,14 @@ mod tests {
                 Ok(self.stations_by_line_group.clone())
             }
             async fn get_route_stops(
+                &self,
+                _: u32,
+                _: u32,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_route_stops_by_station_cd(
                 &self,
                 _: u32,
                 _: u32,
