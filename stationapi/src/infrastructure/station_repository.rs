@@ -2868,4 +2868,16 @@ mod tests {
     async fn test_get_by_line_group_id_station_order() {
         // 返される駅がsst.idの順序でソートされていることを確認
     }
+
+    #[tokio::test]
+    #[ignore] // Requires actual database setup
+    async fn test_get_route_stops_by_station_cd_default_order() {
+        // direction_id未指定時にデフォルト(ASC)順で駅が返されることを確認
+    }
+
+    #[tokio::test]
+    #[ignore] // Requires actual database setup
+    async fn test_get_route_stops_by_station_cd_reverse_order() {
+        // direction_id=1または2で駅の並び順がDESCに反転されることを確認
+    }
 }
