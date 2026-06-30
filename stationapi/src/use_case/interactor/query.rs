@@ -1117,6 +1117,23 @@ where
                 continue;
             }
 
+            if direction_id.is_none() {
+                let from_pos = group_stops
+                    .iter()
+                    .position(|s| s.station_cd as u32 == from_station_id);
+                let to_pos = group_stops
+                    .iter()
+                    .position(|s| s.station_cd as u32 == to_station_id);
+                if let (Some(fi), Some(ti)) = (from_pos, to_pos) {
+                    if fi > ti {
+                        let mut reversed: Vec<&Station> = group_stops.iter().copied().collect();
+                        reversed.reverse();
+                        result.extend(estimate_arrival_minutes(&reversed, &params));
+                        continue;
+                    }
+                }
+            }
+
             result.extend(estimate_arrival_minutes(group_stops, &params));
         }
 
