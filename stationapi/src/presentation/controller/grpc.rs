@@ -932,7 +932,6 @@ mod tests {
         ) -> Result<Vec<Station>, UseCaseError> {
             Ok(vec![])
         }
-
     }
 
     // ============================================
