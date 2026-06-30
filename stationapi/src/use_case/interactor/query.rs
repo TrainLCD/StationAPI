@@ -40,7 +40,9 @@ use crate::{
         },
     },
     proto::{self, Route},
-    use_case::{error::UseCaseError, traits::query::QueryUseCase},
+    use_case::{
+        dto::simulation::resolve_speed_profile, error::UseCaseError, traits::query::QueryUseCase,
+    },
 };
 use async_trait::async_trait;
 
@@ -990,6 +992,68 @@ where
         Ok(result)
     }
 
+    async fn get_train_route(
+        &self,
+        from_station_group_id: u32,
+        to_station_group_id: u32,
+        line_group_id: u32,
+    ) -> Result<Vec<proto::TrainRouteSegment>, UseCaseError> {
+        let stations = self
+            .get_stations_by_line_group_id(line_group_id, TransportTypeFilter::RailAndBus)
+            .await?;
+
+        let from_idx = stations
+            .iter()
+            .position(|s| s.station_g_cd as u32 == from_station_group_id)
+            .ok_or_else(|| UseCaseError::NotFound {
+                entity_type: "station in line group",
+                entity_id: from_station_group_id.to_string(),
+            })?;
+        let to_idx = stations
+            .iter()
+            .position(|s| s.station_g_cd as u32 == to_station_group_id)
+            .ok_or_else(|| UseCaseError::NotFound {
+                entity_type: "station in line group",
+                entity_id: to_station_group_id.to_string(),
+            })?;
+
+        let sliced: Vec<Station> = if from_idx <= to_idx {
+            stations[from_idx..=to_idx].to_vec()
+        } else {
+            let mut v = stations[to_idx..=from_idx].to_vec();
+            v.reverse();
+            v
+        };
+
+        let mut segments: Vec<proto::TrainRouteSegment> = Vec::with_capacity(sliced.len());
+        let mut prev_coord: Option<(f64, f64)> = None;
+        for station in sliced {
+            let stops = station.stop_condition != proto::StopCondition::Not;
+
+            let distance_from_previous = match prev_coord {
+                Some((plat, plon)) => haversine_distance(plat, plon, station.lat, station.lon),
+                None => 0.0,
+            };
+            prev_coord = Some((station.lat, station.lon));
+
+            let is_bus = station.transport_type == TransportType::Bus;
+            let kind = station.train_type.as_ref().and_then(|tt| tt.kind);
+            let profile = resolve_speed_profile(station.line_type, is_bus, kind);
+
+            let grpc_station: proto::Station = station.into();
+            segments.push(proto::TrainRouteSegment {
+                station: Some(grpc_station),
+                stops,
+                distance_from_previous,
+                max_speed: profile.max_speed,
+                max_acceleration: profile.max_acceleration,
+                max_deceleration: profile.max_deceleration,
+            });
+        }
+
+        Ok(segments)
+    }
+
     async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError> {
         let line = self.line_repository.find_by_id(line_id).await?;
         Ok(line)
@@ -1032,17 +1096,11 @@ where
             .get_route_stops(from_station_id, to_station_id, via_line_id)
             .await?;
 
-        // 経路は運用上 line_group_cd を跨がないが、get_route_stops は複数の
-        // 候補経路(line_group)を返しうるので、グループごとに推定して連結する。
-        // 各グループ内は始点→終点の順序(e_sort, station_cd)が保たれている。
-        // BTreeMap なので連結順は line_group_cd 昇順で決定的。
         let route_row_tree_map = self.build_route_tree_map(&stops);
         let params = EstimationParams::default();
 
         let mut result: Vec<EstimatedStop> = Vec::new();
         for (_line_group_cd, group_stops) in route_row_tree_map.iter() {
-            // get_routes / get_routes_minimal と同様に、要求された駅(始点・終点)を
-            // 含まない候補グループは到着予測の対象外として除外する。
             let includes_requested_station = group_stops.iter().any(|stop| {
                 stop.station_g_cd as u32 == from_station_id
                     || stop.station_g_cd as u32 == to_station_id
