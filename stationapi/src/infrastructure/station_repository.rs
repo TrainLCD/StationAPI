@@ -464,12 +464,14 @@ impl StationRepository for MyStationRepository {
         from_station_cd: u32,
         to_station_cd: u32,
         via_line_ids: &[u32],
+        direction_id: Option<u32>,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::get_route_stops_by_station_cd(
             from_station_cd,
             to_station_cd,
             via_line_ids,
+            direction_id,
             &mut conn,
         )
         .await
@@ -2236,11 +2238,19 @@ impl InternalStationRepository {
         from_station_cd: u32,
         to_station_cd: u32,
         via_line_ids: &[u32],
+        direction_id: Option<u32>,
         conn: &mut PgConnection,
     ) -> Result<Vec<Station>, DomainError> {
+        // direction_id = 1 (上り) の場合、並び順を反転する
+        let reverse = matches!(direction_id, Some(1));
         let via_line_ids_i32: Vec<i32> = via_line_ids.iter().map(|&id| id as i32).collect();
-        let mut rows = sqlx::query_as!(
-            StationRow,
+        let untyped_order = if reverse {
+            "ORDER BY sta.e_sort DESC, sta.station_cd DESC"
+        } else {
+            "ORDER BY sta.e_sort ASC, sta.station_cd ASC"
+        };
+
+        let untyped_query = format!(
             r#"WITH
                 from_cte AS (
                     SELECT
@@ -2366,8 +2376,8 @@ impl InternalStationRepository {
             sta.transport_type
             FROM
                 stations AS sta
-				JOIN common_lines AS cl ON sta.line_cd = cl.line_cd
-				JOIN lines AS lin ON lin.line_cd = cl.line_cd
+                JOIN common_lines AS cl ON sta.line_cd = cl.line_cd
+                JOIN lines AS lin ON lin.line_cd = cl.line_cd
                 LEFT JOIN sst_cte AS sst ON sst.station_cd = sta.station_cd
                 LEFT JOIN types AS tt ON tt.type_cd = sst.type_cd
                 LEFT JOIN line_aliases AS la ON la.station_cd = sta.station_cd
@@ -2376,18 +2386,25 @@ impl InternalStationRepository {
                 sst.line_group_cd IS NULL
                 AND lin.e_status = 0
                 AND sta.e_status = 0
-                ORDER BY sta.e_sort, sta.station_cd"#,
-            from_station_cd as i32,
-            to_station_cd as i32,
-            from_station_cd as i32,
-            to_station_cd as i32,
-            &via_line_ids_i32,
-        )
-        .fetch_all(&mut *conn)
-        .await?;
+                {untyped_order}"#
+        );
 
-        let mut typed_rows = sqlx::query_as!(
-            StationRow,
+        let mut rows = sqlx::query_as::<_, StationRow>(&untyped_query)
+            .bind(from_station_cd as i32)
+            .bind(to_station_cd as i32)
+            .bind(from_station_cd as i32)
+            .bind(to_station_cd as i32)
+            .bind(&via_line_ids_i32)
+            .fetch_all(&mut *conn)
+            .await?;
+
+        let typed_order = if reverse {
+            "ORDER BY sst.id DESC"
+        } else {
+            "ORDER BY sst.id ASC"
+        };
+
+        let typed_query = format!(
             r#"WITH
                 from_cte AS (
                     SELECT
@@ -2509,13 +2526,15 @@ impl InternalStationRepository {
             WHERE
                 sta.e_status = 0
                 AND (array_length($3::int[], 1) IS NULL OR sta.line_cd = ANY($3))
-            ORDER BY sst.id"#,
-            from_station_cd as i32,
-            to_station_cd as i32,
-            &via_line_ids_i32,
-        )
-        .fetch_all(conn)
-        .await?;
+            {typed_order}"#
+        );
+
+        let mut typed_rows = sqlx::query_as::<_, StationRow>(&typed_query)
+            .bind(from_station_cd as i32)
+            .bind(to_station_cd as i32)
+            .bind(&via_line_ids_i32)
+            .fetch_all(conn)
+            .await?;
 
         rows.append(&mut typed_rows);
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
@@ -2848,5 +2867,17 @@ mod tests {
     #[ignore] // Requires actual database setup
     async fn test_get_by_line_group_id_station_order() {
         // 返される駅がsst.idの順序でソートされていることを確認
+    }
+
+    #[tokio::test]
+    #[ignore] // Requires actual database setup
+    async fn test_get_route_stops_by_station_cd_default_order() {
+        // direction_id未指定時にデフォルト(ASC)順で駅が返されることを確認
+    }
+
+    #[tokio::test]
+    #[ignore] // Requires actual database setup
+    async fn test_get_route_stops_by_station_cd_reverse_order() {
+        // direction_id=1または2で駅の並び順がDESCに反転されることを確認
     }
 }
