@@ -2241,6 +2241,7 @@ impl InternalStationRepository {
         direction_id: Option<u32>,
         conn: &mut PgConnection,
     ) -> Result<Vec<Station>, DomainError> {
+        // direction_id = 1 (上り) または 2 (下り) の場合、並び順を反転する
         let reverse = matches!(direction_id, Some(1) | Some(2));
         let via_line_ids_i32: Vec<i32> = via_line_ids.iter().map(|&id| id as i32).collect();
         let untyped_order = if reverse {
