@@ -447,13 +447,13 @@ impl StationRepository for MyStationRepository {
         &self,
         from_station_id: u32,
         to_station_id: u32,
-        via_line_id: Option<u32>,
+        via_line_ids: &[u32],
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
         InternalStationRepository::get_route_stops(
             from_station_id,
             to_station_id,
-            via_line_id,
+            via_line_ids,
             &mut conn,
         )
         .await
@@ -1928,10 +1928,10 @@ impl InternalStationRepository {
     async fn get_route_stops(
         from_station_id: u32,
         to_station_id: u32,
-        via_line_id: Option<u32>,
+        via_line_ids: &[u32],
         conn: &mut PgConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let via_line_id = via_line_id.map(|id| id as i32);
+        let via_line_ids_i32: Vec<i32> = via_line_ids.iter().map(|&id| id as i32).collect();
         let mut rows = sqlx::query_as!(
             StationRow,
             r#"WITH
@@ -1942,7 +1942,7 @@ impl InternalStationRepository {
                     FROM
                         stations AS s
                     WHERE
-                        s.station_g_cd = $1
+                        s.station_cd = $1
                 ),
                 to_cte AS (
                     SELECT
@@ -1951,18 +1951,18 @@ impl InternalStationRepository {
                     FROM
                         stations AS s
                     WHERE
-                        s.station_g_cd = $2
+                        s.station_cd = $2
                 ),
                 common_lines AS (
                     SELECT DISTINCT s1.line_cd
                     FROM stations s1
-                    WHERE s1.station_g_cd = $3
+                    WHERE s1.station_cd = $3
                         AND s1.e_status = 0
-                        AND ($5::int IS NULL OR s1.line_cd = $5)
+                        AND (array_length($5::int[], 1) IS NULL OR s1.line_cd = ANY($5))
                         AND EXISTS (
                         SELECT 1
                         FROM stations s2
-                        WHERE s2.station_g_cd = $4
+                        WHERE s2.station_cd = $4
                             AND s2.e_status = 0
                             AND s2.line_cd = s1.line_cd
                         )
@@ -2043,7 +2043,7 @@ impl InternalStationRepository {
             lin.line_symbol3_shape,
             lin.line_symbol4_shape,
             COALESCE(lin.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
-            COALESCE(sst.line_group_cd, NULL)::int AS line_group_cd, -- has_train_types用
+            COALESCE(sst.line_group_cd, NULL)::int AS line_group_cd,
             NULL::int AS type_id,
             NULL::int AS sst_id,
             NULL::int AS type_cd,
@@ -2074,7 +2074,7 @@ impl InternalStationRepository {
             to_station_id as i32,
             from_station_id as i32,
             to_station_id as i32,
-            via_line_id,
+            &via_line_ids_i32,
         )
         .fetch_all(&mut *conn)
         .await?;
@@ -2089,7 +2089,7 @@ impl InternalStationRepository {
                     FROM
                         stations AS s
                     WHERE
-                        s.station_g_cd = $1
+                        s.station_cd = $1
                         AND s.e_status = 0
                 ),
                 to_cte AS (
@@ -2099,7 +2099,7 @@ impl InternalStationRepository {
                     FROM
                         stations AS s
                     WHERE
-                        s.station_g_cd = $2
+                        s.station_cd = $2
                         AND s.e_status = 0
                 ),
                 sst_cte_c1 AS (
@@ -2201,11 +2201,11 @@ impl InternalStationRepository {
                 LEFT JOIN aliases AS a ON a.id = la.alias_cd
             WHERE
                 sta.e_status = 0
-                AND ($3::int IS NULL OR sta.line_cd = $3)
+                AND (array_length($3::int[], 1) IS NULL OR sta.line_cd = ANY($3))
             ORDER BY sst.id"#,
             from_station_id as i32,
             to_station_id as i32,
-            via_line_id,
+            &via_line_ids_i32,
         )
         .fetch_all(conn)
         .await?;

@@ -6,9 +6,9 @@ use crate::{
     },
     presentation::error::PresentationalError,
     proto::{
-        station_api_server::StationApi, EstimatedArrivalResponse, EstimatedArrivalRoute,
-        EstimatedArrivalStop, GetConnectedStationsRequest, GetLineByIdRequest,
-        GetLinesByIdListRequest, GetLinesByNameRequest, GetRouteRequest,
+        station_api_server::StationApi, EstimateArrivalTimesRequest, EstimatedArrivalResponse,
+        EstimatedArrivalRoute, EstimatedArrivalStop, GetConnectedStationsRequest,
+        GetLineByIdRequest, GetLinesByIdListRequest, GetLinesByNameRequest, GetRouteRequest,
         GetStationByCoordinatesRequest, GetStationByGroupIdRequest, GetStationByIdListRequest,
         GetStationByIdRequest, GetStationByLineIdListRequest, GetStationByLineIdRequest,
         GetStationsByLineGroupIdListRequest, GetStationsByLineGroupIdRequest,
@@ -450,15 +450,15 @@ impl StationApi for MyApi {
 
     async fn estimate_arrival_times(
         &self,
-        request: tonic::Request<GetRouteRequest>,
+        request: tonic::Request<EstimateArrivalTimesRequest>,
     ) -> Result<tonic::Response<EstimatedArrivalResponse>, tonic::Status> {
-        let from_id = request.get_ref().from_station_group_id;
-        let to_id = request.get_ref().to_station_group_id;
-        let via_line_id = request.get_ref().via_line_id;
+        let from_id = request.get_ref().from_station_id;
+        let to_id = request.get_ref().to_station_id;
+        let via_line_ids = &request.get_ref().via_line_ids;
 
         match self
             .query_use_case
-            .estimate_route_arrival_times(from_id, to_id, via_line_id)
+            .estimate_route_arrival_times(from_id, to_id, via_line_ids)
             .await
         {
             Ok(estimated_stops) => {
@@ -940,7 +940,7 @@ mod tests {
             &self,
             _from_station_id: u32,
             _to_station_id: u32,
-            _via_line_id: Option<u32>,
+            _via_line_ids: &[u32],
         ) -> Result<Vec<EstimatedStop>, UseCaseError> {
             Ok(vec![])
         }

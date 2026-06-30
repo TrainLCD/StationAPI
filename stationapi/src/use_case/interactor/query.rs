@@ -626,9 +626,10 @@ where
         to_station_id: u32,
         via_line_id: Option<u32>,
     ) -> Result<Vec<Route>, UseCaseError> {
+        let via_ids: Vec<u32> = via_line_id.into_iter().collect();
         let stops = self
             .station_repository
-            .get_route_stops(from_station_id, to_station_id, via_line_id)
+            .get_route_stops(from_station_id, to_station_id, &via_ids)
             .await?;
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
@@ -730,9 +731,10 @@ where
         to_station_id: u32,
         via_line_id: Option<u32>,
     ) -> Result<proto::RouteMinimalResponse, UseCaseError> {
+        let via_ids: Vec<u32> = via_line_id.into_iter().collect();
         let stops = self
             .station_repository
-            .get_route_stops(from_station_id, to_station_id, via_line_id)
+            .get_route_stops(from_station_id, to_station_id, &via_ids)
             .await?;
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
@@ -844,9 +846,10 @@ where
         to_station_id: u32,
         via_line_id: Option<u32>,
     ) -> Result<Vec<TrainType>, UseCaseError> {
+        let via_ids: Vec<u32> = via_line_id.into_iter().collect();
         let stops = self
             .station_repository
-            .get_route_stops(from_station_id, to_station_id, via_line_id)
+            .get_route_stops(from_station_id, to_station_id, &via_ids)
             .await?;
 
         let line_group_id_vec: Vec<u32> = stops
@@ -896,7 +899,7 @@ where
         let dedup_stops: &[Station] = if via_line_id.is_some() {
             dedup_stops_storage = self
                 .station_repository
-                .get_route_stops(from_station_id, to_station_id, None)
+                .get_route_stops(from_station_id, to_station_id, &[])
                 .await?;
             &dedup_stops_storage
         } else {
@@ -1089,11 +1092,11 @@ where
         &self,
         from_station_id: u32,
         to_station_id: u32,
-        via_line_id: Option<u32>,
+        via_line_ids: &[u32],
     ) -> Result<Vec<EstimatedStop>, UseCaseError> {
         let stops = self
             .station_repository
-            .get_route_stops(from_station_id, to_station_id, via_line_id)
+            .get_route_stops(from_station_id, to_station_id, via_line_ids)
             .await?;
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
@@ -1102,8 +1105,7 @@ where
         let mut result: Vec<EstimatedStop> = Vec::new();
         for (_line_group_cd, group_stops) in route_row_tree_map.iter() {
             let includes_requested_station = group_stops.iter().any(|stop| {
-                stop.station_g_cd as u32 == from_station_id
-                    || stop.station_g_cd as u32 == to_station_id
+                stop.station_cd as u32 == from_station_id || stop.station_cd as u32 == to_station_id
             });
             if !includes_requested_station {
                 continue;
@@ -1902,9 +1904,9 @@ mod tests {
                 &self,
                 _: u32,
                 _: u32,
-                via_line_id: Option<u32>,
+                via_line_ids: &[u32],
             ) -> Result<Vec<Station>, DomainError> {
-                if via_line_id.is_some() {
+                if !via_line_ids.is_empty() {
                     Ok(self.stops_via.clone())
                 } else {
                     Ok(self.stops_unrestricted.clone())
@@ -2317,7 +2319,7 @@ mod tests {
 
             let interactor = build_interactor(stops, vec![], vec![], vec![]);
             let est = interactor
-                .estimate_route_arrival_times(1, 4, None)
+                .estimate_route_arrival_times(1, 4, &[])
                 .await
                 .unwrap();
 
@@ -2355,7 +2357,7 @@ mod tests {
 
             let interactor = build_interactor(stops, vec![], vec![], vec![]);
             let est = interactor
-                .estimate_route_arrival_times(1, 4, None)
+                .estimate_route_arrival_times(1, 4, &[])
                 .await
                 .unwrap();
 
@@ -2472,7 +2474,7 @@ mod tests {
                 &self,
                 _: u32,
                 _: u32,
-                _: Option<u32>,
+                _: &[u32],
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
@@ -2945,7 +2947,7 @@ mod tests {
                 &self,
                 _: u32,
                 _: u32,
-                _: Option<u32>,
+                _: &[u32],
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
