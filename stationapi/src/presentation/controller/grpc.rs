@@ -500,9 +500,12 @@ impl StationApi for MyApi {
 mod tests {
     use super::*;
     use crate::{
-        domain::entity::{
-            company::Company, gtfs::TransportType, line::Line, line_symbol::LineSymbol,
-            station::Station, station_number::StationNumber, train_type::TrainType,
+        domain::{
+            arrival_estimation::EstimatedStop,
+            entity::{
+                company::Company, gtfs::TransportType, line::Line, line_symbol::LineSymbol,
+                station::Station, station_number::StationNumber, train_type::TrainType,
+            },
         },
         proto::RouteMinimalResponse,
         use_case::{error::UseCaseError, traits::query::QueryUseCase},
@@ -930,6 +933,15 @@ mod tests {
             _from_station_id: u32,
             _to_station_id: u32,
         ) -> Result<Vec<Station>, UseCaseError> {
+            Ok(vec![])
+        }
+
+        async fn estimate_route_arrival_times(
+            &self,
+            _from_station_id: u32,
+            _to_station_id: u32,
+            _via_line_id: Option<u32>,
+        ) -> Result<Vec<EstimatedStop>, UseCaseError> {
             Ok(vec![])
         }
     }
