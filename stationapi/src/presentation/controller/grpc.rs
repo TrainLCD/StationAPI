@@ -455,10 +455,11 @@ impl StationApi for MyApi {
         let from_id = request.get_ref().from_station_id;
         let to_id = request.get_ref().to_station_id;
         let via_line_ids = &request.get_ref().via_line_ids;
+        let direction_id = request.get_ref().direction_id;
 
         match self
             .query_use_case
-            .estimate_route_arrival_times(from_id, to_id, via_line_ids)
+            .estimate_route_arrival_times(from_id, to_id, via_line_ids, direction_id)
             .await
         {
             Ok(estimated_stops) => {
@@ -941,6 +942,7 @@ mod tests {
             _from_station_id: u32,
             _to_station_id: u32,
             _via_line_ids: &[u32],
+            _direction_id: Option<u32>,
         ) -> Result<Vec<EstimatedStop>, UseCaseError> {
             Ok(vec![])
         }
