@@ -1126,7 +1126,7 @@ where
                     .position(|s| s.station_cd as u32 == to_station_id);
                 if let (Some(fi), Some(ti)) = (from_pos, to_pos) {
                     if fi > ti {
-                        let mut reversed: Vec<&Station> = group_stops.iter().copied().collect();
+                        let mut reversed: Vec<&Station> = group_stops.to_vec();
                         reversed.reverse();
                         result.extend(estimate_arrival_minutes(&reversed, &params));
                         continue;
