@@ -7,7 +7,7 @@
 //! モデル概要:
 //! 1. 連続駅間の直線距離(haversine)を求める。
 //! 2. 迂回係数 `α` で「みなし走行距離(軌道距離)」へ補正する。`α` は
-//!    `Line.average_distance`(実距離±10%精度)が得られる路線では
+//!    `Line.average_distance`(メートル単位・実距離±10%精度)が得られる路線では
 //!    `average_distance / 直線平均駅間距離` で較正し、得られない路線では
 //!    路線種別ベースの固定値にフォールバックする。
 //! 3. 停車駅間ごとに「加速→巡航→減速」の運動学モデルで走行時間を算出する。
@@ -111,7 +111,7 @@ fn fallback_detour_factor(line_type: Option<i32>) -> f64 {
 
 /// 迂回係数 `α` を決める。
 ///
-/// `avg_distance_km`(= `Line.average_distance`、実距離±10%精度)が得られる場合は
+/// `avg_distance_km`(= `Line.average_distance` を km 換算した値、実距離±10%精度)が得られる場合は
 /// `avg_distance_km / mean_straight_km` で較正し、`detour_min..=detour_max` にクランプする。
 /// 得られない(`<= 0`)場合や直線平均が 0 の場合は路線種別ベースの固定値へフォールバックする。
 pub fn detour_factor_for(
@@ -202,10 +202,11 @@ fn detour_factors_by_line(
         let cur = stops[i];
         let prev = stops[i - 1];
         // average_distance / line_type は line_cd 単位で同じなので最初に見たものを採用。
+        // average_distance はメートル単位で格納されているため km へ変換して直線平均と比較する。
         let entry = acc.entry(cur.line_cd).or_insert((
             0.0,
             0,
-            cur.average_distance.unwrap_or(0.0),
+            cur.average_distance.unwrap_or(0.0) / 1000.0,
             cur.line_type,
         ));
         // 同一路線が連続するペアだけを直線平均の母数にする。
@@ -597,6 +598,31 @@ mod tests {
         approx(
             fast_est[1].cumulative_minutes,
             slow_est[1].cumulative_minutes,
+        );
+    }
+
+    #[test]
+    fn average_distance_meters_calibrates_detour_instead_of_clamping() {
+        let p = EstimationParams::default();
+        // 両毛線 伊勢崎→国定 相当: 直線約 5.65km、average_distance = 4866.8(メートル)。
+        // メートルを km と誤解釈すると α が 4866.8/5.65 → 上限 1.6 に張り付き、
+        // 実乗車時間(5〜6分)より大幅に長い約 6.9 分と推定されてしまう。
+        let a = station(1, 11341, 36.326849, 139.193704, Some(4866.8));
+        let b = station(2, 11341, 36.359018, 139.242463, Some(4866.8));
+        let stations = vec![a, b];
+        let refs: Vec<&Station> = stations.iter().collect();
+        let est = estimate_arrival_minutes(&refs, &p);
+
+        // km 換算後は α = 4.8668 / 5.65 < 1 → detour_min の 1.0 でクランプされ、
+        // みなし走行距離は直線距離そのものになる。
+        let straight_m = haversine_distance(36.326849, 139.193704, 36.359018, 139.242463);
+        let v_kmh = 85.0; // 在来線・普通(kind=None)
+        let expected = segment_run_minutes(straight_m, v_kmh, &p);
+        approx(est[1].cumulative_minutes, expected);
+        assert!(
+            est[1].cumulative_minutes < 6.0,
+            "got {}",
+            est[1].cumulative_minutes
         );
     }
 
