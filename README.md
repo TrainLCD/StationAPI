@@ -51,19 +51,6 @@ This project follows the [all-contributors](https://github.com/all-contributors/
 Do you like this project? Join our Discord community!
 [https://discord.gg/tsemdME9Nz](https://discord.gg/tsemdME9Nz)
 
-## Monitoring
-
-A Prometheus + Grafana environment for visualizing gRPC metrics is included.
-
-```bash
-docker compose up -d api prometheus grafana
-```
-
-- **Grafana**: http://localhost:3001 (login: `admin` / `admin`)
-- **Prometheus**: http://localhost:9090
-
-Grafana comes with a pre-provisioned "StationAPI gRPC Metrics" dashboard, where you can monitor request rates, error rates, latency percentiles, and more.
-
 ## Development
 
 ### Running Tests
