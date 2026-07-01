@@ -70,7 +70,15 @@ impl Default for EstimationParams {
 }
 
 /// 新幹線を表す `line_type`。
-const LINE_TYPE_SHINKANSEN: i32 = 7;
+const LINE_TYPE_SHINKANSEN: i32 = 1;
+/// 地下鉄を表す `line_type`。
+const LINE_TYPE_SUBWAY: i32 = 3;
+/// 路面電車を表す `line_type`。
+const LINE_TYPE_TRAM: i32 = 4;
+/// AGT/モノレールを表す `line_type`。
+const LINE_TYPE_AGT: i32 = 5;
+/// ケーブルカーを表す `line_type`。
+const LINE_TYPE_CABLE: i32 = 0;
 
 /// 地球半径(メートル)。
 const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
@@ -92,9 +100,11 @@ pub fn haversine_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 /// `average_distance` が得られない路線で使う、路線種別ベースの固定迂回係数。
 fn fallback_detour_factor(line_type: Option<i32>) -> f64 {
     match line_type {
-        // 新幹線は比較的直線的。
         Some(LINE_TYPE_SHINKANSEN) => 1.15,
-        // それ以外は在来線/私鉄の標準値。
+        Some(LINE_TYPE_SUBWAY) => 1.20,
+        Some(LINE_TYPE_TRAM) => 1.40,
+        Some(LINE_TYPE_AGT) => 1.20,
+        Some(LINE_TYPE_CABLE) => 1.10,
         _ => 1.30,
     }
 }
@@ -117,15 +127,27 @@ pub fn detour_factor_for(
     }
 }
 
-/// 路線種別・列車種別から最高速度(km/h)を決める。ヒューリスティック。
-fn max_speed_kmh(line_type: Option<i32>, kind: Option<i32>) -> f64 {
-    if line_type == Some(LINE_TYPE_SHINKANSEN) {
-        return 250.0;
+/// 路線種別ごとの基本最高速度(km/h)。
+fn base_speed_kmh(line_type: Option<i32>) -> f64 {
+    match line_type {
+        Some(LINE_TYPE_SHINKANSEN) => 250.0,
+        Some(LINE_TYPE_SUBWAY) => 75.0,
+        Some(LINE_TYPE_TRAM) => 40.0,
+        Some(LINE_TYPE_AGT) => 60.0,
+        Some(LINE_TYPE_CABLE) => 12.0,
+        _ => 85.0,
     }
-    // 在来線。速達種別(快速・急行・特急など kind != 0/None)は実効速度を上げる。
+}
+
+/// 路線種別・列車種別から最高速度(km/h)を決める。
+fn max_speed_kmh(line_type: Option<i32>, kind: Option<i32>) -> f64 {
+    let base = base_speed_kmh(line_type);
+    if line_type == Some(LINE_TYPE_SHINKANSEN) {
+        return base;
+    }
     match kind {
-        Some(k) if k != 0 => 100.0,
-        _ => 80.0,
+        Some(k) if k != 0 => base * 1.2,
+        _ => base,
     }
 }
 
@@ -394,7 +416,7 @@ mod tests {
             line_name_zh: None,
             line_name_ko: None,
             line_color_c: None,
-            line_type: Some(1),
+            line_type: Some(2),
             line_symbol1: None,
             line_symbol2: None,
             line_symbol3: None,
@@ -459,13 +481,13 @@ mod tests {
     fn detour_factor_calibrates_then_clamps() {
         let p = EstimationParams::default();
         // average 1.3km / 直線 1.0km = 1.3。
-        approx(detour_factor_for(1.3, 1.0, Some(1), &p), 1.3);
+        approx(detour_factor_for(1.3, 1.0, Some(2), &p), 1.3);
         // 上限 1.6 でクランプ。
-        approx(detour_factor_for(5.0, 1.0, Some(1), &p), 1.6);
+        approx(detour_factor_for(5.0, 1.0, Some(2), &p), 1.6);
         // average_distance 無し → 在来線フォールバック 1.30。
-        approx(detour_factor_for(0.0, 1.0, Some(1), &p), 1.30);
+        approx(detour_factor_for(0.0, 1.0, Some(2), &p), 1.30);
         // 新幹線フォールバック 1.15。
-        approx(detour_factor_for(0.0, 1.0, Some(7), &p), 1.15);
+        approx(detour_factor_for(0.0, 1.0, Some(1), &p), 1.15);
     }
 
     /// 緯度方向に約 1.8km 間隔で並ぶ直線 3 駅。全駅停車。
