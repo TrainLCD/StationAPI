@@ -1088,6 +1088,9 @@ where
         Ok(vec![])
     }
 
+    /// `from_station_id` から `to_station_id` までの区間の各駅について、始点からの
+    /// 推定到着時間(分)を返す。経路候補ごとに両端が含まれる区間だけへ絞り込み、
+    /// `direction_id` の有無に関わらず from→to 順になるよう並べ替える。
     async fn estimate_route_arrival_times(
         &self,
         from_station_id: u32,
