@@ -12,7 +12,10 @@
 //!    路線種別ベースの固定値にフォールバックする。
 //! 3. 停車駅間ごとに「加速→巡航→減速」の運動学モデルで走行時間を算出する。
 //!    停車が多いほど巡航しきれず平均速度が落ちる(各停が速達より遅い)現象が
-//!    加減速ペナルティとして自然に表現される。
+//!    加減速ペナルティとして自然に表現される。運動学モデルは理想走行
+//!    (最大加速→最高速度で巡航→最大減速)を仮定するため、実ダイヤに含まれる
+//!    途中の速度制限・惰行・回復余裕のぶん系統的に速すぎる。これを走行時間への
+//!    運転余裕率 `run_margin` として補正する(実路線の時刻表との較正で約 1.15)。
 //! 4. 中間停車駅に停車時間 `dwell` を加算して累積する。
 //!
 //! 入力経路は運用上 `line_group_cd` を跨がない(=単一の列車・直通サービス)ため
@@ -49,8 +52,12 @@ pub struct EstimationParams {
     pub accel: f64,
     /// 減速度 (m/s^2)。
     pub decel: f64,
-    /// 中間停車駅 1 駅あたりの停車時間(分)。
+    /// 中間停車駅 1 駅あたりの停車時間(分)。ドア開閉・乗降に加え、
+    /// 出発までの余裕時分も含む実効値。
     pub dwell_minutes: f64,
+    /// 走行時間に掛ける運転余裕率。運動学モデルの理想走行と実ダイヤの差
+    /// (途中の速度制限・惰行・回復余裕)を包括する補正係数。
+    pub run_margin: f64,
     /// 迂回係数 `α` のクランプ下限。
     pub detour_min: f64,
     /// 迂回係数 `α` のクランプ上限。
@@ -62,7 +69,8 @@ impl Default for EstimationParams {
         Self {
             accel: 0.7,
             decel: 0.9,
-            dwell_minutes: 0.4,
+            dwell_minutes: 0.6,
+            run_margin: 1.15,
             detour_min: 1.0,
             detour_max: 1.6,
         }
@@ -135,7 +143,7 @@ fn base_speed_kmh(line_type: Option<i32>) -> f64 {
         Some(LINE_TYPE_TRAM) => 40.0,
         Some(LINE_TYPE_AGT) => 60.0,
         Some(LINE_TYPE_CABLE) => 12.0,
-        _ => 85.0,
+        _ => 80.0,
     }
 }
 
@@ -155,6 +163,7 @@ fn max_speed_kmh(line_type: Option<i32>, kind: Option<i32>) -> f64 {
 ///
 /// 列車は 0→v_max 加速 → 巡航 → v_max→0 減速すると仮定する。
 /// 区間距離が短く v_max に到達できない場合は三角形プロファイルで頂点速度を解く。
+/// 理想走行と実ダイヤの差を埋めるため、結果に運転余裕率 `run_margin` を掛ける。
 pub fn segment_run_minutes(distance_m: f64, v_max_kmh: f64, params: &EstimationParams) -> f64 {
     if distance_m <= 0.0 || v_max_kmh <= 0.0 {
         return 0.0;
@@ -173,7 +182,7 @@ pub fn segment_run_minutes(distance_m: f64, v_max_kmh: f64, params: &EstimationP
         let v_peak = (2.0 * distance_m * a * b / (a + b)).sqrt();
         v_peak / a + v_peak / b
     };
-    seconds / 60.0
+    seconds * params.run_margin / 60.0
 }
 
 /// その駅に列車が停車するか判定する。端点(始点・終点)は常に停車扱い。
@@ -269,7 +278,7 @@ fn assign_segment_times(
             // 通過駅: 加速 + ここまでの巡航(減速はまだ)。
             accel_penalty_sec + cruise_sec
         };
-        result[idx].cumulative_minutes = departure_minutes + seconds / 60.0;
+        result[idx].cumulative_minutes = departure_minutes + seconds * params.run_margin / 60.0;
     }
 }
 
@@ -462,8 +471,18 @@ mod tests {
         let p = EstimationParams::default();
         // 10km を 80km/h で。巡航支配。
         let t = segment_run_minutes(10_000.0, 80.0, &p);
-        // 巡航のみなら 10km / 80km/h = 7.5 分。加減速分だけ少し増える。
-        assert!(t > 7.5 && t < 9.0, "got {t}");
+        // 巡航のみなら 10km / 80km/h × 余裕率 1.15 = 8.625 分。加減速分だけ少し増える。
+        assert!(t > 8.6 && t < 10.0, "got {t}");
+    }
+
+    #[test]
+    fn run_margin_scales_run_time_but_not_dwell() {
+        let mut p = EstimationParams::default();
+        p.run_margin = 1.0;
+        let base = segment_run_minutes(5_000.0, 80.0, &p);
+        p.run_margin = 1.15;
+        let with_margin = segment_run_minutes(5_000.0, 80.0, &p);
+        approx(with_margin, base * 1.15);
     }
 
     #[test]
@@ -616,14 +635,53 @@ mod tests {
         // km 換算後は α = 4.8668 / 5.65 < 1 → detour_min の 1.0 でクランプされ、
         // みなし走行距離は直線距離そのものになる。
         let straight_m = haversine_distance(36.326849, 139.193704, 36.359018, 139.242463);
-        let v_kmh = 85.0; // 在来線・普通(kind=None)
+        let v_kmh = 80.0; // 在来線・普通(kind=None)
         let expected = segment_run_minutes(straight_m, v_kmh, &p);
         approx(est[1].cumulative_minutes, expected);
+        // 実乗車時間は 5〜6 分。
         assert!(
-            est[1].cumulative_minutes < 6.0,
+            est[1].cumulative_minutes > 4.5 && est[1].cumulative_minutes < 6.5,
             "got {}",
             est[1].cumulative_minutes
         );
+    }
+
+    #[test]
+    fn oedo_line_segment_matches_real_travel_time() {
+        let p = EstimationParams::default();
+        // 都営大江戸線 落合南長崎→光が丘(各駅停車のみの区間)。
+        // 実座標・実データ値(average_distance = 1066.84m、地下鉄 line_type=3)。
+        // 実乗車時間: 新江古田 2分 / 練馬 5分 / 豊島園 7分 / 練馬春日町 9分 / 光が丘 11分。
+        let coords = [
+            (35.723608, 139.683303),            // 落合南長崎
+            (35.732538, 139.670653),            // 新江古田
+            (35.737404, 139.65477),             // 練馬
+            (35.742567043044, 139.64894845621), // 豊島園
+            (35.751452, 139.640236),            // 練馬春日町
+            (35.758526, 139.628603),            // 光が丘
+        ];
+        let stations: Vec<Station> = coords
+            .iter()
+            .enumerate()
+            .map(|(i, &(lat, lon))| {
+                let mut s = station(i as i32 + 1, 99301, lat, lon, Some(1066.84));
+                s.line_type = Some(LINE_TYPE_SUBWAY);
+                s
+            })
+            .collect();
+        let refs: Vec<&Station> = stations.iter().collect();
+        let est = estimate_arrival_minutes(&refs, &p);
+
+        let real = [2.0, 5.0, 7.0, 9.0, 11.0];
+        for (e, r) in est[1..].iter().zip(real.iter()) {
+            assert!(
+                (e.cumulative_minutes - r).abs() < 1.0,
+                "station_cd {}: est {} vs real {}",
+                e.station_cd,
+                e.cumulative_minutes,
+                r
+            );
+        }
     }
 
     #[test]
