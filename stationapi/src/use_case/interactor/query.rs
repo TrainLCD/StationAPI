@@ -1088,6 +1088,9 @@ where
         Ok(vec![])
     }
 
+    /// `from_station_id` から `to_station_id` までの区間の各駅について、始点からの
+    /// 推定到着時間(分)を返す。経路候補ごとに両端が含まれる区間だけへ絞り込み、
+    /// `direction_id` の有無に関わらず from→to 順になるよう並べ替える。
     async fn estimate_route_arrival_times(
         &self,
         from_station_id: u32,
@@ -1110,31 +1113,29 @@ where
 
         let mut result: Vec<EstimatedStop> = Vec::new();
         for (_line_group_cd, group_stops) in route_row_tree_map.iter() {
-            let includes_requested_station = group_stops.iter().any(|stop| {
-                stop.station_cd as u32 == from_station_id || stop.station_cd as u32 == to_station_id
-            });
-            if !includes_requested_station {
+            let from_pos = group_stops
+                .iter()
+                .position(|s| s.station_cd as u32 == from_station_id);
+            let to_pos = group_stops
+                .iter()
+                .position(|s| s.station_cd as u32 == to_station_id);
+
+            // 始点・終点の両方がこの経路候補に含まれない、または同一駅の場合は対象外。
+            let (Some(fi), Some(ti)) = (from_pos, to_pos) else {
+                continue;
+            };
+            if fi == ti {
                 continue;
             }
 
-            if direction_id.is_none() {
-                let from_pos = group_stops
-                    .iter()
-                    .position(|s| s.station_cd as u32 == from_station_id);
-                let to_pos = group_stops
-                    .iter()
-                    .position(|s| s.station_cd as u32 == to_station_id);
-                if let (Some(fi), Some(ti)) = (from_pos, to_pos) {
-                    if fi > ti {
-                        let mut reversed: Vec<&Station> = group_stops.to_vec();
-                        reversed.reverse();
-                        result.extend(estimate_arrival_minutes(&reversed, &params));
-                        continue;
-                    }
-                }
+            // 経路全体ではなく、始点→終点の区間だけに絞り込んで推定する。
+            if fi < ti {
+                result.extend(estimate_arrival_minutes(&group_stops[fi..=ti], &params));
+            } else {
+                let mut segment: Vec<&Station> = group_stops[ti..=fi].to_vec();
+                segment.reverse();
+                result.extend(estimate_arrival_minutes(&segment, &params));
             }
-
-            result.extend(estimate_arrival_minutes(group_stops, &params));
         }
 
         Ok(result)
@@ -2405,6 +2406,76 @@ mod tests {
             // 各経路の始点は 0 分から始まる。
             assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
             assert!((est[2].cumulative_minutes - 0.0).abs() < 1e-9);
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_excludes_stations_outside_requested_range() {
+            // station_cd(101-105)と station_g_cd(1-5)をあえて別値にし、ルックアップが
+            // station_cd を正しく参照していることを検証できるようにする。
+            let make_stop = |station_cd: i32, station_g_cd: i32, lat: f64, lon: f64| {
+                let mut station = create_test_station(station_cd, station_g_cd, 100, Some(500));
+                station.lat = lat;
+                station.lon = lon;
+                station.pass = Some(0);
+                station
+            };
+
+            // 同一 line_group_cd に、要求範囲(station_cd=102〜104)の外側の駅
+            // (station_cd=101, 105)も含まれるケース。範囲外の駅は結果に含まれてはならない。
+            let stops = vec![
+                make_stop(101, 1, 35.000, 139.0),
+                make_stop(102, 2, 35.016, 139.0),
+                make_stop(103, 3, 35.032, 139.0),
+                make_stop(104, 4, 35.048, 139.0),
+                make_stop(105, 5, 35.064, 139.0),
+            ];
+
+            let interactor = build_interactor(stops, vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(102, 104, &[], None)
+                .await
+                .unwrap();
+
+            // 範囲内の station_g_cd=2,3,4 の 3 駅のみが返る。
+            assert_eq!(est.len(), 3);
+            assert_eq!(
+                est.iter().map(|e| e.station_g_cd).collect::<Vec<_>>(),
+                vec![2, 3, 4]
+            );
+            // 範囲外の駅(g_cd=1, 5)は含まれない。
+            assert!(est
+                .iter()
+                .all(|e| e.station_g_cd != 1 && e.station_g_cd != 5));
+            // 区間の始点は 0 分から始まる。
+            assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_reversed_range_with_direction_id() {
+            // direction_id が指定されていても(=is_none() ガードを通らなくても)、
+            // 範囲外の駅は除外され、fi > ti の場合は from→to 順に反転される。
+            let stops = vec![
+                create_geo_stop(1, 100, 500, 35.000, 139.0, Some(0)),
+                create_geo_stop(2, 100, 500, 35.016, 139.0, Some(0)),
+                create_geo_stop(3, 100, 500, 35.032, 139.0, Some(0)),
+                create_geo_stop(4, 100, 500, 35.048, 139.0, Some(0)),
+                create_geo_stop(5, 100, 500, 35.064, 139.0, Some(0)),
+            ];
+
+            let interactor = build_interactor(stops, vec![], vec![], vec![]);
+            // from=4, to=2: リスト内では from が to より後ろに現れる。
+            let est = interactor
+                .estimate_route_arrival_times(4, 2, &[], Some(1))
+                .await
+                .unwrap();
+
+            assert_eq!(est.len(), 3);
+            // from(4) → to(2) の順に並び、範囲外の 1,5 は含まれない。
+            assert_eq!(
+                est.iter().map(|e| e.station_g_cd).collect::<Vec<_>>(),
+                vec![4, 3, 2]
+            );
+            assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
         }
     }
 
