@@ -67,6 +67,7 @@ pub trait StationRepository: Send + Sync + 'static {
         from_station_cd: u32,
         to_station_cd: u32,
         via_line_ids: &[u32],
+        direction_id: Option<u32>,
     ) -> Result<Vec<Station>, DomainError>;
 }
 
@@ -340,6 +341,7 @@ mod tests {
             from_station_cd: u32,
             to_station_cd: u32,
             via_line_ids: &[u32],
+            _direction_id: Option<u32>,
         ) -> Result<Vec<Station>, DomainError> {
             self.get_route_stops(from_station_cd, to_station_cd, via_line_ids)
                 .await

@@ -134,5 +134,6 @@ pub trait QueryUseCase: Send + Sync + 'static {
         from_station_id: u32,
         to_station_id: u32,
         via_line_ids: &[u32],
+        direction_id: Option<u32>,
     ) -> Result<Vec<EstimatedStop>, UseCaseError>;
 }

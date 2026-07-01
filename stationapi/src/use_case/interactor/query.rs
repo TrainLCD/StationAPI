@@ -1093,10 +1093,16 @@ where
         from_station_id: u32,
         to_station_id: u32,
         via_line_ids: &[u32],
+        direction_id: Option<u32>,
     ) -> Result<Vec<EstimatedStop>, UseCaseError> {
         let stops = self
             .station_repository
-            .get_route_stops_by_station_cd(from_station_id, to_station_id, via_line_ids)
+            .get_route_stops_by_station_cd(
+                from_station_id,
+                to_station_id,
+                via_line_ids,
+                direction_id,
+            )
             .await?;
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
@@ -1109,6 +1115,23 @@ where
             });
             if !includes_requested_station {
                 continue;
+            }
+
+            if direction_id.is_none() {
+                let from_pos = group_stops
+                    .iter()
+                    .position(|s| s.station_cd as u32 == from_station_id);
+                let to_pos = group_stops
+                    .iter()
+                    .position(|s| s.station_cd as u32 == to_station_id);
+                if let (Some(fi), Some(ti)) = (from_pos, to_pos) {
+                    if fi > ti {
+                        let mut reversed: Vec<&Station> = group_stops.to_vec();
+                        reversed.reverse();
+                        result.extend(estimate_arrival_minutes(&reversed, &params));
+                        continue;
+                    }
+                }
             }
 
             result.extend(estimate_arrival_minutes(group_stops, &params));
@@ -1989,6 +2012,7 @@ mod tests {
                 from: u32,
                 to: u32,
                 via: &[u32],
+                _direction_id: Option<u32>,
             ) -> Result<Vec<Station>, DomainError> {
                 self.get_route_stops(from, to, via).await
             }
@@ -2327,7 +2351,7 @@ mod tests {
 
             let interactor = build_interactor(stops, vec![], vec![], vec![]);
             let est = interactor
-                .estimate_route_arrival_times(1, 4, &[])
+                .estimate_route_arrival_times(1, 4, &[], None)
                 .await
                 .unwrap();
 
@@ -2365,7 +2389,7 @@ mod tests {
 
             let interactor = build_interactor(stops, vec![], vec![], vec![]);
             let est = interactor
-                .estimate_route_arrival_times(1, 4, &[])
+                .estimate_route_arrival_times(1, 4, &[], None)
                 .await
                 .unwrap();
 
@@ -2491,6 +2515,7 @@ mod tests {
                 _: u32,
                 _: u32,
                 _: &[u32],
+                _: Option<u32>,
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
@@ -2972,6 +2997,7 @@ mod tests {
                 _: u32,
                 _: u32,
                 _: &[u32],
+                _: Option<u32>,
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
