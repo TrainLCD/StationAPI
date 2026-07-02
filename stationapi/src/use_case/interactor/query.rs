@@ -1116,10 +1116,20 @@ where
 
         let mut result: Vec<EstimatedStop> = Vec::new();
         for (_line_group_cd, group_stops) in route_row_tree_map.iter() {
-            let from_pos = group_stops
+            // 先頭駅が末尾にも重複格納された「閉じた」環状データ(ポートライナー等)は、
+            // そのままだとラップ時に閉じ駅が二重になるため重複終端を除いてから
+            // 環状判定・弧選択する。
+            let mut route_stops: &[&Station] = group_stops.as_slice();
+            if route_stops.len() > 1
+                && route_stops[0].station_cd == route_stops[route_stops.len() - 1].station_cd
+            {
+                route_stops = &route_stops[..route_stops.len() - 1];
+            }
+
+            let from_pos = route_stops
                 .iter()
                 .position(|s| s.station_cd as u32 == from_station_id);
-            let to_pos = group_stops
+            let to_pos = route_stops
                 .iter()
                 .position(|s| s.station_cd as u32 == to_station_id);
 
@@ -1135,13 +1145,13 @@ where
             // 環状経路(山手線・大阪環状線など)は線形スライスだと格納順の
             // 継ぎ目(例: 品川⇔大崎)を跨ぐ乗車で逆側の弧を返してしまうため、
             // シームをラップする弧を選択する。
-            if is_circular_route(group_stops) {
-                let arc = select_circular_arc(group_stops, fi, ti, direction_id.is_some());
+            if is_circular_route(route_stops) {
+                let arc = select_circular_arc(route_stops, fi, ti, direction_id.is_some());
                 result.extend(estimate_arrival_minutes(&arc, &params));
             } else if fi < ti {
-                result.extend(estimate_arrival_minutes(&group_stops[fi..=ti], &params));
+                result.extend(estimate_arrival_minutes(&route_stops[fi..=ti], &params));
             } else {
-                let mut segment: Vec<&Station> = group_stops[ti..=fi].to_vec();
+                let mut segment: Vec<&Station> = route_stops[ti..=fi].to_vec();
                 segment.reverse();
                 result.extend(estimate_arrival_minutes(&segment, &params));
             }
@@ -2536,6 +2546,32 @@ mod tests {
                 vec![8, 1, 2]
             );
             assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_circular_closed_loop_dedups_endpoint() {
+            // 先頭駅が末尾にも重複格納された「閉じた」環状データ(ポートライナー等)。
+            // 重複終端を除いた上で環状と判定され、継ぎ目をラップした弧が返る
+            // (閉じ駅が二重に現れない)。
+            let mut stops = ring_stops(8, 500);
+            let mut closing = stops[0].clone();
+            closing.e_sort = 9;
+            stops.push(closing);
+
+            let interactor = build_interactor(stops, vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(7, 2, &[], Some(0))
+                .await
+                .unwrap();
+
+            assert_eq!(
+                est.iter().map(|e| e.station_g_cd).collect::<Vec<_>>(),
+                vec![7, 8, 1, 2]
+            );
+            assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+            assert!(est
+                .windows(2)
+                .all(|w| w[1].cumulative_minutes > w[0].cumulative_minutes));
         }
     }
 
