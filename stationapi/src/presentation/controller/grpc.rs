@@ -470,6 +470,7 @@ impl StationApi for MyApi {
                         station_id: stop.station_cd as u32,
                         station_group_id: stop.station_g_cd as u32,
                         cumulative_minutes: stop.cumulative_minutes,
+                        departure_cumulative_minutes: stop.departure_cumulative_minutes,
                         stops_here: stop.stops_here,
                     };
 

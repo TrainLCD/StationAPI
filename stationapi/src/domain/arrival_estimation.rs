@@ -40,6 +40,11 @@ pub struct EstimatedStop {
     /// 始点からの累積到着時間(分)。通過駅は停車駅間を速度プロファイル別に分割した
     /// 走行時間の積み上げで求めた通過時刻。
     pub cumulative_minutes: f64,
+    /// 始点からの累積出発時刻(分)。中間停車駅では「到着 + 停車時間(dwell)」、
+    /// 通過駅では通過時刻(= `cumulative_minutes`)、終点では到着時刻と同じ
+    /// (以降の出発が無いため)。クライアントは基準駅 k0 と任意の駅 k について
+    /// 「到着(k) − 出発(k0)」で基準駅発の正確な残り時間(発車基準 ETA)を計算できる。
+    pub departure_cumulative_minutes: f64,
     /// その駅に停車するか(false = 通過)。
     pub stops_here: bool,
 }
@@ -254,8 +259,10 @@ fn assign_segment_times(
     }
     if seg.len() == 1 {
         let (track_m, v_kmh, idx, _) = seg[0];
-        result[idx].cumulative_minutes =
-            departure_minutes + segment_run_minutes(track_m, v_kmh, params);
+        let arrival = departure_minutes + segment_run_minutes(track_m, v_kmh, params);
+        result[idx].cumulative_minutes = arrival;
+        // 停車駅の出発時刻(dwell 加算)は呼び出し側が上書きする。
+        result[idx].departure_cumulative_minutes = arrival;
         return;
     }
 
@@ -278,7 +285,11 @@ fn assign_segment_times(
             // 通過駅: 加速 + ここまでの巡航(減速はまだ)。
             accel_penalty_sec + cruise_sec
         };
-        result[idx].cumulative_minutes = departure_minutes + seconds * params.run_margin / 60.0;
+        let arrival = departure_minutes + seconds * params.run_margin / 60.0;
+        result[idx].cumulative_minutes = arrival;
+        // 通過駅は停車しないので出発 = 通過時刻。末尾の停車駅は呼び出し側が
+        // dwell を加味した出発時刻で上書きする。
+        result[idx].departure_cumulative_minutes = arrival;
     }
 }
 
@@ -326,12 +337,13 @@ pub fn estimate_arrival_minutes(
 
     let mut result: Vec<EstimatedStop> = Vec::with_capacity(n);
 
-    // 始点。
+    // 始点。即時出発とみなすので到着・出発とも 0 分。
     result.push(EstimatedStop {
         station_cd: stops[0].station_cd,
         station_g_cd: stops[0].station_g_cd,
         line_group_cd: line_group_of(stops[0]),
         cumulative_minutes: 0.0,
+        departure_cumulative_minutes: 0.0,
         stops_here: stops_here[0],
     });
 
@@ -351,6 +363,7 @@ pub fn estimate_arrival_minutes(
             station_g_cd: stops[i].station_g_cd,
             line_group_cd: line_group_of(stops[i]),
             cumulative_minutes: 0.0,
+            departure_cumulative_minutes: 0.0,
             stops_here: stops_here[i],
         });
         seg.push((track_m, v_kmh, idx, stops_here[i]));
@@ -367,6 +380,7 @@ pub fn estimate_arrival_minutes(
             } else {
                 arrival + params.dwell_minutes
             };
+            result[idx].departure_cumulative_minutes = last_departure;
 
             seg.clear();
         }
@@ -538,6 +552,50 @@ mod tests {
         // 「1区間の所要 × 2 + dwell」付近になる。
         let leg = est[1].cumulative_minutes;
         approx(est[2].cumulative_minutes, leg * 2.0 + p.dwell_minutes);
+    }
+
+    #[test]
+    fn departure_minutes_add_dwell_at_intermediate_stops_only() {
+        let p = EstimationParams::default();
+        let stations = three_collinear_stations();
+        let refs: Vec<&Station> = stations.iter().collect();
+        let est = estimate_arrival_minutes(&refs, &p);
+
+        // 始点: 即時出発なので到着・出発とも 0 分。
+        approx(est[0].cumulative_minutes, 0.0);
+        approx(est[0].departure_cumulative_minutes, 0.0);
+        // 中間停車駅: 出発 = 到着 + dwell。
+        approx(
+            est[1].departure_cumulative_minutes,
+            est[1].cumulative_minutes + p.dwell_minutes,
+        );
+        // 終点: 以降の出発が無いので出発 = 到着。
+        approx(
+            est[2].departure_cumulative_minutes,
+            est[2].cumulative_minutes,
+        );
+        // クライアント側の発車基準 ETA: 到着(終点) − 出発(中間駅) = 1 区間の走行時間。
+        let leg = est[1].cumulative_minutes;
+        approx(
+            est[2].cumulative_minutes - est[1].departure_cumulative_minutes,
+            leg,
+        );
+    }
+
+    #[test]
+    fn departure_minutes_equal_pass_time_at_passed_stations() {
+        let p = EstimationParams::default();
+        let mut stations = three_collinear_stations();
+        stations[1].pass = Some(1);
+        let refs: Vec<&Station> = stations.iter().collect();
+        let est = estimate_arrival_minutes(&refs, &p);
+
+        // 通過駅は停車しないので出発 = 通過時刻(dwell 加算なし)。
+        assert!(!est[1].stops_here);
+        approx(
+            est[1].departure_cumulative_minutes,
+            est[1].cumulative_minutes,
+        );
     }
 
     #[test]
