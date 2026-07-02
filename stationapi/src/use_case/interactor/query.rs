@@ -23,7 +23,10 @@ fn filter_to_db_type(filter: TransportTypeFilter) -> Option<TransportType> {
 
 use crate::{
     domain::{
-        arrival_estimation::{estimate_arrival_minutes, EstimatedStop, EstimationParams},
+        arrival_estimation::{
+            estimate_arrival_minutes, is_circular_route, select_circular_arc, EstimatedStop,
+            EstimationParams,
+        },
         entity::{
             company::Company,
             gtfs::{TransportType, TransportTypeFilter},
@@ -1129,7 +1132,13 @@ where
             }
 
             // 経路全体ではなく、始点→終点の区間だけに絞り込んで推定する。
-            if fi < ti {
+            // 環状経路(山手線・大阪環状線など)は線形スライスだと格納順の
+            // 継ぎ目(例: 品川⇔大崎)を跨ぐ乗車で逆側の弧を返してしまうため、
+            // シームをラップする弧を選択する。
+            if is_circular_route(group_stops) {
+                let arc = select_circular_arc(group_stops, fi, ti, direction_id.is_some());
+                result.extend(estimate_arrival_minutes(&arc, &params));
+            } else if fi < ti {
                 result.extend(estimate_arrival_minutes(&group_stops[fi..=ti], &params));
             } else {
                 let mut segment: Vec<&Station> = group_stops[ti..=fi].to_vec();
@@ -2474,6 +2483,57 @@ mod tests {
             assert_eq!(
                 est.iter().map(|e| e.station_g_cd).collect::<Vec<_>>(),
                 vec![4, 3, 2]
+            );
+            assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+        }
+
+        /// 半径約 1.1km の円周上に等間隔で並ぶ n 駅の環状経路(g_cd は 1..=n)。
+        fn ring_stops(n: usize, line_group_cd: i32) -> Vec<Station> {
+            (0..n)
+                .map(|i| {
+                    let theta = 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+                    let lat = 35.0 + 0.01 * theta.cos();
+                    let lon = 139.0 + 0.01 * theta.sin() / 35.0_f64.to_radians().cos();
+                    create_geo_stop(i as i32 + 1, 100, line_group_cd, lat, lon, Some(0))
+                })
+                .collect()
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_circular_wraps_seam() {
+            // 環状経路で direction_id 指定あり: 格納順の継ぎ目(末尾→先頭)を
+            // 跨ぐ乗車では、逆側の弧に反転せずシームをラップして進む。
+            let interactor = build_interactor(ring_stops(8, 500), vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(7, 2, &[], Some(0))
+                .await
+                .unwrap();
+
+            // 7 → 8 → (シーム) → 1 → 2 の 4 駅。修正前は 2〜7 の逆順 6 駅が返っていた。
+            assert_eq!(
+                est.iter().map(|e| e.station_g_cd).collect::<Vec<_>>(),
+                vec![7, 8, 1, 2]
+            );
+            assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+            assert!(est
+                .windows(2)
+                .all(|w| w[1].cumulative_minutes > w[0].cumulative_minutes));
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_circular_shorter_arc_without_direction_id() {
+            // 環状経路で direction_id 未指定: 継ぎ目を挟んだ近接ペアには
+            // 遠回りの弧ではなく短い方の弧を返す。
+            let interactor = build_interactor(ring_stops(8, 500), vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(8, 2, &[], None)
+                .await
+                .unwrap();
+
+            // 8 → (シーム) → 1 → 2 の 3 駅(逆方向だと 7 駅の遠回り)。
+            assert_eq!(
+                est.iter().map(|e| e.station_g_cd).collect::<Vec<_>>(),
+                vec![8, 1, 2]
             );
             assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
         }

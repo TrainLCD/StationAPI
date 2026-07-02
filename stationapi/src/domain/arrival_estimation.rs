@@ -119,6 +119,113 @@ pub fn haversine_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
     EARTH_RADIUS_METERS * c
 }
 
+/// 環状判定の最小駅数。実在の環状路線は最少 13 駅(富山都心線)。
+const CIRCULAR_MIN_STATIONS: usize = 6;
+/// シーム(末尾駅→先頭駅)距離の、平均駅間距離に対する許容倍率。
+const CIRCULAR_SEAM_MEAN_RATIO: f64 = 2.0;
+/// シーム距離の絶対上限(メートル)。実在環状路線の最大シームは山手線の約 1.4km。
+const CIRCULAR_SEAM_MAX_METERS: f64 = 3_000.0;
+/// 連続駅間距離の最大値の、中央値に対する許容倍率。格納順に不連続な飛び
+/// (支線を跨ぐ成田線や、別線の駅が末尾に連なる近鉄奈良線など)を持つ路線を
+/// 環状と誤検出しないためのガード。
+const CIRCULAR_MAX_GAP_MEDIAN_RATIO: f64 = 3.0;
+
+/// 順序付き駅リストが環状(ループ)経路かどうかを座標だけから推定する。
+///
+/// スキーマに環状フラグは無いため、「末尾駅から先頭駅へ戻るシーム距離が
+/// 通常の駅間距離と同程度に短い」ことをヒューリスティックに判定する。
+/// シードデータ全路線・全 line_group に対して山手線・大阪環状線(環状運転系統)・
+/// 名城線・札幌市電・富山都心線・伊予鉄環状線のみが検出され、誤検出が
+/// 無いことを確認済み。
+pub fn is_circular_route(stops: &[&Station]) -> bool {
+    let n = stops.len();
+    if n < CIRCULAR_MIN_STATIONS {
+        return false;
+    }
+    // 先頭駅が末尾にも重複して格納された「閉じた」ループはラップ不要
+    // (ラップすると閉じ駅が二重に現れる)。
+    if stops[0].station_cd == stops[n - 1].station_cd {
+        return false;
+    }
+    let mut gaps: Vec<f64> = (1..n)
+        .map(|i| {
+            haversine_distance(
+                stops[i - 1].lat,
+                stops[i - 1].lon,
+                stops[i].lat,
+                stops[i].lon,
+            )
+        })
+        .collect();
+    let mean_gap = gaps.iter().sum::<f64>() / gaps.len() as f64;
+    if mean_gap <= 0.0 {
+        return false;
+    }
+    let seam = haversine_distance(
+        stops[n - 1].lat,
+        stops[n - 1].lon,
+        stops[0].lat,
+        stops[0].lon,
+    );
+    if seam > CIRCULAR_SEAM_MAX_METERS || seam > CIRCULAR_SEAM_MEAN_RATIO * mean_gap {
+        return false;
+    }
+    gaps.sort_by(|a, b| a.total_cmp(b));
+    let median_gap = gaps[gaps.len() / 2];
+    let max_gap = gaps[gaps.len() - 1];
+    median_gap > 0.0 && max_gap <= CIRCULAR_MAX_GAP_MEDIAN_RATIO * median_gap
+}
+
+/// 弧の直線距離合計(メートル)。無向の弧候補の比較に使う。
+fn arc_length_meters(arc: &[&Station]) -> f64 {
+    (1..arc.len())
+        .map(|i| haversine_distance(arc[i - 1].lat, arc[i - 1].lon, arc[i].lat, arc[i].lon))
+        .sum()
+}
+
+/// 環状経路上で `from_idx` → `to_idx` へ進む弧(arc)の駅列を返す。
+///
+/// `directed == true`(direction_id 指定あり)なら格納された向きに沿って進み、
+/// 必要ならシーム(末尾→先頭)を跨いでラップする(決して反転しない)。
+/// `directed == false` なら順方向弧と逆方向弧のうち直線距離合計が短い方を返す
+/// (同値なら順方向)。駅数比較だと対蹠ペアでタイになるため距離で比べる。
+pub fn select_circular_arc<'a>(
+    stops: &[&'a Station],
+    from_idx: usize,
+    to_idx: usize,
+    directed: bool,
+) -> Vec<&'a Station> {
+    // 順方向弧: 格納順に進み、末尾を越えたら先頭へラップする。
+    let forward: Vec<&Station> = if from_idx <= to_idx {
+        stops[from_idx..=to_idx].to_vec()
+    } else {
+        stops[from_idx..]
+            .iter()
+            .chain(stops[..=to_idx].iter())
+            .copied()
+            .collect()
+    };
+    if directed {
+        return forward;
+    }
+    // 逆方向弧: 格納順を遡り、先頭を越えたら末尾へラップする。
+    let backward: Vec<&Station> = if to_idx <= from_idx {
+        stops[to_idx..=from_idx].iter().rev().copied().collect()
+    } else {
+        stops[..=from_idx]
+            .iter()
+            .rev()
+            .chain(stops[to_idx..].iter().rev())
+            .copied()
+            .collect()
+    };
+    if arc_length_meters(&backward) < arc_length_meters(&forward) {
+        backward
+    } else {
+        forward
+    }
+}
+
 /// `average_distance` が得られない路線で使う、路線種別ベースの固定迂回係数。
 fn fallback_detour_factor(line_type: Option<i32>, transport_type: TransportType) -> f64 {
     if transport_type == TransportType::Bus {
@@ -842,6 +949,172 @@ mod tests {
             estimate_arrival_minutes(&refs, &p)[1].cumulative_minutes
         };
         approx(make(Some(7)), make(None));
+    }
+
+    /// 半径約 1.1km の円周上に等間隔で並ぶ n 駅の合成環状路線を作る(station_cd は 1..=n)。
+    fn ring_stations(n: usize) -> Vec<Station> {
+        (0..n)
+            .map(|i| {
+                let theta = 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+                let lat = 35.0 + 0.01 * theta.cos();
+                let lon = 139.0 + 0.01 * theta.sin() / 35.0_f64.to_radians().cos();
+                station(i as i32 + 1, 500, lat, lon, None)
+            })
+            .collect()
+    }
+
+    /// 山手線 line_group_cd 363 の格納順(大崎→…→高輪ゲートウェイ→品川)と実座標。
+    /// average_distance は実データ値(1093.74m)。
+    fn yamanote_stations() -> Vec<Station> {
+        let coords = [
+            (1130201, 35.619772, 139.728439), // 大崎
+            (1130202, 35.625974, 139.723822), // 五反田
+            (1130203, 35.633923, 139.715775), // 目黒
+            (1130204, 35.646685, 139.71007),  // 恵比寿
+            (1130205, 35.658871, 139.701238), // 渋谷
+            (1130206, 35.670646, 139.702592), // 原宿
+            (1130207, 35.683061, 139.702042), // 代々木
+            (1130208, 35.689729, 139.700464), // 新宿
+            (1130209, 35.700875, 139.700261), // 新大久保
+            (1130210, 35.712677, 139.703715), // 高田馬場
+            (1130211, 35.720476, 139.706228), // 目白
+            (1130212, 35.730256, 139.711086), // 池袋
+            (1130213, 35.731412, 139.728584), // 大塚
+            (1130214, 35.733445, 139.739303), // 巣鴨
+            (1130215, 35.736825, 139.748053), // 駒込
+            (1130216, 35.737781, 139.761229), // 田端
+            (1130217, 35.731954, 139.766857), // 西日暮里
+            (1130218, 35.727908, 139.771287), // 日暮里
+            (1130219, 35.721484, 139.778015), // 鶯谷
+            (1130220, 35.71379, 139.777043),  // 上野
+            (1130221, 35.707282, 139.774727), // 御徒町
+            (1130222, 35.698619, 139.773288), // 秋葉原
+            (1130223, 35.691173, 139.770641), // 神田
+            (1130224, 35.681391, 139.766103), // 東京
+            (1130225, 35.675441, 139.763806), // 有楽町
+            (1130226, 35.666195, 139.758587), // 新橋
+            (1130227, 35.655391, 139.757135), // 浜松町
+            (1130228, 35.645736, 139.747575), // 田町
+            (1130230, 35.6355, 139.7407),     // 高輪ゲートウェイ
+            (1130229, 35.62876, 139.738999),  // 品川
+        ];
+        coords
+            .iter()
+            .map(|&(cd, lat, lon)| {
+                let mut s = station(cd, 11302, lat, lon, Some(1093.73663));
+                s.line_group_cd = Some(363);
+                s
+            })
+            .collect()
+    }
+
+    #[test]
+    fn is_circular_route_detects_yamanote_ring() {
+        let stations = yamanote_stations();
+        let refs: Vec<&Station> = stations.iter().collect();
+        assert!(is_circular_route(&refs));
+    }
+
+    #[test]
+    fn is_circular_route_rejects_linear_line() {
+        // 直線 8 駅(約 1.8km 間隔)。端点間 12km 超なので環状ではない。
+        let stations: Vec<Station> = (0..8)
+            .map(|i| station(i + 1, 100, 35.0 + 0.016 * i as f64, 139.0, None))
+            .collect();
+        let refs: Vec<&Station> = stations.iter().collect();
+        assert!(!is_circular_route(&refs));
+    }
+
+    #[test]
+    fn is_circular_route_rejects_small_ring() {
+        // 幾何的には環状でも最小駅数未満なら対象外。
+        let stations = ring_stations(5);
+        let refs: Vec<&Station> = stations.iter().collect();
+        assert!(!is_circular_route(&refs));
+    }
+
+    #[test]
+    fn is_circular_route_rejects_closed_loop_with_duplicate_endpoint() {
+        // 先頭駅が末尾にも重複格納された「閉じた」ループ(Port Liner 型)は
+        // ラップすると閉じ駅が二重になるため環状扱いしない。
+        let mut stations = ring_stations(10);
+        let mut closing = stations[0].clone();
+        closing.e_sort = 11;
+        stations.push(closing);
+        let refs: Vec<&Station> = stations.iter().collect();
+        assert!(!is_circular_route(&refs));
+    }
+
+    #[test]
+    fn is_circular_route_rejects_discontinuous_order() {
+        // 近鉄奈良線型: 直線に進んだ後、格納順の末尾に始点近くの別線駅が連なる。
+        // シームは短いが内部に巨大な飛びがあるため環状ではない。
+        let mut stations: Vec<Station> = (0..8)
+            .map(|i| station(i + 1, 100, 35.0, 139.0 + 0.011 * i as f64, None))
+            .collect();
+        // 始点から約 200m の位置に「飛び」で戻ってくる駅を追加。
+        stations.push(station(9, 100, 35.0018, 139.0, None));
+        let refs: Vec<&Station> = stations.iter().collect();
+        assert!(!is_circular_route(&refs));
+    }
+
+    #[test]
+    fn circular_arc_directed_wraps_seam() {
+        let stations = ring_stations(10);
+        let refs: Vec<&Station> = stations.iter().collect();
+
+        // 格納順の向きのままシームを跨いでラップする(反転しない)。
+        let arc = select_circular_arc(&refs, 8, 2, true);
+        let cds: Vec<i32> = arc.iter().map(|s| s.station_cd).collect();
+        assert_eq!(cds, vec![9, 10, 1, 2, 3]);
+
+        // シームを跨がない場合は通常のスライス。
+        let arc = select_circular_arc(&refs, 2, 8, true);
+        let cds: Vec<i32> = arc.iter().map(|s| s.station_cd).collect();
+        assert_eq!(cds, vec![3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn circular_arc_undirected_picks_shorter_arc() {
+        let stations = ring_stations(10);
+        let refs: Vec<&Station> = stations.iter().collect();
+
+        // 順方向にラップする 3 駅の弧が最短(逆方向は 9 駅)。
+        let arc = select_circular_arc(&refs, 9, 1, false);
+        let cds: Vec<i32> = arc.iter().map(|s| s.station_cd).collect();
+        assert_eq!(cds, vec![10, 1, 2]);
+
+        // 対称ケース: 逆方向にラップする 3 駅の弧が最短。
+        let arc = select_circular_arc(&refs, 1, 9, false);
+        let cds: Vec<i32> = arc.iter().map(|s| s.station_cd).collect();
+        assert_eq!(cds, vec![2, 1, 10]);
+    }
+
+    #[test]
+    fn yamanote_tamachi_to_shibuya_crosses_seam() {
+        // バグ再現回帰: 外回り 田町→渋谷 は品川・大崎経由の 8 駅(実乗車時間 約15分)。
+        // 修正前は格納順の継ぎ目(品川⇔大崎)を跨げず、東京・池袋経由の
+        // 24 駅の逆側の弧が返っていた。
+        let p = EstimationParams::default();
+        let stations = yamanote_stations();
+        let refs: Vec<&Station> = stations.iter().collect();
+        assert!(is_circular_route(&refs));
+
+        let tamachi = 27; // 田町
+        let shibuya = 4; // 渋谷
+        let arc = select_circular_arc(&refs, tamachi, shibuya, true);
+        let cds: Vec<i32> = arc.iter().map(|s| s.station_cd).collect();
+        assert_eq!(
+            cds,
+            vec![1130228, 1130230, 1130229, 1130201, 1130202, 1130203, 1130204, 1130205],
+        );
+
+        let est = estimate_arrival_minutes(&arc, &p);
+        assert!(est
+            .windows(2)
+            .all(|w| w[1].cumulative_minutes > w[0].cumulative_minutes));
+        let total = est.last().unwrap().cumulative_minutes;
+        assert!((12.0..18.0).contains(&total), "got {total}");
     }
 
     #[test]
