@@ -26,6 +26,7 @@
 
 use std::collections::HashMap;
 
+use crate::domain::entity::gtfs::TransportType;
 use crate::domain::entity::station::Station;
 use crate::proto::StopCondition;
 
@@ -93,6 +94,14 @@ const LINE_TYPE_AGT: i32 = 5;
 /// ケーブルカーを表す `line_type`。
 const LINE_TYPE_CABLE: i32 = 0;
 
+/// バスの最高速度(km/h)。市街地の法定速度・信号停止を踏まえた実効上限。
+/// GTFS 由来のバス路線は `line_type` に GTFS の `route_type`(バス=3)がそのまま
+/// 入っており鉄道の路線種別(3=地下鉄)と衝突するため、速度・迂回係数の判定には
+/// `line_type` ではなく `transport_type` を使う。
+const BUS_MAX_SPEED_KMH: f64 = 50.0;
+/// バスのフォールバック迂回係数。道路網の直線距離に対する迂回率。
+const BUS_FALLBACK_DETOUR: f64 = 1.30;
+
 /// 地球半径(メートル)。
 const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
 
@@ -111,7 +120,10 @@ pub fn haversine_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 }
 
 /// `average_distance` が得られない路線で使う、路線種別ベースの固定迂回係数。
-fn fallback_detour_factor(line_type: Option<i32>) -> f64 {
+fn fallback_detour_factor(line_type: Option<i32>, transport_type: TransportType) -> f64 {
+    if transport_type == TransportType::Bus {
+        return BUS_FALLBACK_DETOUR;
+    }
     match line_type {
         Some(LINE_TYPE_SHINKANSEN) => 1.15,
         Some(LINE_TYPE_SUBWAY) => 1.20,
@@ -131,12 +143,13 @@ pub fn detour_factor_for(
     avg_distance_km: f64,
     mean_straight_km: f64,
     line_type: Option<i32>,
+    transport_type: TransportType,
     params: &EstimationParams,
 ) -> f64 {
     if avg_distance_km > 0.0 && mean_straight_km > 0.0 {
         (avg_distance_km / mean_straight_km).clamp(params.detour_min, params.detour_max)
     } else {
-        fallback_detour_factor(line_type)
+        fallback_detour_factor(line_type, transport_type)
     }
 }
 
@@ -153,7 +166,14 @@ fn base_speed_kmh(line_type: Option<i32>) -> f64 {
 }
 
 /// 路線種別・列車種別から最高速度(km/h)を決める。
-fn max_speed_kmh(line_type: Option<i32>, kind: Option<i32>) -> f64 {
+///
+/// バスは `line_type`(GTFS の route_type が混入)や `kind`(BusRoute=7 は経路
+/// マーカーであり優等種別ではない)で判定できないため、`transport_type` で
+/// 先に分岐して固定の実効上限を返す。
+fn max_speed_kmh(line_type: Option<i32>, kind: Option<i32>, transport_type: TransportType) -> f64 {
+    if transport_type == TransportType::Bus {
+        return BUS_MAX_SPEED_KMH;
+    }
     let base = base_speed_kmh(line_type);
     if line_type == Some(LINE_TYPE_SHINKANSEN) {
         return base;
@@ -209,19 +229,20 @@ fn detour_factors_by_line(
     straight_km: &[f64],
     params: &EstimationParams,
 ) -> HashMap<i32, f64> {
-    // line_cd -> (直線距離の合計, ペア数, average_distance, line_type)
-    let mut acc: HashMap<i32, (f64, u32, f64, Option<i32>)> = HashMap::new();
+    // line_cd -> (直線距離の合計, ペア数, average_distance, line_type, transport_type)
+    let mut acc: HashMap<i32, (f64, u32, f64, Option<i32>, TransportType)> = HashMap::new();
 
     for i in 1..stops.len() {
         let cur = stops[i];
         let prev = stops[i - 1];
-        // average_distance / line_type は line_cd 単位で同じなので最初に見たものを採用。
+        // average_distance / line_type / transport_type は line_cd 単位で同じなので最初に見たものを採用。
         // average_distance はメートル単位で格納されているため km へ変換して直線平均と比較する。
         let entry = acc.entry(cur.line_cd).or_insert((
             0.0,
             0,
             cur.average_distance.unwrap_or(0.0) / 1000.0,
             cur.line_type,
+            cur.transport_type,
         ));
         // 同一路線が連続するペアだけを直線平均の母数にする。
         if prev.line_cd == cur.line_cd {
@@ -231,13 +252,21 @@ fn detour_factors_by_line(
     }
 
     acc.into_iter()
-        .map(|(line_cd, (sum, count, avg_distance, line_type))| {
-            let mean_straight = if count > 0 { sum / count as f64 } else { 0.0 };
-            (
-                line_cd,
-                detour_factor_for(avg_distance, mean_straight, line_type, params),
-            )
-        })
+        .map(
+            |(line_cd, (sum, count, avg_distance, line_type, transport_type))| {
+                let mean_straight = if count > 0 { sum / count as f64 } else { 0.0 };
+                (
+                    line_cd,
+                    detour_factor_for(
+                        avg_distance,
+                        mean_straight,
+                        line_type,
+                        transport_type,
+                        params,
+                    ),
+                )
+            },
+        )
         .collect()
 }
 
@@ -322,7 +351,7 @@ pub fn estimate_arrival_minutes(
         detour_by_line
             .get(&station.line_cd)
             .copied()
-            .unwrap_or_else(|| fallback_detour_factor(station.line_type))
+            .unwrap_or_else(|| fallback_detour_factor(station.line_type, station.transport_type))
     };
 
     // 各駅が停車するか。
@@ -355,7 +384,7 @@ pub fn estimate_arrival_minutes(
 
     for i in 1..n {
         let track_m = straight_km[i] * detour_of(stops[i]) * 1000.0;
-        let v_kmh = max_speed_kmh(stops[i].line_type, stops[i].kind);
+        let v_kmh = max_speed_kmh(stops[i].line_type, stops[i].kind, stops[i].transport_type);
 
         let idx = result.len();
         result.push(EstimatedStop {
@@ -392,7 +421,6 @@ pub fn estimate_arrival_minutes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::entity::gtfs::TransportType;
 
     /// テスト用の最小 Station を作る(座標・路線情報・停車情報のみ意味を持つ)。
     fn station(
@@ -515,13 +543,30 @@ mod tests {
     fn detour_factor_calibrates_then_clamps() {
         let p = EstimationParams::default();
         // average 1.3km / 直線 1.0km = 1.3。
-        approx(detour_factor_for(1.3, 1.0, Some(2), &p), 1.3);
+        approx(
+            detour_factor_for(1.3, 1.0, Some(2), TransportType::Rail, &p),
+            1.3,
+        );
         // 上限 1.6 でクランプ。
-        approx(detour_factor_for(5.0, 1.0, Some(2), &p), 1.6);
+        approx(
+            detour_factor_for(5.0, 1.0, Some(2), TransportType::Rail, &p),
+            1.6,
+        );
         // average_distance 無し → 在来線フォールバック 1.30。
-        approx(detour_factor_for(0.0, 1.0, Some(2), &p), 1.30);
+        approx(
+            detour_factor_for(0.0, 1.0, Some(2), TransportType::Rail, &p),
+            1.30,
+        );
         // 新幹線フォールバック 1.15。
-        approx(detour_factor_for(0.0, 1.0, Some(1), &p), 1.15);
+        approx(
+            detour_factor_for(0.0, 1.0, Some(1), TransportType::Rail, &p),
+            1.15,
+        );
+        // バスは line_type=3(GTFS の route_type)でも地下鉄 1.20 ではなく道路 1.30。
+        approx(
+            detour_factor_for(0.0, 1.0, Some(3), TransportType::Bus, &p),
+            1.30,
+        );
     }
 
     /// 緯度方向に約 1.8km 間隔で並ぶ直線 3 駅。全駅停車。
@@ -740,6 +785,63 @@ mod tests {
                 r
             );
         }
+    }
+
+    /// GTFS インポート後のバス停を再現する(line_type=3 は GTFS route_type のバス、
+    /// kind=7 は TrainTypeKind::BusRoute、average_distance は無し)。
+    fn bus_station(station_cd: i32, line_cd: i32, lat: f64, lon: f64) -> Station {
+        let mut s = station(station_cd, line_cd, lat, lon, None);
+        s.transport_type = TransportType::Bus;
+        s.line_type = Some(3);
+        s.kind = Some(7);
+        s
+    }
+
+    #[test]
+    fn bus_ike65_dense_stops_match_real_travel_time() {
+        let p = EstimationParams::default();
+        // 都営バス池65 落合南長崎駅前→目白駅前相当: 停留所間隔約 300m × 7 区間。
+        // 実乗車時間は約 10 分(表定速度 約13km/h)。0.0027 度 ≈ 300m。
+        let stations: Vec<Station> = (0..8)
+            .map(|i| bus_station(i + 1, 100_000_001, 35.72 + 0.0027 * i as f64, 139.69))
+            .collect();
+        let refs: Vec<&Station> = stations.iter().collect();
+        let est = estimate_arrival_minutes(&refs, &p);
+
+        let total = est[7].cumulative_minutes;
+        assert!(total > 9.0 && total < 11.0, "got {total}");
+    }
+
+    #[test]
+    fn bus_long_segment_does_not_cruise_at_rail_speed() {
+        let p = EstimationParams::default();
+        // 停留所間隔 3km の直行区間。地下鉄扱い(75km/h × 1.2 = 90km/h)のままだと
+        // 約 3.4 分と過小評価される。バス上限 50km/h では約 5.7 分。
+        let stations = vec![
+            bus_station(1, 100_000_001, 35.72, 139.69),
+            bus_station(2, 100_000_001, 35.747, 139.69), // 0.027 度 ≈ 3km
+        ];
+        let refs: Vec<&Station> = stations.iter().collect();
+        let est = estimate_arrival_minutes(&refs, &p);
+
+        let t = est[1].cumulative_minutes;
+        assert!((4.5..7.5).contains(&t), "got {t}");
+    }
+
+    #[test]
+    fn bus_kind_does_not_get_express_multiplier() {
+        let p = EstimationParams::default();
+        // kind=7(BusRoute) は優等種別ではないので ×1.2 が掛かってはいけない。
+        let make = |kind: Option<i32>| -> f64 {
+            let mut a = bus_station(1, 100_000_001, 35.72, 139.69);
+            let mut b = bus_station(2, 100_000_001, 35.747, 139.69);
+            a.kind = kind;
+            b.kind = kind;
+            let stations = vec![a, b];
+            let refs: Vec<&Station> = stations.iter().collect();
+            estimate_arrival_minutes(&refs, &p)[1].cumulative_minutes
+        };
+        approx(make(Some(7)), make(None));
     }
 
     #[test]
