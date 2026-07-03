@@ -6,15 +6,16 @@ use crate::{
     },
     presentation::error::PresentationalError,
     proto::{
-        station_api_server::StationApi, GetConnectedStationsRequest, GetLineByIdRequest,
-        GetLinesByIdListRequest, GetLinesByNameRequest, GetRouteRequest,
+        station_api_server::StationApi, EstimateArrivalTimesRequest, EstimatedArrivalResponse,
+        EstimatedArrivalRoute, EstimatedArrivalStop, GetConnectedStationsRequest,
+        GetLineByIdRequest, GetLinesByIdListRequest, GetLinesByNameRequest, GetRouteRequest,
         GetStationByCoordinatesRequest, GetStationByGroupIdRequest, GetStationByIdListRequest,
         GetStationByIdRequest, GetStationByLineIdListRequest, GetStationByLineIdRequest,
         GetStationsByLineGroupIdListRequest, GetStationsByLineGroupIdRequest,
-        GetStationsByNameRequest, GetTrainTypesByStationIdRequest, MultipleLineResponse,
-        MultipleStationResponse, MultipleTrainTypeResponse, Route, RouteMinimalResponse,
-        RouteResponse, RouteTypeResponse, SingleLineResponse, SingleStationResponse,
-        TransportType as GrpcTransportType,
+        GetStationsByNameRequest, GetTrainRouteRequest, GetTrainTypesByStationIdRequest,
+        MultipleLineResponse, MultipleStationResponse, MultipleTrainTypeResponse, Route,
+        RouteMinimalResponse, RouteResponse, RouteTypeResponse, SingleLineResponse,
+        SingleStationResponse, TrainRouteResponse, TransportType as GrpcTransportType,
     },
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
@@ -425,15 +426,88 @@ impl StationApi for MyApi {
             }
         }
     }
+
+    async fn get_train_route(
+        &self,
+        request: tonic::Request<GetTrainRouteRequest>,
+    ) -> Result<tonic::Response<TrainRouteResponse>, tonic::Status> {
+        let req = request.get_ref();
+        let from_id = req.from_station_group_id;
+        let to_id = req.to_station_group_id;
+        let line_group_id = req
+            .line_group_id
+            .ok_or_else(|| tonic::Status::invalid_argument("line_group_id is required"))?;
+
+        match self
+            .query_use_case
+            .get_train_route(from_id, to_id, line_group_id)
+            .await
+        {
+            Ok(segments) => Ok(Response::new(TrainRouteResponse { segments })),
+            Err(err) => Err(PresentationalError::from(err).into()),
+        }
+    }
+
+    async fn estimate_arrival_times(
+        &self,
+        request: tonic::Request<EstimateArrivalTimesRequest>,
+    ) -> Result<tonic::Response<EstimatedArrivalResponse>, tonic::Status> {
+        let from_id = request.get_ref().from_station_id;
+        let to_id = request.get_ref().to_station_id;
+        let via_line_ids = &request.get_ref().via_line_ids;
+        let direction_id = request.get_ref().direction_id;
+
+        match self
+            .query_use_case
+            .estimate_route_arrival_times(from_id, to_id, via_line_ids, direction_id)
+            .await
+        {
+            Ok(estimated_stops) => {
+                let mut routes: Vec<EstimatedArrivalRoute> = Vec::new();
+
+                for stop in &estimated_stops {
+                    let proto_stop = EstimatedArrivalStop {
+                        station_id: stop.station_cd as u32,
+                        station_group_id: stop.station_g_cd as u32,
+                        cumulative_minutes: stop.cumulative_minutes,
+                        departure_cumulative_minutes: stop.departure_cumulative_minutes,
+                        stops_here: stop.stops_here,
+                    };
+
+                    let route_id = stop.line_group_cd.unwrap_or(0) as u32;
+                    let merge = stop.line_group_cd.is_some()
+                        && routes.last().is_some_and(|r| r.id == route_id);
+
+                    if merge {
+                        routes.last_mut().unwrap().stops.push(proto_stop);
+                    } else {
+                        routes.push(EstimatedArrivalRoute {
+                            id: route_id,
+                            stops: vec![proto_stop],
+                        });
+                    }
+                }
+
+                Ok(Response::new(EstimatedArrivalResponse {
+                    routes,
+                    next_page_token: "".to_string(),
+                }))
+            }
+            Err(err) => Err(PresentationalError::from(err).into()),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        domain::entity::{
-            company::Company, gtfs::TransportType, line::Line, line_symbol::LineSymbol,
-            station::Station, station_number::StationNumber, train_type::TrainType,
+        domain::{
+            arrival_estimation::EstimatedStop,
+            entity::{
+                company::Company, gtfs::TransportType, line::Line, line_symbol::LineSymbol,
+                station::Station, station_number::StationNumber, train_type::TrainType,
+            },
         },
         proto::RouteMinimalResponse,
         use_case::{error::UseCaseError, traits::query::QueryUseCase},
@@ -831,6 +905,15 @@ mod tests {
             Ok(vec![])
         }
 
+        async fn get_train_route(
+            &self,
+            _from_station_group_id: u32,
+            _to_station_group_id: u32,
+            _line_group_id: u32,
+        ) -> Result<Vec<crate::proto::TrainRouteSegment>, UseCaseError> {
+            Ok(vec![])
+        }
+
         async fn find_line_by_id(&self, _line_id: u32) -> Result<Option<Line>, UseCaseError> {
             Ok(None)
         }
@@ -852,6 +935,16 @@ mod tests {
             _from_station_id: u32,
             _to_station_id: u32,
         ) -> Result<Vec<Station>, UseCaseError> {
+            Ok(vec![])
+        }
+
+        async fn estimate_route_arrival_times(
+            &self,
+            _from_station_id: u32,
+            _to_station_id: u32,
+            _via_line_ids: &[u32],
+            _direction_id: Option<u32>,
+        ) -> Result<Vec<EstimatedStop>, UseCaseError> {
             Ok(vec![])
         }
     }

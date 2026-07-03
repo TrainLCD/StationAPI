@@ -23,6 +23,10 @@ fn filter_to_db_type(filter: TransportTypeFilter) -> Option<TransportType> {
 
 use crate::{
     domain::{
+        arrival_estimation::{
+            estimate_arrival_minutes, is_circular_route, select_circular_arc, EstimatedStop,
+            EstimationParams,
+        },
         entity::{
             company::Company,
             gtfs::{TransportType, TransportTypeFilter},
@@ -39,7 +43,9 @@ use crate::{
         },
     },
     proto::{self, Route},
-    use_case::{error::UseCaseError, traits::query::QueryUseCase},
+    use_case::{
+        dto::simulation::resolve_speed_profile, error::UseCaseError, traits::query::QueryUseCase,
+    },
 };
 use async_trait::async_trait;
 
@@ -623,9 +629,10 @@ where
         to_station_id: u32,
         via_line_id: Option<u32>,
     ) -> Result<Vec<Route>, UseCaseError> {
+        let via_ids: Vec<u32> = via_line_id.into_iter().collect();
         let stops = self
             .station_repository
-            .get_route_stops(from_station_id, to_station_id, via_line_id)
+            .get_route_stops(from_station_id, to_station_id, &via_ids)
             .await?;
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
@@ -727,9 +734,10 @@ where
         to_station_id: u32,
         via_line_id: Option<u32>,
     ) -> Result<proto::RouteMinimalResponse, UseCaseError> {
+        let via_ids: Vec<u32> = via_line_id.into_iter().collect();
         let stops = self
             .station_repository
-            .get_route_stops(from_station_id, to_station_id, via_line_id)
+            .get_route_stops(from_station_id, to_station_id, &via_ids)
             .await?;
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
@@ -841,9 +849,10 @@ where
         to_station_id: u32,
         via_line_id: Option<u32>,
     ) -> Result<Vec<TrainType>, UseCaseError> {
+        let via_ids: Vec<u32> = via_line_id.into_iter().collect();
         let stops = self
             .station_repository
-            .get_route_stops(from_station_id, to_station_id, via_line_id)
+            .get_route_stops(from_station_id, to_station_id, &via_ids)
             .await?;
 
         let line_group_id_vec: Vec<u32> = stops
@@ -893,7 +902,7 @@ where
         let dedup_stops: &[Station] = if via_line_id.is_some() {
             dedup_stops_storage = self
                 .station_repository
-                .get_route_stops(from_station_id, to_station_id, None)
+                .get_route_stops(from_station_id, to_station_id, &[])
                 .await?;
             &dedup_stops_storage
         } else {
@@ -989,6 +998,68 @@ where
         Ok(result)
     }
 
+    async fn get_train_route(
+        &self,
+        from_station_group_id: u32,
+        to_station_group_id: u32,
+        line_group_id: u32,
+    ) -> Result<Vec<proto::TrainRouteSegment>, UseCaseError> {
+        let stations = self
+            .get_stations_by_line_group_id(line_group_id, TransportTypeFilter::RailAndBus)
+            .await?;
+
+        let from_idx = stations
+            .iter()
+            .position(|s| s.station_g_cd as u32 == from_station_group_id)
+            .ok_or_else(|| UseCaseError::NotFound {
+                entity_type: "station in line group",
+                entity_id: from_station_group_id.to_string(),
+            })?;
+        let to_idx = stations
+            .iter()
+            .position(|s| s.station_g_cd as u32 == to_station_group_id)
+            .ok_or_else(|| UseCaseError::NotFound {
+                entity_type: "station in line group",
+                entity_id: to_station_group_id.to_string(),
+            })?;
+
+        let sliced: Vec<Station> = if from_idx <= to_idx {
+            stations[from_idx..=to_idx].to_vec()
+        } else {
+            let mut v = stations[to_idx..=from_idx].to_vec();
+            v.reverse();
+            v
+        };
+
+        let mut segments: Vec<proto::TrainRouteSegment> = Vec::with_capacity(sliced.len());
+        let mut prev_coord: Option<(f64, f64)> = None;
+        for station in sliced {
+            let stops = station.stop_condition != proto::StopCondition::Not;
+
+            let distance_from_previous = match prev_coord {
+                Some((plat, plon)) => haversine_distance(plat, plon, station.lat, station.lon),
+                None => 0.0,
+            };
+            prev_coord = Some((station.lat, station.lon));
+
+            let is_bus = station.transport_type == TransportType::Bus;
+            let kind = station.train_type.as_ref().and_then(|tt| tt.kind);
+            let profile = resolve_speed_profile(station.line_type, is_bus, kind);
+
+            let grpc_station: proto::Station = station.into();
+            segments.push(proto::TrainRouteSegment {
+                station: Some(grpc_station),
+                stops,
+                distance_from_previous,
+                max_speed: profile.max_speed,
+                max_acceleration: profile.max_acceleration,
+                max_deceleration: profile.max_deceleration,
+            });
+        }
+
+        Ok(segments)
+    }
+
     async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError> {
         let line = self.line_repository.find_by_id(line_id).await?;
         Ok(line)
@@ -1018,6 +1089,75 @@ where
         _to_station_id: u32,
     ) -> Result<Vec<Station>, UseCaseError> {
         Ok(vec![])
+    }
+
+    /// `from_station_id` から `to_station_id` までの区間の各駅について、始点からの
+    /// 推定到着時間(分)を返す。経路候補ごとに両端が含まれる区間だけへ絞り込み、
+    /// `direction_id` の有無に関わらず from→to 順になるよう並べ替える。
+    async fn estimate_route_arrival_times(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+        via_line_ids: &[u32],
+        direction_id: Option<u32>,
+    ) -> Result<Vec<EstimatedStop>, UseCaseError> {
+        let stops = self
+            .station_repository
+            .get_route_stops_by_station_cd(
+                from_station_id,
+                to_station_id,
+                via_line_ids,
+                direction_id,
+            )
+            .await?;
+
+        let route_row_tree_map = self.build_route_tree_map(&stops);
+        let params = EstimationParams::default();
+
+        let mut result: Vec<EstimatedStop> = Vec::new();
+        for (_line_group_cd, group_stops) in route_row_tree_map.iter() {
+            // 先頭駅が末尾にも重複格納された「閉じた」環状データ(ポートライナー等)は、
+            // そのままだとラップ時に閉じ駅が二重になるため重複終端を除いてから
+            // 環状判定・弧選択する。
+            let mut route_stops: &[&Station] = group_stops.as_slice();
+            if route_stops.len() > 1
+                && route_stops[0].station_cd == route_stops[route_stops.len() - 1].station_cd
+            {
+                route_stops = &route_stops[..route_stops.len() - 1];
+            }
+
+            let from_pos = route_stops
+                .iter()
+                .position(|s| s.station_cd as u32 == from_station_id);
+            let to_pos = route_stops
+                .iter()
+                .position(|s| s.station_cd as u32 == to_station_id);
+
+            // 始点・終点の両方がこの経路候補に含まれない、または同一駅の場合は対象外。
+            let (Some(fi), Some(ti)) = (from_pos, to_pos) else {
+                continue;
+            };
+            if fi == ti {
+                continue;
+            }
+
+            // 経路全体ではなく、始点→終点の区間だけに絞り込んで推定する。
+            // 環状経路(山手線・大阪環状線など)は線形スライスだと格納順の
+            // 継ぎ目(例: 品川⇔大崎)を跨ぐ乗車で逆側の弧を返してしまうため、
+            // シームをラップする弧を選択する。
+            if is_circular_route(route_stops) {
+                let arc = select_circular_arc(route_stops, fi, ti, direction_id.is_some());
+                result.extend(estimate_arrival_minutes(&arc, &params));
+            } else if fi < ti {
+                result.extend(estimate_arrival_minutes(&route_stops[fi..=ti], &params));
+            } else {
+                let mut segment: Vec<&Station> = route_stops[ti..=fi].to_vec();
+                segment.reverse();
+                result.extend(estimate_arrival_minutes(&segment, &params));
+            }
+        }
+
+        Ok(result)
     }
 }
 
@@ -1485,20 +1625,10 @@ fn segment_stop_signature(
 }
 
 /// Calculate the distance between two points on Earth using the Haversine formula.
-/// Returns the distance in meters.
+/// Returns the distance in meters. Delegates to the shared domain implementation to
+/// avoid duplicating the formula.
 fn haversine_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
-    const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
-
-    let lat1_rad = lat1.to_radians();
-    let lat2_rad = lat2.to_radians();
-    let delta_lat = (lat2 - lat1).to_radians();
-    let delta_lon = (lon2 - lon1).to_radians();
-
-    let a = (delta_lat / 2.0).sin().powi(2)
-        + lat1_rad.cos() * lat2_rad.cos() * (delta_lon / 2.0).sin().powi(2);
-    let c = 2.0 * a.sqrt().asin();
-
-    EARTH_RADIUS_METERS * c
+    crate::domain::arrival_estimation::haversine_distance(lat1, lon1, lat2, lon2)
 }
 
 #[cfg(test)]
@@ -1817,9 +1947,9 @@ mod tests {
                 &self,
                 _: u32,
                 _: u32,
-                via_line_id: Option<u32>,
+                via_line_ids: &[u32],
             ) -> Result<Vec<Station>, DomainError> {
-                if via_line_id.is_some() {
+                if !via_line_ids.is_empty() {
                     Ok(self.stops_via.clone())
                 } else {
                     Ok(self.stops_unrestricted.clone())
@@ -1896,6 +2026,15 @@ mod tests {
                 _: &[u32],
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
+            }
+            async fn get_route_stops_by_station_cd(
+                &self,
+                from: u32,
+                to: u32,
+                via: &[u32],
+                _direction_id: Option<u32>,
+            ) -> Result<Vec<Station>, DomainError> {
+                self.get_route_stops(from, to, via).await
             }
         }
 
@@ -2201,6 +2340,239 @@ mod tests {
             assert_eq!(result.len(), 2);
             assert_eq!(line_group_cds(&result), vec![100, 300]);
         }
+
+        /// Build a stop on a given line group with explicit coordinates, line, and pass.
+        fn create_geo_stop(
+            station_g_cd: i32,
+            line_cd: i32,
+            line_group_cd: i32,
+            lat: f64,
+            lon: f64,
+            pass: Option<i32>,
+        ) -> Station {
+            let mut station =
+                create_test_station(station_g_cd, station_g_cd, line_cd, Some(line_group_cd));
+            station.lat = lat;
+            station.lon = lon;
+            station.pass = pass;
+            station
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_through_service_and_pass() {
+            // 単一 line_group_cd の経路。途中で line_cd が 100→200 に変わる直通サービス。
+            // 緯度方向に約 1.78km 間隔で 4 駅。3 駅目を通過にする。
+            let stops = vec![
+                create_geo_stop(1, 100, 500, 35.000, 139.0, Some(0)),
+                create_geo_stop(2, 100, 500, 35.016, 139.0, Some(0)),
+                create_geo_stop(3, 200, 500, 35.032, 139.0, Some(1)), // 通過
+                create_geo_stop(4, 200, 500, 35.048, 139.0, Some(0)),
+            ];
+
+            let interactor = build_interactor(stops, vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(1, 4, &[], None)
+                .await
+                .unwrap();
+
+            assert_eq!(est.len(), 4);
+            // 始点は 0 分。
+            assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+            // 通過駅は stops_here=false、その他は停車。
+            assert!(est[0].stops_here && est[1].stops_here && est[3].stops_here);
+            assert!(!est[2].stops_here);
+            // 累積到着時間は単調増加。
+            assert!(est[1].cumulative_minutes > est[0].cumulative_minutes);
+            assert!(est[2].cumulative_minutes > est[1].cumulative_minutes);
+            assert!(est[3].cumulative_minutes > est[2].cumulative_minutes);
+            // 全駅が同一経路(line_group_cd=500)に属する。
+            assert!(est.iter().all(|e| e.line_group_cd == Some(500)));
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_multiple_candidates_filtered_and_ordered() {
+            // 候補経路が 3 つ返るケース:
+            // - group 500 / 600 は始点(g_cd=1)・終点(g_cd=4)を含む → 対象
+            // - group 700 は無関係な駅(g_cd=5,6)のみ → get_routes 同様に除外される
+            let stops = vec![
+                // group 600(あえて 500 より先に積み、連結順が走査順ではなく
+                // line_group_cd 昇順で決定的になることを確認する)
+                create_geo_stop(1, 100, 600, 35.000, 139.0, Some(0)),
+                create_geo_stop(4, 100, 600, 35.048, 139.0, Some(0)),
+                // group 500
+                create_geo_stop(1, 100, 500, 35.000, 139.0, Some(0)),
+                create_geo_stop(4, 100, 500, 35.048, 139.0, Some(0)),
+                // group 700(始点・終点を含まない → 除外）
+                create_geo_stop(5, 100, 700, 35.100, 139.0, Some(0)),
+                create_geo_stop(6, 100, 700, 35.116, 139.0, Some(0)),
+            ];
+
+            let interactor = build_interactor(stops, vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(1, 4, &[], None)
+                .await
+                .unwrap();
+
+            // 700 は除外、500 と 600 の各 2 駅で計 4 件。
+            assert_eq!(est.len(), 4);
+            // 連結順は line_group_cd 昇順(BTreeMap)で決定的: 500 → 600。
+            let groups: Vec<Option<i32>> = est.iter().map(|e| e.line_group_cd).collect();
+            assert_eq!(groups, vec![Some(500), Some(500), Some(600), Some(600)]);
+            // 除外された 700 の駅は含まれない。
+            assert!(est
+                .iter()
+                .all(|e| e.station_g_cd != 5 && e.station_g_cd != 6));
+            // 各経路の始点は 0 分から始まる。
+            assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+            assert!((est[2].cumulative_minutes - 0.0).abs() < 1e-9);
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_excludes_stations_outside_requested_range() {
+            // station_cd(101-105)と station_g_cd(1-5)をあえて別値にし、ルックアップが
+            // station_cd を正しく参照していることを検証できるようにする。
+            let make_stop = |station_cd: i32, station_g_cd: i32, lat: f64, lon: f64| {
+                let mut station = create_test_station(station_cd, station_g_cd, 100, Some(500));
+                station.lat = lat;
+                station.lon = lon;
+                station.pass = Some(0);
+                station
+            };
+
+            // 同一 line_group_cd に、要求範囲(station_cd=102〜104)の外側の駅
+            // (station_cd=101, 105)も含まれるケース。範囲外の駅は結果に含まれてはならない。
+            let stops = vec![
+                make_stop(101, 1, 35.000, 139.0),
+                make_stop(102, 2, 35.016, 139.0),
+                make_stop(103, 3, 35.032, 139.0),
+                make_stop(104, 4, 35.048, 139.0),
+                make_stop(105, 5, 35.064, 139.0),
+            ];
+
+            let interactor = build_interactor(stops, vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(102, 104, &[], None)
+                .await
+                .unwrap();
+
+            // 範囲内の station_g_cd=2,3,4 の 3 駅のみが返る。
+            assert_eq!(est.len(), 3);
+            assert_eq!(
+                est.iter().map(|e| e.station_g_cd).collect::<Vec<_>>(),
+                vec![2, 3, 4]
+            );
+            // 範囲外の駅(g_cd=1, 5)は含まれない。
+            assert!(est
+                .iter()
+                .all(|e| e.station_g_cd != 1 && e.station_g_cd != 5));
+            // 区間の始点は 0 分から始まる。
+            assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_reversed_range_with_direction_id() {
+            // direction_id が指定されていても(=is_none() ガードを通らなくても)、
+            // 範囲外の駅は除外され、fi > ti の場合は from→to 順に反転される。
+            let stops = vec![
+                create_geo_stop(1, 100, 500, 35.000, 139.0, Some(0)),
+                create_geo_stop(2, 100, 500, 35.016, 139.0, Some(0)),
+                create_geo_stop(3, 100, 500, 35.032, 139.0, Some(0)),
+                create_geo_stop(4, 100, 500, 35.048, 139.0, Some(0)),
+                create_geo_stop(5, 100, 500, 35.064, 139.0, Some(0)),
+            ];
+
+            let interactor = build_interactor(stops, vec![], vec![], vec![]);
+            // from=4, to=2: リスト内では from が to より後ろに現れる。
+            let est = interactor
+                .estimate_route_arrival_times(4, 2, &[], Some(1))
+                .await
+                .unwrap();
+
+            assert_eq!(est.len(), 3);
+            // from(4) → to(2) の順に並び、範囲外の 1,5 は含まれない。
+            assert_eq!(
+                est.iter().map(|e| e.station_g_cd).collect::<Vec<_>>(),
+                vec![4, 3, 2]
+            );
+            assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+        }
+
+        /// 半径約 1.1km の円周上に等間隔で並ぶ n 駅の環状経路(g_cd は 1..=n)。
+        fn ring_stops(n: usize, line_group_cd: i32) -> Vec<Station> {
+            (0..n)
+                .map(|i| {
+                    let theta = 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+                    let lat = 35.0 + 0.01 * theta.cos();
+                    let lon = 139.0 + 0.01 * theta.sin() / 35.0_f64.to_radians().cos();
+                    create_geo_stop(i as i32 + 1, 100, line_group_cd, lat, lon, Some(0))
+                })
+                .collect()
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_circular_wraps_seam() {
+            // 環状経路で direction_id 指定あり: 格納順の継ぎ目(末尾→先頭)を
+            // 跨ぐ乗車では、逆側の弧に反転せずシームをラップして進む。
+            let interactor = build_interactor(ring_stops(8, 500), vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(7, 2, &[], Some(0))
+                .await
+                .unwrap();
+
+            // 7 → 8 → (シーム) → 1 → 2 の 4 駅。修正前は 2〜7 の逆順 6 駅が返っていた。
+            assert_eq!(
+                est.iter().map(|e| e.station_g_cd).collect::<Vec<_>>(),
+                vec![7, 8, 1, 2]
+            );
+            assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+            assert!(est
+                .windows(2)
+                .all(|w| w[1].cumulative_minutes > w[0].cumulative_minutes));
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_circular_shorter_arc_without_direction_id() {
+            // 環状経路で direction_id 未指定: 継ぎ目を挟んだ近接ペアには
+            // 遠回りの弧ではなく短い方の弧を返す。
+            let interactor = build_interactor(ring_stops(8, 500), vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(8, 2, &[], None)
+                .await
+                .unwrap();
+
+            // 8 → (シーム) → 1 → 2 の 3 駅(逆方向だと 7 駅の遠回り)。
+            assert_eq!(
+                est.iter().map(|e| e.station_g_cd).collect::<Vec<_>>(),
+                vec![8, 1, 2]
+            );
+            assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_circular_closed_loop_dedups_endpoint() {
+            // 先頭駅が末尾にも重複格納された「閉じた」環状データ(ポートライナー等)。
+            // 重複終端を除いた上で環状と判定され、継ぎ目をラップした弧が返る
+            // (閉じ駅が二重に現れない)。
+            let mut stops = ring_stops(8, 500);
+            let mut closing = stops[0].clone();
+            closing.e_sort = 9;
+            stops.push(closing);
+
+            let interactor = build_interactor(stops, vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(7, 2, &[], Some(0))
+                .await
+                .unwrap();
+
+            assert_eq!(
+                est.iter().map(|e| e.station_g_cd).collect::<Vec<_>>(),
+                vec![7, 8, 1, 2]
+            );
+            assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+            assert!(est
+                .windows(2)
+                .all(|w| w[1].cumulative_minutes > w[0].cumulative_minutes));
+        }
     }
 
     // ========================================
@@ -2301,6 +2673,15 @@ mod tests {
                 &self,
                 _: u32,
                 _: u32,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_route_stops_by_station_cd(
+                &self,
+                _: u32,
+                _: u32,
+                _: &[u32],
                 _: Option<u32>,
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
@@ -2774,6 +3155,15 @@ mod tests {
                 &self,
                 _: u32,
                 _: u32,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_route_stops_by_station_cd(
+                &self,
+                _: u32,
+                _: u32,
+                _: &[u32],
                 _: Option<u32>,
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
