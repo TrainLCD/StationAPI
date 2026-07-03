@@ -626,8 +626,10 @@ mod tests {
 
     #[test]
     fn run_margin_scales_run_time_but_not_dwell() {
-        let mut p = EstimationParams::default();
-        p.run_margin = 1.0;
+        let mut p = EstimationParams {
+            run_margin: 1.0,
+            ..Default::default()
+        };
         let base = segment_run_minutes(5_000.0, 80.0, &p);
         p.run_margin = 1.15;
         let with_margin = segment_run_minutes(5_000.0, 80.0, &p);
@@ -838,7 +840,7 @@ mod tests {
         // 実乗車時間(5〜6分)より大幅に長い約 6.9 分と推定されてしまう。
         let a = station(1, 11341, 36.326849, 139.193704, Some(4866.8));
         let b = station(2, 11341, 36.359018, 139.242463, Some(4866.8));
-        let stations = vec![a, b];
+        let stations = [a, b];
         let refs: Vec<&Station> = stations.iter().collect();
         let est = estimate_arrival_minutes(&refs, &p);
 
@@ -924,7 +926,7 @@ mod tests {
         let p = EstimationParams::default();
         // 停留所間隔 3km の直行区間。地下鉄扱い(75km/h × 1.2 = 90km/h)のままだと
         // 約 3.4 分と過小評価される。バス上限 50km/h では約 5.7 分。
-        let stations = vec![
+        let stations = [
             bus_station(1, 100_000_001, 35.72, 139.69),
             bus_station(2, 100_000_001, 35.747, 139.69), // 0.027 度 ≈ 3km
         ];
@@ -944,7 +946,7 @@ mod tests {
             let mut b = bus_station(2, 100_000_001, 35.747, 139.69);
             a.kind = kind;
             b.kind = kind;
-            let stations = vec![a, b];
+            let stations = [a, b];
             let refs: Vec<&Station> = stations.iter().collect();
             estimate_arrival_minutes(&refs, &p)[1].cumulative_minutes
         };

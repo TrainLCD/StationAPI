@@ -591,14 +591,11 @@ mod tests {
         }
 
         fn get_captured_coordinates_transport_type(&self) -> Option<TransportTypeFilter> {
-            self.captured_coordinates_transport_type
-                .lock()
-                .unwrap()
-                .clone()
+            *self.captured_coordinates_transport_type.lock().unwrap()
         }
 
         fn get_captured_name_transport_type(&self) -> Option<TransportTypeFilter> {
-            self.captured_name_transport_type.lock().unwrap().clone()
+            *self.captured_name_transport_type.lock().unwrap()
         }
     }
 
