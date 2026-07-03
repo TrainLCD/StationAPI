@@ -357,14 +357,14 @@ where
         for station in stations.iter_mut() {
             station.train_type = train_type_map
                 .get(&station.station_cd)
-                .cloned()
+                .copied()
                 .cloned()
                 .map(Box::new);
             if let Some(ref mut line) = station.line {
                 if let Some(ref mut nested_station) = line.station {
                     nested_station.train_type = train_type_map
                         .get(&nested_station.station_cd)
-                        .cloned()
+                        .copied()
                         .cloned()
                         .map(Box::new);
                 }
@@ -373,7 +373,7 @@ where
                 if let Some(ref mut nested_station) = line.station {
                     nested_station.train_type = train_type_map
                         .get(&nested_station.station_cd)
-                        .cloned()
+                        .copied()
                         .cloned()
                         .map(Box::new);
                 }
@@ -589,14 +589,14 @@ where
                     .collect::<Vec<Line>>();
 
                 for line in lines.iter_mut() {
-                    line.company = company_map.get(&line.company_cd).cloned().cloned();
+                    line.company = company_map.get(&line.company_cd).copied().cloned();
                     line.line_symbols = self.get_line_symbols(line);
                     line.train_type = tt_by_pair
                         .get(&(line_group_cd as u32, line.line_cd as u32))
                         .cloned();
                 }
 
-                line.company = company_map.get(&line.company_cd).cloned().cloned();
+                line.company = company_map.get(&line.company_cd).copied().cloned();
                 line.line_symbols = self.get_line_symbols(&line);
 
                 tt.lines = lines;
@@ -1379,7 +1379,7 @@ where
             station.station_numbers = station_numbers;
             if let Some(tt) = train_type_map
                 .get(&station.station_cd)
-                .cloned()
+                .copied()
                 .cloned()
                 .map(Box::new)
             {
@@ -1485,7 +1485,7 @@ where
                     station_copy.station_numbers = station_numbers;
                     if let Some(tt) = train_type_map
                         .get(&station_copy.station_cd)
-                        .cloned()
+                        .copied()
                         .cloned()
                         .map(Box::new)
                     {
