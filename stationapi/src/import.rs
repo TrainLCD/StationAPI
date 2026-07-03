@@ -38,6 +38,55 @@ type StopTimeBatchRow = (
     Option<i32>,
 );
 
+/// 検索性能に直結するインデックス。create_table.sql内のDOブロックは
+/// 拡張が使えない環境向けに例外をNOTICEで握り潰すため、作成に失敗しても
+/// 起動ログからは分からない(実際に稼働DBでtrigramインデックスだけが
+/// 欠落する事例があった)。必要な拡張はcreate_schemaの冒頭で必須として
+/// 作成しているので、ここに列挙したインデックスは明示的に作成し直し、
+/// 欠落があればERRORログで可視化する。
+const PERFORMANCE_INDEXES: &[(&str, &str)] = &[
+    (
+        "idx_performance_stations_point",
+        "CREATE INDEX IF NOT EXISTS idx_performance_stations_point ON public.stations USING gist ((point(lat, lon)))",
+    ),
+    (
+        "idx_performance_stations_bus_point",
+        "CREATE INDEX IF NOT EXISTS idx_performance_stations_bus_point ON public.stations USING gist ((point(lat, lon))) WHERE e_status = 0 AND transport_type = 1",
+    ),
+    (
+        "idx_performance_station_name_trgm",
+        "CREATE INDEX IF NOT EXISTS idx_performance_station_name_trgm ON public.stations USING gin (station_name gin_trgm_ops)",
+    ),
+    (
+        "idx_performance_station_name_k_trgm",
+        "CREATE INDEX IF NOT EXISTS idx_performance_station_name_k_trgm ON public.stations USING gin (station_name_k gin_trgm_ops)",
+    ),
+    (
+        "idx_performance_station_name_rn_trgm",
+        "CREATE INDEX IF NOT EXISTS idx_performance_station_name_rn_trgm ON public.stations USING gin (station_name_rn gin_trgm_ops)",
+    ),
+    (
+        "idx_performance_station_name_zh_trgm",
+        "CREATE INDEX IF NOT EXISTS idx_performance_station_name_zh_trgm ON public.stations USING gin (station_name_zh gin_trgm_ops)",
+    ),
+    (
+        "idx_performance_station_name_ko_trgm",
+        "CREATE INDEX IF NOT EXISTS idx_performance_station_name_ko_trgm ON public.stations USING gin (station_name_ko gin_trgm_ops)",
+    ),
+    (
+        "idx_gtfs_stops_point",
+        "CREATE INDEX IF NOT EXISTS idx_gtfs_stops_point ON public.gtfs_stops USING gist ((point(stop_lat, stop_lon)))",
+    ),
+    (
+        "idx_gtfs_stops_name_trgm",
+        "CREATE INDEX IF NOT EXISTS idx_gtfs_stops_name_trgm ON public.gtfs_stops USING gin (stop_name gin_trgm_ops)",
+    ),
+    (
+        "idx_gtfs_stops_name_k_trgm",
+        "CREATE INDEX IF NOT EXISTS idx_gtfs_stops_name_k_trgm ON public.gtfs_stops USING gin (stop_name_k gin_trgm_ops)",
+    ),
+];
+
 /// Create required extensions and tables before running data imports.
 /// Must be called before `import_csv` and `import_gtfs` can run in parallel.
 pub async fn create_schema() -> Result<(), Box<dyn std::error::Error>> {
@@ -61,7 +110,39 @@ pub async fn create_schema() -> Result<(), Box<dyn std::error::Error>> {
     let create_sql: String = String::from_utf8_lossy(&create_sql_content).parse()?;
     sqlx::raw_sql(&create_sql).execute(&mut conn).await?;
 
-    info!("Schema creation completed.");
+    for (name, ddl) in PERFORMANCE_INDEXES {
+        if let Err(e) = sqlx::query(ddl).execute(&mut conn).await {
+            tracing::error!("Failed to create performance index {}: {}", name, e);
+        }
+    }
+
+    // 作成結果を検証し、欠落があれば起動ログに残す
+    let expected: Vec<String> = PERFORMANCE_INDEXES
+        .iter()
+        .map(|(name, _)| name.to_string())
+        .collect();
+    let existing: Vec<String> = sqlx::query_scalar::<_, String>(
+        "SELECT indexname FROM pg_indexes WHERE indexname = ANY($1)",
+    )
+    .bind(&expected)
+    .fetch_all(&mut conn)
+    .await?;
+    let missing: Vec<&str> = PERFORMANCE_INDEXES
+        .iter()
+        .map(|(name, _)| *name)
+        .filter(|name| !existing.iter().any(|e| e == name))
+        .collect();
+    if missing.is_empty() {
+        info!(
+            "Schema creation completed. All {} performance indexes are present.",
+            expected.len()
+        );
+    } else {
+        tracing::error!(
+            "Schema creation completed, but performance indexes are missing: {:?}",
+            missing
+        );
+    }
 
     Ok(())
 }
