@@ -1032,8 +1032,8 @@ where
 
     async fn get_train_route(
         &self,
-        from_station_group_id: u32,
-        to_station_group_id: u32,
+        from_station_id: u32,
+        to_station_id: u32,
         line_group_id: u32,
     ) -> Result<Vec<proto::TrainRouteSegment>, UseCaseError> {
         let stations = self
@@ -1042,17 +1042,17 @@ where
 
         let from_idx = stations
             .iter()
-            .position(|s| s.station_g_cd as u32 == from_station_group_id)
+            .position(|s| s.station_cd as u32 == from_station_id)
             .ok_or_else(|| UseCaseError::NotFound {
                 entity_type: "station in line group",
-                entity_id: from_station_group_id.to_string(),
+                entity_id: from_station_id.to_string(),
             })?;
         let to_idx = stations
             .iter()
-            .position(|s| s.station_g_cd as u32 == to_station_group_id)
+            .position(|s| s.station_cd as u32 == to_station_id)
             .ok_or_else(|| UseCaseError::NotFound {
                 entity_type: "station in line group",
-                entity_id: to_station_group_id.to_string(),
+                entity_id: to_station_id.to_string(),
             })?;
 
         let sliced: Vec<Station> = if from_idx <= to_idx {
