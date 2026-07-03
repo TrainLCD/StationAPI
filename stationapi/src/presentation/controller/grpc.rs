@@ -432,8 +432,8 @@ impl StationApi for MyApi {
         request: tonic::Request<GetTrainRouteRequest>,
     ) -> Result<tonic::Response<TrainRouteResponse>, tonic::Status> {
         let req = request.get_ref();
-        let from_id = req.from_station_group_id;
-        let to_id = req.to_station_group_id;
+        let from_id = req.from_station_id;
+        let to_id = req.to_station_id;
         let line_group_id = req
             .line_group_id
             .ok_or_else(|| tonic::Status::invalid_argument("line_group_id is required"))?;
@@ -907,8 +907,8 @@ mod tests {
 
         async fn get_train_route(
             &self,
-            _from_station_group_id: u32,
-            _to_station_group_id: u32,
+            _from_station_id: u32,
+            _to_station_id: u32,
             _line_group_id: u32,
         ) -> Result<Vec<crate::proto::TrainRouteSegment>, UseCaseError> {
             Ok(vec![])
