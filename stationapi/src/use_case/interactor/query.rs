@@ -637,27 +637,75 @@ where
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
 
-        let mut routes: Vec<Route> = Vec::new();
+        // TODO: SQLで同等の処理を行う
+        // 発着駅を含まない経路候補はレスポンスに含まれないため、
+        // 路線の取得やproto変換を行う前にここで除外する
+        let route_groups: Vec<(&i32, &Vec<&Station>)> = route_row_tree_map
+            .iter()
+            .filter(|(_, stops)| {
+                stops.iter().any(|row| {
+                    row.station_g_cd as u32 == from_station_id
+                        || row.station_g_cd as u32 == to_station_id
+                })
+            })
+            .collect();
 
-        for (id, stops) in route_row_tree_map.iter() {
-            let line_group_id_vec = stops
-                .iter()
-                .filter_map(|row| row.line_group_cd.map(|id| id as u32))
-                .collect::<Vec<u32>>();
+        // 経路候補ごとに個別クエリを発行せず、全line_group_cdの路線を一括取得する
+        let line_group_id_vec: Vec<u32> = route_groups
+            .iter()
+            .flat_map(|(_, stops)| {
+                stops
+                    .iter()
+                    .filter_map(|row| row.line_group_cd.map(|id| id as u32))
+            })
+            .collect::<HashSet<u32>>()
+            .into_iter()
+            .collect();
 
-            let mut tt_lines = self
-                .line_repository
-                .get_by_line_group_id_vec_for_routes(&line_group_id_vec)
-                .await?;
+        let mut all_tt_lines = self
+            .line_repository
+            .get_by_line_group_id_vec_for_routes(&line_group_id_vec)
+            .await?;
 
-            // Add line_symbols to all lines first
-            for line in tt_lines.iter_mut() {
-                line.line_symbols = self.get_line_symbols(line);
+        // Add line_symbols to all lines first
+        for line in all_tt_lines.iter_mut() {
+            line.line_symbols = self.get_line_symbols(line);
+        }
+
+        // line_group_cdごとにパーティションする。クエリはsst.id順で返すため、
+        // グループ内の相対順序は単発取得した場合と変わらない
+        let mut tt_lines_by_group: std::collections::HashMap<i32, Vec<&Line>> =
+            std::collections::HashMap::new();
+        for line in &all_tt_lines {
+            if let Some(lgc) = line.line_group_cd {
+                tt_lines_by_group.entry(lgc).or_default().push(line);
             }
+        }
+
+        let mut routes: Vec<Route> = Vec::with_capacity(route_groups.len());
+
+        for (id, stops) in route_groups {
+            let tt_lines: &[&Line] = stops
+                .iter()
+                .find_map(|row| row.line_group_cd)
+                .and_then(|lgc| tt_lines_by_group.get(&lgc))
+                .map(|lines| lines.as_slice())
+                .unwrap_or(&[]);
 
             // Build HashMap for O(1) line lookup by line_cd instead of O(n) linear search
             let tt_line_map: std::collections::HashMap<i32, &Line> =
-                tt_lines.iter().map(|line| (line.line_cd, line)).collect();
+                tt_lines.iter().map(|line| (line.line_cd, *line)).collect();
+
+            // Filter lines to only include those with matching line_group_cd
+            // and remove duplicates by line_cd.
+            // グループ内の停車駅はline_group_cdを共有するため、TrainTypeに
+            // 埋め込むlinesは停車駅ごとではなくグループごとに一度だけ構築する
+            let mut seen_line_cds = std::collections::HashSet::new();
+            let group_filtered_lines: Vec<Line> = tt_lines
+                .iter()
+                .filter(|line| seen_line_cds.insert(line.line_cd))
+                .map(|&line| line.clone())
+                .collect();
 
             let stops = stops
                 .iter()
@@ -667,18 +715,10 @@ where
                     if let Some(tt_line) = tt_line_map.get(&row.line_cd).copied() {
                         let train_type = match row.type_id.is_some() {
                             true => {
-                                // Filter lines to only include those with matching line_group_cd
-                                // and remove duplicates by line_cd
-                                let mut seen_line_cds = std::collections::HashSet::new();
-                                let filtered_lines: Vec<Line> = tt_lines
-                                    .iter()
-                                    .filter(|line| {
-                                        row.line_group_cd.is_some()
-                                            && line.line_group_cd == row.line_group_cd
-                                            && seen_line_cds.insert(line.line_cd)
-                                    })
-                                    .cloned()
-                                    .collect();
+                                let filtered_lines = match row.line_group_cd.is_some() {
+                                    true => group_filtered_lines.clone(),
+                                    false => vec![],
+                                };
 
                                 Some(Box::new(TrainType {
                                     id: row.type_id,
@@ -711,14 +751,6 @@ where
                     stop.into()
                 })
                 .collect::<Vec<proto::Station>>();
-
-            // TODO: SQLで同等の処理を行う
-            let includes_requested_station = stops
-                .iter()
-                .any(|stop| stop.group_id == from_station_id || stop.group_id == to_station_id);
-            if !includes_requested_station {
-                continue;
-            }
 
             routes.push(Route {
                 id: *id as u32,
@@ -1307,7 +1339,10 @@ where
             .collect::<Vec<u32>>();
 
         // Collect company IDs from rail lines
+        // 路線ごとに重複した会社IDをそのままIN句に並べないよう先に一意化する
         let mut company_ids: Vec<u32> = lines.iter().map(|l| l.company_cd as u32).collect();
+        company_ids.sort_unstable();
+        company_ids.dedup();
 
         // Phase 2: dependent queries in parallel
         // Fetch companies, train types, and all bus lines in one batch
@@ -1494,8 +1529,6 @@ where
                     line.station = Some(station_copy);
                 }
             }
-            let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
-            station.station_numbers = station_numbers;
             station.lines = station_lines;
         }
 
@@ -4334,6 +4367,368 @@ mod tests {
         #[test]
         fn test_rail_and_bus_filter_returns_none() {
             assert_eq!(filter_to_db_type(TransportTypeFilter::RailAndBus), None);
+        }
+    }
+
+    // ========================================
+    // get_routes tests
+    // ========================================
+
+    mod get_routes_tests {
+        use super::*;
+        use crate::domain::{
+            entity::company::Company,
+            error::DomainError,
+            repository::{
+                company_repository::CompanyRepository, line_repository::LineRepository,
+                station_repository::StationRepository, train_type_repository::TrainTypeRepository,
+            },
+        };
+        use crate::use_case::traits::query::QueryUseCase;
+        use std::sync::Mutex;
+
+        struct RouteMockStationRepository {
+            stops: Vec<Station>,
+        }
+
+        #[async_trait::async_trait]
+        impl StationRepository for RouteMockStationRepository {
+            async fn get_route_stops(
+                &self,
+                _: u32,
+                _: u32,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(self.stops.clone())
+            }
+            async fn find_by_id(&self, _: u32) -> Result<Option<Station>, DomainError> {
+                Ok(None)
+            }
+            async fn get_by_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_id(
+                &self,
+                _: u32,
+                _: Option<u32>,
+                _: Option<u32>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_id_vec_with_group_stations(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec_no_types(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_coordinates(
+                &self,
+                _: f64,
+                _: f64,
+                _: Option<u32>,
+                _: Option<TransportType>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_bus_stops_near_stations(
+                &self,
+                _: &[(u32, f64, f64)],
+                _: u32,
+            ) -> Result<Vec<(u32, Station)>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_name(
+                &self,
+                _: String,
+                _: Option<u32>,
+                _: Option<u32>,
+                _: Option<TransportType>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_route_stops_by_station_cd(
+                &self,
+                from: u32,
+                to: u32,
+                via: &[u32],
+                _direction_id: Option<u32>,
+            ) -> Result<Vec<Station>, DomainError> {
+                self.get_route_stops(from, to, via).await
+            }
+        }
+
+        /// `get_by_line_group_id_vec_for_routes`の呼び出し引数を記録し、
+        /// 要求されたline_group_cdに属する路線だけを返すモック
+        struct RouteMockLineRepository {
+            lines: Vec<Line>,
+            for_routes_calls: Mutex<Vec<Vec<u32>>>,
+        }
+
+        #[async_trait::async_trait]
+        impl LineRepository for RouteMockLineRepository {
+            async fn get_by_line_group_id_vec_for_routes(
+                &self,
+                line_group_id_vec: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                self.for_routes_calls
+                    .lock()
+                    .unwrap()
+                    .push(line_group_id_vec.to_vec());
+                Ok(self
+                    .lines
+                    .iter()
+                    .filter(|line| {
+                        line.line_group_cd
+                            .is_some_and(|lgc| line_group_id_vec.contains(&(lgc as u32)))
+                    })
+                    .cloned()
+                    .collect())
+            }
+            async fn get_by_line_group_id_vec(&self, _: &[u32]) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn find_by_id(&self, _: u32) -> Result<Option<Line>, DomainError> {
+                Ok(None)
+            }
+            async fn find_by_station_id(&self, _: u32) -> Result<Option<Line>, DomainError> {
+                Ok(None)
+            }
+            async fn get_by_ids(&self, _: &[u32]) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_name(
+                &self,
+                _: String,
+                _: Option<u32>,
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec_no_types(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        struct RouteMockTrainTypeRepository;
+
+        #[async_trait::async_trait]
+        impl TrainTypeRepository for RouteMockTrainTypeRepository {
+            async fn get_by_line_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn find_by_line_group_id_and_line_id(
+                &self,
+                _: u32,
+                _: u32,
+            ) -> Result<Option<TrainType>, DomainError> {
+                Ok(None)
+            }
+            async fn find_by_line_group_id_and_line_id_vec(
+                &self,
+                _: &[(u32, u32)],
+            ) -> Result<std::collections::HashMap<(u32, u32), TrainType>, DomainError> {
+                Ok(std::collections::HashMap::new())
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_id(&self, _: u32) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_id_vec(
+                &self,
+                _: &[u32],
+                _: Option<u32>,
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_types_by_station_id_vec(
+                &self,
+                _: &[u32],
+                _: Option<u32>,
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        struct RouteMockCompanyRepository;
+
+        #[async_trait::async_trait]
+        impl CompanyRepository for RouteMockCompanyRepository {
+            async fn find_by_id_vec(&self, _: &[u32]) -> Result<Vec<Company>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        /// 経路検索の停車駅行を作る。line_group_cdがある行は種別付き
+        /// (type_idあり)として扱われる
+        fn create_route_stop(
+            station_cd: i32,
+            station_g_cd: i32,
+            line_cd: i32,
+            line_group_cd: Option<i32>,
+        ) -> Station {
+            let mut stop = create_test_station(station_cd, station_g_cd, line_cd, line_group_cd);
+            if line_group_cd.is_some() {
+                stop.type_id = Some(station_cd);
+                stop.type_cd = Some(1);
+                stop.type_name = Some("急行".to_string());
+                stop.type_name_k = Some("キュウコウ".to_string());
+                stop.color = Some("#FF0000".to_string());
+            }
+            stop
+        }
+
+        fn create_route_line(line_cd: i32, line_group_cd: i32) -> Line {
+            let mut line = create_test_line(line_cd);
+            line.line_group_cd = Some(line_group_cd);
+            line
+        }
+
+        fn build_interactor(
+            stops: Vec<Station>,
+            lines: Vec<Line>,
+        ) -> QueryInteractor<
+            RouteMockStationRepository,
+            RouteMockLineRepository,
+            RouteMockTrainTypeRepository,
+            RouteMockCompanyRepository,
+        > {
+            QueryInteractor {
+                station_repository: RouteMockStationRepository { stops },
+                line_repository: RouteMockLineRepository {
+                    lines,
+                    for_routes_calls: Mutex::new(vec![]),
+                },
+                train_type_repository: RouteMockTrainTypeRepository,
+                company_repository: RouteMockCompanyRepository,
+            }
+        }
+
+        #[tokio::test]
+        async fn test_get_routes_batches_line_fetch_and_filters_groups() {
+            let stops = vec![
+                // line_group 100: 発着駅(1, 3)を含む → 採用
+                create_route_stop(1101, 1, 11, Some(100)),
+                create_route_stop(1102, 2, 11, Some(100)),
+                create_route_stop(1103, 3, 11, Some(100)),
+                // line_group 200: 発着駅を含む → 採用
+                create_route_stop(2101, 1, 22, Some(200)),
+                create_route_stop(2103, 3, 22, Some(200)),
+                // line_group 300: 発着駅を含まない → 除外
+                create_route_stop(3105, 5, 33, Some(300)),
+                create_route_stop(3106, 6, 33, Some(300)),
+                // line_group_cdなし: line_cd(44)でグループ化され種別なし
+                create_route_stop(4101, 1, 44, None),
+                create_route_stop(4103, 3, 44, None),
+            ];
+            let lines = vec![
+                create_route_line(11, 100),
+                create_route_line(12, 100),
+                create_route_line(22, 200),
+                create_route_line(33, 300),
+            ];
+            let interactor = build_interactor(stops, lines);
+
+            let routes = interactor.get_routes(1, 3, None).await.unwrap();
+
+            // 発着駅を含まないline_group 300は除外され、BTreeMapのキー順に並ぶ
+            let route_ids: Vec<u32> = routes.iter().map(|r| r.id).collect();
+            assert_eq!(route_ids, vec![44, 100, 200]);
+
+            // 路線の取得は経路候補ごとではなく一括1回で、
+            // 除外されたグループ(300)のIDは要求されない
+            {
+                let calls = interactor.line_repository.for_routes_calls.lock().unwrap();
+                assert_eq!(calls.len(), 1);
+                let mut requested = calls[0].clone();
+                requested.sort_unstable();
+                assert_eq!(requested, vec![100, 200]);
+            }
+
+            // line_group 100の停車駅は種別を持ち、グループ内の路線(11, 12)が入る
+            let route100 = routes.iter().find(|r| r.id == 100).unwrap();
+            assert_eq!(route100.stops.len(), 3);
+            for stop in &route100.stops {
+                let tt = stop.train_type.as_ref().unwrap();
+                assert_eq!(tt.group_id, 100);
+                let mut line_ids: Vec<u32> = tt.lines.iter().map(|l| l.id).collect();
+                line_ids.sort_unstable();
+                assert_eq!(line_ids, vec![11, 12]);
+            }
+
+            // line_group 200の停車駅の種別にはグループ内の路線(22)だけが入る
+            let route200 = routes.iter().find(|r| r.id == 200).unwrap();
+            assert_eq!(route200.stops.len(), 2);
+            for stop in &route200.stops {
+                let tt = stop.train_type.as_ref().unwrap();
+                assert_eq!(tt.group_id, 200);
+                let line_ids: Vec<u32> = tt.lines.iter().map(|l| l.id).collect();
+                assert_eq!(line_ids, vec![22]);
+            }
+
+            // line_group_cdなしのグループは種別を持たない
+            let route44 = routes.iter().find(|r| r.id == 44).unwrap();
+            assert_eq!(route44.stops.len(), 2);
+            assert!(route44.stops.iter().all(|s| s.train_type.is_none()));
+        }
+
+        #[tokio::test]
+        async fn test_get_routes_returns_empty_when_no_group_includes_endpoints() {
+            let stops = vec![
+                create_route_stop(3105, 5, 33, Some(300)),
+                create_route_stop(3106, 6, 33, Some(300)),
+            ];
+            let lines = vec![create_route_line(33, 300)];
+            let interactor = build_interactor(stops, lines);
+
+            let routes = interactor.get_routes(1, 3, None).await.unwrap();
+
+            assert!(routes.is_empty());
         }
     }
 }
