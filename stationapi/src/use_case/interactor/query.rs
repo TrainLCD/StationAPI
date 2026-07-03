@@ -832,10 +832,10 @@ where
                         &row.station_name_k,
                         row.station_name_r.as_deref(),
                     );
-                    let name_ipa = ipa.name_ipa;
-                    let name_roman_ipa = ipa.name_roman_ipa;
+                    let name_ipa = ipa.name_ipa.clone();
+                    let name_roman_ipa = ipa.name_roman_ipa.clone();
                     let name_tts_segments =
-                        crate::use_case::dto::tts::to_proto_tts_segments(ipa.tts_segments);
+                        crate::use_case::dto::tts::to_proto_tts_segments(&ipa.tts_segments);
                     proto::StationMinimal {
                         id: row.station_cd as u32,
                         group_id: row.station_g_cd as u32,

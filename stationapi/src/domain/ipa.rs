@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{LazyLock, RwLock};
+use std::sync::{Arc, LazyLock, RwLock};
 
 /// Cached IPA computation result for a single name.
 #[derive(Clone, Debug)]
@@ -11,10 +11,10 @@ pub struct IpaResult {
 
 type IpaCacheKey = (String, Option<String>);
 
-static STATION_IPA_CACHE: LazyLock<RwLock<HashMap<IpaCacheKey, IpaResult>>> =
+static STATION_IPA_CACHE: LazyLock<RwLock<HashMap<IpaCacheKey, Arc<IpaResult>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-static LINE_IPA_CACHE: LazyLock<RwLock<HashMap<IpaCacheKey, IpaResult>>> =
+static LINE_IPA_CACHE: LazyLock<RwLock<HashMap<IpaCacheKey, Arc<IpaResult>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Compute all three IPA outputs in a single pass, eliminating the redundant
@@ -45,22 +45,26 @@ fn compute_line_ipa(name_katakana: &str, name_roman: Option<&str>) -> IpaResult 
 }
 
 fn cached_lookup(
-    cache: &LazyLock<RwLock<HashMap<IpaCacheKey, IpaResult>>>,
+    cache: &LazyLock<RwLock<HashMap<IpaCacheKey, Arc<IpaResult>>>>,
     key: &IpaCacheKey,
     compute: impl FnOnce() -> IpaResult,
-) -> IpaResult {
+) -> Arc<IpaResult> {
     // Fast path: read lock
     if let Some(result) = cache.read().unwrap().get(key) {
-        return result.clone();
+        return Arc::clone(result);
     }
     // Slow path: compute and insert
-    let result = compute();
-    cache.write().unwrap().insert(key.clone(), result.clone());
+    let result = Arc::new(compute());
+    cache
+        .write()
+        .unwrap()
+        .insert(key.clone(), Arc::clone(&result));
     result
 }
 
 /// Compute IPA for station/train-type names with memoization.
-pub fn compute_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
+/// Arcで返すことでキャッシュヒット時にTTSセグメントのディープクローンを避ける。
+pub fn compute_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> Arc<IpaResult> {
     let key = (name_katakana.to_string(), name_roman.map(str::to_string));
     cached_lookup(&STATION_IPA_CACHE, &key, || {
         compute_ipa(name_katakana, name_roman)
@@ -68,7 +72,8 @@ pub fn compute_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaR
 }
 
 /// Compute IPA for line names (with suffix replacement) with memoization.
-pub fn compute_line_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> IpaResult {
+/// Arcで返すことでキャッシュヒット時にTTSセグメントのディープクローンを避ける。
+pub fn compute_line_ipa_cached(name_katakana: &str, name_roman: Option<&str>) -> Arc<IpaResult> {
     let key = (name_katakana.to_string(), name_roman.map(str::to_string));
     cached_lookup(&LINE_IPA_CACHE, &key, || {
         compute_line_ipa(name_katakana, name_roman)

@@ -19,9 +19,9 @@ impl From<TransportType> for i32 {
 impl From<Station> for GrpcStation {
     fn from(station: Station) -> Self {
         let ipa = compute_ipa_cached(&station.station_name_k, station.station_name_r.as_deref());
-        let name_ipa = ipa.name_ipa;
-        let name_roman_ipa = ipa.name_roman_ipa;
-        let name_tts_segments = to_proto_tts_segments(ipa.tts_segments);
+        let name_ipa = ipa.name_ipa.clone();
+        let name_roman_ipa = ipa.name_roman_ipa.clone();
+        let name_tts_segments = to_proto_tts_segments(&ipa.tts_segments);
         Self {
             id: station.station_cd as u32,
             group_id: station.station_g_cd as u32,
