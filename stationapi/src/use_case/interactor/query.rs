@@ -1034,24 +1034,46 @@ where
         &self,
         from_station_id: u32,
         to_station_id: u32,
-        line_group_id: u32,
+        line_group_id: Option<u32>,
     ) -> Result<Vec<proto::TrainRouteSegment>, UseCaseError> {
-        let stations = self
-            .get_stations_by_line_group_id(line_group_id, TransportTypeFilter::RailAndBus)
-            .await?;
+        // line_group_id 未指定は種別なし(各駅停車)の単一路線走行。
+        // from駅の所属路線の駅列をそのまま経路として扱う。
+        let stations = match line_group_id {
+            Some(line_group_id) => {
+                self.get_stations_by_line_group_id(line_group_id, TransportTypeFilter::RailAndBus)
+                    .await?
+            }
+            None => {
+                let from_station = self
+                    .station_repository
+                    .find_by_id(from_station_id)
+                    .await?
+                    .ok_or_else(|| UseCaseError::NotFound {
+                        entity_type: "station",
+                        entity_id: from_station_id.to_string(),
+                    })?;
+                self.get_stations_by_line_id(
+                    from_station.line_cd as u32,
+                    None,
+                    None,
+                    TransportTypeFilter::RailAndBus,
+                )
+                .await?
+            }
+        };
 
         let from_idx = stations
             .iter()
             .position(|s| s.station_cd as u32 == from_station_id)
             .ok_or_else(|| UseCaseError::NotFound {
-                entity_type: "station in line group",
+                entity_type: "station in route",
                 entity_id: from_station_id.to_string(),
             })?;
         let to_idx = stations
             .iter()
             .position(|s| s.station_cd as u32 == to_station_id)
             .ok_or_else(|| UseCaseError::NotFound {
-                entity_type: "station in line group",
+                entity_type: "station in route",
                 entity_id: to_station_id.to_string(),
             })?;
 
