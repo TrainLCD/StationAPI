@@ -432,11 +432,9 @@ impl StationApi for MyApi {
         request: tonic::Request<GetTrainRouteRequest>,
     ) -> Result<tonic::Response<TrainRouteResponse>, tonic::Status> {
         let req = request.get_ref();
-        let from_id = req.from_station_group_id;
-        let to_id = req.to_station_group_id;
-        let line_group_id = req
-            .line_group_id
-            .ok_or_else(|| tonic::Status::invalid_argument("line_group_id is required"))?;
+        let from_id = req.from_station_id;
+        let to_id = req.to_station_id;
+        let line_group_id = req.line_group_id;
 
         match self
             .query_use_case
@@ -591,14 +589,11 @@ mod tests {
         }
 
         fn get_captured_coordinates_transport_type(&self) -> Option<TransportTypeFilter> {
-            self.captured_coordinates_transport_type
-                .lock()
-                .unwrap()
-                .clone()
+            *self.captured_coordinates_transport_type.lock().unwrap()
         }
 
         fn get_captured_name_transport_type(&self) -> Option<TransportTypeFilter> {
-            self.captured_name_transport_type.lock().unwrap().clone()
+            *self.captured_name_transport_type.lock().unwrap()
         }
     }
 
@@ -907,9 +902,9 @@ mod tests {
 
         async fn get_train_route(
             &self,
-            _from_station_group_id: u32,
-            _to_station_group_id: u32,
-            _line_group_id: u32,
+            _from_station_id: u32,
+            _to_station_id: u32,
+            _line_group_id: Option<u32>,
         ) -> Result<Vec<crate::proto::TrainRouteSegment>, UseCaseError> {
             Ok(vec![])
         }

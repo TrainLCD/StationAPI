@@ -129,7 +129,7 @@ mod tests {
             let keihin_line = Line::new(
                 11303,
                 1,
-                Some(company_jr_east.clone()),
+                Some(company_jr_east),
                 "京浜東北線".to_string(),
                 "ケイヒントウホクセン".to_string(),
                 "京浜東北線".to_string(),
@@ -176,8 +176,8 @@ mod tests {
             lines_by_line_group_id.insert(1, vec![yamanote_line.clone()]);
             lines_by_line_group_id.insert(2, vec![keihin_line.clone()]);
 
-            lines_by_name.insert("山手線".to_string(), vec![yamanote_line.clone()]);
-            lines_by_name.insert("京浜東北線".to_string(), vec![keihin_line.clone()]);
+            lines_by_name.insert("山手線".to_string(), vec![yamanote_line]);
+            lines_by_name.insert("京浜東北線".to_string(), vec![keihin_line]);
 
             Self {
                 lines,
