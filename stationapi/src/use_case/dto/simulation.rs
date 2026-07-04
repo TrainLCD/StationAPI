@@ -17,7 +17,7 @@ const SUBWAY_MAX_SPEED: f64 = 22.222_222_222_22; // 80 km/h
 const NORMAL_MAX_SPEED: f64 = 25.0; // 90 km/h
 const TRAM_MAX_SPEED: f64 = 11.111_111_111_11; // 40 km/h
 
-const LIMITED_EXPRESS_KIND_MAX_SPEED: f64 = 36.111_111_111_1; // 130 km/h
+const LIMITED_EXPRESS_KIND_FLOOR_SPEED: f64 = 36.111_111_111_1; // 130 km/h
 
 pub fn resolve_speed_profile(
     line_type: Option<i32>,
@@ -40,12 +40,12 @@ pub fn resolve_speed_profile(
         _ => (NORMAL_MAX_SPEED, 0.83, 0.69),
     };
 
-    // 種別による 130km/h は在来線の速達種別を底上げするための値。
+    // 種別による 130km/h は在来線の速達種別を底上げするための下限値。
     // 新幹線(のぞみ等は kind=LimitedExpress)では路線種別の上限の方が速いため、
-    // 種別上限で引き下げない。
+    // 種別値で引き下げない。
     let max_speed = match kind.and_then(|v| TrainTypeKind::try_from(v).ok()) {
         Some(TrainTypeKind::LimitedExpress) | Some(TrainTypeKind::HighSpeedRapid) => {
-            line_max_speed.max(LIMITED_EXPRESS_KIND_MAX_SPEED)
+            line_max_speed.max(LIMITED_EXPRESS_KIND_FLOOR_SPEED)
         }
         _ => line_max_speed,
     };
@@ -93,13 +93,13 @@ mod tests {
     }
 
     #[test]
-    fn limited_express_kind_caps_speed_over_line_type() {
+    fn limited_express_kind_raises_speed_over_line_type() {
         let p = resolve_speed_profile(
             Some(LineType::Normal as i32),
             false,
             Some(TrainTypeKind::LimitedExpress as i32),
         );
-        assert_eq!(p.max_speed, LIMITED_EXPRESS_KIND_MAX_SPEED);
+        assert_eq!(p.max_speed, LIMITED_EXPRESS_KIND_FLOOR_SPEED);
         assert_eq!(p.max_acceleration, 0.83);
         assert_eq!(p.max_deceleration, 0.69);
     }
@@ -119,13 +119,13 @@ mod tests {
     }
 
     #[test]
-    fn high_speed_rapid_kind_caps_speed() {
+    fn high_speed_rapid_kind_raises_speed() {
         let p = resolve_speed_profile(
             Some(LineType::Normal as i32),
             false,
             Some(TrainTypeKind::HighSpeedRapid as i32),
         );
-        assert_eq!(p.max_speed, LIMITED_EXPRESS_KIND_MAX_SPEED);
+        assert_eq!(p.max_speed, LIMITED_EXPRESS_KIND_FLOOR_SPEED);
     }
 
     #[test]
