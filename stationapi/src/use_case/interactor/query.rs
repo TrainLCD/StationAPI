@@ -357,14 +357,14 @@ where
         for station in stations.iter_mut() {
             station.train_type = train_type_map
                 .get(&station.station_cd)
-                .cloned()
+                .copied()
                 .cloned()
                 .map(Box::new);
             if let Some(ref mut line) = station.line {
                 if let Some(ref mut nested_station) = line.station {
                     nested_station.train_type = train_type_map
                         .get(&nested_station.station_cd)
-                        .cloned()
+                        .copied()
                         .cloned()
                         .map(Box::new);
                 }
@@ -373,7 +373,7 @@ where
                 if let Some(ref mut nested_station) = line.station {
                     nested_station.train_type = train_type_map
                         .get(&nested_station.station_cd)
-                        .cloned()
+                        .copied()
                         .cloned()
                         .map(Box::new);
                 }
@@ -589,14 +589,14 @@ where
                     .collect::<Vec<Line>>();
 
                 for line in lines.iter_mut() {
-                    line.company = company_map.get(&line.company_cd).cloned().cloned();
+                    line.company = company_map.get(&line.company_cd).copied().cloned();
                     line.line_symbols = self.get_line_symbols(line);
                     line.train_type = tt_by_pair
                         .get(&(line_group_cd as u32, line.line_cd as u32))
                         .cloned();
                 }
 
-                line.company = company_map.get(&line.company_cd).cloned().cloned();
+                line.company = company_map.get(&line.company_cd).copied().cloned();
                 line.line_symbols = self.get_line_symbols(&line);
 
                 tt.lines = lines;
@@ -1436,7 +1436,7 @@ where
             station.station_numbers = station_numbers;
             if let Some(tt) = train_type_map
                 .get(&station.station_cd)
-                .cloned()
+                .copied()
                 .cloned()
                 .map(Box::new)
             {
@@ -1542,7 +1542,7 @@ where
                     station_copy.station_numbers = station_numbers;
                     if let Some(tt) = train_type_map
                         .get(&station_copy.station_cd)
-                        .cloned()
+                        .copied()
                         .cloned()
                         .map(Box::new)
                     {
@@ -1862,13 +1862,13 @@ mod tests {
     #[test]
     fn test_segment_stop_signature_identical_stops_match() {
         // Two line groups that stop at exactly the same stations between 1 and 4.
-        let local_stops = vec![
+        let local_stops = [
             create_stop(1, 100, Some(0)),
             create_stop(2, 100, Some(0)),
             create_stop(3, 100, Some(0)),
             create_stop(4, 100, Some(0)),
         ];
-        let express_stops = vec![
+        let express_stops = [
             create_stop(1, 200, Some(0)),
             create_stop(2, 200, Some(0)),
             create_stop(3, 200, Some(0)),
@@ -1887,7 +1887,7 @@ mod tests {
     #[test]
     fn test_segment_stop_signature_excludes_pass_through() {
         // Station 3 is passed through (pass == 1) and must not be part of the signature.
-        let stops = vec![
+        let stops = [
             create_stop(1, 100, Some(0)),
             create_stop(2, 100, Some(0)),
             create_stop(3, 100, Some(1)),
@@ -1902,14 +1902,14 @@ mod tests {
     #[test]
     fn test_segment_stop_signature_differs_when_stops_differ() {
         // Skips station 2.
-        let express_stops = vec![
+        let express_stops = [
             create_stop(1, 100, Some(0)),
             create_stop(2, 100, Some(1)),
             create_stop(3, 100, Some(0)),
             create_stop(4, 100, Some(0)),
         ];
         // Stops everywhere.
-        let local_stops = vec![
+        let local_stops = [
             create_stop(1, 200, Some(0)),
             create_stop(2, 200, Some(0)),
             create_stop(3, 200, Some(0)),
@@ -1927,13 +1927,13 @@ mod tests {
     #[test]
     fn test_segment_stop_signature_restricted_to_segment() {
         // Differences outside the 2→3 segment must be ignored.
-        let stops_a = vec![
+        let stops_a = [
             create_stop(1, 100, Some(0)),
             create_stop(2, 100, Some(0)),
             create_stop(3, 100, Some(0)),
             create_stop(4, 100, Some(0)),
         ];
-        let stops_b = vec![
+        let stops_b = [
             create_stop(1, 200, Some(1)),
             create_stop(2, 200, Some(0)),
             create_stop(3, 200, Some(0)),
@@ -1950,7 +1950,7 @@ mod tests {
 
     #[test]
     fn test_segment_stop_signature_direction_independent() {
-        let stops = vec![
+        let stops = [
             create_stop(1, 100, Some(0)),
             create_stop(2, 100, Some(0)),
             create_stop(3, 100, Some(0)),
@@ -1966,7 +1966,7 @@ mod tests {
 
     #[test]
     fn test_segment_stop_signature_missing_endpoint_returns_none() {
-        let stops = vec![create_stop(1, 100, Some(0)), create_stop(2, 100, Some(0))];
+        let stops = [create_stop(1, 100, Some(0)), create_stop(2, 100, Some(0))];
         let refs: Vec<&Station> = stops.iter().collect();
 
         assert!(segment_stop_signature(&refs, 1, 99).is_none());

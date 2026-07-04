@@ -207,7 +207,7 @@ mod tests {
                 .filter(|station| {
                     transport_type
                         .as_ref()
-                        .map_or(true, |tt| station.transport_type == *tt)
+                        .is_none_or(|tt| station.transport_type == *tt)
                 })
                 .map(|station| {
                     let mut s = station.clone();
@@ -261,7 +261,7 @@ mod tests {
                     station.station_name.contains(&station_name)
                         && transport_type
                             .as_ref()
-                            .map_or(true, |tt| station.transport_type == *tt)
+                            .is_none_or(|tt| station.transport_type == *tt)
                 })
                 .cloned()
                 .collect();
@@ -317,8 +317,7 @@ mod tests {
 
             if !via_line_ids.is_empty() {
                 let line_match = |s: &Station| via_line_ids.contains(&(s.line_cd as u32));
-                if !from_station.map_or(false, line_match) || !to_station.map_or(false, line_match)
-                {
+                if !from_station.is_some_and(line_match) || !to_station.is_some_and(line_match) {
                     return Ok(result);
                 }
             }

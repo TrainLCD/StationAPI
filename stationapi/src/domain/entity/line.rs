@@ -389,7 +389,7 @@ mod tests {
             None,
             None,
             None,
-            symbols.clone(),
+            symbols,
             Some("JY".to_string()),
             Some("JR".to_string()),
             None,
