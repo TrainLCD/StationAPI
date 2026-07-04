@@ -10,9 +10,9 @@ use crate::{
 impl From<Line> for GrpcLine {
     fn from(line: Line) -> Self {
         let ipa = compute_line_ipa_cached(&line.line_name_k, line.line_name_r.as_deref());
-        let name_ipa = ipa.name_ipa;
-        let name_roman_ipa = ipa.name_roman_ipa;
-        let name_tts_segments = to_proto_tts_segments(ipa.tts_segments);
+        let name_ipa = ipa.name_ipa.clone();
+        let name_roman_ipa = ipa.name_roman_ipa.clone();
+        let name_tts_segments = to_proto_tts_segments(&ipa.tts_segments);
         // バス路線の場合は line_type を OtherLineType (0) に強制
         // (鉄道用の line_type が誤って設定されている可能性があるため)
         let line_type = if line.transport_type == TransportType::Bus {
