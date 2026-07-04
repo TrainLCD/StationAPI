@@ -24,9 +24,9 @@ impl From<TrainType> for GrpcTrainType {
             kind,
         } = train_type;
         let ipa = compute_ipa_cached(&type_name_k, type_name_r.as_deref());
-        let name_ipa = ipa.name_ipa;
-        let name_roman_ipa = ipa.name_roman_ipa;
-        let name_tts_segments = to_proto_tts_segments(ipa.tts_segments);
+        let name_ipa = ipa.name_ipa.clone();
+        let name_roman_ipa = ipa.name_roman_ipa.clone();
+        let name_tts_segments = to_proto_tts_segments(&ipa.tts_segments);
         Self {
             id: id.map(|id| id as u32).unwrap_or(0),
             type_id: type_cd.map(|id| id as u32).unwrap_or(0),
