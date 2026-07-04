@@ -40,9 +40,12 @@ pub fn resolve_speed_profile(
         _ => (NORMAL_MAX_SPEED, 0.83, 0.69),
     };
 
+    // 種別による 130km/h は在来線の速達種別を底上げするための値。
+    // 新幹線(のぞみ等は kind=LimitedExpress)では路線種別の上限の方が速いため、
+    // 種別上限で引き下げない。
     let max_speed = match kind.and_then(|v| TrainTypeKind::try_from(v).ok()) {
         Some(TrainTypeKind::LimitedExpress) | Some(TrainTypeKind::HighSpeedRapid) => {
-            LIMITED_EXPRESS_KIND_MAX_SPEED
+            line_max_speed.max(LIMITED_EXPRESS_KIND_MAX_SPEED)
         }
         _ => line_max_speed,
     };
@@ -99,6 +102,20 @@ mod tests {
         assert_eq!(p.max_speed, LIMITED_EXPRESS_KIND_MAX_SPEED);
         assert_eq!(p.max_acceleration, 0.83);
         assert_eq!(p.max_deceleration, 0.69);
+    }
+
+    #[test]
+    fn limited_express_kind_does_not_slow_down_bullet_train() {
+        // のぞみ等は kind=LimitedExpress で登録されているが、
+        // 新幹線の路線上限(320km/h)を 130km/h に引き下げてはいけない。
+        let p = resolve_speed_profile(
+            Some(LineType::BulletTrain as i32),
+            false,
+            Some(TrainTypeKind::LimitedExpress as i32),
+        );
+        assert_eq!(p.max_speed, BULLET_TRAIN_MAX_SPEED);
+        assert_eq!(p.max_acceleration, 0.72);
+        assert_eq!(p.max_deceleration, 0.56);
     }
 
     #[test]
