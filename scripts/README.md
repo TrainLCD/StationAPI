@@ -44,3 +44,41 @@ python3 scripts/compute_average_distance.py --apply
 地理データは OpenStreetMap (© OpenStreetMap contributors) を Overpass API 経由で取得しています。
 OSM データは [Open Database License (ODbL)](https://www.openstreetmap.org/copyright) の下で
 提供されています。算出した距離値を再配布する際は出典表示にご留意ください。
+
+## compute_speed_table.py
+
+`stationapi/src/domain/speed_table.rs` の自動生成ブロック(路線 × 列車種別ごとの
+実効最高速度の較正テーブル)を、公開 GTFS 時刻表から再計算します。
+到着時間推定(`arrival_estimation.rs`)の運動学モデルを Python で再現し、
+実ダイヤの所要時間を再現する実効最高速度を二分探索でフィッティングして、
+一般則(路線種別の基本速度 × 種別倍率)から ±10% 以上乖離した路線だけを出力します。
+
+### 使い方
+
+```bash
+# フィードを取得して較正結果を表示する(ファイルは書き換えない)
+python3 scripts/compute_speed_table.py --validate
+
+# speed_table.rs の自動生成ブロックを書き換える
+python3 scripts/compute_speed_table.py --apply
+```
+
+認証が必要なフィード(公共交通オープンデータセンターの大半)を使うには、
+[developer.odpt.org](https://developer.odpt.org/) で発行した無料のアクセストークンを
+環境変数 `ODPT_ACCESS_TOKEN` に設定します。未設定の場合、該当フィードはスキップされます。
+取得した GTFS は `scripts/.gtfs_cache/` にキャッシュされます(Git 管理対象外)。
+
+### データソース・ライセンス
+
+GTFS 時刻表は[公共交通オープンデータセンター](https://ckan.odpt.org/)から取得しています。
+
+| フィード | 提供事業者 | ライセンス |
+| ---- | ---- | ---- |
+| 京都市営地下鉄 | 京都市交通局 | [公共交通オープンデータ基本ライセンス](https://developer.odpt.org/terms)(要出典明示) |
+| 横浜市営地下鉄 | 横浜市交通局 | 同上 |
+| 函館市電 | 函館市企業局交通部 | [GTFS-RUL (ODPT)](https://gtfs-jp.org/GTFS-RUL(ODPT).pdf) |
+
+較正値(派生データ)を含むサービスを提供する場合は、リポジトリ直下 README の
+「Data Sources」に記載の出典表示をアプリ側のクレジットにも反映してください。
+なお、東武鉄道・京王電鉄などの「公共交通オープンデータチャレンジ限定ライセンス」の
+フィードは本番利用できないため、意図的に対象へ含めていません。
