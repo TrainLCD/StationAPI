@@ -269,7 +269,6 @@ struct GtfsFeed {
     path: &'static str,
     url: &'static str,
     requires_consumer_key: bool,
-    experimental: bool,
 }
 
 const GTFS_FEEDS: &[GtfsFeed] = &[
@@ -279,7 +278,6 @@ const GTFS_FEEDS: &[GtfsFeed] = &[
         path: "data/ToeiBus-GTFS",
         url: "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip",
         requires_consumer_key: false,
-        experimental: false,
     },
     GtfsFeed {
         id: "seibu",
@@ -287,12 +285,10 @@ const GTFS_FEEDS: &[GtfsFeed] = &[
         path: "data/SeibuBus-GTFS",
         url: "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip",
         requires_consumer_key: true,
-        experimental: true,
     },
 ];
 
 const DEFAULT_GTFS_BUS_LINE_COLOR: &str = "#1f63c6";
-const ENABLE_EXPERIMENTAL_BUS_FEATURE_ENV: &str = "ENABLE_EXPERIMENTAL_BUS_FEATURE";
 
 fn scoped_gtfs_id(feed: &GtfsFeed, id: &str) -> String {
     format!("{}:{}", feed.id, id)
@@ -318,16 +314,8 @@ fn gtfs_download_url(feed: &GtfsFeed) -> Result<String, Box<dyn std::error::Erro
     Ok(format!("{}?acl:consumerKey={}", feed.url, token))
 }
 
-fn gtfs_feeds_for_experimental_enabled(enabled: bool) -> Vec<GtfsFeed> {
-    GTFS_FEEDS
-        .iter()
-        .copied()
-        .filter(|feed| !feed.experimental || enabled)
-        .collect()
-}
-
 fn enabled_gtfs_feeds() -> Vec<GtfsFeed> {
-    gtfs_feeds_for_experimental_enabled(is_experimental_bus_feature_enabled())
+    GTFS_FEEDS.to_vec()
 }
 
 /// Download and extract GTFS data from ODPT API
@@ -1600,10 +1588,6 @@ async fn import_gtfs_feed_info(
 
 fn is_bus_feature_disabled() -> bool {
     env_flag_enabled("DISABLE_BUS_FEATURE")
-}
-
-fn is_experimental_bus_feature_enabled() -> bool {
-    env_flag_enabled(ENABLE_EXPERIMENTAL_BUS_FEATURE_ENV)
 }
 
 fn env_flag_enabled(name: &str) -> bool {
@@ -3145,16 +3129,10 @@ mod tests {
     }
 
     #[test]
-    fn test_gtfs_feeds_for_experimental_enabled() {
-        let stable_feeds = gtfs_feeds_for_experimental_enabled(false);
+    fn test_enabled_gtfs_feeds() {
+        let feeds = enabled_gtfs_feeds();
         assert_eq!(
-            stable_feeds.iter().map(|feed| feed.id).collect::<Vec<_>>(),
-            vec!["toei"]
-        );
-
-        let all_feeds = gtfs_feeds_for_experimental_enabled(true);
-        assert_eq!(
-            all_feeds.iter().map(|feed| feed.id).collect::<Vec<_>>(),
+            feeds.iter().map(|feed| feed.id).collect::<Vec<_>>(),
             vec!["toei", "seibu"]
         );
     }
