@@ -314,10 +314,6 @@ fn gtfs_download_url(feed: &GtfsFeed) -> Result<String, Box<dyn std::error::Erro
     Ok(format!("{}?acl:consumerKey={}", feed.url, token))
 }
 
-fn enabled_gtfs_feeds() -> Vec<GtfsFeed> {
-    GTFS_FEEDS.to_vec()
-}
-
 /// Download and extract GTFS data from ODPT API
 fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let gtfs_path = Path::new(feed.path);
@@ -411,7 +407,7 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     info!("[gtfs] bus feature enabled, starting download/extract");
-    let enabled_feeds = enabled_gtfs_feeds();
+    let enabled_feeds = GTFS_FEEDS.to_vec();
     info!(
         "[gtfs] enabled feeds: {}",
         enabled_feeds
@@ -3129,10 +3125,9 @@ mod tests {
     }
 
     #[test]
-    fn test_enabled_gtfs_feeds() {
-        let feeds = enabled_gtfs_feeds();
+    fn test_gtfs_feeds() {
         assert_eq!(
-            feeds.iter().map(|feed| feed.id).collect::<Vec<_>>(),
+            GTFS_FEEDS.iter().map(|feed| feed.id).collect::<Vec<_>>(),
             vec!["toei", "seibu"]
         );
     }
