@@ -7,3 +7,4 @@ tmp.sql
 .vscode/
 data/ToeiBus-GTFS/
 scripts/.osm_cache/
+scripts/.gtfs_cache/
