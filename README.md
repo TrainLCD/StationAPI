@@ -110,4 +110,7 @@ We follow Rust best practices for testing:
 ## Data Sources
 
 - Bus-related data provided by [Tokyo Metropolitan Bureau of Transportation (Toei)](https://www.kotsu.metro.tokyo.jp/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+- Bus-related data (experimental feed) provided by [Seibu Bus Co., Ltd. (西武バス)](https://www.seibubus.co.jp/) via the [Public Transportation Open Data Center](https://ckan.odpt.org/), licensed under the [Public Transportation Open Data Basic License](https://developer.odpt.org/terms)
 - Station data provided by [駅データ.jp](https://www.ekidata.jp/)
+- Speed calibration data (`speed_table.rs`) derived from GTFS timetables provided by Kyoto City Transportation Bureau (京都市交通局) and Yokohama City Transportation Bureau (横浜市交通局) via the [Public Transportation Open Data Center](https://ckan.odpt.org/), licensed under the [Public Transportation Open Data Basic License](https://developer.odpt.org/terms), and by Hakodate City Enterprise Bureau Transportation Department (函館市企業局交通部), licensed under [GTFS-RUL (ODPT)](https://gtfs-jp.org/GTFS-RUL(ODPT).pdf)
+- Average inter-station distances (`average_distance`) computed from railway track geometry © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), licensed under [ODbL](https://opendatacommons.org/licenses/odbl/)
