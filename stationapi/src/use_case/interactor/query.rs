@@ -24,8 +24,8 @@ fn filter_to_db_type(filter: TransportTypeFilter) -> Option<TransportType> {
 use crate::{
     domain::{
         arrival_estimation::{
-            estimate_arrival_minutes, is_circular_route, select_circular_arc, EstimatedStop,
-            EstimationParams,
+            estimate_arrival_minutes_calibrated, is_circular_route, select_circular_arc,
+            EstimatedStop, EstimationParams,
         },
         entity::{
             company::Company,
@@ -1199,15 +1199,29 @@ where
             // 環状経路(山手線・大阪環状線など)は線形スライスだと格納順の
             // 継ぎ目(例: 品川⇔大崎)を跨ぐ乗車で逆側の弧を返してしまうため、
             // シームをラップする弧を選択する。
+            // 迂回係数の較正母数には切り出し前の経路全体を渡す。切り出した区間の
+            // 駅間隔が路線平均と異なると較正が破綻するため(スライス較正バグ)。
             if is_circular_route(route_stops) {
                 let arc = select_circular_arc(route_stops, fi, ti, direction_id.is_some());
-                result.extend(estimate_arrival_minutes(&arc, &params));
+                result.extend(estimate_arrival_minutes_calibrated(
+                    &arc,
+                    route_stops,
+                    &params,
+                ));
             } else if fi < ti {
-                result.extend(estimate_arrival_minutes(&route_stops[fi..=ti], &params));
+                result.extend(estimate_arrival_minutes_calibrated(
+                    &route_stops[fi..=ti],
+                    route_stops,
+                    &params,
+                ));
             } else {
                 let mut segment: Vec<&Station> = route_stops[ti..=fi].to_vec();
                 segment.reverse();
-                result.extend(estimate_arrival_minutes(&segment, &params));
+                result.extend(estimate_arrival_minutes_calibrated(
+                    &segment,
+                    route_stops,
+                    &params,
+                ));
             }
         }
 
