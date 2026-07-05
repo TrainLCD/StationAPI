@@ -503,6 +503,10 @@ pub fn estimate_arrival_minutes_calibrated(
     }
 
     // line_cd ごとの迂回係数。較正には経路全体の駅列を用いる。
+    // 環状路線のシーム辺(末尾駅→先頭駅)は意図的に母数へ含めない。分子側の
+    // `average_distance` 自体が格納順の隣接ペアのみ(シーム辺なし)から算出されて
+    // おり(scripts/compute_average_distance.py)、分母だけシーム辺を足すと母数が
+    // ズレるため。
     let calibration = if calibration_stops.is_empty() {
         stops
     } else {
