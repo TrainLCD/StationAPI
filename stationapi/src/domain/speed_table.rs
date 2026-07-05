@@ -127,6 +127,16 @@ mod tests {
         assert!(line_speed_override_kmh(99105, None).is_some());
     }
 
+    #[test]
+    fn manual_table_takes_precedence_over_gtfs_on_key_collision() {
+        // 手動テーブルと同じキーが仮に GTFS テーブルにも存在した場合でも、
+        // lookup は手動テーブルを先に引くため手動の値が返ることを回帰検知する。
+        approx(
+            line_speed_override_kmh(27001, Some(TrainTypeKind::Express as i32)),
+            Some(120.0),
+        );
+    }
+
     fn approx(actual: Option<f64>, expected: Option<f64>) {
         match (actual, expected) {
             (Some(a), Some(e)) => assert!((a - e).abs() < 1e-9, "expected {e}, got {a}"),
