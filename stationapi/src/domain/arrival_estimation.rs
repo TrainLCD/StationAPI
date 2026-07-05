@@ -40,6 +40,7 @@ use std::collections::HashMap;
 
 use crate::domain::entity::gtfs::TransportType;
 use crate::domain::entity::station::Station;
+use crate::domain::speed_table::line_speed_override_kmh;
 use crate::proto::{StopCondition, TrainTypeKind};
 
 /// 1 駅分の推定結果。
@@ -257,10 +258,18 @@ fn fallback_detour_factor(line_type: Option<i32>, transport_type: TransportType)
     }
 }
 
+/// 鉄道の迂回係数 `α` のクランプ上限。隣接駅間の軌道は直線距離の 1.1〜1.2 倍を
+/// 超えることがほぼ無いため、`average_distance` の母数が汚れている路線
+/// (別線区の駅列が同一 line_cd の末尾に連なる成田スカイアクセス線など)で
+/// `α` が張り付いて走行距離を大幅に過大評価しないためのガード。
+/// 道路網の迂回率が高いバスには適用しない(`params.detour_max` のまま)。
+const RAIL_DETOUR_MAX: f64 = 1.35;
+
 /// 迂回係数 `α` を決める。
 ///
 /// `avg_distance_km`(= `Line.average_distance` を km 換算した値、実距離±10%精度)が得られる場合は
-/// `avg_distance_km / mean_straight_km` で較正し、`detour_min..=detour_max` にクランプする。
+/// `avg_distance_km / mean_straight_km` で較正し、`detour_min..=detour_max` にクランプする
+/// (鉄道は上限をさらに `RAIL_DETOUR_MAX` で抑える)。
 /// 得られない(`<= 0`)場合や直線平均が 0 の場合は路線種別ベースの固定値へフォールバックする。
 pub fn detour_factor_for(
     avg_distance_km: f64,
@@ -270,7 +279,14 @@ pub fn detour_factor_for(
     params: &EstimationParams,
 ) -> f64 {
     if avg_distance_km > 0.0 && mean_straight_km > 0.0 {
-        (avg_distance_km / mean_straight_km).clamp(params.detour_min, params.detour_max)
+        let detour_max = if transport_type == TransportType::Bus {
+            params.detour_max
+        } else {
+            params.detour_max.min(RAIL_DETOUR_MAX)
+        }
+        // detour_min > 上限 の設定でも clamp(min > max) でパニックしないよう正規化。
+        .max(params.detour_min);
+        (avg_distance_km / mean_straight_km).clamp(params.detour_min, detour_max)
     } else {
         fallback_detour_factor(line_type, transport_type)
     }
@@ -308,9 +324,19 @@ fn kind_speed_multiplier(kind: Option<i32>) -> f64 {
 /// バスは `line_type`(GTFS の route_type が混入)や `kind`(BusRoute=7 は経路
 /// マーカーであり優等種別ではない)で判定できないため、`transport_type` で
 /// 先に分岐して固定の実効上限を返す。
-fn max_speed_kmh(line_type: Option<i32>, kind: Option<i32>, transport_type: TransportType) -> f64 {
+/// 鉄道は路線 × 種別の較正テーブル(`speed_table`)を最優先し、エントリが
+/// 無ければ「路線種別の基本速度 × 種別倍率」の一般則にフォールバックする。
+fn max_speed_kmh(
+    line_cd: i32,
+    line_type: Option<i32>,
+    kind: Option<i32>,
+    transport_type: TransportType,
+) -> f64 {
     if transport_type == TransportType::Bus {
         return BUS_MAX_SPEED_KMH;
+    }
+    if let Some(v) = line_speed_override_kmh(line_cd, kind) {
+        return v;
     }
     let base = base_speed_kmh(line_type);
     if line_type == Some(LINE_TYPE_SHINKANSEN) {
@@ -559,7 +585,12 @@ pub fn estimate_arrival_minutes_calibrated(
 
     for i in 1..n {
         let track_m = straight_km[i] * detour_of(stops[i]) * 1000.0;
-        let v_kmh = max_speed_kmh(stops[i].line_type, stops[i].kind, stops[i].transport_type);
+        let v_kmh = max_speed_kmh(
+            stops[i].line_cd,
+            stops[i].line_type,
+            stops[i].kind,
+            stops[i].transport_type,
+        );
 
         let idx = result.len();
         result.push(EstimatedStop {
@@ -724,9 +755,23 @@ mod tests {
             detour_factor_for(1.3, 1.0, Some(2), TransportType::Rail, &p),
             1.3,
         );
-        // 上限 1.6 でクランプ。
+        // 鉄道は RAIL_DETOUR_MAX = 1.35 でクランプ。
         approx(
             detour_factor_for(5.0, 1.0, Some(2), TransportType::Rail, &p),
+            1.35,
+        );
+        // detour_min が鉄道上限 1.35 を超える設定でもパニックせず detour_min を採用。
+        let wide_min = EstimationParams {
+            detour_min: 1.4,
+            ..Default::default()
+        };
+        approx(
+            detour_factor_for(5.0, 1.0, Some(2), TransportType::Rail, &wide_min),
+            1.4,
+        );
+        // バスは params.detour_max = 1.6 のままクランプ。
+        approx(
+            detour_factor_for(5.0, 1.0, Some(3), TransportType::Bus, &p),
             1.6,
         );
         // average_distance 無し → 在来線フォールバック 1.30。
@@ -1233,6 +1278,33 @@ mod tests {
     }
 
     #[test]
+    fn speed_table_override_beats_general_rule() {
+        // 京急本線(27001)の快特(Express)は較正テーブルの 120km/h が適用され、
+        // 一般則(80×1.15=92km/h)の路線より同一区間を速く走る。
+        let p = EstimationParams::default();
+        let time_on_line = |line_cd: i32| -> f64 {
+            // 8km 区間(巡航支配)で比較する。0.072 度 ≈ 8km。
+            let mut a = station(1, line_cd, 35.000, 139.0, None);
+            let mut b = station(2, line_cd, 35.072, 139.0, None);
+            a.kind = Some(TrainTypeKind::Express as i32);
+            b.kind = Some(TrainTypeKind::Express as i32);
+            let stations = [a, b];
+            let refs: Vec<&Station> = stations.iter().collect();
+            estimate_arrival_minutes(&refs, &p)[1].cumulative_minutes
+        };
+        let keikyu = time_on_line(27001);
+        let generic = time_on_line(100);
+        assert!(
+            keikyu < generic,
+            "keikyu {keikyu} should be < generic {generic}"
+        );
+        // テーブル値 120km/h での運動学モデルと厳密に一致する。
+        let straight_m = haversine_distance(35.000, 139.0, 35.072, 139.0);
+        // average_distance 無し → 在来線フォールバック α=1.30。
+        approx(keikyu, segment_run_minutes(straight_m * 1.30, 120.0, &p));
+    }
+
+    #[test]
     fn pass_penalty_adds_time_per_passed_station() {
         let mut p = EstimationParams {
             pass_penalty_seconds: 0.0,
@@ -1253,8 +1325,8 @@ mod tests {
     fn slice_calibration_uses_full_route_regression() {
         // スライス較正バグの回帰: 「都心側は駅間 1km・郊外側は駅間 4km」の路線で
         // average_distance(路線全体の平均実駅間距離 ≈ 2km)を持つとき、都心側だけを
-        // 切り出して較正すると α = 2.0/1.0 → 上限 1.6 に張り付き、走行距離を
-        // 60% 過大評価してしまっていた。経路全体を較正母数に渡せば α ≈ 1.0 になる。
+        // 切り出して較正すると α = 2.0/1.0 → 鉄道上限 1.35 に張り付き、走行距離を
+        // 35% 過大評価してしまう。経路全体を較正母数に渡せば α ≈ 1.0 になる。
         let p = EstimationParams::default();
         let avg_dist_m = Some(2000.0);
         let mut stations: Vec<Station> = Vec::new();
@@ -1287,7 +1359,7 @@ mod tests {
 
         // スライス単体較正(旧挙動)は α が上限に張り付き大幅に遅い推定になる。
         assert!(
-            full_calibrated[5].cumulative_minutes < self_calibrated[5].cumulative_minutes * 0.85,
+            full_calibrated[5].cumulative_minutes < self_calibrated[5].cumulative_minutes * 0.9,
             "full {} should be much faster than slice-calibrated {}",
             full_calibrated[5].cumulative_minutes,
             self_calibrated[5].cumulative_minutes

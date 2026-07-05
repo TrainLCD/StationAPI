@@ -1098,7 +1098,7 @@ where
 
             let is_bus = station.transport_type == TransportType::Bus;
             let kind = station.train_type.as_ref().and_then(|tt| tt.kind);
-            let profile = resolve_speed_profile(station.line_type, is_bus, kind);
+            let profile = resolve_speed_profile(station.line_cd, station.line_type, is_bus, kind);
 
             let grpc_station: proto::Station = station.into();
             segments.push(proto::TrainRouteSegment {

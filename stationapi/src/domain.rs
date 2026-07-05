@@ -4,3 +4,4 @@ pub mod error;
 pub mod ipa;
 pub mod normalize;
 pub mod repository;
+pub mod speed_table;
