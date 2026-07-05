@@ -9,14 +9,26 @@
 //! 2. 迂回係数 `α` で「みなし走行距離(軌道距離)」へ補正する。`α` は
 //!    `Line.average_distance`(メートル単位・実距離±10%精度)が得られる路線では
 //!    `average_distance / 直線平均駅間距離` で較正し、得られない路線では
-//!    路線種別ベースの固定値にフォールバックする。
+//!    路線種別ベースの固定値にフォールバックする。較正の母数(直線平均)は
+//!    クエリで切り出した部分区間ではなく **経路全体の駅列** から取る。
+//!    `average_distance` は路線全体の平均駅間距離なので、駅間隔が路線平均と
+//!    異なる部分区間(長距離路線の都心側など)の直線平均と比較すると `α` が
+//!    実態(1.0〜1.1 程度)から大きく外れてしまうため。
 //! 3. 停車駅間ごとに「加速→巡航→減速」の運動学モデルで走行時間を算出する。
 //!    停車が多いほど巡航しきれず平均速度が落ちる(各停が速達より遅い)現象が
 //!    加減速ペナルティとして自然に表現される。運動学モデルは理想走行
 //!    (最大加速→最高速度で巡航→最大減速)を仮定するため、実ダイヤに含まれる
 //!    途中の速度制限・惰行・回復余裕のぶん系統的に速すぎる。これを走行時間への
 //!    運転余裕率 `run_margin` として補正する(実路線の時刻表との較正で約 1.15)。
+//!    通過駅には分岐器・曲線の速度制限ぶんの小ペナルティ `pass_penalty` を加える。
 //! 4. 中間停車駅に停車時間 `dwell` を加算して累積する。
+//!
+//! 速度は路線種別の基本速度に列車種別(`TrainTypeKind`)の倍率を掛けて決める。
+//! 快速系(Branch/Rapid/CommuterRapid)は各停と同じ車両・線路を走り、速達性は
+//! 通過(停車回数減)そのもので表現されるため倍率 1.0。急行・特急はより高速な
+//! 走行(待避線での追い抜き前提のダイヤ)を、新快速級(HighSpeedRapid)は
+//! 130km/h 運転をそれぞれ倍率で表す。実路線の時刻表(中央快速・井の頭急行・
+//! 東横特急急行・京急快特・小田急快急・新快速など)との較正に基づく。
 //!
 //! 入力経路は運用上 `line_group_cd` を跨がない(=単一の列車・直通サービス)ため
 //! 乗換時間は加算しない。直通で `line_cd` が変わる区間は `α`・最高速度の
@@ -28,7 +40,7 @@ use std::collections::HashMap;
 
 use crate::domain::entity::gtfs::TransportType;
 use crate::domain::entity::station::Station;
-use crate::proto::StopCondition;
+use crate::proto::{StopCondition, TrainTypeKind};
 
 /// 1 駅分の推定結果。
 #[derive(Clone, Debug, PartialEq)]
@@ -64,6 +76,9 @@ pub struct EstimationParams {
     /// 走行時間に掛ける運転余裕率。運動学モデルの理想走行と実ダイヤの差
     /// (途中の速度制限・惰行・回復余裕)を包括する補正係数。
     pub run_margin: f64,
+    /// 通過駅 1 駅あたりの通過ペナルティ(秒)。分岐器・ホーム進入部の曲線など、
+    /// 駅部を最高速度で通過しきれないぶんの実効値。
+    pub pass_penalty_seconds: f64,
     /// 迂回係数 `α` のクランプ下限。
     pub detour_min: f64,
     /// 迂回係数 `α` のクランプ上限。
@@ -77,6 +92,7 @@ impl Default for EstimationParams {
             decel: 0.9,
             dwell_minutes: 0.6,
             run_margin: 1.15,
+            pass_penalty_seconds: 3.0,
             detour_min: 1.0,
             detour_max: 1.6,
         }
@@ -272,6 +288,21 @@ fn base_speed_kmh(line_type: Option<i32>) -> f64 {
     }
 }
 
+/// 列車種別(`TrainTypeKind`)ごとの速度倍率。
+///
+/// 快速系(Rapid/CommuterRapid)や支線直通(Branch)は各停と同じ車両・線路を
+/// 走るため各停と同速とし、速達性は通過(加減速・停車の削減)だけで表現する。
+/// 急行・特急は速達ダイヤの実勢巡航速度、新快速級(HighSpeedRapid)は
+/// 130km/h 運転を倍率で表す(在来線基本 80km/h × 1.5 = 120km/h)。
+fn kind_speed_multiplier(kind: Option<i32>) -> f64 {
+    match kind.and_then(|v| TrainTypeKind::try_from(v).ok()) {
+        Some(TrainTypeKind::Express) => 1.15,
+        Some(TrainTypeKind::LimitedExpress) => 1.2,
+        Some(TrainTypeKind::HighSpeedRapid) => 1.5,
+        _ => 1.0,
+    }
+}
+
 /// 路線種別・列車種別から最高速度(km/h)を決める。
 ///
 /// バスは `line_type`(GTFS の route_type が混入)や `kind`(BusRoute=7 は経路
@@ -285,10 +316,7 @@ fn max_speed_kmh(line_type: Option<i32>, kind: Option<i32>, transport_type: Tran
     if line_type == Some(LINE_TYPE_SHINKANSEN) {
         return base;
     }
-    match kind {
-        Some(k) if k != 0 => base * 1.2,
-        _ => base,
-    }
+    base * kind_speed_multiplier(kind)
 }
 
 /// 停車駅間の走行時間(分)を運動学モデルで求める。
@@ -414,6 +442,11 @@ fn assign_segment_times(
         if v > 0.0 {
             cruise_sec += track_m / v;
         }
+        if !is_stop {
+            // 通過駅は分岐器・ホーム進入部の曲線で最高速度を維持できないぶんの
+            // 小ペナルティを加える。
+            cruise_sec += params.pass_penalty_seconds;
+        }
         let seconds = if is_stop {
             // 終点停車駅: 加速 + 全巡航 + 減速。
             accel_penalty_sec + cruise_sec + decel_penalty_sec
@@ -432,8 +465,25 @@ fn assign_segment_times(
 /// 順序付き駅リスト(単一 `line_group_cd` の経路)に対し、始点からの累積到着時間(分)を推定する。
 ///
 /// `stops` は始点→終点の順に並んでいること。返り値は入力と同じ順・同じ要素数。
+/// 迂回係数 `α` は `stops` 自身から較正する。`stops` が経路全体の一部を切り出した
+/// 区間の場合は [`estimate_arrival_minutes_calibrated`] で経路全体を較正母数に渡すこと。
 pub fn estimate_arrival_minutes(
     stops: &[&Station],
+    params: &EstimationParams,
+) -> Vec<EstimatedStop> {
+    estimate_arrival_minutes_calibrated(stops, stops, params)
+}
+
+/// [`estimate_arrival_minutes`] の較正母数指定版。
+///
+/// `calibration_stops` には経路全体(部分区間へ切り出す前)の駅列を渡す。
+/// `Line.average_distance` は路線全体の平均駅間距離なので、迂回係数
+/// `α = average_distance / 直線平均駅間距離` の分母も路線全体相当の駅列から
+/// 取らないと較正が破綻する(例: 長距離路線の都心側だけを切り出すと駅間隔が
+/// 路線平均より狭く、`α` が上限に張り付いて走行距離を大幅に過大評価する)。
+pub fn estimate_arrival_minutes_calibrated(
+    stops: &[&Station],
+    calibration_stops: &[&Station],
     params: &EstimationParams,
 ) -> Vec<EstimatedStop> {
     let n = stops.len();
@@ -452,8 +502,26 @@ pub fn estimate_arrival_minutes(
         ) / 1000.0;
     }
 
-    // line_cd ごとの迂回係数。
-    let detour_by_line = detour_factors_by_line(stops, &straight_km, params);
+    // line_cd ごとの迂回係数。較正には経路全体の駅列を用いる。
+    // 環状路線のシーム辺(末尾駅→先頭駅)は意図的に母数へ含めない。分子側の
+    // `average_distance` 自体が格納順の隣接ペアのみ(シーム辺なし)から算出されて
+    // おり(scripts/compute_average_distance.py)、分母だけシーム辺を足すと母数が
+    // ズレるため。
+    let calibration = if calibration_stops.is_empty() {
+        stops
+    } else {
+        calibration_stops
+    };
+    let mut calib_straight_km = vec![0.0_f64; calibration.len()];
+    for i in 1..calibration.len() {
+        calib_straight_km[i] = haversine_distance(
+            calibration[i - 1].lat,
+            calibration[i - 1].lon,
+            calibration[i].lat,
+            calibration[i].lon,
+        ) / 1000.0;
+    }
+    let detour_by_line = detour_factors_by_line(calibration, &calib_straight_km, params);
     let detour_of = |station: &Station| -> f64 {
         detour_by_line
             .get(&station.line_cd)
@@ -702,7 +770,7 @@ mod tests {
         // 単調増加。
         assert!(est[1].cumulative_minutes > est[0].cumulative_minutes);
         assert!(est[2].cumulative_minutes > est[1].cumulative_minutes);
-        // 中間駅で dwell(0.4分)が入るので、2区間目の到着は
+        // 中間駅で dwell が入るので、2区間目の到着は
         // 「1区間の所要 × 2 + dwell」付近になる。
         let leg = est[1].cumulative_minutes;
         approx(est[2].cumulative_minutes, leg * 2.0 + p.dwell_minutes);
@@ -810,11 +878,11 @@ mod tests {
         let slow_refs: Vec<&Station> = slow.iter().collect();
         let slow_est = estimate_arrival_minutes(&slow_refs, &p);
 
-        // 後半サブ区間(通過→終点)だけ高速種別(kind != 0 → 100km/h)にする。
+        // 後半サブ区間(通過→終点)だけ高速種別(特急 → 80×1.2=96km/h)にする。
         let mut fast = three_collinear_stations();
         fast[1].pass = Some(1);
         fast[2].line_cd = 200;
-        fast[2].kind = Some(1); // 速達種別 → 後半サブ区間の v_max を上げる
+        fast[2].kind = Some(TrainTypeKind::LimitedExpress as i32); // 後半サブ区間の v_max を上げる
         let fast_refs: Vec<&Station> = fast.iter().collect();
         let fast_est = estimate_arrival_minutes(&fast_refs, &p);
 
@@ -1123,5 +1191,112 @@ mod tests {
     fn empty_input_returns_empty() {
         let p = EstimationParams::default();
         assert!(estimate_arrival_minutes(&[], &p).is_empty());
+        assert!(estimate_arrival_minutes_calibrated(&[], &[], &p).is_empty());
+    }
+
+    #[test]
+    fn rapid_and_branch_kinds_run_at_local_speed() {
+        // 快速(Rapid)・支線(Branch)・通勤快速(CommuterRapid)は各停と同速。
+        // 速達性は通過そのもので表現され、速度倍率では表現しない。
+        let p = EstimationParams::default();
+        let time_with_kind = |kind: Option<i32>| -> f64 {
+            let mut stations = three_collinear_stations();
+            for s in stations.iter_mut() {
+                s.kind = kind;
+            }
+            let refs: Vec<&Station> = stations.iter().collect();
+            estimate_arrival_minutes(&refs, &p)[2].cumulative_minutes
+        };
+        let local = time_with_kind(None);
+        approx(time_with_kind(Some(TrainTypeKind::Rapid as i32)), local);
+        approx(time_with_kind(Some(TrainTypeKind::Branch as i32)), local);
+        approx(
+            time_with_kind(Some(TrainTypeKind::CommuterRapid as i32)),
+            local,
+        );
+        // 急行 < 各停、特急 < 急行、新快速級 < 特急 の順に速い。
+        let express = time_with_kind(Some(TrainTypeKind::Express as i32));
+        let limited = time_with_kind(Some(TrainTypeKind::LimitedExpress as i32));
+        let high_speed = time_with_kind(Some(TrainTypeKind::HighSpeedRapid as i32));
+        assert!(
+            express < local,
+            "express {express} should be < local {local}"
+        );
+        assert!(
+            limited < express,
+            "limited {limited} should be < express {express}"
+        );
+        assert!(
+            high_speed < limited,
+            "high_speed {high_speed} should be < limited {limited}"
+        );
+    }
+
+    #[test]
+    fn pass_penalty_adds_time_per_passed_station() {
+        let mut p = EstimationParams {
+            pass_penalty_seconds: 0.0,
+            ..Default::default()
+        };
+        let mut stations = three_collinear_stations();
+        stations[1].pass = Some(1);
+        let refs: Vec<&Station> = stations.iter().collect();
+        let base = estimate_arrival_minutes(&refs, &p)[2].cumulative_minutes;
+
+        p.pass_penalty_seconds = 3.0;
+        let with_penalty = estimate_arrival_minutes(&refs, &p)[2].cumulative_minutes;
+        // 通過駅 1 駅ぶんのペナルティ(運転余裕率込み)だけ遅くなる。
+        approx(with_penalty, base + 3.0 * p.run_margin / 60.0);
+    }
+
+    #[test]
+    fn slice_calibration_uses_full_route_regression() {
+        // スライス較正バグの回帰: 「都心側は駅間 1km・郊外側は駅間 4km」の路線で
+        // average_distance(路線全体の平均実駅間距離 ≈ 2km)を持つとき、都心側だけを
+        // 切り出して較正すると α = 2.0/1.0 → 上限 1.6 に張り付き、走行距離を
+        // 60% 過大評価してしまっていた。経路全体を較正母数に渡せば α ≈ 1.0 になる。
+        let p = EstimationParams::default();
+        let avg_dist_m = Some(2000.0);
+        let mut stations: Vec<Station> = Vec::new();
+        // 都心側: 1km(緯度 0.009 度)間隔 × 6 駅。
+        for i in 0..6 {
+            stations.push(station(
+                i + 1,
+                100,
+                35.0 + 0.009 * i as f64,
+                139.0,
+                avg_dist_m,
+            ));
+        }
+        // 郊外側: 4km(緯度 0.036 度)間隔 × 3 駅。
+        let base_lat = 35.0 + 0.009 * 5.0;
+        for i in 0..3 {
+            stations.push(station(
+                7 + i,
+                100,
+                base_lat + 0.036 * (i + 1) as f64,
+                139.0,
+                avg_dist_m,
+            ));
+        }
+        let full: Vec<&Station> = stations.iter().collect();
+        let slice: Vec<&Station> = full[..6].to_vec();
+
+        let self_calibrated = estimate_arrival_minutes(&slice, &p);
+        let full_calibrated = estimate_arrival_minutes_calibrated(&slice, &full, &p);
+
+        // スライス単体較正(旧挙動)は α が上限に張り付き大幅に遅い推定になる。
+        assert!(
+            full_calibrated[5].cumulative_minutes < self_calibrated[5].cumulative_minutes * 0.85,
+            "full {} should be much faster than slice-calibrated {}",
+            full_calibrated[5].cumulative_minutes,
+            self_calibrated[5].cumulative_minutes
+        );
+        // 経路全体較正のスライス推定は、経路全体推定の該当区間と一致する。
+        let full_est = estimate_arrival_minutes(&full, &p);
+        approx(
+            full_calibrated[5].cumulative_minutes,
+            full_est[5].cumulative_minutes,
+        );
     }
 }
