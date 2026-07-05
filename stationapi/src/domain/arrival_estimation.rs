@@ -283,7 +283,9 @@ pub fn detour_factor_for(
             params.detour_max
         } else {
             params.detour_max.min(RAIL_DETOUR_MAX)
-        };
+        }
+        // detour_min > 上限 の設定でも clamp(min > max) でパニックしないよう正規化。
+        .max(params.detour_min);
         (avg_distance_km / mean_straight_km).clamp(params.detour_min, detour_max)
     } else {
         fallback_detour_factor(line_type, transport_type)
@@ -757,6 +759,15 @@ mod tests {
         approx(
             detour_factor_for(5.0, 1.0, Some(2), TransportType::Rail, &p),
             1.35,
+        );
+        // detour_min が鉄道上限 1.35 を超える設定でもパニックせず detour_min を採用。
+        let wide_min = EstimationParams {
+            detour_min: 1.4,
+            ..Default::default()
+        };
+        approx(
+            detour_factor_for(5.0, 1.0, Some(2), TransportType::Rail, &wide_min),
+            1.4,
         );
         // バスは params.detour_max = 1.6 のままクランプ。
         approx(
