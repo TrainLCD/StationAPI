@@ -282,8 +282,18 @@ def fetch_feed(feed: Feed, token: str | None) -> zipfile.ZipFile | None:
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
             data = resp.read()
-        with open(cache, "wb") as f:
+        # 200 で ZIP 以外のエラーボディが返るケースをキャッシュへ確定させないよう、
+        # 一時ファイルへ書いて ZIP として開けることを検証してから原子的に置き換える。
+        tmp = cache + ".tmp"
+        with open(tmp, "wb") as f:
             f.write(data)
+        try:
+            with zipfile.ZipFile(tmp):
+                pass
+        except zipfile.BadZipFile:
+            os.remove(tmp)
+            raise RuntimeError(f"{feed.name}: 応答が ZIP ではありません(URL・トークンを確認)")
+        os.replace(tmp, cache)
     return zipfile.ZipFile(cache)
 
 
@@ -609,7 +619,8 @@ def main() -> int:
             continue
         if zf is None:
             continue
-        all_results.extend(calibrate_feed(feed, zf, lines, by_line, kinds, groups))
+        with zf:
+            all_results.extend(calibrate_feed(feed, zf, lines, by_line, kinds, groups))
 
     print(f"\n{'路線':<24} {'kind':<16} {'フィット':>8} {'一般則':>7} {'乖離':>7} {'本数':>4} {'採用':>4}")
     emitted = []
