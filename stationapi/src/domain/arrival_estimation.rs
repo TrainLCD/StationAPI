@@ -13,7 +13,9 @@
 //!    クエリで切り出した部分区間ではなく **経路全体の駅列** から取る。
 //!    `average_distance` は路線全体の平均駅間距離なので、駅間隔が路線平均と
 //!    異なる部分区間(長距離路線の都心側など)の直線平均と比較すると `α` が
-//!    実態(1.0〜1.1 程度)から大きく外れてしまうため。
+//!    実態(1.0〜1.1 程度)から大きく外れてしまうため。経路自体が路線の一部に
+//!    偏り較正が破綻する路線は、実測値の較正テーブル
+//!    (`LINE_DETOUR_OVERRIDES`)で `α` を上書きする。
 //! 3. 停車駅間ごとに「加速→巡航→減速」の運動学モデルで走行時間を算出する。
 //!    停車が多いほど巡航しきれず平均速度が落ちる(各停が速達より遅い)現象が
 //!    加減速ペナルティとして自然に表現される。運動学モデルは理想走行
@@ -265,6 +267,33 @@ fn fallback_detour_factor(line_type: Option<i32>, transport_type: TransportType)
 /// 道路網の迂回率が高いバスには適用しない(`params.detour_max` のまま)。
 const RAIL_DETOUR_MAX: f64 = 1.35;
 
+/// 路線ごとの実測迂回係数 `α` の較正テーブル。`(line_cd, α)`。
+///
+/// `α = average_distance / 直線平均駅間距離` の較正は「分子(路線全体の平均実
+/// 駅間距離)と分母(経路の平均直線駅間距離)が同じ駅間隔分布を持つ」ことを
+/// 仮定している。駅間隔が区間によって大きく異なる路線(都心側は 1〜2km 間隔・
+/// 山間側は 3〜5km 間隔の西武池袋線など)では、経路(列車の運転区間)が路線の
+/// 一部に限られると分母だけ狭い駅間隔で平均され、`α` が実態から大きく外れて
+/// 走行距離・所要時間を系統的に過大評価する(例: 西武池袋線 池袋→飯能経路の
+/// 較正値は 1.24 だが、営業キロ 43.7km / 直線 41.1km = 実測 1.06)。
+///
+/// ここには営業キロと駅座標の直線距離から実測した迂回係数を載せ、
+/// `average_distance` ベースの較正より優先する。
+/// 検証していない路線を推測で追加しないこと(較正フォールバックに任せる)。
+const LINE_DETOUR_OVERRIDES: &[(i32, f64)] = &[
+    // 西武池袋線: 池袋→飯能 営業キロ 43.7km / 直線距離合計 41.1km。
+    // 池袋→所沢 準急 実28〜31分・急行 実24分への較正で検証。
+    (22001, 1.06),
+];
+
+/// `line_cd` に対応する実測迂回係数を返す。エントリが無ければ `None`。
+pub fn line_detour_override(line_cd: i32) -> Option<f64> {
+    LINE_DETOUR_OVERRIDES
+        .iter()
+        .find(|(lc, _)| *lc == line_cd)
+        .map(|(_, v)| *v)
+}
+
 /// 迂回係数 `α` を決める。
 ///
 /// `avg_distance_km`(= `Line.average_distance` を km 換算した値、実距離±10%精度)が得られる場合は
@@ -415,17 +444,19 @@ fn detour_factors_by_line(
     acc.into_iter()
         .map(
             |(line_cd, (sum, count, avg_distance, line_type, transport_type))| {
-                let mean_straight = if count > 0 { sum / count as f64 } else { 0.0 };
-                (
-                    line_cd,
+                // 実測の較正テーブルにある路線は average_distance ベースの
+                // 較正より優先する(経路が路線の一部だと較正が破綻するため)。
+                let detour = line_detour_override(line_cd).unwrap_or_else(|| {
+                    let mean_straight = if count > 0 { sum / count as f64 } else { 0.0 };
                     detour_factor_for(
                         avg_distance,
                         mean_straight,
                         line_type,
                         transport_type,
                         params,
-                    ),
-                )
+                    )
+                });
+                (line_cd, detour)
             },
         )
         .collect()
@@ -552,7 +583,11 @@ pub fn estimate_arrival_minutes_calibrated(
         detour_by_line
             .get(&station.line_cd)
             .copied()
-            .unwrap_or_else(|| fallback_detour_factor(station.line_type, station.transport_type))
+            .unwrap_or_else(|| {
+                line_detour_override(station.line_cd).unwrap_or_else(|| {
+                    fallback_detour_factor(station.line_type, station.transport_type)
+                })
+            })
     };
 
     // 各駅が停車するか。
@@ -1370,5 +1405,103 @@ mod tests {
             full_calibrated[5].cumulative_minutes,
             full_est[5].cumulative_minutes,
         );
+    }
+
+    /// 西武池袋線 準急(kind=Express)の実ダイヤ較正回帰テスト。
+    ///
+    /// 迂回係数の実測較正(`LINE_DETOUR_OVERRIDES`)の回帰: 西武池袋線は都心側
+    /// 1〜2km・山間側 3〜5km と駅間隔の区間差が大きく、準急の経路(池袋→飯能)を
+    /// 較正母数にすると `α = 2041m / 1645m = 1.24` と実測(営業キロ比 1.06)を
+    /// 大きく超え、全区間の所要時間を 10〜17% 過大評価していた
+    /// (実車では表示 ETA より約 1 分早く到着する)。
+    ///
+    /// 期待値は平日日中の準急 池袋→所沢の実時刻表から、石神井公園での
+    /// 待避停車ぶんを除いた純走行ベースで取っている。
+    #[test]
+    fn seibu_ikebukuro_semi_express_matches_real_travel_time() {
+        let p = EstimationParams::default();
+        // 池袋→飯能(準急の経路全体)。pass=1 は通過駅。実座標・実データ値
+        // (average_distance = 2041.41825m)。
+        // (station_cd, lat, lon, pass, 実所要分(池袋発・停車駅のみ))
+        let data: &[(i32, f64, f64, i32, Option<f64>)] = &[
+            (2200101, 35.72913, 139.711461, 0, Some(0.0)),   // 池袋
+            (2200102, 35.726572, 139.694363, 1, None),       // 椎名町
+            (2200103, 35.73003, 139.683294, 1, None),        // 東長崎
+            (2200104, 35.737557, 139.672814, 1, None),       // 江古田
+            (2200105, 35.738797, 139.662602, 1, None),       // 桜台
+            (2200106, 35.737893, 139.654368, 0, Some(6.5)),  // 練馬
+            (2200107, 35.736767, 139.637456, 1, None),       // 中村橋
+            (2200108, 35.735867, 139.62969, 1, None),        // 富士見台
+            (2200109, 35.740622, 139.616749, 1, None),       // 練馬高野台
+            (2200110, 35.743563, 139.606981, 0, Some(10.5)), // 石神井公園
+            (2200111, 35.749406, 139.586732, 0, Some(13.0)), // 大泉学園
+            (2200112, 35.748222, 139.567753, 0, Some(15.5)), // 保谷
+            (2200113, 35.751485, 139.545852, 0, Some(18.5)), // ひばりヶ丘
+            (2200114, 35.760445, 139.533739, 0, Some(20.5)), // 東久留米
+            (2200115, 35.772221, 139.519917, 0, Some(23.0)), // 清瀬
+            (2200116, 35.778614, 139.496539, 0, Some(25.5)), // 秋津
+            (2200131, 35.786627, 139.473324, 0, Some(28.5)), // 所沢
+            (2200117, 35.789303, 139.455959, 0, None),       // 西所沢
+            (2200118, 35.800535, 139.438016, 0, None),       // 小手指
+            (2200119, 35.810445, 139.416975, 0, None),       // 狭山ヶ丘
+            (2200120, 35.820963, 139.412736, 0, None),       // 武蔵藤沢
+            (2200121, 35.845112, 139.39842, 0, None),        // 稲荷山公園
+            (2200122, 35.842904, 139.390294, 0, None),       // 入間市
+            (2200123, 35.83769, 139.360115, 0, None),        // 仏子
+            (2200124, 35.84058, 139.345316, 0, None),        // 元加治
+            (2200125, 35.851189, 139.318824, 0, None),       // 飯能
+        ];
+        let stations: Vec<Station> = data
+            .iter()
+            .map(|&(cd, lat, lon, pass, _)| {
+                let mut s = station(cd, 22001, lat, lon, Some(2041.41825));
+                s.kind = Some(TrainTypeKind::Express as i32);
+                if pass == 1 {
+                    s.pass = Some(1);
+                }
+                s
+            })
+            .collect();
+        // 本番同様、所沢までの乗車区間を切り出し、較正母数には経路全体を渡す。
+        let full: Vec<&Station> = stations.iter().collect();
+        let slice: Vec<&Station> = full[..17].to_vec();
+        let est = estimate_arrival_minutes_calibrated(&slice, &full, &p);
+
+        for (e, d) in est.iter().zip(data.iter()) {
+            let Some(real) = d.4 else { continue };
+            assert!(
+                (e.cumulative_minutes - real).abs() < 1.5,
+                "station_cd {}: est {} vs real {}",
+                d.0,
+                e.cumulative_minutes,
+                real
+            );
+        }
+    }
+
+    #[test]
+    fn line_detour_override_lookup() {
+        // 西武池袋線は実測値 1.06。
+        assert_eq!(line_detour_override(22001), Some(1.06));
+        // 未較正の路線はエントリ無し。
+        assert_eq!(line_detour_override(11302), None);
+    }
+
+    #[test]
+    fn line_detour_override_beats_average_distance_calibration() {
+        let p = EstimationParams::default();
+        // 西武池袋線 石神井公園→大泉学園 相当の 2 駅。average_distance(2041m)を
+        // 直線平均(約 2.0km)で割る較正では α ≈ 1.0 だが、実測テーブルの 1.06 が
+        // 優先される。
+        let a = station(1, 22001, 35.743563, 139.606981, Some(2041.41825));
+        let b = station(2, 22001, 35.749406, 139.586732, Some(2041.41825));
+        let stations = [a, b];
+        let refs: Vec<&Station> = stations.iter().collect();
+        let est = estimate_arrival_minutes(&refs, &p);
+
+        let straight_m = haversine_distance(35.743563, 139.606981, 35.749406, 139.586732);
+        // 在来線・kind=None → 80km/h。みなし走行距離は直線 × 1.06。
+        let expected = segment_run_minutes(straight_m * 1.06, 80.0, &p);
+        approx(est[1].cumulative_minutes, expected);
     }
 }
