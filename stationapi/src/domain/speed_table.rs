@@ -61,6 +61,10 @@ const LINE_SPEED_OVERRIDES_GTFS: &[(i32, TrainTypeKind, f64)] = &[
     (99105, TrainTypeKind::Default, 20.0),
     // 函館市電5系統 Default: 函館市電 GTFS 6本 中央値47分 (一般則 40km/h)
     (99106, TrainTypeKind::Default, 25.0),
+    // 横浜市営地下鉄ブルーライン Rapid: 横浜市営地下鉄 GTFS 3本 中央値61分 (一般則 75km/h)
+    (99316, TrainTypeKind::Rapid, 65.0),
+    // 京都市営地下鉄東西線 Default: 京都市営地下鉄 GTFS 9本 中央値33分 (一般則 75km/h)
+    (99611, TrainTypeKind::Default, 65.0),
     // --- END GENERATED ---
 ];
 
