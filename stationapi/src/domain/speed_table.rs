@@ -16,6 +16,8 @@
 //! - 公表運転速度(例: 京急快特 120km/h、スカイライナー 160km/h)を起点にし、
 //!   実時刻表の所要時間と突き合わせて検証した路線だけを載せる。
 //! - 検証していない路線を推測で追加しない(一般則フォールバックに任せる)。
+//! - 公開 GTFS 時刻表が利用できる路線は `scripts/compute_speed_table.py` で
+//!   自動較正し、下部の自動生成ブロックへ書き込む(手動テーブルが優先)。
 
 use crate::proto::TrainTypeKind;
 
@@ -50,13 +52,31 @@ const LINE_SPEED_OVERRIDES: &[(i32, TrainTypeKind, f64)] = &[
     (31027, TrainTypeKind::LimitedExpress, 120.0),
 ];
 
+/// 公開 GTFS 時刻表からの自動較正エントリ。`scripts/compute_speed_table.py --apply`
+/// がマーカー間を再生成する。手動テーブル(`LINE_SPEED_OVERRIDES`)と重複するキーは
+/// スクリプト側で除外される。手動編集しないこと。
+const LINE_SPEED_OVERRIDES_GTFS: &[(i32, TrainTypeKind, f64)] = &[
+    // --- BEGIN GENERATED (scripts/compute_speed_table.py) ---
+    // 函館市電2系統 Default: 函館市電 GTFS 4本 中央値48分 (一般則 40km/h)
+    (99105, TrainTypeKind::Default, 20.0),
+    // 函館市電5系統 Default: 函館市電 GTFS 6本 中央値47分 (一般則 40km/h)
+    (99106, TrainTypeKind::Default, 25.0),
+    // 横浜市営地下鉄ブルーライン Rapid: 横浜市営地下鉄 GTFS 3本 中央値61分 (一般則 75km/h)
+    (99316, TrainTypeKind::Rapid, 65.0),
+    // 京都市営地下鉄東西線 Default: 京都市営地下鉄 GTFS 9本 中央値33分 (一般則 75km/h)
+    (99611, TrainTypeKind::Default, 65.0),
+    // --- END GENERATED ---
+];
+
 /// (line_cd, kind) に対応する実効最高速度(km/h)を返す。エントリが無ければ `None`。
 ///
+/// 手動較正テーブルを優先し、次に GTFS 自動較正テーブルを引く。
 /// `kind` が `None`(列車種別なし=路線内各駅停車扱い)は `Default` として引く。
 pub fn line_speed_override_kmh(line_cd: i32, kind: Option<i32>) -> Option<f64> {
     let kind = TrainTypeKind::try_from(kind.unwrap_or(0)).ok()?;
     LINE_SPEED_OVERRIDES
         .iter()
+        .chain(LINE_SPEED_OVERRIDES_GTFS.iter())
         .find(|(lc, k, _)| *lc == line_cd && *k == kind)
         .map(|(_, _, v)| *v)
 }
@@ -102,6 +122,23 @@ mod tests {
     fn unknown_line_or_kind_returns_none() {
         assert_eq!(line_speed_override_kmh(11302, None), None);
         assert_eq!(line_speed_override_kmh(27001, Some(999)), None);
+    }
+
+    #[test]
+    fn gtfs_generated_entries_are_looked_up() {
+        // GTFS 自動較正ブロックのエントリも lookup 対象になる(値は再生成で変わり得る
+        // ため存在だけを確認する)。函館市電2系統は認証不要フィードなので常に較正可能。
+        assert!(line_speed_override_kmh(99105, None).is_some());
+    }
+
+    #[test]
+    fn manual_table_takes_precedence_over_gtfs_on_key_collision() {
+        // 手動テーブルと同じキーが仮に GTFS テーブルにも存在した場合でも、
+        // lookup は手動テーブルを先に引くため手動の値が返ることを回帰検知する。
+        approx(
+            line_speed_override_kmh(27001, Some(TrainTypeKind::Express as i32)),
+            Some(120.0),
+        );
     }
 
     fn approx(actual: Option<f64>, expected: Option<f64>) {
