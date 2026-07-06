@@ -1125,6 +1125,38 @@ mod tests {
         }
     }
 
+    #[test]
+    fn ginza_line_shibuya_to_shimbashi_matches_real_travel_time() {
+        let p = EstimationParams::default();
+        // 東京メトロ銀座線 渋谷→新橋。実座標・実データ値
+        // (average_distance = 780.46154m、地下鉄 line_type=3)。
+        // 実乗車時間は東京メトロ/乗換案内系の標準所要時間で約13分。
+        let data = [
+            (2800119, 35.659066, 139.701000), // 渋谷
+            (2800118, 35.665247, 139.712314), // 表参道
+            (2800117, 35.670527, 139.717857), // 外苑前
+            (2800116, 35.672765, 139.724159), // 青山一丁目
+            (2800115, 35.677021, 139.737047), // 赤坂見附
+            (2800114, 35.673621, 139.741419), // 溜池山王
+            (2800113, 35.670236, 139.749832), // 虎ノ門
+            (2800112, 35.667434, 139.758432), // 新橋
+        ];
+        let stations: Vec<Station> = data
+            .iter()
+            .map(|&(cd, lat, lon)| {
+                let mut s = station(cd, 28001, lat, lon, Some(780.46154));
+                s.line_type = Some(LINE_TYPE_SUBWAY);
+                s.line_group_cd = Some(28001);
+                s
+            })
+            .collect();
+        let refs: Vec<&Station> = stations.iter().collect();
+        let est = estimate_arrival_minutes(&refs, &p);
+
+        let total = est.last().unwrap().cumulative_minutes;
+        assert!((12.0..14.0).contains(&total), "got {total}");
+    }
+
     /// GTFS インポート後のバス停を再現する(line_type=3 は GTFS route_type のバス、
     /// kind=7 は TrainTypeKind::BusRoute、average_distance は無し)。
     fn bus_station(station_cd: i32, line_cd: i32, lat: f64, lon: f64) -> Station {

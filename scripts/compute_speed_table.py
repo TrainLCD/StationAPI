@@ -167,8 +167,10 @@ SEG_MIN_SAMPLES = 5
 # 路線単位の較正値からこの比率以上乖離したペアだけを出力する。
 SEG_EMIT_THRESHOLD = 0.05
 # 路線単位較正値に対するフィット結果の妥当範囲(倍率)。範囲外は時刻データ異常
-# (長時間停車の折込みなど)とみなして捨てる。
+# (長時間停車の折込みなど)とみなして捨てる。地下鉄の短区間は分単位GTFSから
+# 加減速モデルの下限に近い速度が出やすいため、別途絶対上限で救済する。
 SEG_SANITY_BAND = (0.4, 1.6)
+SEG_SUBWAY_ABS_MAX_KMH = 110.0
 # 駅間所要時間サンプルの採用範囲(分)。
 SEG_TARGET_RANGE = (0.1, 30.0)
 # 駅名 + 座標マッチングの許容距離(m)。
@@ -538,8 +540,14 @@ def fit_segment_v(dist_m: float, target_min: float) -> float | None:
     lo, hi = 5.0, 250.0
     if seg_run_min(dist_m, lo) < target_min:  # 最低速度でもモデルが速すぎる
         return None
-    if seg_run_min(dist_m, hi) > target_min:  # 最高速度でもモデルが遅すぎる
-        return None
+    if seg_run_min(dist_m, hi) > target_min:
+        # GTFS は駅時刻が分単位のことが多く、短駅間では平均しても
+        # arrival_estimation の加減速モデル上の最短時間より短く見える場合がある。
+        # その場合にサンプルを捨てると路線値へフォールバックして逆に遅くなるため、
+        # これ以上 v_max を上げても三角形プロファイルで所要がほぼ短くならない
+        # 境界速度を採用する。
+        v_switch = math.sqrt(2 * dist_m / (1 / ACCEL + 1 / DECEL)) * 3.6
+        return min(v_switch, hi)
     for _ in range(60):
         mid = (lo + hi) / 2
         if seg_run_min(dist_m, mid) > target_min:
@@ -562,6 +570,8 @@ def collect_segment_samples(
     - 次駅に到着時刻が別記録されていれば「出発 → 次駅到着」(純走行時間)。
     - 到着 = 出発(停車時分がフィードに折り込まれていない)なら
       「出発 → 次駅出発 − モデル停車時分」で近似する。
+      ただし次駅が終点の場合は、モデル側も終点 dwell を加えないため
+      停車時分を引かずに「出発 → 終点時刻」を純走行時間として扱う。
     前者を優先しないと、停車時分を記録する駅で dwell を二重計上して
     駅間速度を系統的に過小評価してしまう。
     """
@@ -576,8 +586,9 @@ def collect_segment_samples(
             continue
         if arr_next is not None and (dep_next is None or arr_next < dep_next):
             target = arr_next - dep_a
-        elif dep_next is not None and j + 1 != len(stop_rows) - 1:
-            target = dep_next - dep_a - DWELL_MIN
+        elif dep_next is not None:
+            dwell = 0.0 if j + 1 == len(stop_rows) - 1 else DWELL_MIN
+            target = dep_next - dep_a - dwell
         else:
             continue
         if not (SEG_TARGET_RANGE[0] <= target <= SEG_TARGET_RANGE[1]):
@@ -585,6 +596,13 @@ def collect_segment_samples(
         cd_a, cd_b = sts_line[a]["cd"], sts_line[b]["cd"]
         key = (line_cd, min(cd_a, cd_b), max(cd_a, cd_b))
         seg_samples.setdefault(key, []).append(target)
+
+
+def segment_sanity_upper_kmh(base: float, line_type: int | None) -> float:
+    upper = SEG_SANITY_BAND[1] * base
+    if line_type == LT_SUBWAY:
+        upper = max(upper, SEG_SUBWAY_ABS_MAX_KMH)
+    return upper
 
 
 def calibrate_feed(
@@ -960,10 +978,12 @@ def main() -> int:
         if v is None:
             continue
         base = line_baseline(line_cd)
-        if not (SEG_SANITY_BAND[0] * base <= v <= SEG_SANITY_BAND[1] * base):
+        upper = segment_sanity_upper_kmh(base, lines[line_cd]["line_type"])
+        if not (SEG_SANITY_BAND[0] * base <= v <= upper):
             sys.stderr.write(
                 f"  {lines[line_cd]['name']} {name_of[cd_lo]}〜{name_of[cd_hi]}: "
-                f"フィット {v:.0f}km/h が路線値 {base:.0f}km/h の妥当範囲外 → 見送り\n"
+                f"フィット {v:.0f}km/h が路線値 {base:.0f}km/h の妥当範囲外 "
+                f"({SEG_SANITY_BAND[0] * base:.0f}〜{upper:.0f}km/h) → 見送り\n"
             )
             continue
         stats[0] += 1
