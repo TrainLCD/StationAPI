@@ -573,6 +573,7 @@ def rebalance_line_targets(
     pair_dist_m: dict[tuple[int, int, int], float],
     by_line: dict,
     lines: dict,
+    dep_only_keys: set[tuple[int, int, int]],
 ) -> None:
     """運動学的下限を下回るペアの不足分を隣接ペアへ繰り越し、合計を保存する。
 
@@ -581,9 +582,14 @@ def rebalance_line_targets(
     千駄木→根津 平均2.1分。実際はどちらも1分台)。このとき短すぎる側は
     フィットで運動学的下限にクランプされて縮められない一方、長すぎる側は
     そのまま再現されるため、区間合計が系統的に過大になる(クランプの
-    非対称バイアス)。路線格納順に連続して較正できているペア列に対し
+    非対称バイアス)。出発間隔ベースでしか較正できないペアの連続列に対し
     前後2パスで不足分を隣へ繰り越すことで、ペア列の合計を保ったまま
     下限違反を解消する。ペア列の端で吸収しきれない不足分は捨てる。
+
+    到着時刻ベースで較正できたペアには適用しない(鎖もそこで分断する)。
+    純走行時間の「下限未満」は補間アーティファクトではなく、モデルの保守的な
+    加減速下限より実車が速いだけであり、隣から時間を奪うと実測に合っていた
+    区間まで過小になる(都営大江戸線で確認済み)。
     """
     for line_cd, sts in by_line.items():
         runs: list[list[tuple[int, int, int]]] = []
@@ -591,7 +597,7 @@ def rebalance_line_targets(
         for i in range(1, len(sts)):
             cd_a, cd_b = sts[i - 1]["cd"], sts[i]["cd"]
             key = (line_cd, min(cd_a, cd_b), max(cd_a, cd_b))
-            if key in mean_targets:
+            if key in mean_targets and key in dep_only_keys:
                 cur.append(key)
             elif cur:
                 runs.append(cur)
@@ -973,13 +979,6 @@ def main() -> int:
     g.add_argument("--validate", action="store_true", help="較正のみ(ファイル不変)")
     g.add_argument("--apply", action="store_true", help="speed_table.rs の生成ブロックを書き換える")
     ap.add_argument(
-        "--rebalance",
-        action="store_true",
-        help="実験的: タイムポイント補間の偏りで運動学的下限を下回るペアの不足分を"
-        "隣接ペアへ繰り越す(--dump-line で生平均の偏りを確認してから使うこと。"
-        "到着時刻ベースのサンプルが多い路線では過補正になる場合がある)",
-    )
-    ap.add_argument(
         "--dump-line",
         type=int,
         default=None,
@@ -1047,6 +1046,8 @@ def main() -> int:
     # ペアごとの平均ターゲットとみなし距離。距離には路線較正済みの迂回係数を使う。
     mean_targets: dict[tuple[int, int, int], float] = {}
     pair_dist_m: dict[tuple[int, int, int], float] = {}
+    # 出発間隔ベースでしか較正できなかったペア(繰り越し補正の対象)。
+    dep_only_keys: set[tuple[int, int, int]] = set()
     detour_cache: dict[int, float] = {}
     for (line_cd, cd_lo, cd_hi), ts in all_seg_samples.items():
         if len(ts) < SEG_MIN_SAMPLES:
@@ -1065,12 +1066,12 @@ def main() -> int:
             dep_ts = sorted(t for t, s in ts if s == "dep") or [t for t, _ in ts]
             keep = max(1, math.ceil(len(dep_ts) * (1.0 - SEG_DEP_TRIM_RATIO)))
             used = dep_ts[:keep]
+            dep_only_keys.add(key)
         mean_targets[key] = sum(used) / len(used)
         pair_dist_m[key] = haversine(lat1, lon1, lat2, lon2) * detour_cache[line_cd]
 
     raw_targets = dict(mean_targets)
-    if args.rebalance:
-        rebalance_line_targets(mean_targets, pair_dist_m, by_line, lines)
+    rebalance_line_targets(mean_targets, pair_dist_m, by_line, lines, dep_only_keys)
 
     seg_emitted: list[SegmentCalibration] = []
     # 較正を評価できた(サンプル数・フィット・妥当性チェックを通過した)ペア。
