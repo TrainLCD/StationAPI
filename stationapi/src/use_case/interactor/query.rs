@@ -2822,8 +2822,9 @@ mod tests {
                     l.cumulative_minutes
                 );
             }
+            // 実所要 18 分に対し較正ポリシーの許容誤差 ±10%。
             let total = express_est.last().unwrap().cumulative_minutes;
-            assert!((17.0..19.5).contains(&total), "got {total}");
+            assert!((16.2..19.8).contains(&total), "got {total}");
         }
 
         /// 環状部南側(河川横断の急勾配・急曲線区間)の駅間別較正の回帰テスト。
