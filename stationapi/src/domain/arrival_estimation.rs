@@ -1450,7 +1450,7 @@ mod tests {
             // 優等種別の速度は中間通過駅のある路線でのみ有効なため、後方に
             // 中間通過駅(3駅目)+終点(4駅目)を足し、2 駅目(単一サブ区間の
             // 停車駅)への到着時間を見る。
-            let mut stations = vec![
+            let mut stations = [
                 station(1, line_cd, 35.000, 139.0, None),
                 station(2, line_cd, 35.072, 139.0, None),
                 station(3, line_cd, 35.080, 139.0, None),
