@@ -171,6 +171,12 @@ SEG_EMIT_THRESHOLD = 0.05
 # 加減速モデルの下限に近い速度が出やすいため、別途絶対上限で救済する。
 SEG_SANITY_BAND = (0.4, 1.6)
 SEG_SUBWAY_ABS_MAX_KMH = 110.0
+# 到着時刻ベース(純走行時間)のサンプルがこの本数以上あるペアは、それだけを使う。
+# 出発間隔ベースは分丸めされた停車時分・接続待ちを含み、混ぜると系統誤差になる。
+SEG_ARR_MIN_SAMPLES = 5
+# 出発間隔ベースしか無いペアで上側から除去する割合。接続待ち・時隔調整の
+# 折込み(北綾瀬〜綾瀬の direction 転換待ちなど)は分布の上側に偏るため。
+SEG_DEP_TRIM_RATIO = 0.3
 # 駅間所要時間サンプルの採用範囲(分)。
 SEG_TARGET_RANGE = (0.1, 30.0)
 # 駅名 + 座標マッチングの許容距離(m)。
@@ -1049,7 +1055,17 @@ def main() -> int:
             detour_cache[line_cd] = line_detour(lines, by_line, line_cd)
         (lat1, lon1), (lat2, lon2) = coord_of[cd_lo], coord_of[cd_hi]
         key = (line_cd, cd_lo, cd_hi)
-        mean_targets[key] = sum(t for t, _ in ts) / len(ts)
+        # 到着時刻ベース(純走行時間)が十分あればそれだけを使う。無いフィード
+        # (東京メトロは全駅 arr==dep)では出発間隔ベースの上側トリム平均で
+        # 接続待ち・時隔調整の折込みを除去する。
+        arr_ts = [t for t, s in ts if s == "arr"]
+        if len(arr_ts) >= SEG_ARR_MIN_SAMPLES:
+            used = arr_ts
+        else:
+            dep_ts = sorted(t for t, s in ts if s == "dep") or [t for t, _ in ts]
+            keep = max(1, math.ceil(len(dep_ts) * (1.0 - SEG_DEP_TRIM_RATIO)))
+            used = dep_ts[:keep]
+        mean_targets[key] = sum(used) / len(used)
         pair_dist_m[key] = haversine(lat1, lon1, lat2, lon2) * detour_cache[line_cd]
 
     raw_targets = dict(mean_targets)
