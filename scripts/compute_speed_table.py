@@ -549,6 +549,44 @@ def fit_segment_v(dist_m: float, target_min: float) -> float | None:
     return (lo + hi) / 2
 
 
+def collect_segment_samples(
+    seg_samples: dict[tuple[int, int, int], list[float]],
+    line_cd: int,
+    sts_line: list[dict],
+    matched_idx: list[int],
+    stop_rows: list[dict],
+) -> None:
+    """各駅停車 1 本ぶんの隣接駅間の純走行時間サンプルを `seg_samples` へ追記する。
+
+    駅間の純走行時間の観測値:
+    - 次駅に到着時刻が別記録されていれば「出発 → 次駅到着」(純走行時間)。
+    - 到着 = 出発(停車時分がフィードに折り込まれていない)なら
+      「出発 → 次駅出発 − モデル停車時分」で近似する。
+    前者を優先しないと、停車時分を記録する駅で dwell を二重計上して
+    駅間速度を系統的に過小評価してしまう。
+    """
+    for j in range(len(matched_idx) - 1):
+        a, b = matched_idx[j], matched_idx[j + 1]
+        if abs(b - a) != 1:  # リポジトリ並び順で隣接するペアのみ
+            continue
+        dep_a = parse_gtfs_time(stop_rows[j].get("departure_time", ""))
+        arr_next = parse_gtfs_time(stop_rows[j + 1].get("arrival_time", ""))
+        dep_next = parse_gtfs_time(stop_rows[j + 1].get("departure_time", ""))
+        if dep_a is None:
+            continue
+        if arr_next is not None and (dep_next is None or arr_next < dep_next):
+            target = arr_next - dep_a
+        elif dep_next is not None and j + 1 != len(stop_rows) - 1:
+            target = dep_next - dep_a - DWELL_MIN
+        else:
+            continue
+        if not (SEG_TARGET_RANGE[0] <= target <= SEG_TARGET_RANGE[1]):
+            continue
+        cd_a, cd_b = sts_line[a]["cd"], sts_line[b]["cd"]
+        key = (line_cd, min(cd_a, cd_b), max(cd_a, cd_b))
+        seg_samples.setdefault(key, []).append(target)
+
+
 def calibrate_feed(
     feed: Feed, zf: zipfile.ZipFile, lines, by_line, kinds, groups
 ) -> tuple[list[Calibration], dict[tuple[int, int, int], list[float]]]:
@@ -637,33 +675,9 @@ def calibrate_feed(
         dedup_key = (tuple(s["cd"] for s in span), tuple(sorted(served)), round(obs, 1))
         samples.setdefault((line_cd, kind), {})[dedup_key] = (seq, obs)
 
-        # 駅間別較正のサンプル収集(各駅停車のみ)。駅間の純走行時間を観測値とする:
-        # - 次駅に到着時刻が別記録されていれば「出発 → 次駅到着」(純走行時間)。
-        # - 到着 = 出発(停車時分がフィードに折り込まれていない)なら
-        #   「出発 → 次駅出発 − モデル停車時分」で近似する。
-        # 前者を優先しないと、停車時分を記録する駅で dwell を二重計上して
-        # 駅間速度を系統的に過小評価してしまう。
+        # 駅間別較正のサンプル収集(各駅停車のみ)。
         if kind == 0:
-            for j in range(len(matched_idx) - 1):
-                a, b = matched_idx[j], matched_idx[j + 1]
-                if abs(b - a) != 1:  # リポジトリ並び順で隣接するペアのみ
-                    continue
-                dep_a = parse_gtfs_time(stop_rows[j].get("departure_time", ""))
-                arr_next = parse_gtfs_time(stop_rows[j + 1].get("arrival_time", ""))
-                dep_next = parse_gtfs_time(stop_rows[j + 1].get("departure_time", ""))
-                if dep_a is None:
-                    continue
-                if arr_next is not None and (dep_next is None or arr_next < dep_next):
-                    target = arr_next - dep_a
-                elif dep_next is not None and j + 1 != len(stop_rows) - 1:
-                    target = dep_next - dep_a - DWELL_MIN
-                else:
-                    continue
-                if not (SEG_TARGET_RANGE[0] <= target <= SEG_TARGET_RANGE[1]):
-                    continue
-                cd_a, cd_b = sts_line[a]["cd"], sts_line[b]["cd"]
-                key = (line_cd, min(cd_a, cd_b), max(cd_a, cd_b))
-                seg_samples.setdefault(key, []).append(target)
+            collect_segment_samples(seg_samples, line_cd, sts_line, matched_idx, stop_rows)
 
     results = []
     for (line_cd, kind), dd in sorted(samples.items()):
@@ -821,15 +835,17 @@ def existing_segment_entries(src: str) -> list[tuple[int, int, int, str]]:
 
 def apply_segments_to_rust(
     seg_results: list[SegmentCalibration],
-    recalibrated_lines: set[int],
+    recalibrated_pairs: set[tuple[int, int, int]],
     name_of: dict[int, str],
     lines: dict,
 ) -> int:
     """segment_speed_table.rs の生成ブロックを更新する。
 
-    今回の実行で駅間サンプルを較正できた路線のエントリは新しい結果で置き換え
-    (閾値未満になったペアは削除)、較正対象にならなかった路線の既存エントリは
-    そのまま残す。
+    今回の実行で較正を評価できた駅間ペア(サンプル数・フィット・妥当性チェックを
+    通過したペア)は新しい結果で置き換え、閾値未満になったペアは削除する。
+    評価できなかったペア(時刻データ欠損・サンプル不足・フィード未取得など)の
+    既存エントリはそのまま残す。路線単位で消すと、時刻データの無い駅間の
+    較正済みエントリまで巻き添えで消えるため、必ずペア単位で判定する。
     """
     with open(SEGMENT_TABLE_RS, encoding="utf-8") as f:
         src = f.read()
@@ -840,7 +856,7 @@ def apply_segments_to_rust(
 
     merged: dict[tuple[int, int, int], str] = {}
     for line_cd, cd_lo, cd_hi, text in existing_segment_entries(src):
-        if line_cd in recalibrated_lines:
+        if (line_cd, cd_lo, cd_hi) in recalibrated_pairs:
             continue
         merged[(line_cd, cd_lo, cd_hi)] = text
 
@@ -929,6 +945,9 @@ def main() -> int:
     coord_of = {s["cd"]: (s["lat"], s["lon"]) for sts in by_line.values() for s in sts}
 
     seg_emitted: list[SegmentCalibration] = []
+    # 較正を評価できた(サンプル数・フィット・妥当性チェックを通過した)ペア。
+    # --apply 時に既存エントリを置き換え・削除してよいのはこの集合だけ。
+    seg_recal_pairs: set[tuple[int, int, int]] = set()
     seg_stats: dict[int, list[int]] = {}  # line_cd -> [較正ペア数, 出力ペア数]
     for (line_cd, cd_lo, cd_hi), ts in sorted(all_seg_samples.items()):
         if len(ts) < SEG_MIN_SAMPLES:
@@ -948,6 +967,7 @@ def main() -> int:
             )
             continue
         stats[0] += 1
+        seg_recal_pairs.add((line_cd, cd_lo, cd_hi))
         v = float(round(v))
         if abs(v / base - 1.0) < SEG_EMIT_THRESHOLD:
             continue
@@ -979,8 +999,7 @@ def main() -> int:
         recalibrated = {(c.line_cd, KIND_NAMES[c.kind]) for c in all_results}
         n = apply_to_rust(emitted, recalibrated)
         print(f"\nspeed_table.rs 生成ブロックを更新: {n} エントリ")
-        seg_recal_lines = {key[0] for key in all_seg_samples}
-        n_seg = apply_segments_to_rust(seg_emitted, seg_recal_lines, name_of, lines)
+        n_seg = apply_segments_to_rust(seg_emitted, seg_recal_pairs, name_of, lines)
         print(f"segment_speed_table.rs 生成ブロックを更新: {n_seg} エントリ")
     else:
         print(f"\n出力対象(一般則から ±{EMIT_THRESHOLD:.0%} 以上乖離): {len(emitted)} エントリ(--apply で書き込み)")

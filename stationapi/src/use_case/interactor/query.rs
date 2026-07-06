@@ -1090,11 +1090,15 @@ where
         // 経路スライス内で路線ごとに通過駅があるか。通過駅が無い路線では優等種別でも
         // 実質各駅停車として走る(東急田園都市線の急行が半蔵門線内で各駅停車になる
         // 直通など)ため、種別の速度を適用せず各停(Default)として扱う。
+        // arrival_estimation と同様に端点は常に停車扱いとし、中間の通過駅だけを
+        // 優等扱いの根拠にする。
+        let sliced_len = sliced.len();
         let mut line_has_pass: std::collections::HashMap<i32, bool> =
             std::collections::HashMap::new();
-        for station in &sliced {
-            let passed =
-                station.stop_condition == proto::StopCondition::Not || station.pass == Some(1);
+        for (i, station) in sliced.iter().enumerate() {
+            let is_endpoint = i == 0 || i + 1 == sliced_len;
+            let passed = !is_endpoint
+                && (station.stop_condition == proto::StopCondition::Not || station.pass == Some(1));
             let entry = line_has_pass.entry(station.line_cd).or_insert(false);
             *entry = *entry || passed;
         }

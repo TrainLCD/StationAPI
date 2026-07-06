@@ -604,11 +604,12 @@ pub fn estimate_arrival_minutes_calibrated(
     // 優等種別(急行・特急など)でも実質各駅停車として走る(東急田園都市線の
     // 急行が半蔵門線内で各駅停車になる直通など)ため、その路線の区間では
     // 種別の速度倍率・種別別の速度較正を適用せず各停(Default)として扱う。
+    // 判定は `is_stop` と同じ端点補正込みの `stops_here` を使う(端点は常に
+    // 停車扱いのため、端点の pass フラグだけでは優等扱いにしない)。
     let mut line_has_pass: HashMap<i32, bool> = HashMap::new();
-    for s in stops.iter() {
-        let passed = s.pass == Some(1) || s.stop_condition == StopCondition::Not;
+    for (i, s) in stops.iter().enumerate() {
         let entry = line_has_pass.entry(s.line_cd).or_insert(false);
-        *entry = *entry || passed;
+        *entry = *entry || !stops_here[i];
     }
 
     let line_group_of =
@@ -1375,13 +1376,14 @@ mod tests {
             local,
         );
         // 急行 < 各停、特急 < 急行、新快速級 < 特急 の順に速い。
-        // 優等種別の倍率は「経路内に通過駅がある路線」でのみ有効なため、
-        // 末尾に通過駅を足した経路の 3 駅目到着で比較する。
+        // 優等種別の倍率は「経路内に中間通過駅がある路線」でのみ有効なため、
+        // 末尾側に中間通過駅(4駅目)+終点(5駅目)を足した経路の 3 駅目到着で比較する。
         let time_with_kind_passing = |kind: Option<i32>| -> f64 {
             let mut stations = three_collinear_stations();
-            let mut tail = station(4, 100, 35.048, 139.0, None);
-            tail.pass = Some(1);
-            stations.push(tail);
+            let mut passed = station(4, 100, 35.048, 139.0, None);
+            passed.pass = Some(1);
+            stations.push(passed);
+            stations.push(station(5, 100, 35.064, 139.0, None));
             for s in stations.iter_mut() {
                 s.kind = kind;
             }
@@ -1413,16 +1415,19 @@ mod tests {
         let p = EstimationParams::default();
         let time_on_line = |line_cd: i32| -> f64 {
             // 8km 区間(巡航支配)で比較する。0.072 度 ≈ 8km。
-            // 優等種別の速度は通過駅のある路線でのみ有効なため、末尾に通過駅を足し、
-            // 2 駅目(単一サブ区間の停車駅)への到着時間を見る。
-            let mut a = station(1, line_cd, 35.000, 139.0, None);
-            let mut b = station(2, line_cd, 35.072, 139.0, None);
-            let mut c = station(3, line_cd, 35.080, 139.0, None);
-            a.kind = Some(TrainTypeKind::Express as i32);
-            b.kind = Some(TrainTypeKind::Express as i32);
-            c.kind = Some(TrainTypeKind::Express as i32);
-            c.pass = Some(1);
-            let stations = [a, b, c];
+            // 優等種別の速度は中間通過駅のある路線でのみ有効なため、後方に
+            // 中間通過駅(3駅目)+終点(4駅目)を足し、2 駅目(単一サブ区間の
+            // 停車駅)への到着時間を見る。
+            let mut stations = vec![
+                station(1, line_cd, 35.000, 139.0, None),
+                station(2, line_cd, 35.072, 139.0, None),
+                station(3, line_cd, 35.080, 139.0, None),
+                station(4, line_cd, 35.088, 139.0, None),
+            ];
+            stations[2].pass = Some(1);
+            for s in stations.iter_mut() {
+                s.kind = Some(TrainTypeKind::Express as i32);
+            }
             let refs: Vec<&Station> = stations.iter().collect();
             estimate_arrival_minutes(&refs, &p)[1].cumulative_minutes
         };
