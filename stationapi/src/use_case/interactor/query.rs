@@ -41,6 +41,7 @@ use crate::{
             company_repository::CompanyRepository, line_repository::LineRepository,
             station_repository::StationRepository, train_type_repository::TrainTypeRepository,
         },
+        segment_speed_table::{segment_override_applies_to_kind, segment_speed_override_kmh},
     },
     proto::{self, Route},
     use_case::{
@@ -1086,19 +1087,55 @@ where
         };
 
         let mut segments: Vec<proto::TrainRouteSegment> = Vec::with_capacity(sliced.len());
-        let mut prev_coord: Option<(f64, f64)> = None;
+        // 経路スライス内で路線ごとに通過駅があるか。通過駅が無い路線では優等種別でも
+        // 実質各駅停車として走る(東急田園都市線の急行が半蔵門線内で各駅停車になる
+        // 直通など)ため、種別の速度を適用せず各停(Default)として扱う。
+        // arrival_estimation と同様に端点は常に停車扱いとし、中間の通過駅だけを
+        // 優等扱いの根拠にする。
+        let sliced_len = sliced.len();
+        let mut line_has_pass: std::collections::HashMap<i32, bool> =
+            std::collections::HashMap::new();
+        for (i, station) in sliced.iter().enumerate() {
+            let is_endpoint = i == 0 || i + 1 == sliced_len;
+            let passed = !is_endpoint
+                && (station.stop_condition == proto::StopCondition::Not || station.pass == Some(1));
+            let entry = line_has_pass.entry(station.line_cd).or_insert(false);
+            *entry = *entry || passed;
+        }
+        let mut prev_stop: Option<(f64, f64, i32)> = None;
         for station in sliced {
             let stops = station.stop_condition != proto::StopCondition::Not;
 
-            let distance_from_previous = match prev_coord {
-                Some((plat, plon)) => haversine_distance(plat, plon, station.lat, station.lon),
+            let distance_from_previous = match prev_stop {
+                Some((plat, plon, _)) => haversine_distance(plat, plon, station.lat, station.lon),
                 None => 0.0,
             };
-            prev_coord = Some((station.lat, station.lon));
 
             let is_bus = station.transport_type == TransportType::Bus;
             let kind = station.train_type.as_ref().and_then(|tt| tt.kind);
-            let profile = resolve_speed_profile(station.line_cd, station.line_type, is_bus, kind);
+            let effective_kind = if line_has_pass
+                .get(&station.line_cd)
+                .copied()
+                .unwrap_or(false)
+            {
+                kind
+            } else {
+                None
+            };
+            let mut profile =
+                resolve_speed_profile(station.line_cd, station.line_type, is_bus, effective_kind);
+            // 隣接駅ペア単位の較正(GTFS 実ダイヤ由来)があれば、このセグメントの
+            // 最高速度を路線単位のプロファイルより優先して上書きする(各停系のみ)。
+            if !is_bus && segment_override_applies_to_kind(effective_kind) {
+                if let Some((_, _, prev_cd)) = prev_stop {
+                    if let Some(v_kmh) =
+                        segment_speed_override_kmh(station.line_cd, prev_cd, station.station_cd)
+                    {
+                        profile.max_speed = v_kmh / 3.6;
+                    }
+                }
+            }
+            prev_stop = Some((station.lat, station.lon, station.station_cd));
 
             let grpc_station: proto::Station = station.into();
             segments.push(proto::TrainRouteSegment {
@@ -2615,6 +2652,214 @@ mod tests {
                 vec![8, 1, 2]
             );
             assert!((est[0].cumulative_minutes - 0.0).abs() < 1e-9);
+        }
+
+        /// 都営大江戸線の実データ(修正後CSV)を e_sort 順に再現する。
+        /// 都庁前は環状部始端(9930100)と放射部側(9930101)の2レコード。
+        fn oedo_stops() -> Vec<Station> {
+            let data: Vec<(i32, f64, f64)> = vec![
+                (9930100, 35.690551, 139.69257),             // 都庁前(A)
+                (9930102, 35.693315, 139.699155),            // 新宿西口
+                (9930103, 35.69792, 139.707549),             // 東新宿
+                (9930104, 35.699218, 139.718184),            // 若松河田
+                (9930105, 35.699518, 139.725027),            // 牛込柳町
+                (9930106, 35.700851, 139.735802),            // 牛込神楽坂
+                (9930107, 35.702927, 139.744999),            // 飯田橋
+                (9930108, 35.709598, 139.75325),             // 春日
+                (9930109, 35.707462, 139.760095),            // 本郷三丁目
+                (9930110, 35.707893, 139.774332),            // 上野御徒町
+                (9930111, 35.707045, 139.781958),            // 新御徒町
+                (9930112, 35.703236, 139.790931),            // 蔵前
+                (9930113, 35.696881, 139.797421),            // 両国
+                (9930114, 35.68796, 139.797042),             // 森下
+                (9930115, 35.682105, 139.798851),            // 清澄白河
+                (9930116, 35.671851, 139.796209),            // 門前仲町
+                (9930117, 35.664871, 139.784233),            // 月島
+                (9930118, 35.658507, 139.776442),            // 勝どき
+                (9930119, 35.664895, 139.766915),            // 築地市場
+                (9930120, 35.663703, 139.760642),            // 汐留
+                (9930121, 35.656785, 139.75466),             // 大門
+                (9930122, 35.655007, 139.743642),            // 赤羽橋
+                (9930123, 35.656503, 139.736116),            // 麻布十番
+                (9930124, 35.663921, 139.731567),            // 六本木
+                (9930125, 35.672929, 139.72396),             // 青山一丁目
+                (9930126, 35.679831, 139.714932),            // 国立競技場
+                (9930127, 35.683218, 139.701666),            // 代々木
+                (9930128, 35.68869, 139.698812),             // 新宿
+                (9930101, 35.690551, 139.69257),             // 都庁前(B)
+                (9930129, 35.689798, 139.684304),            // 西新宿五丁目
+                (9930130, 35.69709, 139.682279),             // 中野坂上
+                (9930131, 35.706891, 139.682987),            // 東中野
+                (9930132, 35.714035, 139.686356),            // 中井
+                (9930133, 35.723608, 139.683303),            // 落合南長崎
+                (9930134, 35.732538, 139.670653),            // 新江古田
+                (9930135, 35.737404, 139.65477),             // 練馬
+                (9930136, 35.742567043044, 139.64894845621), // 豊島園
+                (9930137, 35.751452, 139.640236),            // 練馬春日町
+                (9930138, 35.758526, 139.628603),            // 光が丘
+            ];
+            data.iter()
+                .enumerate()
+                .map(|(i, &(cd, lat, lon))| {
+                    let mut s = create_test_station(cd, 9930100, 99301, None);
+                    s.lat = lat;
+                    s.lon = lon;
+                    s.e_sort = 9930101 + i as i32;
+                    s.line_type = Some(3);
+                    s.average_distance = Some(1066.83815);
+                    s.pass = Some(0);
+                    s
+                })
+                .collect()
+        }
+
+        /// 都営大江戸線の「6の字」経路で、放射部⇔環状部を跨ぐ乗車の推定に
+        /// 都庁前(9930101)が正しく含まれることを検証する。
+        ///
+        /// 都庁前は環状部始端(9930100)と放射部接続側(9930101)の2レコードで表現
+        /// されるため、並び順が「…新宿→都庁前(9930101)→西新宿五丁目…」から
+        /// 崩れると、新宿⇔放射部を跨ぐ区間のスライスから都庁前が丸ごと欠落し、
+        /// 全駅のETAが一駅分(約1.5〜2分)短くなる退行が起きる(#1589で発生、
+        /// #1595 のデータ修正で解消)。データ側の並びは data_validator が守るが、
+        /// スライスロジック側の退行もここで検知する。
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_oedo_radial_loop_crossing() {
+            // 新宿(9930128)→光が丘(9930138): 都庁前(9930101)を跨ぐ放射部方面の乗車。
+            let interactor = build_interactor(oedo_stops(), vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(9930128, 9930138, &[], None)
+                .await
+                .unwrap();
+
+            let sequence: Vec<i32> = est.iter().map(|e| e.station_cd).collect();
+            assert_eq!(
+                sequence,
+                vec![
+                    9930128, // 新宿
+                    9930101, // 都庁前
+                    9930129, // 西新宿五丁目
+                    9930130, // 中野坂上
+                    9930131, // 東中野
+                    9930132, // 中井
+                    9930133, // 落合南長崎
+                    9930134, // 新江古田
+                    9930135, // 練馬
+                    9930136, // 豊島園
+                    9930137, // 練馬春日町
+                    9930138, // 光が丘
+                ],
+                "都庁前(9930101)が新宿の直後に含まれること"
+            );
+            assert!(est
+                .windows(2)
+                .all(|w| w[1].cumulative_minutes > w[0].cumulative_minutes));
+            // 実所要時間は約24分。都庁前が欠落すると約22分に縮む。
+            let total = est.last().unwrap().cumulative_minutes;
+            assert!((22.5..26.0).contains(&total), "got {total}");
+        }
+
+        /// 東京メトロ半蔵門線の実データ(e_sort 順・実座標)。全駅各駅停車。
+        /// 東急田園都市線からの直通急行も半蔵門線内は各駅停車になる。
+        fn hanzomon_stops(kind: Option<i32>) -> Vec<Station> {
+            let data: Vec<(i32, f64, f64)> = vec![
+                (2800801, 35.659066, 139.701),    // 渋谷
+                (2800802, 35.665247, 139.712314), // 表参道
+                (2800803, 35.672765, 139.724159), // 青山一丁目
+                (2800804, 35.678757, 139.740258), // 永田町
+                (2800805, 35.685703, 139.74163),  // 半蔵門
+                (2800806, 35.695589, 139.751948), // 九段下
+                (2800807, 35.695966, 139.757606), // 神保町
+                (2800808, 35.68686, 139.764107),  // 大手町
+                (2800809, 35.684908, 139.773147), // 三越前
+                (2800810, 35.682683, 139.785377), // 水天宮前
+                (2800811, 35.682105, 139.798851), // 清澄白河
+                (2800814, 35.689073, 139.815681), // 住吉
+                (2800812, 35.697578, 139.814941), // 錦糸町
+                (2800813, 35.710702, 139.812935), // 押上
+            ];
+            data.iter()
+                .enumerate()
+                .map(|(i, &(cd, lat, lon))| {
+                    let mut s = create_test_station(cd, cd, 28008, None);
+                    s.lat = lat;
+                    s.lon = lon;
+                    s.e_sort = 2800801 + i as i32;
+                    s.line_type = Some(3);
+                    s.average_distance = Some(1283.41956);
+                    s.pass = Some(0);
+                    s.kind = kind;
+                    s
+                })
+                .collect()
+        }
+
+        /// 直通急行の線内各駅停車の回帰テスト。
+        /// 半蔵門線内は急行(Express)でも全駅に停車するため、経路スライス内に
+        /// 通過駅が無ければ各停と同じ推定になること(実所要 押上→神保町 約18分)。
+        /// 修正前は種別倍率(×1.15)が掛かり駅間別較正も外れて約15分に縮んでいた。
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_through_express_all_stops_matches_local() {
+            let local = build_interactor(hanzomon_stops(None), vec![], vec![], vec![]);
+            let local_est = local
+                .estimate_route_arrival_times(2800813, 2800807, &[], None)
+                .await
+                .unwrap();
+
+            let express_kind = Some(proto::TrainTypeKind::Express as i32);
+            let express = build_interactor(hanzomon_stops(express_kind), vec![], vec![], vec![]);
+            let express_est = express
+                .estimate_route_arrival_times(2800813, 2800807, &[], None)
+                .await
+                .unwrap();
+
+            assert_eq!(local_est.len(), 8);
+            assert_eq!(express_est.len(), 8);
+            for (e, l) in express_est.iter().zip(local_est.iter()) {
+                assert!(
+                    (e.cumulative_minutes - l.cumulative_minutes).abs() < 1e-9,
+                    "express {} != local {}",
+                    e.cumulative_minutes,
+                    l.cumulative_minutes
+                );
+            }
+            // 実所要 18 分に対し較正ポリシーの許容誤差 ±10%。
+            let total = express_est.last().unwrap().cumulative_minutes;
+            assert!((16.2..19.8).contains(&total), "got {total}");
+        }
+
+        /// 環状部南側(河川横断の急勾配・急曲線区間)の駅間別較正の回帰テスト。
+        /// 路線一様速度(70km/h)では実16分に対し約14.7分と -8% に過小評価される。
+        /// GTFS 実ダイヤ由来の駅間別較正(segment_speed_table)で ±5% 以内に入る。
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_oedo_kiyosumi_to_akabanebashi() {
+            // 清澄白河(9930115)→赤羽橋(9930122): 実所要時間 16分。
+            let interactor = build_interactor(oedo_stops(), vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(9930115, 9930122, &[], None)
+                .await
+                .unwrap();
+
+            assert_eq!(est.len(), 8);
+            assert_eq!(est.first().unwrap().station_cd, 9930115);
+            assert_eq!(est.last().unwrap().station_cd, 9930122);
+            let total = est.last().unwrap().cumulative_minutes;
+            assert!((15.0..17.0).contains(&total), "got {total}");
+        }
+
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_oedo_hikarigaoka_to_tochomae() {
+            // 光が丘(9930138)→都庁前(9930101): 放射部の全区間。実所要時間は約22分。
+            let interactor = build_interactor(oedo_stops(), vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(9930138, 9930101, &[], None)
+                .await
+                .unwrap();
+
+            assert_eq!(est.len(), 11);
+            assert_eq!(est.first().unwrap().station_cd, 9930138);
+            assert_eq!(est.last().unwrap().station_cd, 9930101);
+            let total = est.last().unwrap().cumulative_minutes;
+            assert!((20.0..24.0).contains(&total), "got {total}");
         }
 
         #[tokio::test]
