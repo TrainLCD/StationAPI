@@ -1087,6 +1087,17 @@ where
         };
 
         let mut segments: Vec<proto::TrainRouteSegment> = Vec::with_capacity(sliced.len());
+        // 経路スライス内で路線ごとに通過駅があるか。通過駅が無い路線では優等種別でも
+        // 実質各駅停車として走る(東急田園都市線の急行が半蔵門線内で各駅停車になる
+        // 直通など)ため、種別の速度を適用せず各停(Default)として扱う。
+        let mut line_has_pass: std::collections::HashMap<i32, bool> =
+            std::collections::HashMap::new();
+        for station in &sliced {
+            let passed =
+                station.stop_condition == proto::StopCondition::Not || station.pass == Some(1);
+            let entry = line_has_pass.entry(station.line_cd).or_insert(false);
+            *entry = *entry || passed;
+        }
         let mut prev_stop: Option<(f64, f64, i32)> = None;
         for station in sliced {
             let stops = station.stop_condition != proto::StopCondition::Not;
@@ -1098,11 +1109,20 @@ where
 
             let is_bus = station.transport_type == TransportType::Bus;
             let kind = station.train_type.as_ref().and_then(|tt| tt.kind);
+            let effective_kind = if line_has_pass
+                .get(&station.line_cd)
+                .copied()
+                .unwrap_or(false)
+            {
+                kind
+            } else {
+                None
+            };
             let mut profile =
-                resolve_speed_profile(station.line_cd, station.line_type, is_bus, kind);
+                resolve_speed_profile(station.line_cd, station.line_type, is_bus, effective_kind);
             // 隣接駅ペア単位の較正(GTFS 実ダイヤ由来)があれば、このセグメントの
             // 最高速度を路線単位のプロファイルより優先して上書きする(各停系のみ)。
-            if !is_bus && segment_override_applies_to_kind(kind) {
+            if !is_bus && segment_override_applies_to_kind(effective_kind) {
                 if let Some((_, _, prev_cd)) = prev_stop {
                     if let Some(v_kmh) =
                         segment_speed_override_kmh(station.line_cd, prev_cd, station.station_cd)
@@ -2732,6 +2752,74 @@ mod tests {
             // 実所要時間は約24分。都庁前が欠落すると約22分に縮む。
             let total = est.last().unwrap().cumulative_minutes;
             assert!((22.5..26.0).contains(&total), "got {total}");
+        }
+
+        /// 東京メトロ半蔵門線の実データ(e_sort 順・実座標)。全駅各駅停車。
+        /// 東急田園都市線からの直通急行も半蔵門線内は各駅停車になる。
+        fn hanzomon_stops(kind: Option<i32>) -> Vec<Station> {
+            let data: Vec<(i32, f64, f64)> = vec![
+                (2800801, 35.659066, 139.701),    // 渋谷
+                (2800802, 35.665247, 139.712314), // 表参道
+                (2800803, 35.672765, 139.724159), // 青山一丁目
+                (2800804, 35.678757, 139.740258), // 永田町
+                (2800805, 35.685703, 139.74163),  // 半蔵門
+                (2800806, 35.695589, 139.751948), // 九段下
+                (2800807, 35.695966, 139.757606), // 神保町
+                (2800808, 35.68686, 139.764107),  // 大手町
+                (2800809, 35.684908, 139.773147), // 三越前
+                (2800810, 35.682683, 139.785377), // 水天宮前
+                (2800811, 35.682105, 139.798851), // 清澄白河
+                (2800814, 35.689073, 139.815681), // 住吉
+                (2800812, 35.697578, 139.814941), // 錦糸町
+                (2800813, 35.710702, 139.812935), // 押上
+            ];
+            data.iter()
+                .enumerate()
+                .map(|(i, &(cd, lat, lon))| {
+                    let mut s = create_test_station(cd, cd, 28008, None);
+                    s.lat = lat;
+                    s.lon = lon;
+                    s.e_sort = 2800801 + i as i32;
+                    s.line_type = Some(3);
+                    s.average_distance = Some(1283.41956);
+                    s.pass = Some(0);
+                    s.kind = kind;
+                    s
+                })
+                .collect()
+        }
+
+        /// 直通急行の線内各駅停車の回帰テスト。
+        /// 半蔵門線内は急行(Express)でも全駅に停車するため、経路スライス内に
+        /// 通過駅が無ければ各停と同じ推定になること(実所要 押上→神保町 約18分)。
+        /// 修正前は種別倍率(×1.15)が掛かり駅間別較正も外れて約15分に縮んでいた。
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_through_express_all_stops_matches_local() {
+            let local = build_interactor(hanzomon_stops(None), vec![], vec![], vec![]);
+            let local_est = local
+                .estimate_route_arrival_times(2800813, 2800807, &[], None)
+                .await
+                .unwrap();
+
+            let express_kind = Some(proto::TrainTypeKind::Express as i32);
+            let express = build_interactor(hanzomon_stops(express_kind), vec![], vec![], vec![]);
+            let express_est = express
+                .estimate_route_arrival_times(2800813, 2800807, &[], None)
+                .await
+                .unwrap();
+
+            assert_eq!(local_est.len(), 8);
+            assert_eq!(express_est.len(), 8);
+            for (e, l) in express_est.iter().zip(local_est.iter()) {
+                assert!(
+                    (e.cumulative_minutes - l.cumulative_minutes).abs() < 1e-9,
+                    "express {} != local {}",
+                    e.cumulative_minutes,
+                    l.cumulative_minutes
+                );
+            }
+            let total = express_est.last().unwrap().cumulative_minutes;
+            assert!((17.0..19.5).contains(&total), "got {total}");
         }
 
         /// 環状部南側(河川横断の急勾配・急曲線区間)の駅間別較正の回帰テスト。
