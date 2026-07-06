@@ -66,6 +66,24 @@ const LINE_SPEED_OVERRIDES: &[(i32, TrainTypeKind, f64)] = &[
 /// スクリプト側で除外される。手動編集しないこと。
 const LINE_SPEED_OVERRIDES_GTFS: &[(i32, TrainTypeKind, f64)] = &[
     // --- BEGIN GENERATED (scripts/compute_speed_table.py) ---
+    // 東京メトロ銀座線 Default: 東京メトロ GTFS 15本 中央値34分 (一般則 75km/h)
+    (28001, TrainTypeKind::Default, 55.0),
+    // 東京メトロ丸ノ内線 Default: 東京メトロ GTFS 10本 中央値51分 (一般則 75km/h)
+    (28002, TrainTypeKind::Default, 65.0),
+    // 東京メトロ日比谷線 Default: 東京メトロ GTFS 7本 中央値45分 (一般則 75km/h)
+    (28003, TrainTypeKind::Default, 50.0),
+    // 東京メトロ東西線 Default: 東京メトロ GTFS 20本 中央値54分 (一般則 75km/h)
+    (28004, TrainTypeKind::Default, 60.0),
+    // 東京メトロ有楽町線 Default: 東京メトロ GTFS 19本 中央値52分 (一般則 75km/h)
+    (28006, TrainTypeKind::Default, 65.0),
+    // 東京メトロ半蔵門線 Default: 東京メトロ GTFS 10本 中央値32分 (一般則 75km/h)
+    (28008, TrainTypeKind::Default, 55.0),
+    // 東京メトロ南北線 Default: 東京メトロ GTFS 12本 中央値38分 (一般則 75km/h)
+    (28009, TrainTypeKind::Default, 65.0),
+    // 東京メトロ副都心線 Default: 東京メトロ GTFS 31本 中央値27分 (一般則 75km/h)
+    (28010, TrainTypeKind::Default, 55.0),
+    // 東京メトロ副都心線 Express: 東京メトロ GTFS 15本 中央値28分 (一般則 86km/h)
+    (28010, TrainTypeKind::Express, 60.0),
     // 函館市電2系統 Default: 函館市電 GTFS 4本 中央値48分 (一般則 40km/h)
     (99105, TrainTypeKind::Default, 20.0),
     // 函館市電5系統 Default: 函館市電 GTFS 6本 中央値47分 (一般則 40km/h)
@@ -78,6 +96,10 @@ const LINE_SPEED_OVERRIDES_GTFS: &[(i32, TrainTypeKind, f64)] = &[
     (99305, TrainTypeKind::Default, 25.0),
     // 横浜市営地下鉄ブルーライン Rapid: 横浜市営地下鉄 GTFS 3本 中央値61分 (一般則 75km/h)
     (99316, TrainTypeKind::Rapid, 65.0),
+    // 多摩モノレール Default: 多摩都市モノレール GTFS 6本 中央値38分 (一般則 60km/h)
+    (99334, TrainTypeKind::Default, 50.0),
+    // りんかい線 Default: りんかい線 GTFS 8本 中央値20分 (一般則 80km/h)
+    (99337, TrainTypeKind::Default, 65.0),
     // 京都市営地下鉄東西線 Default: 京都市営地下鉄 GTFS 9本 中央値33分 (一般則 75km/h)
     (99611, TrainTypeKind::Default, 65.0),
     // --- END GENERATED ---
