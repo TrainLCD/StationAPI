@@ -992,7 +992,9 @@ def main() -> int:
 
     all_results: list[Calibration] = []
     all_seg_samples: dict[tuple[int, int, int], list[tuple[float, str]]] = {}
-    seg_feed_of: dict[int, str] = {}  # line_cd -> フィード名(出典コメント用)
+    # 駅間ペア -> フィード名集合(出典コメント用)。通常は路線とフィードが 1 対 1 だが、
+    # 複数フィードが同一ペアへ寄与した場合も全出典を保持する。
+    seg_feed_of: dict[tuple[int, int, int], set[str]] = {}
     for feed in FEEDS:
         sys.stderr.write(f"[{feed.key}] {feed.name} ({feed.license})\n")
         try:
@@ -1007,7 +1009,7 @@ def main() -> int:
         all_results.extend(results)
         for key, ts in seg_samples.items():
             all_seg_samples.setdefault(key, []).extend(ts)
-            seg_feed_of[key[0]] = feed.name
+            seg_feed_of.setdefault(key, set()).add(feed.name)
 
     print(f"\n{'路線':<24} {'kind':<16} {'フィット':>8} {'一般則':>7} {'乖離':>7} {'本数':>4} {'採用':>4}")
     emitted = []
@@ -1116,7 +1118,7 @@ def main() -> int:
             v_base=base,
             n_samples=len(ts),
             mean_run_min=target,
-            feed=seg_feed_of.get(line_cd, ""),
+            feed="・".join(sorted(seg_feed_of.get((line_cd, cd_lo, cd_hi), set()))),
         ))
 
     if seg_debug:
