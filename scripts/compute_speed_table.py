@@ -557,6 +557,66 @@ def fit_segment_v(dist_m: float, target_min: float) -> float | None:
     return (lo + hi) / 2
 
 
+def kinematic_min_minutes(dist_m: float) -> float:
+    """加減速モデル上の最短走行時間(分)。速度を上げても縮まない三角形プロファイル。"""
+    return seg_run_min(dist_m, 1e9)
+
+
+def rebalance_line_targets(
+    mean_targets: dict[tuple[int, int, int], float],
+    pair_dist_m: dict[tuple[int, int, int], float],
+    by_line: dict,
+    lines: dict,
+) -> None:
+    """運動学的下限を下回るペアの不足分を隣接ペアへ繰り越し、合計を保存する。
+
+    GTFS の駅時刻は分単位で、タイムポイント以外の駅では時刻が機械的に
+    割り付けられることがある(例: 千代田線 西日暮里→千駄木 平均0.7分 /
+    千駄木→根津 平均2.1分。実際はどちらも1分台)。このとき短すぎる側は
+    フィットで運動学的下限にクランプされて縮められない一方、長すぎる側は
+    そのまま再現されるため、区間合計が系統的に過大になる(クランプの
+    非対称バイアス)。路線格納順に連続して較正できているペア列に対し
+    前後2パスで不足分を隣へ繰り越すことで、ペア列の合計を保ったまま
+    下限違反を解消する。ペア列の端で吸収しきれない不足分は捨てる。
+    """
+    for line_cd, sts in by_line.items():
+        runs: list[list[tuple[int, int, int]]] = []
+        cur: list[tuple[int, int, int]] = []
+        for i in range(1, len(sts)):
+            cd_a, cd_b = sts[i - 1]["cd"], sts[i]["cd"]
+            key = (line_cd, min(cd_a, cd_b), max(cd_a, cd_b))
+            if key in mean_targets:
+                cur.append(key)
+            elif cur:
+                runs.append(cur)
+                cur = []
+        if cur:
+            runs.append(cur)
+
+        moved: list[str] = []
+        for run in runs:
+            if len(run) < 2:
+                continue
+            mins = [kinematic_min_minutes(pair_dist_m[k]) for k in run]
+            if all(mean_targets[k] >= m for k, m in zip(run, mins)):
+                continue
+            for order in (range(len(run)), range(len(run) - 1, -1, -1)):
+                carry = 0.0
+                for i in order:
+                    t = mean_targets[run[i]] + carry
+                    if t < mins[i]:
+                        carry = t - mins[i]
+                        t = mins[i]
+                    else:
+                        carry = 0.0
+                    mean_targets[run[i]] = t
+            moved.append(f"{len(run)}ペア列")
+        if moved:
+            sys.stderr.write(
+                f"  {lines[line_cd]['name']}: 駅間時間の繰り越し補正を適用 ({', '.join(moved)})\n"
+            )
+
+
 def collect_segment_samples(
     seg_samples: dict[tuple[int, int, int], list[float]],
     line_cd: int,
@@ -586,16 +646,18 @@ def collect_segment_samples(
             continue
         if arr_next is not None and (dep_next is None or arr_next < dep_next):
             target = arr_next - dep_a
+            source = "arr"  # 到着時刻ベース(純走行時間)
         elif dep_next is not None:
             dwell = 0.0 if j + 1 == len(stop_rows) - 1 else DWELL_MIN
             target = dep_next - dep_a - dwell
+            source = "dep"  # 出発間隔ベース(モデル停車時分を控除)
         else:
             continue
         if not (SEG_TARGET_RANGE[0] <= target <= SEG_TARGET_RANGE[1]):
             continue
         cd_a, cd_b = sts_line[a]["cd"], sts_line[b]["cd"]
         key = (line_cd, min(cd_a, cd_b), max(cd_a, cd_b))
-        seg_samples.setdefault(key, []).append(target)
+        seg_samples.setdefault(key, []).append((target, source))
 
 
 def segment_sanity_upper_kmh(base: float, line_type: int | None) -> float:
@@ -904,6 +966,20 @@ def main() -> int:
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--validate", action="store_true", help="較正のみ(ファイル不変)")
     g.add_argument("--apply", action="store_true", help="speed_table.rs の生成ブロックを書き換える")
+    ap.add_argument(
+        "--rebalance",
+        action="store_true",
+        help="実験的: タイムポイント補間の偏りで運動学的下限を下回るペアの不足分を"
+        "隣接ペアへ繰り越す(--dump-line で生平均の偏りを確認してから使うこと。"
+        "到着時刻ベースのサンプルが多い路線では過補正になる場合がある)",
+    )
+    ap.add_argument(
+        "--dump-line",
+        type=int,
+        default=None,
+        metavar="LINE_CD",
+        help="指定した line_cd の駅間較正の内訳(生平均・繰り越し補正後・運動学的下限・フィット結果)を表示する",
+    )
     args = ap.parse_args()
 
     token = os.environ.get("ODPT_ACCESS_TOKEN")
@@ -962,18 +1038,41 @@ def main() -> int:
     name_of = {s["cd"]: s["name"] for sts in by_line.values() for s in sts}
     coord_of = {s["cd"]: (s["lat"], s["lon"]) for sts in by_line.values() for s in sts}
 
+    # ペアごとの平均ターゲットとみなし距離。距離には路線較正済みの迂回係数を使う。
+    mean_targets: dict[tuple[int, int, int], float] = {}
+    pair_dist_m: dict[tuple[int, int, int], float] = {}
+    detour_cache: dict[int, float] = {}
+    for (line_cd, cd_lo, cd_hi), ts in all_seg_samples.items():
+        if len(ts) < SEG_MIN_SAMPLES:
+            continue
+        if line_cd not in detour_cache:
+            detour_cache[line_cd] = line_detour(lines, by_line, line_cd)
+        (lat1, lon1), (lat2, lon2) = coord_of[cd_lo], coord_of[cd_hi]
+        key = (line_cd, cd_lo, cd_hi)
+        mean_targets[key] = sum(t for t, _ in ts) / len(ts)
+        pair_dist_m[key] = haversine(lat1, lon1, lat2, lon2) * detour_cache[line_cd]
+
+    raw_targets = dict(mean_targets)
+    if args.rebalance:
+        rebalance_line_targets(mean_targets, pair_dist_m, by_line, lines)
+
     seg_emitted: list[SegmentCalibration] = []
     # 較正を評価できた(サンプル数・フィット・妥当性チェックを通過した)ペア。
     # --apply 時に既存エントリを置き換え・削除してよいのはこの集合だけ。
     seg_recal_pairs: set[tuple[int, int, int]] = set()
     seg_stats: dict[int, list[int]] = {}  # line_cd -> [較正ペア数, 出力ペア数]
-    for (line_cd, cd_lo, cd_hi), ts in sorted(all_seg_samples.items()):
-        if len(ts) < SEG_MIN_SAMPLES:
-            continue
-        target = sum(ts) / len(ts)
-        (lat1, lon1), (lat2, lon2) = coord_of[cd_lo], coord_of[cd_hi]
-        dist_m = haversine(lat1, lon1, lat2, lon2) * line_detour(lines, by_line, line_cd)
+    seg_debug: list[tuple] = []
+    for (line_cd, cd_lo, cd_hi), target in sorted(mean_targets.items()):
+        ts = all_seg_samples[(line_cd, cd_lo, cd_hi)]
+        dist_m = pair_dist_m[(line_cd, cd_lo, cd_hi)]
         v = fit_segment_v(dist_m, target)
+        if args.dump_line == line_cd:
+            n_arr = sum(1 for _, s in ts if s == "arr")
+            seg_debug.append((
+                (line_cd, cd_lo, cd_hi), len(ts), n_arr,
+                raw_targets[(line_cd, cd_lo, cd_hi)], target,
+                kinematic_min_minutes(dist_m), dist_m, v,
+            ))
         stats = seg_stats.setdefault(line_cd, [0, 0])
         if v is None:
             continue
@@ -1002,6 +1101,17 @@ def main() -> int:
             mean_run_min=target,
             feed=seg_feed_of.get(line_cd, ""),
         ))
+
+    if seg_debug:
+        print(
+            f"\n[--dump-line {args.dump_line}] "
+            f"{'ペア':<24} {'本数':>5} {'到着基準':>5} {'生平均':>7} {'補正後':>7} {'下限':>6} {'距離m':>7} {'フィット':>7}"
+        )
+        for key, n, n_arr, raw, adj, kmin, dist, v in seg_debug:
+            _, lo, hi = key
+            label = f"{name_of.get(lo, lo)}〜{name_of.get(hi, hi)}"
+            v_str = f"{v:6.0f}km" if v is not None else "  失敗"
+            print(f"  {label:<24} {n:>5} {n_arr:>5} {raw:7.2f} {adj:7.2f} {kmin:6.2f} {dist:7.0f} {v_str}")
 
     if seg_stats:
         print(f"\n[駅間別較正] {'路線':<24} {'較正ペア':>6} {'出力':>4}")
