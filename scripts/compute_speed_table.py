@@ -157,6 +157,20 @@ EMIT_THRESHOLD = 0.10
 MIN_TRIPS = 3
 # フィット結果の妥当範囲(km/h)。範囲外は駅マッチング異常とみなして捨てる。
 V_MIN, V_MAX = 15.0, 220.0
+
+# --- 駅間別較正(segment_speed_table.rs)のパラメータ ---
+# 出力先。
+SEGMENT_TABLE_RS = os.path.join(ROOT, "stationapi", "src", "domain", "segment_speed_table.rs")
+# 駅間ペアの較正に必要な最小サンプル数。GTFS の時刻は分単位に丸められているため、
+# 複数本の平均でしか実勢の駅間所要時間(分未満の端数)を推定できない。
+SEG_MIN_SAMPLES = 5
+# 路線単位の較正値からこの比率以上乖離したペアだけを出力する。
+SEG_EMIT_THRESHOLD = 0.05
+# 路線単位較正値に対するフィット結果の妥当範囲(倍率)。範囲外は時刻データ異常
+# (長時間停車の折込みなど)とみなして捨てる。
+SEG_SANITY_BAND = (0.4, 1.6)
+# 駅間所要時間サンプルの採用範囲(分)。
+SEG_TARGET_RANGE = (0.1, 30.0)
 # 駅名 + 座標マッチングの許容距離(m)。
 MATCH_RADIUS_M = 500.0
 # 駅名が一致しない場合に座標最近傍で救済する許容距離(m)。改称駅・表記揺れ対策。
@@ -507,7 +521,37 @@ class Calibration:
     feed: str
 
 
-def calibrate_feed(feed: Feed, zf: zipfile.ZipFile, lines, by_line, kinds, groups) -> list[Calibration]:
+@dataclass
+class SegmentCalibration:
+    line_cd: int
+    cd_lo: int
+    cd_hi: int
+    v_fit: float
+    v_base: float
+    n_samples: int
+    mean_run_min: float
+    feed: str
+
+
+def fit_segment_v(dist_m: float, target_min: float) -> float | None:
+    """駅間の走行時間 target_min(分)を再現する実効最高速度を二分探索する。"""
+    lo, hi = 5.0, 250.0
+    if seg_run_min(dist_m, lo) < target_min:  # 最低速度でもモデルが速すぎる
+        return None
+    if seg_run_min(dist_m, hi) > target_min:  # 最高速度でもモデルが遅すぎる
+        return None
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        if seg_run_min(dist_m, mid) > target_min:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2
+
+
+def calibrate_feed(
+    feed: Feed, zf: zipfile.ZipFile, lines, by_line, kinds, groups
+) -> tuple[list[Calibration], dict[tuple[int, int, int], list[float]]]:
     stops_by_id = {
         s["stop_id"]: (norm_name(s["stop_name"]), float(s["stop_lat"]), float(s["stop_lon"]))
         for s in read_gtfs_csv(zf, "stops.txt")
@@ -526,6 +570,10 @@ def calibrate_feed(feed: Feed, zf: zipfile.ZipFile, lines, by_line, kinds, group
 
     # (line_cd, kind) -> [(モデル入力列, 観測分), ...](同一パターン・同一所要は重複排除)
     samples: dict[tuple[int, int], dict[tuple, tuple]] = {}
+    # (line_cd, station_cd小, station_cd大) -> [駅間走行時間(分), ...]。
+    # 各駅停車(kind=0)の隣接駅間のみ。時刻の分丸めを複数本の平均で均すため
+    # 重複排除しない(同時刻パターンの多重度も含めて平均する)。
+    seg_samples: dict[tuple[int, int, int], list[float]] = {}
     line_match_cache: dict[tuple, int | None] = {}
 
     for trip_id, sts in st_by_trip.items():
@@ -589,6 +637,34 @@ def calibrate_feed(feed: Feed, zf: zipfile.ZipFile, lines, by_line, kinds, group
         dedup_key = (tuple(s["cd"] for s in span), tuple(sorted(served)), round(obs, 1))
         samples.setdefault((line_cd, kind), {})[dedup_key] = (seq, obs)
 
+        # 駅間別較正のサンプル収集(各駅停車のみ)。駅間の純走行時間を観測値とする:
+        # - 次駅に到着時刻が別記録されていれば「出発 → 次駅到着」(純走行時間)。
+        # - 到着 = 出発(停車時分がフィードに折り込まれていない)なら
+        #   「出発 → 次駅出発 − モデル停車時分」で近似する。
+        # 前者を優先しないと、停車時分を記録する駅で dwell を二重計上して
+        # 駅間速度を系統的に過小評価してしまう。
+        if kind == 0:
+            for j in range(len(matched_idx) - 1):
+                a, b = matched_idx[j], matched_idx[j + 1]
+                if abs(b - a) != 1:  # リポジトリ並び順で隣接するペアのみ
+                    continue
+                dep_a = parse_gtfs_time(stop_rows[j].get("departure_time", ""))
+                arr_next = parse_gtfs_time(stop_rows[j + 1].get("arrival_time", ""))
+                dep_next = parse_gtfs_time(stop_rows[j + 1].get("departure_time", ""))
+                if dep_a is None:
+                    continue
+                if arr_next is not None and (dep_next is None or arr_next < dep_next):
+                    target = arr_next - dep_a
+                elif dep_next is not None and j + 1 != len(stop_rows) - 1:
+                    target = dep_next - dep_a - DWELL_MIN
+                else:
+                    continue
+                if not (SEG_TARGET_RANGE[0] <= target <= SEG_TARGET_RANGE[1]):
+                    continue
+                cd_a, cd_b = sts_line[a]["cd"], sts_line[b]["cd"]
+                key = (line_cd, min(cd_a, cd_b), max(cd_a, cd_b))
+                seg_samples.setdefault(key, []).append(target)
+
     results = []
     for (line_cd, kind), dd in sorted(samples.items()):
         trips_list = list(dd.values())
@@ -611,7 +687,7 @@ def calibrate_feed(feed: Feed, zf: zipfile.ZipFile, lines, by_line, kinds, group
             median_obs=statistics.median(o for _, o in trips_list),
             feed=feed.name,
         ))
-    return results
+    return results, seg_samples
 
 
 # ---------------------------------------------------------------------------
@@ -703,6 +779,90 @@ def apply_to_rust(results: list[Calibration], recalibrated: set[tuple[int, str]]
 
 
 # ---------------------------------------------------------------------------
+# segment_speed_table.rs の自動生成ブロック書き換え(駅間別較正)
+# ---------------------------------------------------------------------------
+def default_kind_speeds_in_rust() -> tuple[dict[int, float], dict[int, float]]:
+    """speed_table.rs の (line_cd, Default) エントリ値を (手動, 生成) で返す。"""
+    with open(SPEED_TABLE_RS, encoding="utf-8") as f:
+        src = f.read()
+    gen_start = src.find(BEGIN_MARK)
+    manual_src = src if gen_start < 0 else src[:gen_start]
+    gen_src = "" if gen_start < 0 else src[gen_start:]
+    pat = r"\(\s*(\d+)\s*,\s*TrainTypeKind::Default\s*,\s*([0-9.]+)\s*\)"
+    manual = {int(lc): float(v) for lc, v in re.findall(pat, manual_src)}
+    generated = {int(lc): float(v) for lc, v in re.findall(pat, gen_src)}
+    return manual, generated
+
+
+def existing_segment_entries(src: str) -> list[tuple[int, int, int, str]]:
+    """生成ブロック内の既存駅間エントリを (line_cd, cd小, cd大, 整形済み行) で返す。"""
+    start = src.find(BEGIN_MARK)
+    end = src.find(END_MARK)
+    if start < 0 or end < 0:
+        return []
+    block = src[start + len(BEGIN_MARK):end]
+    entries = []
+    pending_comment = ""
+    for line in block.splitlines():
+        stripped = line.strip()
+        m = re.match(r"\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*[0-9.]+\s*\)\s*,", stripped)
+        if m:
+            entries.append((
+                int(m.group(1)),
+                int(m.group(2)),
+                int(m.group(3)),
+                pending_comment + f"    {stripped}\n",
+            ))
+            pending_comment = ""
+        elif stripped.startswith("//") and "エントリなし" not in stripped:
+            pending_comment += f"    {stripped}\n"
+    return entries
+
+
+def apply_segments_to_rust(
+    seg_results: list[SegmentCalibration],
+    recalibrated_lines: set[int],
+    name_of: dict[int, str],
+    lines: dict,
+) -> int:
+    """segment_speed_table.rs の生成ブロックを更新する。
+
+    今回の実行で駅間サンプルを較正できた路線のエントリは新しい結果で置き換え
+    (閾値未満になったペアは削除)、較正対象にならなかった路線の既存エントリは
+    そのまま残す。
+    """
+    with open(SEGMENT_TABLE_RS, encoding="utf-8") as f:
+        src = f.read()
+    start = src.find(BEGIN_MARK)
+    end = src.find(END_MARK)
+    if start < 0 or end < 0 or end < start:
+        raise SystemExit(f"{SEGMENT_TABLE_RS} に生成ブロックマーカーが見つかりません")
+
+    merged: dict[tuple[int, int, int], str] = {}
+    for line_cd, cd_lo, cd_hi, text in existing_segment_entries(src):
+        if line_cd in recalibrated_lines:
+            continue
+        merged[(line_cd, cd_lo, cd_hi)] = text
+
+    for s in seg_results:
+        merged[(s.line_cd, s.cd_lo, s.cd_hi)] = (
+            f"    // {lines[s.line_cd]['name']} {name_of.get(s.cd_lo, s.cd_lo)}〜"
+            f"{name_of.get(s.cd_hi, s.cd_hi)}: {s.feed} GTFS {s.n_samples}本 "
+            f"平均{s.mean_run_min:.1f}分 (路線値 {s.v_base:.0f}km/h)\n"
+            f"    ({s.line_cd}, {s.cd_lo}, {s.cd_hi}, {s.v_fit:.1f}),\n"
+        )
+
+    rows = [merged[k] for k in sorted(merged)]
+    body = "".join(rows) if rows else "    // (現在エントリなし)\n"
+    line_start = src.rfind("\n", 0, end) + 1
+    new_src = src[: start + len(BEGIN_MARK)] + "\n" + body + src[line_start:]
+    if new_src != src:
+        with open(SEGMENT_TABLE_RS, "w", encoding="utf-8") as f:
+            f.write(new_src)
+    return len(rows)
+
+
+# ---------------------------------------------------------------------------
 # メイン
 # ---------------------------------------------------------------------------
 def main() -> int:
@@ -716,6 +876,8 @@ def main() -> int:
     lines, by_line, kinds, groups = load_repo_data()
 
     all_results: list[Calibration] = []
+    all_seg_samples: dict[tuple[int, int, int], list[float]] = {}
+    seg_feed_of: dict[int, str] = {}  # line_cd -> フィード名(出典コメント用)
     for feed in FEEDS:
         sys.stderr.write(f"[{feed.key}] {feed.name} ({feed.license})\n")
         try:
@@ -726,7 +888,11 @@ def main() -> int:
         if zf is None:
             continue
         with zf:
-            all_results.extend(calibrate_feed(feed, zf, lines, by_line, kinds, groups))
+            results, seg_samples = calibrate_feed(feed, zf, lines, by_line, kinds, groups)
+        all_results.extend(results)
+        for key, ts in seg_samples.items():
+            all_seg_samples.setdefault(key, []).extend(ts)
+            seg_feed_of[key[0]] = feed.name
 
     print(f"\n{'路線':<24} {'kind':<16} {'フィット':>8} {'一般則':>7} {'乖離':>7} {'本数':>4} {'採用':>4}")
     emitted = []
@@ -740,10 +906,82 @@ def main() -> int:
             f"{dev:+7.1%} {c.n_trips:>4} {'○' if emit else '-':>4}"
         )
 
+    # --- 駅間別較正 ---
+    # ベースライン(Rust 側が実際に使う路線単位の実効速度): 手動テーブル →
+    # 今回の較正で出力される値 → 既存の生成値 → 一般則 の順で解決する。
+    manual_default, gen_default = default_kind_speeds_in_rust()
+    recal_lines = {c.line_cd for c in all_results if c.kind == 0}
+    emit_default = {c.line_cd: c.v_fit for c in emitted if c.kind == 0}
+
+    def line_baseline(line_cd: int) -> float:
+        if line_cd in manual_default:
+            return manual_default[line_cd]
+        if line_cd in recal_lines:
+            v = emit_default.get(line_cd)
+            if v:
+                return v
+            return general_rule_speed(lines[line_cd]["line_type"], 0)
+        if line_cd in gen_default:
+            return gen_default[line_cd]
+        return general_rule_speed(lines[line_cd]["line_type"], 0)
+
+    name_of = {s["cd"]: s["name"] for sts in by_line.values() for s in sts}
+    coord_of = {s["cd"]: (s["lat"], s["lon"]) for sts in by_line.values() for s in sts}
+
+    seg_emitted: list[SegmentCalibration] = []
+    seg_stats: dict[int, list[int]] = {}  # line_cd -> [較正ペア数, 出力ペア数]
+    for (line_cd, cd_lo, cd_hi), ts in sorted(all_seg_samples.items()):
+        if len(ts) < SEG_MIN_SAMPLES:
+            continue
+        target = sum(ts) / len(ts)
+        (lat1, lon1), (lat2, lon2) = coord_of[cd_lo], coord_of[cd_hi]
+        dist_m = haversine(lat1, lon1, lat2, lon2) * line_detour(lines, by_line, line_cd)
+        v = fit_segment_v(dist_m, target)
+        stats = seg_stats.setdefault(line_cd, [0, 0])
+        if v is None:
+            continue
+        base = line_baseline(line_cd)
+        if not (SEG_SANITY_BAND[0] * base <= v <= SEG_SANITY_BAND[1] * base):
+            sys.stderr.write(
+                f"  {lines[line_cd]['name']} {name_of[cd_lo]}〜{name_of[cd_hi]}: "
+                f"フィット {v:.0f}km/h が路線値 {base:.0f}km/h の妥当範囲外 → 見送り\n"
+            )
+            continue
+        stats[0] += 1
+        v = float(round(v))
+        if abs(v / base - 1.0) < SEG_EMIT_THRESHOLD:
+            continue
+        stats[1] += 1
+        seg_emitted.append(SegmentCalibration(
+            line_cd=line_cd,
+            cd_lo=cd_lo,
+            cd_hi=cd_hi,
+            v_fit=v,
+            v_base=base,
+            n_samples=len(ts),
+            mean_run_min=target,
+            feed=seg_feed_of.get(line_cd, ""),
+        ))
+
+    if seg_stats:
+        print(f"\n[駅間別較正] {'路線':<24} {'較正ペア':>6} {'出力':>4}")
+        for line_cd, (n_cal, n_emit) in sorted(seg_stats.items()):
+            print(f"{'':<11}{lines[line_cd]['name']:<24} {n_cal:>6} {n_emit:>4}")
+    if not args.apply and seg_emitted:
+        print(f"\n[駅間別較正] 出力対象(路線値から ±{SEG_EMIT_THRESHOLD:.0%} 以上乖離):")
+        for s in seg_emitted:
+            print(
+                f"  {lines[s.line_cd]['name']} {name_of[s.cd_lo]}〜{name_of[s.cd_hi]}: "
+                f"{s.v_fit:.0f}km/h (路線値 {s.v_base:.0f}km/h, {s.n_samples}本, 平均{s.mean_run_min:.1f}分)"
+            )
+
     if args.apply:
         recalibrated = {(c.line_cd, KIND_NAMES[c.kind]) for c in all_results}
         n = apply_to_rust(emitted, recalibrated)
         print(f"\nspeed_table.rs 生成ブロックを更新: {n} エントリ")
+        seg_recal_lines = {key[0] for key in all_seg_samples}
+        n_seg = apply_segments_to_rust(seg_emitted, seg_recal_lines, name_of, lines)
+        print(f"segment_speed_table.rs 生成ブロックを更新: {n_seg} エントリ")
     else:
         print(f"\n出力対象(一般則から ±{EMIT_THRESHOLD:.0%} 以上乖離): {len(emitted)} エントリ(--apply で書き込み)")
     return 0

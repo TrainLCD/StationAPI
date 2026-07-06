@@ -41,6 +41,7 @@ use crate::{
             company_repository::CompanyRepository, line_repository::LineRepository,
             station_repository::StationRepository, train_type_repository::TrainTypeRepository,
         },
+        segment_speed_table::{segment_override_applies_to_kind, segment_speed_override_kmh},
     },
     proto::{self, Route},
     use_case::{
@@ -1086,19 +1087,31 @@ where
         };
 
         let mut segments: Vec<proto::TrainRouteSegment> = Vec::with_capacity(sliced.len());
-        let mut prev_coord: Option<(f64, f64)> = None;
+        let mut prev_stop: Option<(f64, f64, i32)> = None;
         for station in sliced {
             let stops = station.stop_condition != proto::StopCondition::Not;
 
-            let distance_from_previous = match prev_coord {
-                Some((plat, plon)) => haversine_distance(plat, plon, station.lat, station.lon),
+            let distance_from_previous = match prev_stop {
+                Some((plat, plon, _)) => haversine_distance(plat, plon, station.lat, station.lon),
                 None => 0.0,
             };
-            prev_coord = Some((station.lat, station.lon));
 
             let is_bus = station.transport_type == TransportType::Bus;
             let kind = station.train_type.as_ref().and_then(|tt| tt.kind);
-            let profile = resolve_speed_profile(station.line_cd, station.line_type, is_bus, kind);
+            let mut profile =
+                resolve_speed_profile(station.line_cd, station.line_type, is_bus, kind);
+            // 隣接駅ペア単位の較正(GTFS 実ダイヤ由来)があれば、このセグメントの
+            // 最高速度を路線単位のプロファイルより優先して上書きする(各停系のみ)。
+            if !is_bus && segment_override_applies_to_kind(kind) {
+                if let Some((_, _, prev_cd)) = prev_stop {
+                    if let Some(v_kmh) =
+                        segment_speed_override_kmh(station.line_cd, prev_cd, station.station_cd)
+                    {
+                        profile.max_speed = v_kmh / 3.6;
+                    }
+                }
+            }
+            prev_stop = Some((station.lat, station.lon, station.station_cd));
 
             let grpc_station: proto::Station = station.into();
             segments.push(proto::TrainRouteSegment {
@@ -2719,6 +2732,25 @@ mod tests {
             // 実所要時間は約24分。都庁前が欠落すると約22分に縮む。
             let total = est.last().unwrap().cumulative_minutes;
             assert!((22.5..26.0).contains(&total), "got {total}");
+        }
+
+        /// 環状部南側(河川横断の急勾配・急曲線区間)の駅間別較正の回帰テスト。
+        /// 路線一様速度(70km/h)では実16分に対し約14.7分と -8% に過小評価される。
+        /// GTFS 実ダイヤ由来の駅間別較正(segment_speed_table)で ±5% 以内に入る。
+        #[tokio::test]
+        async fn test_estimate_route_arrival_times_oedo_kiyosumi_to_akabanebashi() {
+            // 清澄白河(9930115)→赤羽橋(9930122): 実所要時間 16分。
+            let interactor = build_interactor(oedo_stops(), vec![], vec![], vec![]);
+            let est = interactor
+                .estimate_route_arrival_times(9930115, 9930122, &[], None)
+                .await
+                .unwrap();
+
+            assert_eq!(est.len(), 8);
+            assert_eq!(est.first().unwrap().station_cd, 9930115);
+            assert_eq!(est.last().unwrap().station_cd, 9930122);
+            let total = est.last().unwrap().cumulative_minutes;
+            assert!((15.0..17.0).contains(&total), "got {total}");
         }
 
         #[tokio::test]

@@ -42,6 +42,9 @@ use std::collections::HashMap;
 
 use crate::domain::entity::gtfs::TransportType;
 use crate::domain::entity::station::Station;
+use crate::domain::segment_speed_table::{
+    segment_override_applies_to_kind, segment_speed_override_kmh,
+};
 use crate::domain::speed_table::line_speed_override_kmh;
 use crate::proto::{StopCondition, TrainTypeKind};
 
@@ -620,12 +623,26 @@ pub fn estimate_arrival_minutes_calibrated(
 
     for i in 1..n {
         let track_m = straight_km[i] * detour_of(stops[i]) * 1000.0;
-        let v_kmh = max_speed_kmh(
+        let mut v_kmh = max_speed_kmh(
             stops[i].line_cd,
             stops[i].line_type,
             stops[i].kind,
             stops[i].transport_type,
         );
+        // 隣接駅ペア単位の較正(GTFS 実ダイヤ由来)があれば路線単位の速度より
+        // 優先する。急曲線・急勾配で路線平均より遅い区間(大江戸線 月島〜赤羽橋
+        // など)の区間差を反映する。各停系種別の鉄道のみ。
+        if stops[i].transport_type != TransportType::Bus
+            && segment_override_applies_to_kind(stops[i].kind)
+        {
+            if let Some(v) = segment_speed_override_kmh(
+                stops[i].line_cd,
+                stops[i - 1].station_cd,
+                stops[i].station_cd,
+            ) {
+                v_kmh = v;
+            }
+        }
 
         let idx = result.len();
         result.push(EstimatedStop {
