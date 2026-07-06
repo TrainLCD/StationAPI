@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import csv
 import io
+import itertools
 import math
 import os
 import re
@@ -75,6 +76,13 @@ FEEDS: list[Feed] = [
         license="公共交通オープンデータセンター(認証なし公開)",
     ),
     Feed(
+        key="toei_train",
+        name="都営地下鉄",
+        url="https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip",
+        needs_token=False,
+        license="CC BY 4.0(東京都交通局・要出典明示)",
+    ),
+    Feed(
         key="kyoto_subway",
         name="京都市営地下鉄",
         url="https://api.odpt.org/api/v4/files/odpt/KyotoMunicipalTransportation/Kyoto_City_Subway_GTFS.zip?date=20260703&acl:consumerKey={token}",
@@ -88,6 +96,37 @@ FEEDS: list[Feed] = [
         needs_token=True,
         license="公共交通オープンデータ基本ライセンス(要出典明示)",
     ),
+    Feed(
+        key="tokyometro_train",
+        name="東京メトロ",
+        url="https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-Train-GTFS.zip?acl:consumerKey={token}",
+        needs_token=True,
+        license="公共交通オープンデータ基本ライセンス(要出典明示)",
+    ),
+    Feed(
+        key="mir_train",
+        name="つくばエクスプレス",
+        url="https://api.odpt.org/api/v4/files/MIR/data/MIR-Train-GTFS.zip?acl:consumerKey={token}",
+        needs_token=True,
+        license="公共交通オープンデータ基本ライセンス(要出典明示)",
+    ),
+    Feed(
+        key="tamamonorail_train",
+        name="多摩都市モノレール",
+        url="https://api.odpt.org/api/v4/files/TamaMonorail/data/TamaMonorail-Train-GTFS.zip?acl:consumerKey={token}",
+        needs_token=True,
+        license="公共交通オープンデータ基本ライセンス(要出典明示)",
+    ),
+    Feed(
+        key="twr_train",
+        name="りんかい線",
+        url="https://api.odpt.org/api/v4/files/TWR/data/TWR-Train-GTFS.zip?acl:consumerKey={token}",
+        needs_token=True,
+        license="公共交通オープンデータ基本ライセンス(要出典明示)",
+    ),
+    # 京王・相鉄・東武の鉄道 GTFS も公共交通オープンデータセンターに存在するが、
+    # 「公共交通オープンデータチャレンジ限定ライセンス」(api-challenge.odpt.org)で
+    # 本番利用できないため意図的に含めていない(scripts/README.md 参照)。
 ]
 
 # ---------------------------------------------------------------------------
@@ -331,20 +370,58 @@ def weekday_service_ids(zf: zipfile.ZipFile) -> set[str]:
 # ---------------------------------------------------------------------------
 # 較正本体
 # ---------------------------------------------------------------------------
-def find_station(sts_line: list[dict], nm: str, lat: float, lon: float) -> int | None:
-    """路線の駅リストから停留所に対応する駅 index を返す。
+def find_station_candidates(sts_line: list[dict], nm: str, lat: float, lon: float) -> list[int]:
+    """路線の駅リストから停留所に対応しうる駅 index の候補を返す。
 
     正規化名一致(座標 500m 以内)を優先し、無ければ座標最近傍(200m 以内)で
     救済する(改称駅・「アリーナ前」⇔「函館アリーナ前」のような表記揺れ対策)。
+
+    同名駅が同一路線に複数格納される路線(都営大江戸線の都庁前が環状部始端と
+    放射部側の2レコードを持つなど)があるため、単一 index ではなく候補列を返し、
+    どちらを採用するかは列車全体の単調性(`resolve_monotonic`)で決める。
     """
-    for i, s in enumerate(sts_line):
-        if s["norm"] == nm and haversine(lat, lon, s["lat"], s["lon"]) <= MATCH_RADIUS_M:
-            return i
+    hits = [
+        i
+        for i, s in enumerate(sts_line)
+        if s["norm"] == nm and haversine(lat, lon, s["lat"], s["lon"]) <= MATCH_RADIUS_M
+    ]
+    if hits:
+        return hits
     best, best_d = None, NEAREST_RADIUS_M
     for i, s in enumerate(sts_line):
         d = haversine(lat, lon, s["lat"], s["lon"])
         if d <= best_d:
             best, best_d = i, d
+    return [best] if best is not None else []
+
+
+def resolve_monotonic(cand_lists: list[list[int]]) -> list[int] | None:
+    """各停留所の候補 index 列から、単調増加または単調減少になる割当を返す。
+
+    候補が複数ある割当(同名駅)は、成立する割当のうち走行区間(span)が最小の
+    ものを採用する。例: 大江戸線 光が丘→都庁前 の終点「都庁前」は環状部始端
+    (index 0)と放射部側(index 28)の両候補があるが、放射部側を選ぶと
+    38→28 の単調減少・span 10 で成立するためそちらを採る。
+    組合せ数が異常に多い場合は割当不能として捨てる(実データでは同名駅は
+    高々2候補×少数なので実質発生しない)。
+    """
+    total = 1
+    for cands in cand_lists:
+        if not cands:
+            return None
+        total *= len(cands)
+        if total > 32:
+            return None
+    best: list[int] | None = None
+    best_span = None
+    for combo in itertools.product(*cand_lists):
+        inc = all(b > a for a, b in zip(combo, combo[1:]))
+        dec = all(b < a for a, b in zip(combo, combo[1:]))
+        if not (inc or dec):
+            continue
+        span = max(combo) - min(combo)
+        if best_span is None or span < best_span:
+            best, best_span = list(combo), span
     return best
 
 
@@ -358,7 +435,7 @@ def match_line(
     for line_cd, sts in by_line.items():
         if lines.get(line_cd, {}).get("e_status") != "0":
             continue
-        hits = sum(1 for nm, lat, lon in trip_stop_keys if find_station(sts, nm, lat, lon) is not None)
+        hits = sum(1 for nm, lat, lon in trip_stop_keys if find_station_candidates(sts, nm, lat, lon))
         if hits > best_hits:
             best, best_hits = line_cd, hits
     if best is not None and best_hits >= max(2, math.ceil(len(trip_stop_keys) * MATCH_COVERAGE)):
@@ -484,25 +561,18 @@ def calibrate_feed(feed: Feed, zf: zipfile.ZipFile, lines, by_line, kinds, group
         if line_cd is None:
             continue
 
-        # 停車駅を自データの駅へ対応付ける。
+        # 停車駅を自データの駅へ対応付ける。同名駅(大江戸線 都庁前など)は
+        # 候補が複数あるため、列車全体で単調になる割当を選ぶ。
+        # 単調割当が無い列車(環状一周・折返し・6の字乗り通し)は除外する。
         sts_line = by_line[line_cd]
-        matched_idx: list[int] = []
-        for nm, lat, lon in keys:
-            found = find_station(sts_line, nm, lat, lon)
-            if found is None:
-                break
-            matched_idx.append(found)
-        if len(matched_idx) != len(keys):
-            continue
-        # 進行方向が単調な列車だけを使う(環状・折返しは除外)。
-        inc = all(b > a for a, b in zip(matched_idx, matched_idx[1:]))
-        dec = all(b < a for a, b in zip(matched_idx, matched_idx[1:]))
-        if not (inc or dec):
+        cand_lists = [find_station_candidates(sts_line, nm, lat, lon) for nm, lat, lon in keys]
+        matched_idx = resolve_monotonic(cand_lists)
+        if matched_idx is None:
             continue
 
         lo, hi = min(matched_idx), max(matched_idx)
         span = sts_line[lo:hi + 1]
-        if dec:
+        if matched_idx[0] > matched_idx[-1]:
             span = list(reversed(span))
         served = {sts_line[i]["cd"] for i in matched_idx}
         kind = classify_kind(line_cd, served, [s["cd"] for s in span], groups, kinds)
@@ -561,7 +631,34 @@ def manual_keys_in_rust(src: str) -> set[tuple[int, str]]:
     }
 
 
-def apply_to_rust(results: list[Calibration]) -> int:
+def existing_generated_entries(src: str) -> list[tuple[int, str, str]]:
+    """生成ブロック内の既存エントリを (line_cd, kind名, 整形済み2行) で返す。"""
+    start = src.find(BEGIN_MARK)
+    end = src.find(END_MARK)
+    if start < 0 or end < 0:
+        return []
+    block = src[start + len(BEGIN_MARK):end]
+    entries = []
+    pending_comment = ""
+    for line in block.splitlines():
+        stripped = line.strip()
+        m = re.match(r"\(\s*(\d+)\s*,\s*TrainTypeKind::(\w+)\s*,\s*[0-9.]+\s*\)\s*,", stripped)
+        if m:
+            entries.append((int(m.group(1)), m.group(2), pending_comment + f"    {stripped}\n"))
+            pending_comment = ""
+        elif stripped.startswith("//") and "エントリなし" not in stripped:
+            pending_comment += f"    {stripped}\n"
+    return entries
+
+
+def apply_to_rust(results: list[Calibration], recalibrated: set[tuple[int, str]]) -> int:
+    """生成ブロックを更新する。
+
+    今回の実行で較正できた (line_cd, kind) は新しい値で置き換え、較正対象に
+    ならなかったキー(トークン未設定でスキップしたフィード・取得失敗など)の
+    既存エントリはそのまま残す。較正した結果、乖離が閾値未満になったキーは
+    `recalibrated` に含まれるため既存エントリごと削除される。
+    """
     with open(SPEED_TABLE_RS, encoding="utf-8") as f:
         src = f.read()
     start = src.find(BEGIN_MARK)
@@ -570,9 +667,17 @@ def apply_to_rust(results: list[Calibration]) -> int:
         raise SystemExit(f"{SPEED_TABLE_RS} に生成ブロックマーカーが見つかりません")
 
     manual = manual_keys_in_rust(src)
-    rows = []
+    kind_value = {name: value for value, name in KIND_NAMES.items()}
+
+    # (line_cd, kind値) -> 整形済みエントリ文字列
+    merged: dict[tuple[int, int], str] = {}
+    for line_cd, kind_name, text in existing_generated_entries(src):
+        if (line_cd, kind_name) in recalibrated or (line_cd, kind_name) in manual:
+            continue
+        merged[(line_cd, kind_value.get(kind_name, 0))] = text
+
     skipped = 0
-    for c in sorted(results, key=lambda c: (c.line_cd, c.kind)):
+    for c in results:
         kind_name = KIND_NAMES[c.kind]
         if (c.line_cd, kind_name) in manual:
             sys.stderr.write(
@@ -580,12 +685,13 @@ def apply_to_rust(results: list[Calibration]) -> int:
             )
             skipped += 1
             continue
-        rows.append(
+        merged[(c.line_cd, c.kind)] = (
             f"    // {c.line_name} {kind_name}: {c.feed} GTFS {c.n_trips}本 "
             f"中央値{c.median_obs:.0f}分 (一般則 {c.v_rule:.0f}km/h)\n"
             f"    ({c.line_cd}, TrainTypeKind::{kind_name}, {c.v_fit:.1f}),\n"
         )
 
+    rows = [merged[k] for k in sorted(merged)]
     body = "".join(rows) if rows else "    // (現在エントリなし)\n"
     # BEGIN マーカー行の直後から END マーカー行(インデント込み)の直前までを置換する。
     line_start = src.rfind("\n", 0, end) + 1
@@ -635,7 +741,8 @@ def main() -> int:
         )
 
     if args.apply:
-        n = apply_to_rust(emitted)
+        recalibrated = {(c.line_cd, KIND_NAMES[c.kind]) for c in all_results}
+        n = apply_to_rust(emitted, recalibrated)
         print(f"\nspeed_table.rs 生成ブロックを更新: {n} エントリ")
     else:
         print(f"\n出力対象(一般則から ±{EMIT_THRESHOLD:.0%} 以上乖離): {len(emitted)} エントリ(--apply で書き込み)")
