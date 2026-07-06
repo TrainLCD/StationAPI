@@ -630,7 +630,7 @@ def rebalance_line_targets(
 
 
 def collect_segment_samples(
-    seg_samples: dict[tuple[int, int, int], list[float]],
+    seg_samples: dict[tuple[int, int, int], list[tuple[float, str]]],
     line_cd: int,
     sts_line: list[dict],
     matched_idx: list[int],
@@ -681,7 +681,7 @@ def segment_sanity_upper_kmh(base: float, line_type: int | None) -> float:
 
 def calibrate_feed(
     feed: Feed, zf: zipfile.ZipFile, lines, by_line, kinds, groups
-) -> tuple[list[Calibration], dict[tuple[int, int, int], list[float]]]:
+) -> tuple[list[Calibration], dict[tuple[int, int, int], list[tuple[float, str]]]]:
     stops_by_id = {
         s["stop_id"]: (norm_name(s["stop_name"]), float(s["stop_lat"]), float(s["stop_lon"]))
         for s in read_gtfs_csv(zf, "stops.txt")
@@ -700,10 +700,10 @@ def calibrate_feed(
 
     # (line_cd, kind) -> [(モデル入力列, 観測分), ...](同一パターン・同一所要は重複排除)
     samples: dict[tuple[int, int], dict[tuple, tuple]] = {}
-    # (line_cd, station_cd小, station_cd大) -> [駅間走行時間(分), ...]。
+    # (line_cd, station_cd小, station_cd大) -> [(駅間走行時間(分), "arr"|"dep"), ...]。
     # 各駅停車(kind=0)の隣接駅間のみ。時刻の分丸めを複数本の平均で均すため
     # 重複排除しない(同時刻パターンの多重度も含めて平均する)。
-    seg_samples: dict[tuple[int, int, int], list[float]] = {}
+    seg_samples: dict[tuple[int, int, int], list[tuple[float, str]]] = {}
     line_match_cache: dict[tuple, int | None] = {}
 
     for trip_id, sts in st_by_trip.items():
@@ -991,7 +991,7 @@ def main() -> int:
     lines, by_line, kinds, groups = load_repo_data()
 
     all_results: list[Calibration] = []
-    all_seg_samples: dict[tuple[int, int, int], list[float]] = {}
+    all_seg_samples: dict[tuple[int, int, int], list[tuple[float, str]]] = {}
     seg_feed_of: dict[int, str] = {}  # line_cd -> フィード名(出典コメント用)
     for feed in FEEDS:
         sys.stderr.write(f"[{feed.key}] {feed.name} ({feed.license})\n")
