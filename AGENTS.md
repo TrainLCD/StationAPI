@@ -39,7 +39,7 @@ This guide explains how automation agents and human contributors should work wit
 ## Data Management
 - CSV import order depends on the numeric prefix (`1!`, `2!`, ...). When adding datasets, choose a prefix that preserves foreign-key dependencies.
 - `data/create_table.sql` drops and recreates tables, indexes, and foreign keys. Update this script alongside any schema or CSV column changes.
-- `data_validator` currently verifies that `5!station_station_types.csv` references valid station and type IDs. Extend the validator when new cross-references are introduced and keep the process fail-fast (panic on invalid data).
+- `data_validator` currently verifies that `5!station_station_types.csv` references valid station and type IDs, and that order-sensitive station sequences in `3!stations.csv` stay intact under `ORDER BY e_sort, station_cd` (e.g. the Toei Oedo Line's Tochomae rows, whose misordering silently drops the station from ETA estimation). Extend the validator when new cross-references or order-sensitive spots are introduced and keep the process fail-fast (panic on invalid data).
 
 ## Testing and Quality
 - **Unit tests** – `cargo test --lib --package stationapi` or `make test-unit`; focus on entities and repository mocks without a database.

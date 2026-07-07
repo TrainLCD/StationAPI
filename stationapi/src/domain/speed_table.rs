@@ -50,6 +50,15 @@ const LINE_SPEED_OVERRIDES: &[(i32, TrainTypeKind, f64)] = &[
     (31001, TrainTypeKind::LimitedExpress, 80.0),
     (31005, TrainTypeKind::LimitedExpress, 115.0),
     (31027, TrainTypeKind::LimitedExpress, 120.0),
+    // 都営大江戸線: リニア地下鉄で公表最高速度 70km/h(地下鉄一般則 75km/h より低い)。
+    // 都営 GTFS の一様フィットは 60km/h だが、サンプルの大半が 6の字全区間直通
+    // (光が丘⇔都庁前 環状部経由・実83〜88分)で、急曲線の多い環状部に引きずられ
+    // 放射部(落合南長崎→光が丘 実11分)が +14% になるため採用しない。
+    // 公表最高速度 70km/h なら全ベンチマーク(放射部 実11分・新宿→光が丘 実24分・
+    // 光が丘→都庁前 実22分・清澄白河→赤羽橋 実16分・全区間 実85分)が ±9% 以内。
+    // 環状部南側(月島〜赤羽橋の河川横断・急曲線区間)の残差 -8% は路線一様速度では
+    // 解消できない(区間別較正が必要)。
+    (99301, TrainTypeKind::Default, 70.0),
 ];
 
 /// 公開 GTFS 時刻表からの自動較正エントリ。`scripts/compute_speed_table.py --apply`
@@ -57,12 +66,40 @@ const LINE_SPEED_OVERRIDES: &[(i32, TrainTypeKind, f64)] = &[
 /// スクリプト側で除外される。手動編集しないこと。
 const LINE_SPEED_OVERRIDES_GTFS: &[(i32, TrainTypeKind, f64)] = &[
     // --- BEGIN GENERATED (scripts/compute_speed_table.py) ---
+    // 東京メトロ銀座線 Default: 東京メトロ GTFS 15本 中央値34分 (一般則 75km/h)
+    (28001, TrainTypeKind::Default, 55.0),
+    // 東京メトロ丸ノ内線 Default: 東京メトロ GTFS 10本 中央値51分 (一般則 75km/h)
+    (28002, TrainTypeKind::Default, 65.0),
+    // 東京メトロ日比谷線 Default: 東京メトロ GTFS 7本 中央値45分 (一般則 75km/h)
+    (28003, TrainTypeKind::Default, 50.0),
+    // 東京メトロ東西線 Default: 東京メトロ GTFS 20本 中央値54分 (一般則 75km/h)
+    (28004, TrainTypeKind::Default, 60.0),
+    // 東京メトロ有楽町線 Default: 東京メトロ GTFS 19本 中央値52分 (一般則 75km/h)
+    (28006, TrainTypeKind::Default, 65.0),
+    // 東京メトロ半蔵門線 Default: 東京メトロ GTFS 10本 中央値32分 (一般則 75km/h)
+    (28008, TrainTypeKind::Default, 55.0),
+    // 東京メトロ南北線 Default: 東京メトロ GTFS 12本 中央値38分 (一般則 75km/h)
+    (28009, TrainTypeKind::Default, 65.0),
+    // 東京メトロ副都心線 Default: 東京メトロ GTFS 31本 中央値27分 (一般則 75km/h)
+    (28010, TrainTypeKind::Default, 55.0),
+    // 東京メトロ副都心線 Express: 東京メトロ GTFS 15本 中央値28分 (一般則 86km/h)
+    (28010, TrainTypeKind::Express, 60.0),
     // 函館市電2系統 Default: 函館市電 GTFS 4本 中央値48分 (一般則 40km/h)
     (99105, TrainTypeKind::Default, 20.0),
     // 函館市電5系統 Default: 函館市電 GTFS 6本 中央値47分 (一般則 40km/h)
     (99106, TrainTypeKind::Default, 25.0),
+    // 都営浅草線 Default: 都営地下鉄 GTFS 18本 中央値37分 (一般則 75km/h)
+    (99302, TrainTypeKind::Default, 65.0),
+    // 都営浅草線 LimitedExpress: 都営地下鉄 GTFS 5本 中央値21分 (一般則 90km/h)
+    (99302, TrainTypeKind::LimitedExpress, 55.0),
+    // 東京さくらトラム(都電荒川線) Default: 都営地下鉄 GTFS 13本 中央値56分 (一般則 40km/h)
+    (99305, TrainTypeKind::Default, 25.0),
     // 横浜市営地下鉄ブルーライン Rapid: 横浜市営地下鉄 GTFS 3本 中央値61分 (一般則 75km/h)
     (99316, TrainTypeKind::Rapid, 65.0),
+    // 多摩モノレール Default: 多摩都市モノレール GTFS 6本 中央値38分 (一般則 60km/h)
+    (99334, TrainTypeKind::Default, 50.0),
+    // りんかい線 Default: りんかい線 GTFS 8本 中央値20分 (一般則 80km/h)
+    (99337, TrainTypeKind::Default, 65.0),
     // 京都市営地下鉄東西線 Default: 京都市営地下鉄 GTFS 9本 中央値33分 (一般則 75km/h)
     (99611, TrainTypeKind::Default, 65.0),
     // --- END GENERATED ---

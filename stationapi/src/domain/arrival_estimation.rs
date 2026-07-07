@@ -42,6 +42,9 @@ use std::collections::HashMap;
 
 use crate::domain::entity::gtfs::TransportType;
 use crate::domain::entity::station::Station;
+use crate::domain::segment_speed_table::{
+    segment_override_applies_to_kind, segment_speed_override_kmh,
+};
 use crate::domain::speed_table::line_speed_override_kmh;
 use crate::proto::{StopCondition, TrainTypeKind};
 
@@ -597,6 +600,18 @@ pub fn estimate_arrival_minutes_calibrated(
         .map(|(i, s)| is_stop(s, i == 0 || i == n - 1))
         .collect();
 
+    // 経路スライス内で路線ごとに通過駅があるか。通過駅が一つも無い路線では、
+    // 優等種別(急行・特急など)でも実質各駅停車として走る(東急田園都市線の
+    // 急行が半蔵門線内で各駅停車になる直通など)ため、その路線の区間では
+    // 種別の速度倍率・種別別の速度較正を適用せず各停(Default)として扱う。
+    // 判定は `is_stop` と同じ端点補正込みの `stops_here` を使う(端点は常に
+    // 停車扱いのため、端点の pass フラグだけでは優等扱いにしない)。
+    let mut line_has_pass: HashMap<i32, bool> = HashMap::new();
+    for (i, s) in stops.iter().enumerate() {
+        let entry = line_has_pass.entry(s.line_cd).or_insert(false);
+        *entry = *entry || !stops_here[i];
+    }
+
     let line_group_of =
         |station: &Station| -> Option<i32> { station.line_group_cd.or(Some(station.line_cd)) };
 
@@ -620,12 +635,37 @@ pub fn estimate_arrival_minutes_calibrated(
 
     for i in 1..n {
         let track_m = straight_km[i] * detour_of(stops[i]) * 1000.0;
-        let v_kmh = max_speed_kmh(
+        // この路線に通過駅が無ければ各駅停車として振る舞う(種別倍率なし・
+        // Default の速度較正を使用)。
+        let effective_kind = if line_has_pass
+            .get(&stops[i].line_cd)
+            .copied()
+            .unwrap_or(false)
+        {
+            stops[i].kind
+        } else {
+            None
+        };
+        let mut v_kmh = max_speed_kmh(
             stops[i].line_cd,
             stops[i].line_type,
-            stops[i].kind,
+            effective_kind,
             stops[i].transport_type,
         );
+        // 隣接駅ペア単位の較正(GTFS 実ダイヤ由来)があれば路線単位の速度より
+        // 優先する。急曲線・急勾配で路線平均より遅い区間(大江戸線 月島〜赤羽橋
+        // など)の区間差を反映する。各停系種別の鉄道のみ。
+        if stops[i].transport_type != TransportType::Bus
+            && segment_override_applies_to_kind(effective_kind)
+        {
+            if let Some(v) = segment_speed_override_kmh(
+                stops[i].line_cd,
+                stops[i - 1].station_cd,
+                stops[i].station_cd,
+            ) {
+                v_kmh = v;
+            }
+        }
 
         let idx = result.len();
         result.push(EstimatedStop {
@@ -950,17 +990,20 @@ mod tests {
     fn speed_profile_splits_within_pass_through_segment() {
         let p = EstimationParams::default();
 
-        // 始点→通過→終点。通過駅で line_cd が変わる直通区間。
-        // どちらも在来線(普通)。
+        // 始点→通過→終点。通過駅から line_cd が変わる直通区間。
+        // どちらも在来線(普通)。通過駅を line 200 側に置き、優等種別の速度が
+        // 「通過駅のある路線」で有効になる条件を満たす。
         let mut slow = three_collinear_stations();
         slow[1].pass = Some(1);
-        slow[2].line_cd = 200; // 直通で line_cd が変わる
+        slow[1].line_cd = 200; // 直通で line_cd が変わる
+        slow[2].line_cd = 200;
         let slow_refs: Vec<&Station> = slow.iter().collect();
         let slow_est = estimate_arrival_minutes(&slow_refs, &p);
 
         // 後半サブ区間(通過→終点)だけ高速種別(特急 → 80×1.2=96km/h)にする。
         let mut fast = three_collinear_stations();
         fast[1].pass = Some(1);
+        fast[1].line_cd = 200;
         fast[2].line_cd = 200;
         fast[2].kind = Some(TrainTypeKind::LimitedExpress as i32); // 後半サブ区間の v_max を上げる
         let fast_refs: Vec<&Station> = fast.iter().collect();
@@ -977,6 +1020,44 @@ mod tests {
         approx(
             fast_est[1].cumulative_minutes,
             slow_est[1].cumulative_minutes,
+        );
+    }
+
+    #[test]
+    fn express_kind_without_passes_behaves_like_local() {
+        // 経路スライス内に通過駅が無い路線では、優等種別でも各駅停車として走る
+        // (東急田園都市線の急行が半蔵門線内で各駅停車になる直通など)。
+        // 種別倍率(特急 ×1.2)を適用してはいけない。
+        let p = EstimationParams::default();
+        let local = three_collinear_stations();
+        let local_refs: Vec<&Station> = local.iter().collect();
+        let local_est = estimate_arrival_minutes(&local_refs, &p);
+
+        let mut express = three_collinear_stations();
+        for s in express.iter_mut() {
+            s.kind = Some(TrainTypeKind::LimitedExpress as i32);
+        }
+        let express_refs: Vec<&Station> = express.iter().collect();
+        let express_est = estimate_arrival_minutes(&express_refs, &p);
+
+        for (e, l) in express_est.iter().zip(local_est.iter()) {
+            approx(e.cumulative_minutes, l.cumulative_minutes);
+        }
+
+        // 同じ種別でも通過駅があれば優等として扱われ、種別倍率のぶん速くなる。
+        let mut passing = express.clone();
+        passing[1].pass = Some(1);
+        let passing_refs: Vec<&Station> = passing.iter().collect();
+        let passing_est = estimate_arrival_minutes(&passing_refs, &p);
+        let mut local_passing = three_collinear_stations();
+        local_passing[1].pass = Some(1);
+        let lp_refs: Vec<&Station> = local_passing.iter().collect();
+        let lp_est = estimate_arrival_minutes(&lp_refs, &p);
+        assert!(
+            passing_est[2].cumulative_minutes < lp_est[2].cumulative_minutes,
+            "passing express {} should be < passing local {}",
+            passing_est[2].cumulative_minutes,
+            lp_est[2].cumulative_minutes
         );
     }
 
@@ -1042,6 +1123,38 @@ mod tests {
                 r
             );
         }
+    }
+
+    #[test]
+    fn ginza_line_shibuya_to_shimbashi_matches_real_travel_time() {
+        let p = EstimationParams::default();
+        // 東京メトロ銀座線 渋谷→新橋。実座標・実データ値
+        // (average_distance = 780.46154m、地下鉄 line_type=3)。
+        // 実乗車時間は東京メトロ/乗換案内系の標準所要時間で約13分。
+        let data = [
+            (2800119, 35.659066, 139.701000), // 渋谷
+            (2800118, 35.665247, 139.712314), // 表参道
+            (2800117, 35.670527, 139.717857), // 外苑前
+            (2800116, 35.672765, 139.724159), // 青山一丁目
+            (2800115, 35.677021, 139.737047), // 赤坂見附
+            (2800114, 35.673621, 139.741419), // 溜池山王
+            (2800113, 35.670236, 139.749832), // 虎ノ門
+            (2800112, 35.667434, 139.758432), // 新橋
+        ];
+        let stations: Vec<Station> = data
+            .iter()
+            .map(|&(cd, lat, lon)| {
+                let mut s = station(cd, 28001, lat, lon, Some(780.46154));
+                s.line_type = Some(LINE_TYPE_SUBWAY);
+                s.line_group_cd = Some(28001);
+                s
+            })
+            .collect();
+        let refs: Vec<&Station> = stations.iter().collect();
+        let est = estimate_arrival_minutes(&refs, &p);
+
+        let total = est.last().unwrap().cumulative_minutes;
+        assert!((12.0..14.0).contains(&total), "got {total}");
     }
 
     /// GTFS インポート後のバス停を再現する(line_type=3 は GTFS route_type のバス、
@@ -1295,9 +1408,24 @@ mod tests {
             local,
         );
         // 急行 < 各停、特急 < 急行、新快速級 < 特急 の順に速い。
-        let express = time_with_kind(Some(TrainTypeKind::Express as i32));
-        let limited = time_with_kind(Some(TrainTypeKind::LimitedExpress as i32));
-        let high_speed = time_with_kind(Some(TrainTypeKind::HighSpeedRapid as i32));
+        // 優等種別の倍率は「経路内に中間通過駅がある路線」でのみ有効なため、
+        // 末尾側に中間通過駅(4駅目)+終点(5駅目)を足した経路の 3 駅目到着で比較する。
+        let time_with_kind_passing = |kind: Option<i32>| -> f64 {
+            let mut stations = three_collinear_stations();
+            let mut passed = station(4, 100, 35.048, 139.0, None);
+            passed.pass = Some(1);
+            stations.push(passed);
+            stations.push(station(5, 100, 35.064, 139.0, None));
+            for s in stations.iter_mut() {
+                s.kind = kind;
+            }
+            let refs: Vec<&Station> = stations.iter().collect();
+            estimate_arrival_minutes(&refs, &p)[2].cumulative_minutes
+        };
+        let local = time_with_kind_passing(None);
+        let express = time_with_kind_passing(Some(TrainTypeKind::Express as i32));
+        let limited = time_with_kind_passing(Some(TrainTypeKind::LimitedExpress as i32));
+        let high_speed = time_with_kind_passing(Some(TrainTypeKind::HighSpeedRapid as i32));
         assert!(
             express < local,
             "express {express} should be < local {local}"
@@ -1319,11 +1447,19 @@ mod tests {
         let p = EstimationParams::default();
         let time_on_line = |line_cd: i32| -> f64 {
             // 8km 区間(巡航支配)で比較する。0.072 度 ≈ 8km。
-            let mut a = station(1, line_cd, 35.000, 139.0, None);
-            let mut b = station(2, line_cd, 35.072, 139.0, None);
-            a.kind = Some(TrainTypeKind::Express as i32);
-            b.kind = Some(TrainTypeKind::Express as i32);
-            let stations = [a, b];
+            // 優等種別の速度は中間通過駅のある路線でのみ有効なため、後方に
+            // 中間通過駅(3駅目)+終点(4駅目)を足し、2 駅目(単一サブ区間の
+            // 停車駅)への到着時間を見る。
+            let mut stations = [
+                station(1, line_cd, 35.000, 139.0, None),
+                station(2, line_cd, 35.072, 139.0, None),
+                station(3, line_cd, 35.080, 139.0, None),
+                station(4, line_cd, 35.088, 139.0, None),
+            ];
+            stations[2].pass = Some(1);
+            for s in stations.iter_mut() {
+                s.kind = Some(TrainTypeKind::Express as i32);
+            }
             let refs: Vec<&Station> = stations.iter().collect();
             estimate_arrival_minutes(&refs, &p)[1].cumulative_minutes
         };
