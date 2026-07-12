@@ -5,6 +5,7 @@ use serde::de::{DeserializeOwned, DeserializeSeed, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use sqlx::{Connection, PgConnection};
 use stationapi::config::fetch_database_url;
+use stationapi::domain::arrival_estimation::haversine_distance;
 use stationapi::domain::romaji::{romaji_display_name, strip_macrons, to_fullwidth_katakana};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -2246,6 +2247,88 @@ fn generate_bus_station_g_cd(stop_id: &str) -> i32 {
     200_000_000 + (hash % 100_000_000) as i32
 }
 
+/// Distance within which two like-named bus stops are treated as direction
+/// poles of a single physical stop and merged into one `station_g_cd`.
+const BUS_STOP_GROUPING_RADIUS_METERS: f64 = 250.0;
+
+/// Build a `stop_id -> station_g_cd` map that collapses the separate direction
+/// poles of one physical bus stop into a single group.
+///
+/// Some GTFS feeds encode poles with a `parent_station` hierarchy (Toei), in
+/// which case each imported stop is already one deduplicated physical stop. Such
+/// stops — the ones listed in `parent_stop_ids` because a child references them —
+/// are pinned to their own `station_g_cd` and never merged, so parent-hierarchy
+/// feeds are left exactly as before. Other feeds (Seibu, the Tokyu community
+/// buses, and typically Keio) expose every pole as its own top-level stop, so the
+/// same bus stop name would otherwise appear multiple times in the app; those
+/// hierarchy-less stops are grouped when they share a name *and* sit close
+/// together, mirroring how rail stations collapse across companies.
+///
+/// Grouping uses deterministic greedy complete-linkage: within a name, stops are
+/// visited in `stop_id` order and each joins the first cluster whose *every*
+/// member is within `BUS_STOP_GROUPING_RADIUS_METERS`. This bounds each cluster's
+/// diameter to the radius (no transitive chaining that could swallow a distant
+/// same-named stop) and is independent of DB row ordering. A lone stop yields the
+/// exact same `station_g_cd` as [`generate_bus_station_g_cd`].
+fn build_bus_station_g_cd_map(
+    stops: &[GtfsStopRow],
+    parent_stop_ids: &HashSet<String>,
+) -> HashMap<String, i32> {
+    let mut map: HashMap<String, i32> = HashMap::with_capacity(stops.len());
+
+    // Pin parent stops to their own group; bucket the rest by name for grouping.
+    let mut by_name: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (idx, stop) in stops.iter().enumerate() {
+        if parent_stop_ids.contains(&stop.stop_id) {
+            map.insert(
+                stop.stop_id.clone(),
+                generate_bus_station_g_cd(&stop.stop_id),
+            );
+            continue;
+        }
+        by_name.entry(stop.stop_name.trim()).or_default().push(idx);
+    }
+
+    for indices in by_name.values() {
+        // Visit in a canonical order so the resulting clusters are deterministic.
+        let mut order = indices.clone();
+        order.sort_by(|&a, &b| stops[a].stop_id.cmp(&stops[b].stop_id));
+
+        // Greedy complete-linkage: a stop joins the first cluster all of whose
+        // members are within the radius; otherwise it starts a new cluster.
+        let mut clusters: Vec<Vec<usize>> = Vec::new();
+        for &i in &order {
+            let si = &stops[i];
+            let joined = clusters.iter_mut().find(|cluster| {
+                cluster.iter().all(|&j| {
+                    let sj = &stops[j];
+                    haversine_distance(si.stop_lat, si.stop_lon, sj.stop_lat, sj.stop_lon)
+                        <= BUS_STOP_GROUPING_RADIUS_METERS
+                })
+            });
+            match joined {
+                Some(cluster) => cluster.push(i),
+                None => clusters.push(vec![i]),
+            }
+        }
+
+        for cluster in &clusters {
+            // Representative = lexicographically smallest stop_id for stability.
+            let rep = cluster
+                .iter()
+                .map(|&j| stops[j].stop_id.as_str())
+                .min()
+                .expect("cluster is non-empty");
+            let g_cd = generate_bus_station_g_cd(rep);
+            for &j in cluster {
+                map.insert(stops[j].stop_id.clone(), g_cd);
+            }
+        }
+    }
+
+    map
+}
+
 /// Generate deterministic type_cd from (route_id, shape_id).
 /// Uses range starting at 100,000,000 to avoid conflicts with existing rail types.
 fn generate_bus_type_cd(route_id: &str, shape_id: &str) -> i32 {
@@ -2919,10 +3002,38 @@ async fn integrate_gtfs_stops_to_stations(
     .fetch_all(&mut *conn)
     .await?;
 
+    // Stops referenced as a parent_station already represent one deduplicated
+    // physical stop; they must stay pinned to their own group during grouping.
+    let parent_stop_ids: HashSet<String> = sqlx::query_scalar::<_, String>(
+        "SELECT DISTINCT parent_station FROM gtfs_stops \
+         WHERE parent_station IS NOT NULL AND parent_station <> ''",
+    )
+    .fetch_all(&mut *conn)
+    .await?
+    .into_iter()
+    .collect();
+
+    // Collapse the separate direction poles of one physical stop (feeds without a
+    // parent_station hierarchy expose each pole as its own top-level stop).
+    let station_g_cd_by_stop = build_bus_station_g_cd_map(&stops, &parent_stop_ids);
+    let group_count = station_g_cd_by_stop
+        .values()
+        .copied()
+        .collect::<HashSet<_>>()
+        .len();
+    info!(
+        "Grouped {} bus stops into {} station groups.",
+        stops.len(),
+        group_count
+    );
+
     let mut inserted_count = 0;
 
     for stop in &stops {
-        let station_g_cd = generate_bus_station_g_cd(&stop.stop_id);
+        let station_g_cd = station_g_cd_by_stop
+            .get(&stop.stop_id)
+            .copied()
+            .unwrap_or_else(|| generate_bus_station_g_cd(&stop.stop_id));
 
         // Get routes for this parent stop (with stop_sequence)
         // The mapping now uses parent_stop_id as key
@@ -3769,6 +3880,87 @@ mod tests {
             generate_bus_station_g_cd("stop_001"),
             generate_bus_station_g_cd("stop_001")
         );
+    }
+
+    fn stop_row(stop_id: &str, name: &str, lat: f64, lon: f64) -> GtfsStopRow {
+        GtfsStopRow {
+            stop_id: stop_id.to_string(),
+            stop_code: None,
+            stop_name: name.to_string(),
+            stop_name_k: None,
+            stop_name_r: None,
+            stop_name_zh: None,
+            stop_name_ko: None,
+            stop_desc: None,
+            stop_lat: lat,
+            stop_lon: lon,
+            zone_id: None,
+            stop_url: None,
+            location_type: None,
+            parent_station: None,
+            stop_timezone: None,
+            wheelchair_boarding: None,
+            platform_code: None,
+        }
+    }
+
+    #[test]
+    fn test_build_bus_station_g_cd_map_merges_nearby_poles() {
+        let stops = vec![
+            // Two direction poles of the same physical stop (~17 m apart).
+            stop_row("100001-01", "南大通り【朝霞警察署】", 35.787006, 139.592117),
+            stop_row("100001-02", "南大通り【朝霞警察署】", 35.786852, 139.592150),
+            // A distinct stop that merely shares a common name, far away (~40 km).
+            stop_row("A", "新田", 35.79, 139.59),
+            stop_row("B", "新田", 35.65, 139.80),
+        ];
+
+        let map = build_bus_station_g_cd_map(&stops, &HashSet::new());
+
+        // The two nearby poles collapse into one group.
+        assert_eq!(map["100001-01"], map["100001-02"]);
+        // The far-apart namesakes stay separate.
+        assert_ne!(map["A"], map["B"]);
+        // The merged group is stable and equals the representative (min stop_id).
+        assert_eq!(map["100001-01"], generate_bus_station_g_cd("100001-01"));
+        // A lone stop keeps the exact station_g_cd it had before grouping.
+        assert_eq!(map["A"], generate_bus_station_g_cd("A"));
+    }
+
+    #[test]
+    fn test_build_bus_station_g_cd_map_no_transitive_chain() {
+        // A-B and B-C are each within the radius, but A-C is not (~400 m apart).
+        // Single-linkage would chain all three; complete-linkage must keep the
+        // distant endpoints A and C in separate groups.
+        let stops = vec![
+            stop_row("chain_a", "連鎖テスト", 35.0, 139.0),
+            stop_row("chain_b", "連鎖テスト", 35.0, 139.0022), // ~200 m east of A
+            stop_row("chain_c", "連鎖テスト", 35.0, 139.0044), // ~400 m east of A
+        ];
+
+        let map = build_bus_station_g_cd_map(&stops, &HashSet::new());
+
+        // The chain endpoints must not be merged despite the bridging middle stop.
+        assert_ne!(map["chain_a"], map["chain_c"]);
+        // Sanity: A-C really exceeds the radius while A-B stays within it.
+        assert!(haversine_distance(35.0, 139.0, 35.0, 139.0044) > BUS_STOP_GROUPING_RADIUS_METERS);
+        assert!(haversine_distance(35.0, 139.0, 35.0, 139.0022) <= BUS_STOP_GROUPING_RADIUS_METERS);
+    }
+
+    #[test]
+    fn test_build_bus_station_g_cd_map_pins_parent_stops() {
+        // A parent stop and a hierarchy-less stop share a name and sit close by.
+        let stops = vec![
+            stop_row("0001", "青戸車庫前", 35.744787, 139.843847),
+            stop_row("other-01", "青戸車庫前", 35.744900, 139.843900),
+        ];
+        let parents: HashSet<String> = ["0001".to_string()].into_iter().collect();
+
+        let map = build_bus_station_g_cd_map(&stops, &parents);
+
+        // The parent stop keeps its own station_g_cd and is never merged.
+        assert_eq!(map["0001"], generate_bus_station_g_cd("0001"));
+        assert_ne!(map["0001"], map["other-01"]);
     }
 
     #[test]
