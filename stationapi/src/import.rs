@@ -3140,6 +3140,15 @@ mod tests {
             GTFS_FEEDS.iter().map(|feed| feed.id).collect::<Vec<_>>(),
             vec!["toei", "seibu", "keio"]
         );
+
+        let keio = GTFS_FEEDS.iter().find(|feed| feed.id == "keio").unwrap();
+        assert_eq!(keio.name, "Keio Bus");
+        assert_eq!(keio.path, "data/KeioBus-GTFS");
+        assert_eq!(
+            keio.url,
+            "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip"
+        );
+        assert!(keio.requires_consumer_key);
     }
 
     #[test]
