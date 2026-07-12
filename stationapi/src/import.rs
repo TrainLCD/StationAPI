@@ -311,6 +311,15 @@ const GTFS_FEEDS: &[GtfsFeed] = &[
         url: "https://api.odpt.org/api/v4/files/odpt/TokyuBus/tokyubus_community_MeguroCity.zip?date=current",
         requires_consumer_key: true,
     },
+    GtfsFeed {
+        // ODPT's versioned files endpoint requires a `date` selector; `current`
+        // always resolves to the timetable in effect today (omitting it 404s).
+        id: "keio",
+        name: "Keio Bus",
+        path: "data/KeioBus-GTFS",
+        url: "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current",
+        requires_consumer_key: true,
+    },
 ];
 
 const DEFAULT_GTFS_BUS_LINE_COLOR: &str = "#1f63c6";
@@ -575,9 +584,12 @@ fn scoped_gtfs_id_opt(feed: &GtfsFeed, id: Option<&str>) -> Option<String> {
         .map(|s| scoped_gtfs_id(feed, s))
 }
 
-fn gtfs_download_url_with_token(feed: &GtfsFeed, token: &str) -> String {
-    let separator = if feed.url.contains('?') { '&' } else { '?' };
-    format!("{}{}acl:consumerKey={}", feed.url, separator, token)
+/// Append the ODPT `acl:consumerKey` query parameter to a feed URL, using the
+/// correct separator (`?` for the first parameter, `&` when the URL already
+/// carries a query string such as `?date=current`).
+fn append_consumer_key(url: &str, token: &str) -> String {
+    let separator = if url.contains('?') { '&' } else { '?' };
+    format!("{}{}acl:consumerKey={}", url, separator, token)
 }
 
 fn gtfs_download_url(feed: &GtfsFeed) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
@@ -592,10 +604,14 @@ fn gtfs_download_url(feed: &GtfsFeed) -> Result<String, Box<dyn std::error::Erro
         )
     })?;
 
-    Ok(gtfs_download_url_with_token(feed, &token))
+    Ok(append_consumer_key(feed.url, &token))
 }
 
-/// Download and extract GTFS data from ODPT API
+/// Download and extract GTFS data from ODPT API.
+///
+/// If the download or extraction fails partway, the (possibly partial) target
+/// directory is removed so a later run does not treat the incomplete extraction
+/// as a valid, importable feed.
 fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let gtfs_path = Path::new(feed.path);
 
@@ -608,11 +624,33 @@ fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send 
         return Ok(());
     }
 
+    match download_and_extract_gtfs(&feed, gtfs_path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            if gtfs_path.exists() {
+                if let Err(cleanup_err) = fs::remove_dir_all(gtfs_path) {
+                    warn!(
+                        "Failed to remove partial {} GTFS directory after error: {}",
+                        feed.name, cleanup_err
+                    );
+                }
+            }
+            Err(e)
+        }
+    }
+}
+
+fn download_and_extract_gtfs(
+    feed: &GtfsFeed,
+    gtfs_path: &Path,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Downloading {} GTFS data from ODPT API...", feed.name);
 
-    // Download the ZIP file
+    // Download the ZIP file. `without_url()` strips the request URL (which carries
+    // the `acl:consumerKey` token) from any transport error so the token cannot
+    // leak into logs or propagated error messages.
     let request_start = std::time::Instant::now();
-    let response = reqwest::blocking::get(gtfs_download_url(&feed)?)?;
+    let response = reqwest::blocking::get(gtfs_download_url(feed)?).map_err(|e| e.without_url())?;
     info!(
         "[gtfs-download:{}] response received in {:?} (status={})",
         feed.id,
@@ -630,7 +668,7 @@ fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send 
     }
 
     let body_start = std::time::Instant::now();
-    let bytes = response.bytes()?;
+    let bytes = response.bytes().map_err(|e| e.without_url())?;
     info!(
         "[gtfs-download:{}] body read in {:?} ({} bytes), extracting...",
         feed.id,
@@ -698,13 +736,29 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
             .join(", ")
     );
 
-    // Download GTFS data if not present (use spawn_blocking to avoid blocking async runtime)
+    // Download GTFS data if not present (use spawn_blocking to avoid blocking async runtime).
+    // A single feed's download failure (e.g. an operator's ODPT outage or a moved URL)
+    // must not abort the whole pipeline: log it and continue so the other feeds still
+    // import. The per-feed import loop below skips any feed whose directory is missing.
     let download_start = std::time::Instant::now();
     for feed in enabled_feeds.iter().copied() {
-        tokio::task::spawn_blocking(move || download_gtfs(feed))
-            .await
-            .map_err(|e| format!("Failed to spawn blocking task: {}", e))?
-            .map_err(|e| -> Box<dyn std::error::Error> { e })?;
+        match tokio::task::spawn_blocking(move || download_gtfs(feed)).await {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                warn!(
+                    "Failed to download {} GTFS: {}. Skipping this feed; other feeds continue.",
+                    feed.name, e
+                );
+            }
+            // A panic or cancellation of the blocking task must not abort the whole
+            // pipeline either: log it and let the remaining feeds proceed.
+            Err(join_err) => {
+                warn!(
+                    "{} GTFS download task did not complete ({}). Skipping this feed; other feeds continue.",
+                    feed.name, join_err
+                );
+            }
+        }
     }
     let tokyu_odpt_data = tokio::task::spawn_blocking(download_tokyu_odpt_data)
         .await
@@ -891,7 +945,7 @@ async fn import_tokyu_odpt_data(
            (agency_id, agency_name, agency_name_k, agency_name_r, agency_url,
             agency_timezone, agency_lang, company_cd)
            VALUES ($1, '東急バス', 'トウキュウバス', 'Tokyu Bus',
-                   'https://www.tokyubus.co.jp/', 'Asia/Tokyo', 'ja', 254)
+                   'https://www.tokyubus.co.jp/', 'Asia/Tokyo', 'ja', 255)
            ON CONFLICT (agency_id) DO NOTHING"#,
     )
     .bind(&agency_id)
@@ -2177,8 +2231,10 @@ fn company_cd_for_gtfs_route(route_id: &str) -> Option<i32> {
         Some(119) // Toei Transportation
     } else if route_id.starts_with("seibu:") {
         Some(253) // Seibu Bus
+    } else if route_id.starts_with("keio:") {
+        Some(254) // Keio Bus
     } else if route_id.starts_with("tokyu_") {
-        Some(254) // Tokyu Bus
+        Some(255) // Tokyu Bus
     } else {
         None // Unknown/unsupported prefix
     }
@@ -3553,18 +3609,19 @@ mod tests {
     fn test_company_cd_for_gtfs_route() {
         assert_eq!(company_cd_for_gtfs_route("toei:route_001"), Some(119));
         assert_eq!(company_cd_for_gtfs_route("seibu:route_001"), Some(253));
-        assert_eq!(company_cd_for_gtfs_route("tokyu_ota:route_001"), Some(254));
+        assert_eq!(company_cd_for_gtfs_route("keio:route_001"), Some(254));
+        assert_eq!(company_cd_for_gtfs_route("tokyu_ota:route_001"), Some(255));
         assert_eq!(
             company_cd_for_gtfs_route("tokyu_shinagawa:route_001"),
-            Some(254)
+            Some(255)
         );
         assert_eq!(
             company_cd_for_gtfs_route("tokyu_meguro:route_001"),
-            Some(254)
+            Some(255)
         );
         assert_eq!(
             company_cd_for_gtfs_route("tokyu_json:TokyuBus.Route"),
-            Some(254)
+            Some(255)
         );
         assert_eq!(company_cd_for_gtfs_route("unknown:route_001"), None);
     }
@@ -3659,9 +3716,21 @@ mod tests {
                 "seibu",
                 "tokyu_ota",
                 "tokyu_shinagawa",
-                "tokyu_meguro"
+                "tokyu_meguro",
+                "keio"
             ]
         );
+
+        let keio = GTFS_FEEDS.iter().find(|feed| feed.id == "keio").unwrap();
+        assert_eq!(keio.name, "Keio Bus");
+        assert_eq!(keio.path, "data/KeioBus-GTFS");
+        // ODPT's versioned files endpoint 404s without a `date` selector; `current`
+        // keeps the URL pinned to the timetable in effect today.
+        assert_eq!(
+            keio.url,
+            "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current"
+        );
+        assert!(keio.requires_consumer_key);
 
         for feed in GTFS_FEEDS
             .iter()
@@ -3673,19 +3742,40 @@ mod tests {
     }
 
     #[test]
+    fn test_append_consumer_key() {
+        // URL without an existing query string uses `?`.
+        assert_eq!(
+            append_consumer_key(
+                "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip",
+                "TOKEN"
+            ),
+            "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip?acl:consumerKey=TOKEN"
+        );
+        // URL that already carries a query string (e.g. `?date=current`) uses `&`
+        // so the consumer key does not clobber the existing parameter.
+        assert_eq!(
+            append_consumer_key(
+                "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current",
+                "TOKEN"
+            ),
+            "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current&acl:consumerKey=TOKEN"
+        );
+    }
+
+    #[test]
     fn test_gtfs_download_url_preserves_existing_query() {
         let feed = GTFS_FEEDS
             .iter()
             .find(|feed| feed.id == "tokyu_ota")
             .unwrap();
         assert_eq!(
-            gtfs_download_url_with_token(feed, "test-token"),
+            append_consumer_key(feed.url, "test-token"),
             "https://api.odpt.org/api/v4/files/odpt/TokyuBus/tokyubus_community_OtaCity.zip?date=current&acl:consumerKey=test-token"
         );
 
         let feed = GTFS_FEEDS.iter().find(|feed| feed.id == "seibu").unwrap();
         assert_eq!(
-            gtfs_download_url_with_token(feed, "test-token"),
+            append_consumer_key(feed.url, "test-token"),
             "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip?acl:consumerKey=test-token"
         );
     }
