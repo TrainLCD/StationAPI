@@ -919,7 +919,7 @@ async fn import_tokyu_odpt_data(
                 r#"INSERT INTO gtfs_routes
                    (route_id, agency_id, route_short_name, route_long_name,
                     route_long_name_r, route_type, route_color)
-                   VALUES ($1, $2, $3, $3, $3, 3, 'DD1133')
+                   VALUES ($1, $2, $3, $3, NULL, 3, 'DD1133')
                    ON CONFLICT (route_id) DO NOTHING"#,
             )
             .bind(&route_id)
@@ -944,12 +944,11 @@ async fn import_tokyu_odpt_data(
             missing_coordinates += 1;
         }
         stop_values.push(format!(
-            "('{}', '{}', '{}', '{}', '{}', {}, {})",
+            "('{}', '{}', '{}', '{}', NULL, {}, {})",
             escape_sql_string(&stop_id),
             escape_sql_string(stop.number.as_deref().unwrap_or("")),
             escape_sql_string(&stop.title),
             escape_sql_string(&hiragana_to_katakana(&stop.kana)),
-            escape_sql_string(&stop.title),
             stop.lat,
             stop.lon
         ));
