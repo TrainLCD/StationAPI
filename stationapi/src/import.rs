@@ -5,6 +5,8 @@ use serde::de::{DeserializeOwned, DeserializeSeed, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use sqlx::{Connection, PgConnection};
 use stationapi::config::fetch_database_url;
+use stationapi::domain::arrival_estimation::haversine_distance;
+use stationapi::domain::romaji::{romaji_display_name, strip_macrons, to_fullwidth_katakana};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::File;
@@ -997,12 +999,21 @@ async fn import_tokyu_odpt_data(
         if stop.lat == 0.0 || stop.lon == 0.0 {
             missing_coordinates += 1;
         }
+        // Tokyu Bus ODPT JSON has no English field, so romanize the kana reading
+        // into a Hepburn stop_name_r (NULL when the reading has no convertible
+        // kana). This mirrors the GTFS `en` fallback and feeds the same
+        // English-facing station/search/route surfaces.
+        let katakana = hiragana_to_katakana(&stop.kana);
+        let stop_name_r = romaji_display_name(&katakana)
+            .map(|r| format!("'{}'", escape_sql_string(&r)))
+            .unwrap_or_else(|| "NULL".to_string());
         stop_values.push(format!(
-            "('{}', '{}', '{}', '{}', NULL, {}, {})",
+            "('{}', '{}', '{}', '{}', {}, {}, {})",
             escape_sql_string(&stop_id),
             escape_sql_string(stop.number.as_deref().unwrap_or("")),
             escape_sql_string(&stop.title),
-            escape_sql_string(&hiragana_to_katakana(&stop.kana)),
+            escape_sql_string(&katakana),
+            stop_name_r,
             stop.lat,
             stop.lon
         ));
@@ -1141,70 +1152,82 @@ fn load_gtfs_translations(
 
     let mut rdr = ReaderBuilder::new().from_path(&translations_path)?;
 
+    // The GTFS-JP translations.txt column layout differs between feeds: Seibu
+    // omits `record_sub_id` (6 columns), while Keio and the Tokyu community feeds
+    // include it (7 columns). Resolve every column by header name so positions
+    // stay correct regardless of layout.
+    let headers = rdr.headers()?.clone();
+    let column = |name: &str| headers.iter().position(|h| h == name);
+    let (Some(table_idx), Some(field_idx), Some(lang_idx), Some(text_idx)) = (
+        column("table_name"),
+        column("field_name"),
+        column("language"),
+        column("translation"),
+    ) else {
+        warn!("translations.txt missing required columns; skipping translations.");
+        return Ok(translations);
+    };
+    let record_id_idx = column("record_id");
+    let field_value_idx = column("field_value");
+
     for result in rdr.records() {
         let record = result?;
-        // table_name,field_name,language,translation,record_id,record_sub_id,field_value
-        let table_name = record.get(0).unwrap_or("");
-        let field_name = record.get(1).unwrap_or("");
-        let language = record.get(2).unwrap_or("");
-        let translation_text = record.get(3).unwrap_or("");
-        let record_id = record.get(4).unwrap_or("");
+        let cell = |idx: Option<usize>| idx.and_then(|i| record.get(i)).unwrap_or("");
 
         // Only process stop_name translations for now
-        if table_name == "stops" && field_name == "stop_name" {
-            // Store translation for the exact record_id (e.g., "0001-01")
-            let key = ("stops".to_string(), record_id.to_string());
-            let entry = translations.entry(key).or_default();
+        if record.get(table_idx) != Some("stops") || record.get(field_idx) != Some("stop_name") {
+            continue;
+        }
 
-            match language {
-                "ja" => entry.ja = Some(translation_text.to_string()),
-                "ja-Hrkt" => entry.ja_hrkt = Some(translation_text.to_string()),
-                "en" => entry.en = Some(translation_text.to_string()),
-                "zh-Hans" | "zh-Hant" | "zh" => entry.zh = Some(translation_text.to_string()),
-                "ko" => entry.ko = Some(translation_text.to_string()),
-                _ => {}
-            }
+        let language = record.get(lang_idx).unwrap_or("");
+        let text = record.get(text_idx).unwrap_or("");
+        let record_id = cell(record_id_idx);
+        let field_value = cell(field_value_idx);
 
-            // Also store translation for parent stop_id (without suffix like "-01", "-02")
-            // This allows parent stops (location_type=1) to find translations
+        // Feeds key stop_name translations either by `record_id` (Seibu — the
+        // stop_id, sometimes with a "-01" pole suffix) or by `field_value` (Keio,
+        // Tokyu community — the Japanese stop_name itself, with record_id left
+        // empty). Index whichever the row provides so the stop importer can look
+        // the translation up by stop_id or by name.
+        if !record_id.is_empty() {
+            set_translation_language(&mut translations, record_id, language, text, true);
+            // Parent stop_id (drop the "-NN" pole suffix); first child wins.
             if let Some(parent_id) = record_id.rfind('-').map(|pos| &record_id[..pos]) {
-                let parent_key = ("stops".to_string(), parent_id.to_string());
-                // Only insert if not already present (first child's translation wins)
-                translations
-                    .entry(parent_key)
-                    .or_insert_with(|| Translation {
-                        ja: None,
-                        ja_hrkt: None,
-                        en: None,
-                        zh: None,
-                        ko: None,
-                    });
-                let parent_entry = translations
-                    .get_mut(&("stops".to_string(), parent_id.to_string()))
-                    .unwrap();
-                match language {
-                    "ja" if parent_entry.ja.is_none() => {
-                        parent_entry.ja = Some(translation_text.to_string())
-                    }
-                    "ja-Hrkt" if parent_entry.ja_hrkt.is_none() => {
-                        parent_entry.ja_hrkt = Some(translation_text.to_string())
-                    }
-                    "en" if parent_entry.en.is_none() => {
-                        parent_entry.en = Some(translation_text.to_string())
-                    }
-                    "zh-Hans" | "zh-Hant" | "zh" if parent_entry.zh.is_none() => {
-                        parent_entry.zh = Some(translation_text.to_string())
-                    }
-                    "ko" if parent_entry.ko.is_none() => {
-                        parent_entry.ko = Some(translation_text.to_string())
-                    }
-                    _ => {}
-                }
+                set_translation_language(&mut translations, parent_id, language, text, false);
             }
+        }
+        if !field_value.is_empty() {
+            set_translation_language(&mut translations, field_value, language, text, true);
         }
     }
 
     Ok(translations)
+}
+
+/// Set one language field on the `("stops", key)` translation entry. When
+/// `overwrite` is false the value is only filled if currently absent (used for
+/// parent-stop aggregation where the first child wins).
+fn set_translation_language(
+    translations: &mut HashMap<(String, String), Translation>,
+    key: &str,
+    language: &str,
+    text: &str,
+    overwrite: bool,
+) {
+    let entry = translations
+        .entry(("stops".to_string(), key.to_string()))
+        .or_default();
+    let slot = match language {
+        "ja" => &mut entry.ja,
+        "ja-Hrkt" => &mut entry.ja_hrkt,
+        "en" => &mut entry.en,
+        "zh-Hans" | "zh-Hant" | "zh" => &mut entry.zh,
+        "ko" => &mut entry.ko,
+        _ => return,
+    };
+    if overwrite || slot.is_none() {
+        *slot = Some(text.to_string());
+    }
 }
 
 /// Import agencies from agency.txt
@@ -1383,12 +1406,26 @@ async fn import_gtfs_stops(
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string());
 
-        // Get translations
-        let key = ("stops".to_string(), original_stop_id.to_string());
-        let translation = translations.get(&key);
+        // Get translations. Feeds key stop_name translations by either record_id
+        // (== stop_id) or field_value (== the Japanese stop_name), so try both.
+        let translation = translations
+            .get(&("stops".to_string(), original_stop_id.to_string()))
+            .or_else(|| translations.get(&("stops".to_string(), stop_name.clone())));
 
-        let stop_name_k = translation.and_then(|t| t.ja_hrkt.clone());
-        let stop_name_r = translation.and_then(|t| t.en.clone());
+        // Some feeds (Keio, Tokyu community) provide ja-Hrkt readings as
+        // half-width katakana, so normalize to full-width for the katakana column.
+        let stop_name_k = translation
+            .and_then(|t| t.ja_hrkt.clone())
+            .map(|k| to_fullwidth_katakana(&k));
+        // Prefer the official English translation, but fall back to a Hepburn
+        // romanization of the kana reading when the feed ships no `en` row
+        // (e.g. Tokyu community, or any en-less stop). This keeps every
+        // English-facing surface — station name, name search, and romanized
+        // route/headsign names — populated.
+        let stop_name_r = translation
+            .and_then(|t| t.en.clone())
+            .filter(|s| !s.is_empty())
+            .or_else(|| stop_name_k.as_deref().and_then(romaji_display_name));
         let stop_name_zh = translation.and_then(|t| t.zh.clone());
         let stop_name_ko = translation.and_then(|t| t.ko.clone());
 
@@ -2210,6 +2247,88 @@ fn generate_bus_station_g_cd(stop_id: &str) -> i32 {
     200_000_000 + (hash % 100_000_000) as i32
 }
 
+/// Distance within which two like-named bus stops are treated as direction
+/// poles of a single physical stop and merged into one `station_g_cd`.
+const BUS_STOP_GROUPING_RADIUS_METERS: f64 = 250.0;
+
+/// Build a `stop_id -> station_g_cd` map that collapses the separate direction
+/// poles of one physical bus stop into a single group.
+///
+/// Some GTFS feeds encode poles with a `parent_station` hierarchy (Toei), in
+/// which case each imported stop is already one deduplicated physical stop. Such
+/// stops — the ones listed in `parent_stop_ids` because a child references them —
+/// are pinned to their own `station_g_cd` and never merged, so parent-hierarchy
+/// feeds are left exactly as before. Other feeds (Seibu, the Tokyu community
+/// buses, and typically Keio) expose every pole as its own top-level stop, so the
+/// same bus stop name would otherwise appear multiple times in the app; those
+/// hierarchy-less stops are grouped when they share a name *and* sit close
+/// together, mirroring how rail stations collapse across companies.
+///
+/// Grouping uses deterministic greedy complete-linkage: within a name, stops are
+/// visited in `stop_id` order and each joins the first cluster whose *every*
+/// member is within `BUS_STOP_GROUPING_RADIUS_METERS`. This bounds each cluster's
+/// diameter to the radius (no transitive chaining that could swallow a distant
+/// same-named stop) and is independent of DB row ordering. A lone stop yields the
+/// exact same `station_g_cd` as [`generate_bus_station_g_cd`].
+fn build_bus_station_g_cd_map(
+    stops: &[GtfsStopRow],
+    parent_stop_ids: &HashSet<String>,
+) -> HashMap<String, i32> {
+    let mut map: HashMap<String, i32> = HashMap::with_capacity(stops.len());
+
+    // Pin parent stops to their own group; bucket the rest by name for grouping.
+    let mut by_name: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (idx, stop) in stops.iter().enumerate() {
+        if parent_stop_ids.contains(&stop.stop_id) {
+            map.insert(
+                stop.stop_id.clone(),
+                generate_bus_station_g_cd(&stop.stop_id),
+            );
+            continue;
+        }
+        by_name.entry(stop.stop_name.trim()).or_default().push(idx);
+    }
+
+    for indices in by_name.values() {
+        // Visit in a canonical order so the resulting clusters are deterministic.
+        let mut order = indices.clone();
+        order.sort_by(|&a, &b| stops[a].stop_id.cmp(&stops[b].stop_id));
+
+        // Greedy complete-linkage: a stop joins the first cluster all of whose
+        // members are within the radius; otherwise it starts a new cluster.
+        let mut clusters: Vec<Vec<usize>> = Vec::new();
+        for &i in &order {
+            let si = &stops[i];
+            let joined = clusters.iter_mut().find(|cluster| {
+                cluster.iter().all(|&j| {
+                    let sj = &stops[j];
+                    haversine_distance(si.stop_lat, si.stop_lon, sj.stop_lat, sj.stop_lon)
+                        <= BUS_STOP_GROUPING_RADIUS_METERS
+                })
+            });
+            match joined {
+                Some(cluster) => cluster.push(i),
+                None => clusters.push(vec![i]),
+            }
+        }
+
+        for cluster in &clusters {
+            // Representative = lexicographically smallest stop_id for stability.
+            let rep = cluster
+                .iter()
+                .map(|&j| stops[j].stop_id.as_str())
+                .min()
+                .expect("cluster is non-empty");
+            let g_cd = generate_bus_station_g_cd(rep);
+            for &j in cluster {
+                map.insert(stops[j].stop_id.clone(), g_cd);
+            }
+        }
+    }
+
+    map
+}
+
 /// Generate deterministic type_cd from (route_id, shape_id).
 /// Uses range starting at 100,000,000 to avoid conflicts with existing rail types.
 fn generate_bus_type_cd(route_id: &str, shape_id: &str) -> i32 {
@@ -2883,10 +3002,38 @@ async fn integrate_gtfs_stops_to_stations(
     .fetch_all(&mut *conn)
     .await?;
 
+    // Stops referenced as a parent_station already represent one deduplicated
+    // physical stop; they must stay pinned to their own group during grouping.
+    let parent_stop_ids: HashSet<String> = sqlx::query_scalar::<_, String>(
+        "SELECT DISTINCT parent_station FROM gtfs_stops \
+         WHERE parent_station IS NOT NULL AND parent_station <> ''",
+    )
+    .fetch_all(&mut *conn)
+    .await?
+    .into_iter()
+    .collect();
+
+    // Collapse the separate direction poles of one physical stop (feeds without a
+    // parent_station hierarchy expose each pole as its own top-level stop).
+    let station_g_cd_by_stop = build_bus_station_g_cd_map(&stops, &parent_stop_ids);
+    let group_count = station_g_cd_by_stop
+        .values()
+        .copied()
+        .collect::<HashSet<_>>()
+        .len();
+    info!(
+        "Grouped {} bus stops into {} station groups.",
+        stops.len(),
+        group_count
+    );
+
     let mut inserted_count = 0;
 
     for stop in &stops {
-        let station_g_cd = generate_bus_station_g_cd(&stop.stop_id);
+        let station_g_cd = station_g_cd_by_stop
+            .get(&stop.stop_id)
+            .copied()
+            .unwrap_or_else(|| generate_bus_station_g_cd(&stop.stop_id));
 
         // Get routes for this parent stop (with stop_sequence)
         // The mapping now uses parent_stop_id as key
@@ -2894,6 +3041,11 @@ async fn integrate_gtfs_stops_to_stations(
             Some(r) => r.clone(),
             None => continue, // Skip stops not on any route
         };
+
+        // station_name_rn is the plain-ASCII spelling of the romanized name
+        // (Tokyo), whereas station_name_r keeps the macrons (Tōkyō). Derive it
+        // from stop_name_r so both bus and rail rows follow the same convention.
+        let station_name_rn = stop.stop_name_r.as_deref().map(strip_macrons);
 
         // Create a station record for each route this physical stop serves
         for (route_id, stop_sequence) in &routes {
@@ -2903,12 +3055,12 @@ async fn integrate_gtfs_stops_to_stations(
             sqlx::query(
                 r#"INSERT INTO stations (
                     station_cd, station_g_cd, station_name, station_name_k,
-                    station_name_r, station_name_zh, station_name_ko,
+                    station_name_r, station_name_rn, station_name_zh, station_name_ko,
                     line_cd, pref_cd, post, address, lon, lat,
                     open_ymd, close_ymd, e_status, e_sort, transport_type
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, 13, '', '', $9, $10,
-                    '', '', 0, $11, 1
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, 13, '', '', $10, $11,
+                    '', '', 0, $12, 1
                 )
                 ON CONFLICT (station_cd) DO NOTHING"#,
             )
@@ -2922,6 +3074,7 @@ async fn integrate_gtfs_stops_to_stations(
                     .unwrap_or_else(|| stop.stop_name.clone()),
             )
             .bind(&stop.stop_name_r)
+            .bind(&station_name_rn)
             .bind(&stop.stop_name_zh)
             .bind(&stop.stop_name_ko)
             .bind(line_cd)
@@ -3548,6 +3701,67 @@ mod tests {
     }
 
     #[test]
+    fn test_load_gtfs_translations_field_value_keyed() {
+        // Keio and the Tokyu community feeds key stop_name translations by
+        // field_value (the Japanese stop_name) with an empty record_id, ship
+        // ja-Hrkt as half-width katakana, and use the 7-column layout that
+        // includes record_sub_id.
+        let dir = std::env::temp_dir().join("stationapi_test_translations_fv");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("translations.txt"),
+            "table_name,field_name,language,translation,record_id,record_sub_id,field_value\n\
+             stops,stop_name,ja,西八王子駅南口,,,西八王子駅南口\n\
+             stops,stop_name,ja-Hrkt,ﾆｼﾊﾁｵｳｼﾞｴｷﾐﾅﾐｸﾞﾁ,,,西八王子駅南口\n\
+             stops,stop_name,en,Nishi-hachioji Sta. South,,,西八王子駅南口\n",
+        )
+        .unwrap();
+
+        let translations = load_gtfs_translations(&dir).unwrap();
+        let t = translations
+            .get(&("stops".to_string(), "西八王子駅南口".to_string()))
+            .expect("field_value-keyed translation should be found by stop_name");
+        assert_eq!(t.ja_hrkt.as_deref(), Some("ﾆｼﾊﾁｵｳｼﾞｴｷﾐﾅﾐｸﾞﾁ"));
+        assert_eq!(t.en.as_deref(), Some("Nishi-hachioji Sta. South"));
+        // The half-width reading normalizes to full-width katakana for storage.
+        assert_eq!(
+            to_fullwidth_katakana(t.ja_hrkt.as_deref().unwrap()),
+            "ニシハチオウジエキミナミグチ"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_gtfs_translations_record_id_keyed() {
+        // Seibu keys translations by record_id (the stop_id, with a "-01" pole
+        // suffix) in a 6-column layout without record_sub_id, and ships ja-Hrkt
+        // as full-width katakana. The parent stop_id resolves too.
+        let dir = std::env::temp_dir().join("stationapi_test_translations_rid");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("translations.txt"),
+            "table_name,field_name,language,translation,record_id,field_value\n\
+             stops,stop_name,ja,西武百貨店前,20001-01,\n\
+             stops,stop_name,ja-Hrkt,セイブヒャッカテンマエ,20001-01,\n\
+             stops,stop_name,en,Seibu hyakkaten-mae,20001-01,\n",
+        )
+        .unwrap();
+
+        let translations = load_gtfs_translations(&dir).unwrap();
+        let t = translations
+            .get(&("stops".to_string(), "20001-01".to_string()))
+            .expect("record_id-keyed translation should be found by stop_id");
+        assert_eq!(t.en.as_deref(), Some("Seibu hyakkaten-mae"));
+        // Parent stop_id (pole suffix dropped) also resolves to the reading.
+        assert!(translations.contains_key(&("stops".to_string(), "20001".to_string())));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_parse_odpt_time_adds_gtfs_seconds() {
         assert_eq!(parse_odpt_time("08:30"), Some("08:30:00".to_string()));
         assert_eq!(parse_odpt_time("8:03"), Some("08:03:00".to_string()));
@@ -3666,6 +3880,87 @@ mod tests {
             generate_bus_station_g_cd("stop_001"),
             generate_bus_station_g_cd("stop_001")
         );
+    }
+
+    fn stop_row(stop_id: &str, name: &str, lat: f64, lon: f64) -> GtfsStopRow {
+        GtfsStopRow {
+            stop_id: stop_id.to_string(),
+            stop_code: None,
+            stop_name: name.to_string(),
+            stop_name_k: None,
+            stop_name_r: None,
+            stop_name_zh: None,
+            stop_name_ko: None,
+            stop_desc: None,
+            stop_lat: lat,
+            stop_lon: lon,
+            zone_id: None,
+            stop_url: None,
+            location_type: None,
+            parent_station: None,
+            stop_timezone: None,
+            wheelchair_boarding: None,
+            platform_code: None,
+        }
+    }
+
+    #[test]
+    fn test_build_bus_station_g_cd_map_merges_nearby_poles() {
+        let stops = vec![
+            // Two direction poles of the same physical stop (~17 m apart).
+            stop_row("100001-01", "南大通り【朝霞警察署】", 35.787006, 139.592117),
+            stop_row("100001-02", "南大通り【朝霞警察署】", 35.786852, 139.592150),
+            // A distinct stop that merely shares a common name, far away (~40 km).
+            stop_row("A", "新田", 35.79, 139.59),
+            stop_row("B", "新田", 35.65, 139.80),
+        ];
+
+        let map = build_bus_station_g_cd_map(&stops, &HashSet::new());
+
+        // The two nearby poles collapse into one group.
+        assert_eq!(map["100001-01"], map["100001-02"]);
+        // The far-apart namesakes stay separate.
+        assert_ne!(map["A"], map["B"]);
+        // The merged group is stable and equals the representative (min stop_id).
+        assert_eq!(map["100001-01"], generate_bus_station_g_cd("100001-01"));
+        // A lone stop keeps the exact station_g_cd it had before grouping.
+        assert_eq!(map["A"], generate_bus_station_g_cd("A"));
+    }
+
+    #[test]
+    fn test_build_bus_station_g_cd_map_no_transitive_chain() {
+        // A-B and B-C are each within the radius, but A-C is not (~400 m apart).
+        // Single-linkage would chain all three; complete-linkage must keep the
+        // distant endpoints A and C in separate groups.
+        let stops = vec![
+            stop_row("chain_a", "連鎖テスト", 35.0, 139.0),
+            stop_row("chain_b", "連鎖テスト", 35.0, 139.0022), // ~200 m east of A
+            stop_row("chain_c", "連鎖テスト", 35.0, 139.0044), // ~400 m east of A
+        ];
+
+        let map = build_bus_station_g_cd_map(&stops, &HashSet::new());
+
+        // The chain endpoints must not be merged despite the bridging middle stop.
+        assert_ne!(map["chain_a"], map["chain_c"]);
+        // Sanity: A-C really exceeds the radius while A-B stays within it.
+        assert!(haversine_distance(35.0, 139.0, 35.0, 139.0044) > BUS_STOP_GROUPING_RADIUS_METERS);
+        assert!(haversine_distance(35.0, 139.0, 35.0, 139.0022) <= BUS_STOP_GROUPING_RADIUS_METERS);
+    }
+
+    #[test]
+    fn test_build_bus_station_g_cd_map_pins_parent_stops() {
+        // A parent stop and a hierarchy-less stop share a name and sit close by.
+        let stops = vec![
+            stop_row("0001", "青戸車庫前", 35.744787, 139.843847),
+            stop_row("other-01", "青戸車庫前", 35.744900, 139.843900),
+        ];
+        let parents: HashSet<String> = ["0001".to_string()].into_iter().collect();
+
+        let map = build_bus_station_g_cd_map(&stops, &parents);
+
+        // The parent stop keeps its own station_g_cd and is never merged.
+        assert_eq!(map["0001"], generate_bus_station_g_cd("0001"));
+        assert_ne!(map["0001"], map["other-01"]);
     }
 
     #[test]
