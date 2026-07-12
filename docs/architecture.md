@@ -166,11 +166,11 @@ CREATE INDEX idx_performance_station_name_trgm ON stations
 
 ### バス (GTFS) データの統合
 
-`stations` / `lines` / `types` / `station_station_types` は鉄道とバスの両方を保持し、`stations.transport_type` / `lines.transport_type` (0: 鉄道, 1: バス) でフィルタリングします。バスデータの取り込みは `src/import.rs` の `integrate_gtfs_to_stations()` が起動時に実行し、ODPT 公開の GTFS を `gtfs_*` テーブルに展開してから既存テーブルへ統合します。Seibu Bus・Keio Bus を含む設定済みの全GTFSフィードを使用します。Seibu Bus・Keio Bus のダウンロードには `.env.local` の `ODPT_ACCESS_TOKEN` を使用します。
+`stations` / `lines` / `types` / `station_station_types` は鉄道とバスの両方を保持し、`stations.transport_type` / `lines.transport_type` (0: 鉄道, 1: バス) でフィルタリングします。バスデータの取り込みは `src/import.rs` の `integrate_gtfs_to_stations()` が起動時に実行し、ODPT 公開のデータを `gtfs_*` テーブルに展開してから既存テーブルへ統合します。都営バス・西武バス・京王バスを含む設定済みの全GTFSフィードを直接読み込みます。東急バスの一般路線は `BusroutePattern` / `BusstopPole` / `BusTimetable` JSONをGTFS相当の路線・停留所・便・停車時刻へ変換し、路線パターンIDを `shape_id` として扱います。ODPTのJSON APIは全事業者分の大きな配列を返すため、レスポンスをファイルへストリーミングし、1件ずつ東急バス分だけ抽出した7日間キャッシュを `data/TokyuBus-ODPT/` に保持します。大田区（たまちゃんバス）・品川区（しなバス）・目黒区（さんまバス）は公式GTFSを使用し、JSON側の同一路線を除外して重複を防ぎます。認証付きデータ（西武バス・京王バスのGTFSや東急バスのJSON）のダウンロードには `.env.local` の `ODPT_ACCESS_TOKEN` を使用します。なお、ODPT JSONで座標が欠落している一般路線停留所は名称・路線検索には含まれますが、座標検索には含められません。
 
 | 鉄道側の概念 | バス側の対応 |
 |---|---|
-| `companies` | GTFS フィードごとに会社を決定。Toei Bus は東京都交通局 (`company_cd=119`)、Seibu Bus は西武バス (`company_cd=253`)、Keio Bus は京王バス (`company_cd=254`) |
+| `companies` | データソースごとに会社を決定。Toei Bus は東京都交通局 (`company_cd=119`)、Seibu Bus は西武バス (`company_cd=253`)、Keio Bus は京王バス (`company_cd=254`)、東急バスのJSON変換データとコミュニティバス3フィードは東急バス (`company_cd=255`) |
 | `lines` | GTFS `routes` を 1:1 で `lines` に登録。`line_cd` はフィード接頭辞付き `route_id` の fnv1a ハッシュで 100,000,000+ 空間に決定的に生成 |
 | `stations` | GTFS `stops` (親停留所) を `(stop_id, route_id)` 単位で `stations` に登録。`station_cd` / `station_g_cd` もフィード接頭辞付き ID から 200,000,000+ 空間にハッシュ生成 |
 | `types` | GTFS の `(route_id, shape_id)` バリエーション (フルループ / 短ターン / 支線など) を `kind = TrainTypeKind::BusRoute (= 7)` の TrainType として登録。**停留所集合が完全に同じ shape ペア (上下方向違いのみ) は 1 つの TrainType に畳み、`direction = Both` を設定**。`type_name` は循環なら `<headsign> (循環)`、双方向ペアなら `<A> ⇔ <B>`、片方向なら `<始発停留所> → <headsign>` |
