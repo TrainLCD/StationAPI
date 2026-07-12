@@ -287,10 +287,12 @@ const GTFS_FEEDS: &[GtfsFeed] = &[
         requires_consumer_key: true,
     },
     GtfsFeed {
+        // ODPT's versioned files endpoint requires a `date` selector; `current`
+        // always resolves to the timetable in effect today (omitting it 404s).
         id: "keio",
         name: "Keio Bus",
         path: "data/KeioBus-GTFS",
-        url: "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip",
+        url: "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current",
         requires_consumer_key: true,
     },
 ];
@@ -306,6 +308,14 @@ fn scoped_gtfs_id_opt(feed: &GtfsFeed, id: Option<&str>) -> Option<String> {
         .map(|s| scoped_gtfs_id(feed, s))
 }
 
+/// Append the ODPT `acl:consumerKey` query parameter to a feed URL, using the
+/// correct separator (`?` for the first parameter, `&` when the URL already
+/// carries a query string such as `?date=current`).
+fn append_consumer_key(url: &str, token: &str) -> String {
+    let separator = if url.contains('?') { '&' } else { '?' };
+    format!("{}{}acl:consumerKey={}", url, separator, token)
+}
+
 fn gtfs_download_url(feed: &GtfsFeed) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     if !feed.requires_consumer_key {
         return Ok(feed.url.to_string());
@@ -318,7 +328,7 @@ fn gtfs_download_url(feed: &GtfsFeed) -> Result<String, Box<dyn std::error::Erro
         )
     })?;
 
-    Ok(format!("{}?acl:consumerKey={}", feed.url, token))
+    Ok(append_consumer_key(feed.url, &token))
 }
 
 /// Download and extract GTFS data from ODPT API
@@ -424,13 +434,21 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
             .join(", ")
     );
 
-    // Download GTFS data if not present (use spawn_blocking to avoid blocking async runtime)
+    // Download GTFS data if not present (use spawn_blocking to avoid blocking async runtime).
+    // A single feed's download failure (e.g. an operator's ODPT outage or a moved URL)
+    // must not abort the whole pipeline: log it and continue so the other feeds still
+    // import. The per-feed import loop below skips any feed whose directory is missing.
     let download_start = std::time::Instant::now();
     for feed in enabled_feeds.iter().copied() {
-        tokio::task::spawn_blocking(move || download_gtfs(feed))
+        let result = tokio::task::spawn_blocking(move || download_gtfs(feed))
             .await
-            .map_err(|e| format!("Failed to spawn blocking task: {}", e))?
-            .map_err(|e| -> Box<dyn std::error::Error> { e })?;
+            .map_err(|e| format!("Failed to spawn blocking task: {}", e))?;
+        if let Err(e) = result {
+            warn!(
+                "Failed to download {} GTFS: {}. Skipping this feed; other feeds continue.",
+                feed.name, e
+            );
+        }
     }
     info!(
         "[gtfs] download/extract finished in {:?}",
@@ -3144,11 +3162,34 @@ mod tests {
         let keio = GTFS_FEEDS.iter().find(|feed| feed.id == "keio").unwrap();
         assert_eq!(keio.name, "Keio Bus");
         assert_eq!(keio.path, "data/KeioBus-GTFS");
+        // ODPT's versioned files endpoint 404s without a `date` selector; `current`
+        // keeps the URL pinned to the timetable in effect today.
         assert_eq!(
             keio.url,
-            "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip"
+            "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current"
         );
         assert!(keio.requires_consumer_key);
+    }
+
+    #[test]
+    fn test_append_consumer_key() {
+        // URL without an existing query string uses `?`.
+        assert_eq!(
+            append_consumer_key(
+                "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip",
+                "TOKEN"
+            ),
+            "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip?acl:consumerKey=TOKEN"
+        );
+        // URL that already carries a query string (e.g. `?date=current`) uses `&`
+        // so the consumer key does not clobber the existing parameter.
+        assert_eq!(
+            append_consumer_key(
+                "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current",
+                "TOKEN"
+            ),
+            "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current&acl:consumerKey=TOKEN"
+        );
     }
 
     #[test]
