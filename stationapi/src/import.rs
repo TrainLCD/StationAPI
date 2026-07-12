@@ -1,10 +1,14 @@
 //! Data import module for CSV and GTFS data
 
 use csv::{ReaderBuilder, StringRecord};
+use serde::de::{DeserializeOwned, DeserializeSeed, SeqAccess, Visitor};
+use serde::{Deserialize, Serialize};
 use sqlx::{Connection, PgConnection};
 use stationapi::config::fetch_database_url;
-use std::collections::HashMap;
-use std::io::{Cursor, Read as _};
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Cursor, Read, Write};
 use std::path::Path;
 use std::{env, fs};
 use tracing::{info, warn};
@@ -286,9 +290,290 @@ const GTFS_FEEDS: &[GtfsFeed] = &[
         url: "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip",
         requires_consumer_key: true,
     },
+    GtfsFeed {
+        id: "tokyu_ota",
+        name: "Tokyu Bus (Ota City Community Bus)",
+        path: "data/TokyuBus-OtaCity-GTFS",
+        url: "https://api.odpt.org/api/v4/files/odpt/TokyuBus/tokyubus_community_OtaCity.zip?date=current",
+        requires_consumer_key: true,
+    },
+    GtfsFeed {
+        id: "tokyu_shinagawa",
+        name: "Tokyu Bus (Shinagawa City Community Bus)",
+        path: "data/TokyuBus-ShinagawaCity-GTFS",
+        url: "https://api.odpt.org/api/v4/files/odpt/TokyuBus/tokyubus_community_ShinagawaCity.zip?date=current",
+        requires_consumer_key: true,
+    },
+    GtfsFeed {
+        id: "tokyu_meguro",
+        name: "Tokyu Bus (Meguro City Community Bus)",
+        path: "data/TokyuBus-MeguroCity-GTFS",
+        url: "https://api.odpt.org/api/v4/files/odpt/TokyuBus/tokyubus_community_MeguroCity.zip?date=current",
+        requires_consumer_key: true,
+    },
+    GtfsFeed {
+        // ODPT's versioned files endpoint requires a `date` selector; `current`
+        // always resolves to the timetable in effect today (omitting it 404s).
+        id: "keio",
+        name: "Keio Bus",
+        path: "data/KeioBus-GTFS",
+        url: "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current",
+        requires_consumer_key: true,
+    },
 ];
 
 const DEFAULT_GTFS_BUS_LINE_COLOR: &str = "#1f63c6";
+const TOKYU_ODPT_PREFIX: &str = "tokyu_json";
+const TOKYU_ODPT_OPERATOR: &str = "odpt.Operator:TokyuBus";
+const TOKYU_ODPT_CACHE_MAX_AGE: std::time::Duration =
+    std::time::Duration::from_secs(7 * 24 * 60 * 60);
+
+#[derive(Debug, Deserialize, Serialize)]
+struct OdptBusroutePattern {
+    #[serde(rename = "owl:sameAs")]
+    same_as: String,
+    #[serde(rename = "dc:title", default)]
+    title: String,
+    #[serde(rename = "odpt:operator")]
+    operator: String,
+    #[serde(rename = "odpt:busroute")]
+    busroute: String,
+    #[serde(rename = "odpt:direction")]
+    direction: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct OdptBusstopPole {
+    #[serde(rename = "owl:sameAs")]
+    same_as: String,
+    #[serde(rename = "dc:title", default)]
+    title: String,
+    #[serde(rename = "odpt:kana", default)]
+    kana: String,
+    #[serde(rename = "odpt:busstopPoleNumber")]
+    number: Option<String>,
+    #[serde(rename = "odpt:operator", default)]
+    operators: Vec<String>,
+    #[serde(rename = "geo:lat", default)]
+    lat: f64,
+    #[serde(rename = "geo:long", default)]
+    lon: f64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct OdptBusTimetable {
+    #[serde(rename = "owl:sameAs")]
+    same_as: String,
+    #[serde(rename = "odpt:operator")]
+    operator: String,
+    #[serde(rename = "odpt:busroutePattern")]
+    busroute_pattern: String,
+    #[serde(rename = "odpt:calendar")]
+    calendar: String,
+    #[serde(rename = "odpt:busTimetableObject", default)]
+    objects: Vec<OdptBusTimetableObject>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct OdptBusTimetableObject {
+    #[serde(rename = "odpt:index")]
+    index: i32,
+    #[serde(rename = "odpt:busstopPole")]
+    busstop_pole: String,
+    #[serde(rename = "odpt:arrivalTime")]
+    arrival_time: Option<String>,
+    #[serde(rename = "odpt:departureTime")]
+    departure_time: Option<String>,
+    #[serde(rename = "odpt:destinationSign")]
+    destination_sign: Option<String>,
+    #[serde(rename = "odpt:canGetOn")]
+    can_get_on: Option<bool>,
+    #[serde(rename = "odpt:canGetOff")]
+    can_get_off: Option<bool>,
+}
+
+struct TokyuOdptData {
+    patterns: Vec<OdptBusroutePattern>,
+    stops: Vec<OdptBusstopPole>,
+    timetables: Vec<OdptBusTimetable>,
+}
+
+struct TokyuOnlySeed<T>(std::marker::PhantomData<T>);
+
+impl<'de, T> DeserializeSeed<'de> for TokyuOnlySeed<T>
+where
+    T: DeserializeOwned,
+{
+    type Value = Vec<T>;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(TokyuOnlyVisitor(std::marker::PhantomData))
+    }
+}
+
+struct TokyuOnlyVisitor<T>(std::marker::PhantomData<T>);
+
+impl<'de, T> Visitor<'de> for TokyuOnlyVisitor<T>
+where
+    T: DeserializeOwned,
+{
+    type Value = Vec<T>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("an ODPT JSON array")
+    }
+
+    fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut selected = Vec::new();
+        while let Some(value) = sequence.next_element::<serde_json::Value>()? {
+            let belongs_to_tokyu = match value.get("odpt:operator") {
+                Some(serde_json::Value::String(operator)) => operator == TOKYU_ODPT_OPERATOR,
+                Some(serde_json::Value::Array(operators)) => operators
+                    .iter()
+                    .any(|operator| operator.as_str() == Some(TOKYU_ODPT_OPERATOR)),
+                _ => false,
+            };
+            if belongs_to_tokyu {
+                selected.push(serde_json::from_value(value).map_err(|error| {
+                    serde::de::Error::custom(format!("invalid Tokyu Bus record: {}", error))
+                })?);
+            }
+        }
+        Ok(selected)
+    }
+}
+
+fn read_tokyu_odpt_items<T>(path: &Path) -> Result<Vec<T>, Box<dyn std::error::Error + Send + Sync>>
+where
+    T: DeserializeOwned,
+{
+    read_tokyu_odpt_items_from_reader(BufReader::new(File::open(path)?))
+}
+
+fn read_tokyu_odpt_items_from_reader<T, R>(
+    reader: R,
+) -> Result<Vec<T>, Box<dyn std::error::Error + Send + Sync>>
+where
+    T: DeserializeOwned,
+    R: Read,
+{
+    let mut deserializer = serde_json::Deserializer::from_reader(reader);
+    Ok(TokyuOnlySeed(std::marker::PhantomData).deserialize(&mut deserializer)?)
+}
+
+fn strip_odpt_prefix(value: &str) -> &str {
+    value.split_once(':').map_or(value, |(_, id)| id)
+}
+
+fn scoped_tokyu_odpt_id(value: &str) -> String {
+    format!("{}:{}", TOKYU_ODPT_PREFIX, strip_odpt_prefix(value))
+}
+
+fn odpt_direction_id(direction: Option<&str>) -> Option<i32> {
+    match direction {
+        Some("1") => Some(0),
+        Some("2") => Some(1),
+        _ => None,
+    }
+}
+
+fn tokyu_route_name(title: &str) -> &str {
+    title.split_whitespace().next().unwrap_or(title)
+}
+
+fn is_tokyu_community_route(busroute: &str) -> bool {
+    matches!(
+        strip_odpt_prefix(busroute),
+        "TokyuBus.Tamachan" | "TokyuBus.Shinabasu" | "TokyuBus.Sanma"
+    )
+}
+
+fn download_odpt_json<T>(
+    client: &reqwest::blocking::Client,
+    resource: &str,
+    token: &str,
+) -> Result<Vec<T>, Box<dyn std::error::Error + Send + Sync>>
+where
+    T: DeserializeOwned + Serialize,
+{
+    let cache_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../data/TokyuBus-ODPT");
+    let cache_path = cache_dir.join(format!(
+        "{}.tokyu.json",
+        resource.rsplit(':').next().unwrap_or(resource)
+    ));
+    if let Ok(metadata) = fs::metadata(&cache_path) {
+        if metadata
+            .modified()
+            .ok()
+            .and_then(|modified| modified.elapsed().ok())
+            .is_some_and(|age| age < TOKYU_ODPT_CACHE_MAX_AGE)
+        {
+            info!("Using cached Tokyu Bus {} JSON.", resource);
+            return read_tokyu_odpt_items(&cache_path);
+        }
+    }
+
+    let url = format!("https://api.odpt.org/api/v4/{}.json", resource);
+    let mut response = client
+        .get(url)
+        .query(&[
+            ("odpt:operator", TOKYU_ODPT_OPERATOR),
+            ("acl:consumerKey", token),
+        ])
+        .send()?;
+    if !response.status().is_success() {
+        return Err(format!(
+            "Failed to download {}: HTTP {}",
+            resource,
+            response.status()
+        )
+        .into());
+    }
+    fs::create_dir_all(&cache_dir)?;
+    let download_path = cache_path.with_extension("download.tmp");
+    let mut download_file = BufWriter::new(File::create(&download_path)?);
+    std::io::copy(&mut response, &mut download_file)?;
+    download_file.flush()?;
+    drop(download_file);
+
+    let selected = match read_tokyu_odpt_items(&download_path) {
+        Ok(selected) => selected,
+        Err(error) => {
+            let _ = fs::remove_file(&download_path);
+            return Err(error);
+        }
+    };
+    fs::remove_file(&download_path)?;
+    let temporary_path = cache_path.with_extension("json.tmp");
+    let mut cache_file = BufWriter::new(File::create(&temporary_path)?);
+    serde_json::to_writer(&mut cache_file, &selected)?;
+    cache_file.flush()?;
+    drop(cache_file);
+    if cache_path.exists() {
+        fs::remove_file(&cache_path)?;
+    }
+    fs::rename(temporary_path, &cache_path)?;
+    Ok(selected)
+}
+
+fn download_tokyu_odpt_data() -> Result<TokyuOdptData, Box<dyn std::error::Error + Send + Sync>> {
+    let token = env::var("ODPT_ACCESS_TOKEN")
+        .map_err(|_| "Tokyu Bus ODPT JSON requires ODPT_ACCESS_TOKEN in the environment")?;
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(300))
+        .build()?;
+    Ok(TokyuOdptData {
+        patterns: download_odpt_json(&client, "odpt:BusroutePattern", &token)?,
+        stops: download_odpt_json(&client, "odpt:BusstopPole", &token)?,
+        timetables: download_odpt_json(&client, "odpt:BusTimetable", &token)?,
+    })
+}
 
 fn scoped_gtfs_id(feed: &GtfsFeed, id: &str) -> String {
     format!("{}:{}", feed.id, id)
@@ -297,6 +582,14 @@ fn scoped_gtfs_id(feed: &GtfsFeed, id: &str) -> String {
 fn scoped_gtfs_id_opt(feed: &GtfsFeed, id: Option<&str>) -> Option<String> {
     id.filter(|s| !s.is_empty())
         .map(|s| scoped_gtfs_id(feed, s))
+}
+
+/// Append the ODPT `acl:consumerKey` query parameter to a feed URL, using the
+/// correct separator (`?` for the first parameter, `&` when the URL already
+/// carries a query string such as `?date=current`).
+fn append_consumer_key(url: &str, token: &str) -> String {
+    let separator = if url.contains('?') { '&' } else { '?' };
+    format!("{}{}acl:consumerKey={}", url, separator, token)
 }
 
 fn gtfs_download_url(feed: &GtfsFeed) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
@@ -311,10 +604,14 @@ fn gtfs_download_url(feed: &GtfsFeed) -> Result<String, Box<dyn std::error::Erro
         )
     })?;
 
-    Ok(format!("{}?acl:consumerKey={}", feed.url, token))
+    Ok(append_consumer_key(feed.url, &token))
 }
 
-/// Download and extract GTFS data from ODPT API
+/// Download and extract GTFS data from ODPT API.
+///
+/// If the download or extraction fails partway, the (possibly partial) target
+/// directory is removed so a later run does not treat the incomplete extraction
+/// as a valid, importable feed.
 fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let gtfs_path = Path::new(feed.path);
 
@@ -327,11 +624,33 @@ fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send 
         return Ok(());
     }
 
+    match download_and_extract_gtfs(&feed, gtfs_path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            if gtfs_path.exists() {
+                if let Err(cleanup_err) = fs::remove_dir_all(gtfs_path) {
+                    warn!(
+                        "Failed to remove partial {} GTFS directory after error: {}",
+                        feed.name, cleanup_err
+                    );
+                }
+            }
+            Err(e)
+        }
+    }
+}
+
+fn download_and_extract_gtfs(
+    feed: &GtfsFeed,
+    gtfs_path: &Path,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Downloading {} GTFS data from ODPT API...", feed.name);
 
-    // Download the ZIP file
+    // Download the ZIP file. `without_url()` strips the request URL (which carries
+    // the `acl:consumerKey` token) from any transport error so the token cannot
+    // leak into logs or propagated error messages.
     let request_start = std::time::Instant::now();
-    let response = reqwest::blocking::get(gtfs_download_url(&feed)?)?;
+    let response = reqwest::blocking::get(gtfs_download_url(feed)?).map_err(|e| e.without_url())?;
     info!(
         "[gtfs-download:{}] response received in {:?} (status={})",
         feed.id,
@@ -349,7 +668,7 @@ fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send 
     }
 
     let body_start = std::time::Instant::now();
-    let bytes = response.bytes()?;
+    let bytes = response.bytes().map_err(|e| e.without_url())?;
     info!(
         "[gtfs-download:{}] body read in {:?} ({} bytes), extracting...",
         feed.id,
@@ -417,14 +736,41 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
             .join(", ")
     );
 
-    // Download GTFS data if not present (use spawn_blocking to avoid blocking async runtime)
+    // Download GTFS data if not present (use spawn_blocking to avoid blocking async runtime).
+    // A single feed's download failure (e.g. an operator's ODPT outage or a moved URL)
+    // must not abort the whole pipeline: log it and continue so the other feeds still
+    // import. The per-feed import loop below skips any feed whose directory is missing.
     let download_start = std::time::Instant::now();
     for feed in enabled_feeds.iter().copied() {
-        tokio::task::spawn_blocking(move || download_gtfs(feed))
-            .await
-            .map_err(|e| format!("Failed to spawn blocking task: {}", e))?
-            .map_err(|e| -> Box<dyn std::error::Error> { e })?;
+        match tokio::task::spawn_blocking(move || download_gtfs(feed)).await {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                warn!(
+                    "Failed to download {} GTFS: {}. Skipping this feed; other feeds continue.",
+                    feed.name, e
+                );
+            }
+            // A panic or cancellation of the blocking task must not abort the whole
+            // pipeline either: log it and let the remaining feeds proceed.
+            Err(join_err) => {
+                warn!(
+                    "{} GTFS download task did not complete ({}). Skipping this feed; other feeds continue.",
+                    feed.name, join_err
+                );
+            }
+        }
     }
+    let tokyu_odpt_data = tokio::task::spawn_blocking(download_tokyu_odpt_data)
+        .await
+        .map_err(|e| format!("Failed to spawn Tokyu Bus JSON download: {}", e))?
+        .map_err(|e| -> Box<dyn std::error::Error> { e })?;
+    info!(
+        "[gtfs:{}] downloaded ODPT JSON: {} patterns, {} stops, {} timetables",
+        TOKYU_ODPT_PREFIX,
+        tokyu_odpt_data.patterns.len(),
+        tokyu_odpt_data.stops.len(),
+        tokyu_odpt_data.timetables.len()
+    );
     info!(
         "[gtfs] download/extract finished in {:?}",
         download_start.elapsed()
@@ -571,6 +917,8 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    import_tokyu_odpt_data(&mut tx, &tokyu_odpt_data).await?;
+
     info!("[gtfs] committing transaction");
     let commit_start = std::time::Instant::now();
     tx.commit().await?;
@@ -584,6 +932,199 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
         total_start.elapsed()
     );
 
+    Ok(())
+}
+
+async fn import_tokyu_odpt_data(
+    conn: &mut PgConnection,
+    data: &TokyuOdptData,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let agency_id = format!("{}:TokyuBus", TOKYU_ODPT_PREFIX);
+    sqlx::query(
+        r#"INSERT INTO gtfs_agencies
+           (agency_id, agency_name, agency_name_k, agency_name_r, agency_url,
+            agency_timezone, agency_lang, company_cd)
+           VALUES ($1, '東急バス', 'トウキュウバス', 'Tokyu Bus',
+                   'https://www.tokyubus.co.jp/', 'Asia/Tokyo', 'ja', 255)
+           ON CONFLICT (agency_id) DO NOTHING"#,
+    )
+    .bind(&agency_id)
+    .execute(&mut *conn)
+    .await?;
+
+    let mut pattern_map: HashMap<String, (String, Option<i32>)> = HashMap::new();
+    let mut inserted_routes = HashSet::new();
+    for pattern in data.patterns.iter().filter(|pattern| {
+        pattern.operator == TOKYU_ODPT_OPERATOR && !is_tokyu_community_route(&pattern.busroute)
+    }) {
+        let route_id = scoped_tokyu_odpt_id(&pattern.busroute);
+        let pattern_id = scoped_tokyu_odpt_id(&pattern.same_as);
+        pattern_map.insert(
+            pattern_id,
+            (
+                route_id.clone(),
+                odpt_direction_id(pattern.direction.as_deref()),
+            ),
+        );
+
+        if inserted_routes.insert(route_id.clone()) {
+            let route_name = tokyu_route_name(&pattern.title);
+            sqlx::query(
+                r#"INSERT INTO gtfs_routes
+                   (route_id, agency_id, route_short_name, route_long_name,
+                    route_long_name_r, route_type, route_color)
+                   VALUES ($1, $2, $3, $3, NULL, 3, 'DD1133')
+                   ON CONFLICT (route_id) DO NOTHING"#,
+            )
+            .bind(&route_id)
+            .bind(&agency_id)
+            .bind(route_name)
+            .execute(&mut *conn)
+            .await?;
+        }
+    }
+
+    let mut stop_ids = HashSet::new();
+    let mut stop_values = Vec::new();
+    let mut missing_coordinates = 0_usize;
+    for stop in data.stops.iter().filter(|stop| {
+        stop.operators
+            .iter()
+            .any(|operator| operator == TOKYU_ODPT_OPERATOR)
+    }) {
+        let stop_id = scoped_tokyu_odpt_id(&stop.same_as);
+        stop_ids.insert(stop_id.clone());
+        if stop.lat == 0.0 || stop.lon == 0.0 {
+            missing_coordinates += 1;
+        }
+        stop_values.push(format!(
+            "('{}', '{}', '{}', '{}', NULL, {}, {})",
+            escape_sql_string(&stop_id),
+            escape_sql_string(stop.number.as_deref().unwrap_or("")),
+            escape_sql_string(&stop.title),
+            escape_sql_string(&hiragana_to_katakana(&stop.kana)),
+            stop.lat,
+            stop.lon
+        ));
+        if stop_values.len() == 500 {
+            insert_tokyu_stop_values(&mut *conn, &stop_values).await?;
+            stop_values.clear();
+        }
+    }
+    insert_tokyu_stop_values(&mut *conn, &stop_values).await?;
+    if missing_coordinates > 0 {
+        warn!(
+            "Tokyu Bus ODPT JSON contains {} stops without coordinates; name/route queries work, but coordinate queries cannot return those stops",
+            missing_coordinates
+        );
+    }
+
+    let mut trips = Vec::with_capacity(2_000);
+    let mut stop_times = Vec::with_capacity(1_000);
+    let mut trip_count = 0_usize;
+    let mut stop_time_count = 0_usize;
+    for timetable in data
+        .timetables
+        .iter()
+        .filter(|timetable| timetable.operator == TOKYU_ODPT_OPERATOR)
+    {
+        let pattern_id = scoped_tokyu_odpt_id(&timetable.busroute_pattern);
+        let Some((route_id, direction_id)) = pattern_map.get(&pattern_id) else {
+            continue;
+        };
+        let trip_id = scoped_tokyu_odpt_id(&timetable.same_as);
+        let service_id = scoped_tokyu_odpt_id(&timetable.calendar);
+        let headsign = timetable
+            .objects
+            .iter()
+            .find_map(|object| object.destination_sign.clone());
+        trips.push((
+            trip_id.clone(),
+            route_id.clone(),
+            service_id,
+            headsign,
+            None,
+            *direction_id,
+            None,
+            Some(pattern_id),
+            None,
+            None,
+        ));
+        trip_count += 1;
+        if trips.len() == 2_000 {
+            insert_trips_batch(&mut *conn, &trips).await?;
+            trips.clear();
+        }
+
+        for object in &timetable.objects {
+            let stop_id = scoped_tokyu_odpt_id(&object.busstop_pole);
+            if !stop_ids.contains(&stop_id) {
+                continue;
+            }
+            let arrival = object
+                .arrival_time
+                .as_deref()
+                .or(object.departure_time.as_deref())
+                .and_then(parse_odpt_time);
+            let departure = object
+                .departure_time
+                .as_deref()
+                .or(object.arrival_time.as_deref())
+                .and_then(parse_odpt_time);
+            if arrival.is_none() && departure.is_none() {
+                continue;
+            }
+            stop_times.push((
+                trip_id.clone(),
+                arrival,
+                departure,
+                stop_id,
+                object.index,
+                object.destination_sign.clone(),
+                object.can_get_on.map(|allowed| if allowed { 0 } else { 1 }),
+                object
+                    .can_get_off
+                    .map(|allowed| if allowed { 0 } else { 1 }),
+                None,
+                None,
+            ));
+            stop_time_count += 1;
+            if stop_times.len() == 1_000 {
+                // stop_times has a foreign key to trips. Flush every pending trip
+                // before its stop-time batch, even when the trip batch is not full.
+                insert_trips_batch(&mut *conn, &trips).await?;
+                trips.clear();
+                insert_stop_times_batch(&mut *conn, &stop_times).await?;
+                stop_times.clear();
+            }
+        }
+    }
+
+    insert_trips_batch(&mut *conn, &trips).await?;
+    insert_stop_times_batch(&mut *conn, &stop_times).await?;
+
+    info!(
+        "Imported Tokyu Bus ODPT JSON as GTFS: {} routes, {} stops, {} trips, {} stop times.",
+        inserted_routes.len(),
+        stop_ids.len(),
+        trip_count,
+        stop_time_count
+    );
+    Ok(())
+}
+
+async fn insert_tokyu_stop_values(
+    conn: &mut PgConnection,
+    values: &[String],
+) -> Result<(), Box<dyn std::error::Error>> {
+    if values.is_empty() {
+        return Ok(());
+    }
+    let sql = format!(
+        "INSERT INTO gtfs_stops (stop_id, stop_code, stop_name, stop_name_k, stop_name_r, stop_lat, stop_lon) VALUES {} ON CONFLICT (stop_id) DO NOTHING",
+        values.join(",")
+    );
+    sqlx::query(&sql).execute(&mut *conn).await?;
     Ok(())
 }
 
@@ -1448,6 +1989,21 @@ fn parse_gtfs_time(time_str: &str) -> Option<String> {
     Some(time_str.to_string())
 }
 
+/// ODPT bus timetable values use HH:MM, while GTFS requires HH:MM:SS.
+fn parse_odpt_time(time_str: &str) -> Option<String> {
+    if let Some(gtfs_time) = parse_gtfs_time(time_str) {
+        return Some(gtfs_time);
+    }
+
+    let (hours, minutes) = time_str.split_once(':')?;
+    let hours: u32 = hours.parse().ok()?;
+    let minutes: u32 = minutes.parse().ok()?;
+    if minutes >= 60 {
+        return None;
+    }
+    Some(format!("{hours:02}:{minutes:02}:00"))
+}
+
 async fn insert_stop_times_batch(
     conn: &mut PgConnection,
     batch: &[StopTimeBatchRow],
@@ -1675,6 +2231,10 @@ fn company_cd_for_gtfs_route(route_id: &str) -> Option<i32> {
         Some(119) // Toei Transportation
     } else if route_id.starts_with("seibu:") {
         Some(253) // Seibu Bus
+    } else if route_id.starts_with("keio:") {
+        Some(254) // Keio Bus
+    } else if route_id.starts_with("tokyu_") {
+        Some(255) // Tokyu Bus
     } else {
         None // Unknown/unsupported prefix
     }
@@ -2988,6 +3548,15 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_odpt_time_adds_gtfs_seconds() {
+        assert_eq!(parse_odpt_time("08:30"), Some("08:30:00".to_string()));
+        assert_eq!(parse_odpt_time("8:03"), Some("08:03:00".to_string()));
+        assert_eq!(parse_odpt_time("25:30:00"), Some("25:30:00".to_string()));
+        assert_eq!(parse_odpt_time("08:60"), None);
+        assert_eq!(parse_odpt_time("invalid"), None);
+    }
+
+    #[test]
     fn test_hiragana_to_katakana() {
         assert_eq!(hiragana_to_katakana("あいうえお"), "アイウエオ");
         assert_eq!(hiragana_to_katakana("かきくけこ"), "カキクケコ");
@@ -3040,6 +3609,20 @@ mod tests {
     fn test_company_cd_for_gtfs_route() {
         assert_eq!(company_cd_for_gtfs_route("toei:route_001"), Some(119));
         assert_eq!(company_cd_for_gtfs_route("seibu:route_001"), Some(253));
+        assert_eq!(company_cd_for_gtfs_route("keio:route_001"), Some(254));
+        assert_eq!(company_cd_for_gtfs_route("tokyu_ota:route_001"), Some(255));
+        assert_eq!(
+            company_cd_for_gtfs_route("tokyu_shinagawa:route_001"),
+            Some(255)
+        );
+        assert_eq!(
+            company_cd_for_gtfs_route("tokyu_meguro:route_001"),
+            Some(255)
+        );
+        assert_eq!(
+            company_cd_for_gtfs_route("tokyu_json:TokyuBus.Route"),
+            Some(255)
+        );
         assert_eq!(company_cd_for_gtfs_route("unknown:route_001"), None);
     }
 
@@ -3128,8 +3711,159 @@ mod tests {
     fn test_gtfs_feeds() {
         assert_eq!(
             GTFS_FEEDS.iter().map(|feed| feed.id).collect::<Vec<_>>(),
-            vec!["toei", "seibu"]
+            vec![
+                "toei",
+                "seibu",
+                "tokyu_ota",
+                "tokyu_shinagawa",
+                "tokyu_meguro",
+                "keio"
+            ]
         );
+
+        let keio = GTFS_FEEDS.iter().find(|feed| feed.id == "keio").unwrap();
+        assert_eq!(keio.name, "Keio Bus");
+        assert_eq!(keio.path, "data/KeioBus-GTFS");
+        // ODPT's versioned files endpoint 404s without a `date` selector; `current`
+        // keeps the URL pinned to the timetable in effect today.
+        assert_eq!(
+            keio.url,
+            "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current"
+        );
+        assert!(keio.requires_consumer_key);
+
+        for feed in GTFS_FEEDS
+            .iter()
+            .filter(|feed| feed.id.starts_with("tokyu_"))
+        {
+            assert!(feed.url.contains("date=current"));
+            assert!(feed.requires_consumer_key);
+        }
+    }
+
+    #[test]
+    fn test_append_consumer_key() {
+        // URL without an existing query string uses `?`.
+        assert_eq!(
+            append_consumer_key(
+                "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip",
+                "TOKEN"
+            ),
+            "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip?acl:consumerKey=TOKEN"
+        );
+        // URL that already carries a query string (e.g. `?date=current`) uses `&`
+        // so the consumer key does not clobber the existing parameter.
+        assert_eq!(
+            append_consumer_key(
+                "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current",
+                "TOKEN"
+            ),
+            "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current&acl:consumerKey=TOKEN"
+        );
+    }
+
+    #[test]
+    fn test_gtfs_download_url_preserves_existing_query() {
+        let feed = GTFS_FEEDS
+            .iter()
+            .find(|feed| feed.id == "tokyu_ota")
+            .unwrap();
+        assert_eq!(
+            append_consumer_key(feed.url, "test-token"),
+            "https://api.odpt.org/api/v4/files/odpt/TokyuBus/tokyubus_community_OtaCity.zip?date=current&acl:consumerKey=test-token"
+        );
+
+        let feed = GTFS_FEEDS.iter().find(|feed| feed.id == "seibu").unwrap();
+        assert_eq!(
+            append_consumer_key(feed.url, "test-token"),
+            "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip?acl:consumerKey=test-token"
+        );
+    }
+
+    #[test]
+    fn test_tokyu_odpt_json_deserialization_and_id_conversion() {
+        let pattern: OdptBusroutePattern = serde_json::from_str(
+            r#"{
+                "owl:sameAs":"odpt.BusroutePattern:TokyuBus.Sh11.1",
+                "dc:title":"渋11 田園調布駅行き",
+                "odpt:operator":"odpt.Operator:TokyuBus",
+                "odpt:busroute":"odpt.Busroute:TokyuBus.Sh11",
+                "odpt:direction":"2"
+            }"#,
+        )
+        .unwrap();
+        assert_eq!(
+            scoped_tokyu_odpt_id(&pattern.same_as),
+            "tokyu_json:TokyuBus.Sh11.1"
+        );
+        assert_eq!(tokyu_route_name(&pattern.title), "渋11");
+        assert_eq!(odpt_direction_id(pattern.direction.as_deref()), Some(1));
+
+        let stop: OdptBusstopPole = serde_json::from_str(
+            r#"{
+                "owl:sameAs":"odpt.BusstopPole:TokyuBus.123.a",
+                "dc:title":"渋谷駅",
+                "odpt:kana":"しぶやえき",
+                "odpt:busstopPoleNumber":"01",
+                "odpt:operator":["odpt.Operator:TokyuBus"]
+            }"#,
+        )
+        .unwrap();
+        assert_eq!(stop.lat, 0.0);
+        assert_eq!(stop.lon, 0.0);
+        assert_eq!(stop.operators, vec![TOKYU_ODPT_OPERATOR]);
+    }
+
+    #[test]
+    fn test_tokyu_odpt_streaming_filter_discards_other_operators() {
+        let json = r#"[
+            {
+                "owl:sameAs":"odpt.BusroutePattern:TokyuBus.Sh11.1",
+                "dc:title":"渋11",
+                "odpt:operator":"odpt.Operator:TokyuBus",
+                "odpt:busroute":"odpt.Busroute:TokyuBus.Sh11"
+            },
+            {
+                "owl:sameAs":"odpt.BusroutePattern:Other.1",
+                "dc:title":"Other",
+                "odpt:operator":"odpt.Operator:Other",
+                "odpt:busroute":"odpt.Busroute:Other.1"
+            }
+        ]"#;
+        let selected: Vec<OdptBusroutePattern> =
+            read_tokyu_odpt_items_from_reader(json.as_bytes()).unwrap();
+        assert_eq!(selected.len(), 1);
+        assert_eq!(selected[0].operator, TOKYU_ODPT_OPERATOR);
+    }
+
+    #[test]
+    #[ignore = "requires ODPT_ACCESS_TOKEN and downloads the large ODPT bus dumps"]
+    fn test_live_tokyu_odpt_download_and_filter() {
+        let _ = dotenv::from_filename(".env.local");
+        let data = download_tokyu_odpt_data().unwrap();
+        assert!(!data.patterns.is_empty());
+        assert!(!data.stops.is_empty());
+        assert!(!data.timetables.is_empty());
+        assert!(data
+            .patterns
+            .iter()
+            .all(|pattern| pattern.operator == TOKYU_ODPT_OPERATOR));
+        assert!(data.stops.iter().all(|stop| stop
+            .operators
+            .iter()
+            .any(|operator| operator == TOKYU_ODPT_OPERATOR)));
+        assert!(data
+            .timetables
+            .iter()
+            .all(|timetable| timetable.operator == TOKYU_ODPT_OPERATOR));
+    }
+
+    #[test]
+    fn test_tokyu_community_routes_are_excluded_from_json_conversion() {
+        assert!(is_tokyu_community_route("odpt.Busroute:TokyuBus.Tamachan"));
+        assert!(is_tokyu_community_route("odpt.Busroute:TokyuBus.Shinabasu"));
+        assert!(is_tokyu_community_route("odpt.Busroute:TokyuBus.Sanma"));
+        assert!(!is_tokyu_community_route("odpt.Busroute:TokyuBus.Sh11"));
     }
 
     #[test]
