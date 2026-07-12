@@ -5,6 +5,7 @@ use serde::de::{DeserializeOwned, DeserializeSeed, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use sqlx::{Connection, PgConnection};
 use stationapi::config::fetch_database_url;
+use stationapi::domain::romaji::romaji_display_name;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::File;
@@ -997,12 +998,21 @@ async fn import_tokyu_odpt_data(
         if stop.lat == 0.0 || stop.lon == 0.0 {
             missing_coordinates += 1;
         }
+        // Tokyu Bus ODPT JSON has no English field, so romanize the kana reading
+        // into a Hepburn stop_name_r (NULL when the reading has no convertible
+        // kana). This mirrors the GTFS `en` fallback and feeds the same
+        // English-facing station/search/route surfaces.
+        let katakana = hiragana_to_katakana(&stop.kana);
+        let stop_name_r = romaji_display_name(&katakana)
+            .map(|r| format!("'{}'", escape_sql_string(&r)))
+            .unwrap_or_else(|| "NULL".to_string());
         stop_values.push(format!(
-            "('{}', '{}', '{}', '{}', NULL, {}, {})",
+            "('{}', '{}', '{}', '{}', {}, {}, {})",
             escape_sql_string(&stop_id),
             escape_sql_string(stop.number.as_deref().unwrap_or("")),
             escape_sql_string(&stop.title),
-            escape_sql_string(&hiragana_to_katakana(&stop.kana)),
+            escape_sql_string(&katakana),
+            stop_name_r,
             stop.lat,
             stop.lon
         ));
@@ -1388,7 +1398,14 @@ async fn import_gtfs_stops(
         let translation = translations.get(&key);
 
         let stop_name_k = translation.and_then(|t| t.ja_hrkt.clone());
-        let stop_name_r = translation.and_then(|t| t.en.clone());
+        // Prefer the official English translation, but fall back to a Hepburn
+        // romanization of the kana reading when the feed ships no `en` row
+        // (e.g. Keio Bus). This keeps every English-facing surface — station
+        // name, name search, and romanized route/headsign names — populated.
+        let stop_name_r = translation
+            .and_then(|t| t.en.clone())
+            .filter(|s| !s.is_empty())
+            .or_else(|| stop_name_k.as_deref().and_then(romaji_display_name));
         let stop_name_zh = translation.and_then(|t| t.zh.clone());
         let stop_name_ko = translation.and_then(|t| t.ko.clone());
 
