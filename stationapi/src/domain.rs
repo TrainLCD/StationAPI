@@ -4,5 +4,6 @@ pub mod error;
 pub mod ipa;
 pub mod normalize;
 pub mod repository;
+pub mod romaji;
 pub mod segment_speed_table;
 pub mod speed_table;
