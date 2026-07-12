@@ -287,10 +287,12 @@ const GTFS_FEEDS: &[GtfsFeed] = &[
         requires_consumer_key: true,
     },
     GtfsFeed {
+        // ODPT's versioned files endpoint requires a `date` selector; `current`
+        // always resolves to the timetable in effect today (omitting it 404s).
         id: "keio",
         name: "Keio Bus",
         path: "data/KeioBus-GTFS",
-        url: "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip",
+        url: "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current",
         requires_consumer_key: true,
     },
 ];
@@ -306,6 +308,14 @@ fn scoped_gtfs_id_opt(feed: &GtfsFeed, id: Option<&str>) -> Option<String> {
         .map(|s| scoped_gtfs_id(feed, s))
 }
 
+/// Append the ODPT `acl:consumerKey` query parameter to a feed URL, using the
+/// correct separator (`?` for the first parameter, `&` when the URL already
+/// carries a query string such as `?date=current`).
+fn append_consumer_key(url: &str, token: &str) -> String {
+    let separator = if url.contains('?') { '&' } else { '?' };
+    format!("{}{}acl:consumerKey={}", url, separator, token)
+}
+
 fn gtfs_download_url(feed: &GtfsFeed) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     if !feed.requires_consumer_key {
         return Ok(feed.url.to_string());
@@ -318,10 +328,14 @@ fn gtfs_download_url(feed: &GtfsFeed) -> Result<String, Box<dyn std::error::Erro
         )
     })?;
 
-    Ok(format!("{}?acl:consumerKey={}", feed.url, token))
+    Ok(append_consumer_key(feed.url, &token))
 }
 
-/// Download and extract GTFS data from ODPT API
+/// Download and extract GTFS data from ODPT API.
+///
+/// If the download or extraction fails partway, the (possibly partial) target
+/// directory is removed so a later run does not treat the incomplete extraction
+/// as a valid, importable feed.
 fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let gtfs_path = Path::new(feed.path);
 
@@ -334,11 +348,33 @@ fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send 
         return Ok(());
     }
 
+    match download_and_extract_gtfs(&feed, gtfs_path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            if gtfs_path.exists() {
+                if let Err(cleanup_err) = fs::remove_dir_all(gtfs_path) {
+                    warn!(
+                        "Failed to remove partial {} GTFS directory after error: {}",
+                        feed.name, cleanup_err
+                    );
+                }
+            }
+            Err(e)
+        }
+    }
+}
+
+fn download_and_extract_gtfs(
+    feed: &GtfsFeed,
+    gtfs_path: &Path,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Downloading {} GTFS data from ODPT API...", feed.name);
 
-    // Download the ZIP file
+    // Download the ZIP file. `without_url()` strips the request URL (which carries
+    // the `acl:consumerKey` token) from any transport error so the token cannot
+    // leak into logs or propagated error messages.
     let request_start = std::time::Instant::now();
-    let response = reqwest::blocking::get(gtfs_download_url(&feed)?)?;
+    let response = reqwest::blocking::get(gtfs_download_url(feed)?).map_err(|e| e.without_url())?;
     info!(
         "[gtfs-download:{}] response received in {:?} (status={})",
         feed.id,
@@ -356,7 +392,7 @@ fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send 
     }
 
     let body_start = std::time::Instant::now();
-    let bytes = response.bytes()?;
+    let bytes = response.bytes().map_err(|e| e.without_url())?;
     info!(
         "[gtfs-download:{}] body read in {:?} ({} bytes), extracting...",
         feed.id,
@@ -424,13 +460,29 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
             .join(", ")
     );
 
-    // Download GTFS data if not present (use spawn_blocking to avoid blocking async runtime)
+    // Download GTFS data if not present (use spawn_blocking to avoid blocking async runtime).
+    // A single feed's download failure (e.g. an operator's ODPT outage or a moved URL)
+    // must not abort the whole pipeline: log it and continue so the other feeds still
+    // import. The per-feed import loop below skips any feed whose directory is missing.
     let download_start = std::time::Instant::now();
     for feed in enabled_feeds.iter().copied() {
-        tokio::task::spawn_blocking(move || download_gtfs(feed))
-            .await
-            .map_err(|e| format!("Failed to spawn blocking task: {}", e))?
-            .map_err(|e| -> Box<dyn std::error::Error> { e })?;
+        match tokio::task::spawn_blocking(move || download_gtfs(feed)).await {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                warn!(
+                    "Failed to download {} GTFS: {}. Skipping this feed; other feeds continue.",
+                    feed.name, e
+                );
+            }
+            // A panic or cancellation of the blocking task must not abort the whole
+            // pipeline either: log it and let the remaining feeds proceed.
+            Err(join_err) => {
+                warn!(
+                    "{} GTFS download task did not complete ({}). Skipping this feed; other feeds continue.",
+                    feed.name, join_err
+                );
+            }
+        }
     }
     info!(
         "[gtfs] download/extract finished in {:?}",
@@ -3144,11 +3196,34 @@ mod tests {
         let keio = GTFS_FEEDS.iter().find(|feed| feed.id == "keio").unwrap();
         assert_eq!(keio.name, "Keio Bus");
         assert_eq!(keio.path, "data/KeioBus-GTFS");
+        // ODPT's versioned files endpoint 404s without a `date` selector; `current`
+        // keeps the URL pinned to the timetable in effect today.
         assert_eq!(
             keio.url,
-            "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip"
+            "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current"
         );
         assert!(keio.requires_consumer_key);
+    }
+
+    #[test]
+    fn test_append_consumer_key() {
+        // URL without an existing query string uses `?`.
+        assert_eq!(
+            append_consumer_key(
+                "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip",
+                "TOKEN"
+            ),
+            "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip?acl:consumerKey=TOKEN"
+        );
+        // URL that already carries a query string (e.g. `?date=current`) uses `&`
+        // so the consumer key does not clobber the existing parameter.
+        assert_eq!(
+            append_consumer_key(
+                "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current",
+                "TOKEN"
+            ),
+            "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current&acl:consumerKey=TOKEN"
+        );
     }
 
     #[test]
