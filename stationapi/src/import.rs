@@ -286,6 +286,13 @@ const GTFS_FEEDS: &[GtfsFeed] = &[
         url: "https://api.odpt.org/api/v4/files/SeibuBus/data/SeibuBus-GTFS.zip",
         requires_consumer_key: true,
     },
+    GtfsFeed {
+        id: "keio",
+        name: "Keio Bus",
+        path: "data/KeioBus-GTFS",
+        url: "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip",
+        requires_consumer_key: true,
+    },
 ];
 
 const DEFAULT_GTFS_BUS_LINE_COLOR: &str = "#1f63c6";
@@ -1675,6 +1682,8 @@ fn company_cd_for_gtfs_route(route_id: &str) -> Option<i32> {
         Some(119) // Toei Transportation
     } else if route_id.starts_with("seibu:") {
         Some(253) // Seibu Bus
+    } else if route_id.starts_with("keio:") {
+        Some(254) // Keio Bus
     } else {
         None // Unknown/unsupported prefix
     }
@@ -3040,6 +3049,7 @@ mod tests {
     fn test_company_cd_for_gtfs_route() {
         assert_eq!(company_cd_for_gtfs_route("toei:route_001"), Some(119));
         assert_eq!(company_cd_for_gtfs_route("seibu:route_001"), Some(253));
+        assert_eq!(company_cd_for_gtfs_route("keio:route_001"), Some(254));
         assert_eq!(company_cd_for_gtfs_route("unknown:route_001"), None);
     }
 
@@ -3128,7 +3138,7 @@ mod tests {
     fn test_gtfs_feeds() {
         assert_eq!(
             GTFS_FEEDS.iter().map(|feed| feed.id).collect::<Vec<_>>(),
-            vec!["toei", "seibu"]
+            vec!["toei", "seibu", "keio"]
         );
     }
 

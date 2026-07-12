@@ -6,6 +6,8 @@ api_descriptor.pb
 tmp.sql
 .vscode/
 data/ToeiBus-GTFS/
+data/SeibuBus-GTFS/
+data/KeioBus-GTFS/
 scripts/.osm_cache/
 scripts/.gtfs_cache/
 __pycache__/
