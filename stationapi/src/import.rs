@@ -331,7 +331,11 @@ fn gtfs_download_url(feed: &GtfsFeed) -> Result<String, Box<dyn std::error::Erro
     Ok(append_consumer_key(feed.url, &token))
 }
 
-/// Download and extract GTFS data from ODPT API
+/// Download and extract GTFS data from ODPT API.
+///
+/// If the download or extraction fails partway, the (possibly partial) target
+/// directory is removed so a later run does not treat the incomplete extraction
+/// as a valid, importable feed.
 fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let gtfs_path = Path::new(feed.path);
 
@@ -344,11 +348,33 @@ fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send 
         return Ok(());
     }
 
+    match download_and_extract_gtfs(&feed, gtfs_path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            if gtfs_path.exists() {
+                if let Err(cleanup_err) = fs::remove_dir_all(gtfs_path) {
+                    warn!(
+                        "Failed to remove partial {} GTFS directory after error: {}",
+                        feed.name, cleanup_err
+                    );
+                }
+            }
+            Err(e)
+        }
+    }
+}
+
+fn download_and_extract_gtfs(
+    feed: &GtfsFeed,
+    gtfs_path: &Path,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Downloading {} GTFS data from ODPT API...", feed.name);
 
-    // Download the ZIP file
+    // Download the ZIP file. `without_url()` strips the request URL (which carries
+    // the `acl:consumerKey` token) from any transport error so the token cannot
+    // leak into logs or propagated error messages.
     let request_start = std::time::Instant::now();
-    let response = reqwest::blocking::get(gtfs_download_url(&feed)?)?;
+    let response = reqwest::blocking::get(gtfs_download_url(feed)?).map_err(|e| e.without_url())?;
     info!(
         "[gtfs-download:{}] response received in {:?} (status={})",
         feed.id,
@@ -366,7 +392,7 @@ fn download_gtfs(feed: GtfsFeed) -> Result<(), Box<dyn std::error::Error + Send 
     }
 
     let body_start = std::time::Instant::now();
-    let bytes = response.bytes()?;
+    let bytes = response.bytes().map_err(|e| e.without_url())?;
     info!(
         "[gtfs-download:{}] body read in {:?} ({} bytes), extracting...",
         feed.id,
@@ -440,14 +466,22 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
     // import. The per-feed import loop below skips any feed whose directory is missing.
     let download_start = std::time::Instant::now();
     for feed in enabled_feeds.iter().copied() {
-        let result = tokio::task::spawn_blocking(move || download_gtfs(feed))
-            .await
-            .map_err(|e| format!("Failed to spawn blocking task: {}", e))?;
-        if let Err(e) = result {
-            warn!(
-                "Failed to download {} GTFS: {}. Skipping this feed; other feeds continue.",
-                feed.name, e
-            );
+        match tokio::task::spawn_blocking(move || download_gtfs(feed)).await {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                warn!(
+                    "Failed to download {} GTFS: {}. Skipping this feed; other feeds continue.",
+                    feed.name, e
+                );
+            }
+            // A panic or cancellation of the blocking task must not abort the whole
+            // pipeline either: log it and let the remaining feeds proceed.
+            Err(join_err) => {
+                warn!(
+                    "{} GTFS download task did not complete ({}). Skipping this feed; other feeds continue.",
+                    feed.name, join_err
+                );
+            }
         }
     }
     info!(
