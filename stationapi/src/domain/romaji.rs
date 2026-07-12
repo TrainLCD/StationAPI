@@ -257,18 +257,148 @@ fn is_separator(c: char) -> bool {
     matches!(c, '\u{30FB}' | ' ' | '\u{3000}' | '/' | '\u{FF0F}')
 }
 
-/// Normalize hiragana to katakana so both reading styles convert identically.
+/// Normalize a kana string to full-width katakana so every reading style
+/// converts identically. Delegates to [`to_fullwidth_katakana`].
 fn normalize_kana(input: &str) -> String {
-    input
-        .chars()
-        .map(|c| {
-            if ('\u{3041}'..='\u{3096}').contains(&c) {
-                char::from_u32(c as u32 + 0x60).unwrap_or(c)
-            } else {
-                c
+    to_fullwidth_katakana(input)
+}
+
+/// Normalize hiragana and half-width katakana to full-width katakana.
+///
+/// Some ODPT bus GTFS feeds ship their `ja-Hrkt` readings as half-width
+/// katakana with combining voiced/semi-voiced marks (e.g. `ﾆｼﾊﾁｵｳｼﾞ`), which
+/// must be folded to full-width before they can be stored in the katakana
+/// column or romanized. Full-width katakana passes through unchanged, so the
+/// function is idempotent.
+pub fn to_fullwidth_katakana(input: &str) -> String {
+    let chars: Vec<char> = input.chars().collect();
+    let mut out = String::with_capacity(chars.len());
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+
+        // Hiragana → katakana (same +0x60 offset used across the module).
+        if ('\u{3041}'..='\u{3096}').contains(&c) {
+            out.push(char::from_u32(c as u32 + 0x60).unwrap_or(c));
+            i += 1;
+            continue;
+        }
+
+        // Half-width katakana → full-width, folding a trailing voiced (ﾞ) or
+        // semi-voiced (ﾟ) mark into the preceding kana.
+        if let Some(base) = halfwidth_katakana_to_fullwidth(c) {
+            match chars.get(i + 1).copied() {
+                Some('\u{FF9E}') => {
+                    if let Some(voiced) = apply_dakuten(base) {
+                        out.push(voiced);
+                        i += 2;
+                        continue;
+                    }
+                }
+                Some('\u{FF9F}') => {
+                    if let Some(semi) = apply_handakuten(base) {
+                        out.push(semi);
+                        i += 2;
+                        continue;
+                    }
+                }
+                _ => {}
             }
-        })
-        .collect()
+            out.push(base);
+            i += 1;
+            continue;
+        }
+
+        out.push(c);
+        i += 1;
+    }
+    out
+}
+
+/// Map a half-width katakana code point to its full-width base form.
+fn halfwidth_katakana_to_fullwidth(c: char) -> Option<char> {
+    let full = match c {
+        '\u{FF65}' => '\u{30FB}', // ・ middle dot
+        'ｦ' => 'ヲ',
+        'ｧ' => 'ァ',
+        'ｨ' => 'ィ',
+        'ｩ' => 'ゥ',
+        'ｪ' => 'ェ',
+        'ｫ' => 'ォ',
+        'ｬ' => 'ャ',
+        'ｭ' => 'ュ',
+        'ｮ' => 'ョ',
+        'ｯ' => 'ッ',
+        'ｰ' => 'ー',
+        'ｱ' => 'ア',
+        'ｲ' => 'イ',
+        'ｳ' => 'ウ',
+        'ｴ' => 'エ',
+        'ｵ' => 'オ',
+        'ｶ' => 'カ',
+        'ｷ' => 'キ',
+        'ｸ' => 'ク',
+        'ｹ' => 'ケ',
+        'ｺ' => 'コ',
+        'ｻ' => 'サ',
+        'ｼ' => 'シ',
+        'ｽ' => 'ス',
+        'ｾ' => 'セ',
+        'ｿ' => 'ソ',
+        'ﾀ' => 'タ',
+        'ﾁ' => 'チ',
+        'ﾂ' => 'ツ',
+        'ﾃ' => 'テ',
+        'ﾄ' => 'ト',
+        'ﾅ' => 'ナ',
+        'ﾆ' => 'ニ',
+        'ﾇ' => 'ヌ',
+        'ﾈ' => 'ネ',
+        'ﾉ' => 'ノ',
+        'ﾊ' => 'ハ',
+        'ﾋ' => 'ヒ',
+        'ﾌ' => 'フ',
+        'ﾍ' => 'ヘ',
+        'ﾎ' => 'ホ',
+        'ﾏ' => 'マ',
+        'ﾐ' => 'ミ',
+        'ﾑ' => 'ム',
+        'ﾒ' => 'メ',
+        'ﾓ' => 'モ',
+        'ﾔ' => 'ヤ',
+        'ﾕ' => 'ユ',
+        'ﾖ' => 'ヨ',
+        'ﾗ' => 'ラ',
+        'ﾘ' => 'リ',
+        'ﾙ' => 'ル',
+        'ﾚ' => 'レ',
+        'ﾛ' => 'ロ',
+        'ﾜ' => 'ワ',
+        'ﾝ' => 'ン',
+        _ => return None,
+    };
+    Some(full)
+}
+
+/// Apply a dakuten (voiced mark) to a full-width katakana base, if voiceable.
+fn apply_dakuten(c: char) -> Option<char> {
+    let voiced = match c {
+        'ウ' => 'ヴ',
+        'カ' | 'キ' | 'ク' | 'ケ' | 'コ' | 'サ' | 'シ' | 'ス' | 'セ' | 'ソ' | 'タ' | 'チ'
+        | 'ツ' | 'テ' | 'ト' | 'ハ' | 'ヒ' | 'フ' | 'ヘ' | 'ホ' => {
+            char::from_u32(c as u32 + 1)?
+        }
+        _ => return None,
+    };
+    Some(voiced)
+}
+
+/// Apply a handakuten (semi-voiced mark) to a full-width katakana base.
+fn apply_handakuten(c: char) -> Option<char> {
+    match c {
+        'ハ' | 'ヒ' | 'フ' | 'ヘ' | 'ホ' => char::from_u32(c as u32 + 2),
+        _ => None,
+    }
 }
 
 /// Two-character katakana combinations (palatalised sounds and loanword kana).
@@ -520,6 +650,28 @@ mod tests {
     fn hiragana_is_accepted() {
         assert_eq!(romaji("しぶや"), "shibuya");
         assert_eq!(romaji("とうきょう"), "tōkyō");
+    }
+
+    #[test]
+    fn halfwidth_katakana_is_folded_to_fullwidth() {
+        // Real Keio Bus ja-Hrkt readings (half-width with combining dakuten).
+        assert_eq!(
+            to_fullwidth_katakana("ﾆｼﾊﾁｵｳｼﾞｴｷﾐﾅﾐｸﾞﾁ"),
+            "ニシハチオウジエキミナミグチ"
+        );
+        assert_eq!(to_fullwidth_katakana("ｱｷﾊﾞｼﾞﾝｼﾞｬ"), "アキバジンジャ");
+        assert_eq!(to_fullwidth_katakana("ｱｻｶﾞﾔｼﾞｭｳﾀｸ"), "アサガヤジュウタク");
+        // Handakuten and prolonged mark.
+        assert_eq!(to_fullwidth_katakana("ﾊﾟｰｸ"), "パーク");
+        // Full-width katakana and hiragana are unchanged / folded (idempotent).
+        assert_eq!(to_fullwidth_katakana("トウキョウ"), "トウキョウ");
+        assert_eq!(to_fullwidth_katakana("しぶや"), "シブヤ");
+    }
+
+    #[test]
+    fn halfwidth_reading_romanizes_end_to_end() {
+        // Keio Bus 阿佐ヶ谷住宅東 reading → Hepburn (used only when `en` is absent).
+        assert_eq!(romaji("ｱｻｶﾞﾔｼﾞｭｳﾀｸﾋｶﾞｼ"), "asagayajūtakuhigashi");
     }
 
     #[test]
