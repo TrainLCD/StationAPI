@@ -135,6 +135,31 @@ pub fn romaji_display_name(input: &str) -> Option<String> {
     katakana_to_romaji(input).map(|romaji| title_case(&romaji))
 }
 
+/// Strip macron accents from a romanized name, mapping each long vowel back to
+/// its plain ASCII letter (ō → o, ū → u, ā → a, ī → i, ē → e).
+///
+/// The dataset stores two romanized forms per station: `station_name_r` keeps
+/// the macrons (Tōkyō) while `station_name_rn` is the plain-ASCII spelling
+/// (Tokyo). This produces the latter from the former.
+pub fn strip_macrons(input: &str) -> String {
+    input
+        .chars()
+        .map(|c| match c {
+            'ā' => 'a',
+            'ī' => 'i',
+            'ū' => 'u',
+            'ē' => 'e',
+            'ō' => 'o',
+            'Ā' => 'A',
+            'Ī' => 'I',
+            'Ū' => 'U',
+            'Ē' => 'E',
+            'Ō' => 'O',
+            other => other,
+        })
+        .collect()
+}
+
 /// Capitalize the first letter of every whitespace/separator-delimited word.
 fn title_case(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 4);
@@ -509,6 +534,21 @@ mod tests {
         assert_eq!(katakana_to_romaji("シブヤ2"), None);
         assert_eq!(katakana_to_romaji(""), None);
         assert_eq!(katakana_to_romaji("   "), None);
+    }
+
+    #[test]
+    fn strip_macrons_produces_plain_ascii_form() {
+        // Matches the rail dataset's _r → _rn convention.
+        assert_eq!(strip_macrons("Tōkyō"), "Tokyo");
+        assert_eq!(strip_macrons("Kyōto"), "Kyoto");
+        assert_eq!(strip_macrons("Shin-Ōsaka"), "Shin-Osaka");
+        assert_eq!(strip_macrons("Mikawa-Anjō"), "Mikawa-Anjo");
+        // Already plain names are unchanged.
+        assert_eq!(strip_macrons("Shinagawa"), "Shinagawa");
+        // Derived bus romaji round-trips through both forms.
+        let r = romaji_display_name("トウキョウ").unwrap();
+        assert_eq!(r, "Tōkyō");
+        assert_eq!(strip_macrons(&r), "Tokyo");
     }
 
     #[test]

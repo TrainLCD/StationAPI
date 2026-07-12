@@ -5,7 +5,7 @@ use serde::de::{DeserializeOwned, DeserializeSeed, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use sqlx::{Connection, PgConnection};
 use stationapi::config::fetch_database_url;
-use stationapi::domain::romaji::romaji_display_name;
+use stationapi::domain::romaji::{romaji_display_name, strip_macrons};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::File;
@@ -2912,6 +2912,11 @@ async fn integrate_gtfs_stops_to_stations(
             None => continue, // Skip stops not on any route
         };
 
+        // station_name_rn is the plain-ASCII spelling of the romanized name
+        // (Tokyo), whereas station_name_r keeps the macrons (Tōkyō). Derive it
+        // from stop_name_r so both bus and rail rows follow the same convention.
+        let station_name_rn = stop.stop_name_r.as_deref().map(strip_macrons);
+
         // Create a station record for each route this physical stop serves
         for (route_id, stop_sequence) in &routes {
             let station_cd = generate_bus_station_cd(&stop.stop_id, route_id);
@@ -2920,12 +2925,12 @@ async fn integrate_gtfs_stops_to_stations(
             sqlx::query(
                 r#"INSERT INTO stations (
                     station_cd, station_g_cd, station_name, station_name_k,
-                    station_name_r, station_name_zh, station_name_ko,
+                    station_name_r, station_name_rn, station_name_zh, station_name_ko,
                     line_cd, pref_cd, post, address, lon, lat,
                     open_ymd, close_ymd, e_status, e_sort, transport_type
                 ) VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, 13, '', '', $9, $10,
-                    '', '', 0, $11, 1
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, 13, '', '', $10, $11,
+                    '', '', 0, $12, 1
                 )
                 ON CONFLICT (station_cd) DO NOTHING"#,
             )
@@ -2939,6 +2944,7 @@ async fn integrate_gtfs_stops_to_stations(
                     .unwrap_or_else(|| stop.stop_name.clone()),
             )
             .bind(&stop.stop_name_r)
+            .bind(&station_name_rn)
             .bind(&stop.stop_name_zh)
             .bind(&stop.stop_name_ko)
             .bind(line_cd)
