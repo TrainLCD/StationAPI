@@ -193,6 +193,20 @@ CREATE INDEX idx_performance_station_name_trgm ON stations
 | 経路検索 | `GetRoutes`, `GetRoutesMinimal`, `GetConnectedRoutes` |
 | 列車種別 | `GetTrainTypesByStationId`, `GetRouteTypes` |
 
+### 接続経路探索
+
+`GetConnectedRoutes` は、始点の駅グループに停車する列車種別から幅優先で探索し、
+同じ駅グループに停車する別の列車種別へ接続します。Repository は探索階層ごとの
+駅グループをまとめて問い合わせ、該当する `line_group_cd` の駅列も一括取得するため、
+候補ごとの N+1 クエリを発生させません。
+
+探索中は通過駅を乗換地点にせず、利用済みの列車種別および訪問済みの駅グループを
+再訪しません。さらに列車種別数、展開状態数、返却候補数に上限を設けています。
+完成した経路は接続駅を一度だけ含む駅列へ連結し、各区間の `stop_condition` を保持します。
+返却時には経路の列車種別列と駅グループ列から決定的な仮想 `lineGroupId` を生成し、
+経路内の全 `station.train_type.group_id` に同じ値を設定します。仮想 ID は既存の
+PostgreSQL `INTEGER` ID と衝突しない `uint32` 上位半分を使用します。
+
 ### Proto 更新時の注意点
 
 1. **後方互換性**: 新フィールドには `optional` キーワードを使用

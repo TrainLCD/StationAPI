@@ -13,7 +13,7 @@ use crate::{
         GetStationByIdRequest, GetStationByLineIdListRequest, GetStationByLineIdRequest,
         GetStationsByLineGroupIdListRequest, GetStationsByLineGroupIdRequest,
         GetStationsByNameRequest, GetTrainRouteRequest, GetTrainTypesByStationIdRequest,
-        MultipleLineResponse, MultipleStationResponse, MultipleTrainTypeResponse, Route,
+        MultipleLineResponse, MultipleStationResponse, MultipleTrainTypeResponse,
         RouteMinimalResponse, RouteResponse, RouteTypeResponse, SingleLineResponse,
         SingleStationResponse, TrainRouteResponse, TransportType as GrpcTransportType,
     },
@@ -414,11 +414,8 @@ impl StationApi for MyApi {
             .get_connected_stations(from_station_group_id, to_station_group_id)
             .await
         {
-            Ok(stations) => Ok(Response::new(RouteResponse {
-                routes: vec![Route {
-                    id: 0,
-                    stops: stations.into_iter().map(|station| station.into()).collect(),
-                }],
+            Ok(routes) => Ok(Response::new(RouteResponse {
+                routes,
                 next_page_token: "".to_string(),
             })),
             Err(err) => {
@@ -507,7 +504,7 @@ mod tests {
                 station::Station, station_number::StationNumber, train_type::TrainType,
             },
         },
-        proto::RouteMinimalResponse,
+        proto::{Route, RouteMinimalResponse},
         use_case::{error::UseCaseError, traits::query::QueryUseCase},
     };
     use async_trait::async_trait;
@@ -929,7 +926,7 @@ mod tests {
             &self,
             _from_station_id: u32,
             _to_station_id: u32,
-        ) -> Result<Vec<Station>, UseCaseError> {
+        ) -> Result<Vec<Route>, UseCaseError> {
             Ok(vec![])
         }
 

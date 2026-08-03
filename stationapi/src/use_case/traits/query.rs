@@ -128,7 +128,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
         &self,
         from_station_id: u32,
         to_station_id: u32,
-    ) -> Result<Vec<Station>, UseCaseError>;
+    ) -> Result<Vec<Route>, UseCaseError>;
     async fn estimate_route_arrival_times(
         &self,
         from_station_id: u32,

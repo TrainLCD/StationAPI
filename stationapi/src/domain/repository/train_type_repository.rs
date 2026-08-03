@@ -1,9 +1,20 @@
 use async_trait::async_trait;
+use std::collections::HashMap;
 
 use crate::domain::{entity::train_type::TrainType, error::DomainError};
 
 #[async_trait]
 pub trait TrainTypeRepository: Send + Sync + 'static {
+    /// Return train-type line groups that stop at each requested station group.
+    ///
+    /// The default keeps existing lightweight test repositories source-compatible;
+    /// repositories used by connected-route search must override it.
+    async fn get_line_group_ids_by_station_group_ids(
+        &self,
+        _station_group_ids: &[u32],
+    ) -> Result<HashMap<u32, Vec<u32>>, DomainError> {
+        Ok(HashMap::new())
+    }
     async fn get_by_line_group_id(&self, line_group_id: u32)
         -> Result<Vec<TrainType>, DomainError>;
     async fn get_by_station_id(&self, station_id: u32) -> Result<Vec<TrainType>, DomainError>;

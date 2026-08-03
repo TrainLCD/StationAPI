@@ -4,7 +4,7 @@ use crate::domain::{
 };
 use async_trait::async_trait;
 use sqlx::{PgConnection, Pool, Postgres};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(sqlx::FromRow, Clone)]
 pub struct TrainTypeRow {
@@ -21,6 +21,12 @@ pub struct TrainTypeRow {
     color: String,
     direction: Option<i32>,
     kind: Option<i32>,
+}
+
+#[derive(sqlx::FromRow)]
+struct ConnectionLineGroupRow {
+    station_g_cd: i32,
+    line_group_cd: i32,
 }
 
 impl From<TrainTypeRow> for TrainType {
@@ -72,6 +78,21 @@ impl MyTrainTypeRepository {
 
 #[async_trait]
 impl TrainTypeRepository for MyTrainTypeRepository {
+    async fn get_line_group_ids_by_station_group_ids(
+        &self,
+        station_group_ids: &[u32],
+    ) -> Result<HashMap<u32, Vec<u32>>, DomainError> {
+        if station_group_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let mut conn = self.pool.acquire().await?;
+        InternalTrainTypeRepository::get_line_group_ids_by_station_group_ids(
+            station_group_ids,
+            &mut conn,
+        )
+        .await
+    }
+
     async fn get_by_line_group_id(
         &self,
         line_group_id: u32,
@@ -146,6 +167,43 @@ impl TrainTypeRepository for MyTrainTypeRepository {
 pub struct InternalTrainTypeRepository {}
 
 impl InternalTrainTypeRepository {
+    async fn get_line_group_ids_by_station_group_ids(
+        station_group_ids: &[u32],
+        conn: &mut PgConnection,
+    ) -> Result<HashMap<u32, Vec<u32>>, DomainError> {
+        if station_group_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let station_group_ids: Vec<i32> = station_group_ids
+            .iter()
+            .filter_map(|id| i32::try_from(*id).ok())
+            .collect();
+        let rows = sqlx::query_as::<_, ConnectionLineGroupRow>(
+            r#"SELECT DISTINCT s.station_g_cd, sst.line_group_cd
+               FROM stations AS s
+               JOIN station_station_types AS sst ON sst.station_cd = s.station_cd
+               JOIN types AS t ON t.type_cd = sst.type_cd
+               WHERE s.station_g_cd = ANY($1)
+                 AND s.e_status = 0
+                 AND sst.pass <> 1
+                 AND sst.line_group_cd IS NOT NULL
+               ORDER BY s.station_g_cd, sst.line_group_cd"#,
+        )
+        .bind(&station_group_ids)
+        .fetch_all(conn)
+        .await?;
+
+        let mut result = HashMap::new();
+        for row in rows {
+            result
+                .entry(row.station_g_cd as u32)
+                .or_insert_with(Vec::new)
+                .push(row.line_group_cd as u32);
+        }
+        Ok(result)
+    }
+
     async fn get_by_line_group_id(
         line_group_id: u32,
         conn: &mut PgConnection,
@@ -531,6 +589,10 @@ mod tests {
             .execute(pool)
             .await
             .unwrap();
+        sqlx::query("DROP TABLE IF EXISTS stations CASCADE")
+            .execute(pool)
+            .await
+            .unwrap();
 
         // テーブル作成
         sqlx::query(
@@ -551,6 +613,17 @@ mod tests {
         .unwrap();
 
         sqlx::query(
+            "CREATE TABLE stations (
+                station_cd INTEGER PRIMARY KEY,
+                station_g_cd INTEGER NOT NULL,
+                e_status INTEGER NOT NULL DEFAULT 0
+            )",
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
             "CREATE TABLE station_station_types (
                 id SERIAL PRIMARY KEY,
                 station_cd INTEGER NOT NULL,
@@ -558,6 +631,18 @@ mod tests {
                 line_group_cd INTEGER,
                 pass INTEGER NOT NULL DEFAULT 0
             )",
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO stations (station_cd, station_g_cd, e_status) VALUES
+            (101, 1001, 0),
+            (102, 1001, 0),
+            (103, 1002, 0),
+            (104, 1002, 1),
+            (105, 1003, 0)",
         )
         .execute(pool)
         .await
@@ -593,6 +678,10 @@ mod tests {
             .await
             .unwrap();
         sqlx::query("DROP TABLE IF EXISTS types CASCADE")
+            .execute(pool)
+            .await
+            .unwrap();
+        sqlx::query("DROP TABLE IF EXISTS stations CASCADE")
             .execute(pool)
             .await
             .unwrap();
@@ -800,6 +889,27 @@ mod tests {
         assert!(result.is_ok());
         let train_types = result.unwrap();
         assert_eq!(train_types.len(), 0);
+
+        cleanup_test_data(&pool).await;
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_get_line_group_ids_by_station_group_ids_filters_pass_and_inactive_stations() {
+        let pool = setup_test_db().await;
+        setup_test_data(&pool).await;
+
+        let mut conn = pool.acquire().await.unwrap();
+        let result = InternalTrainTypeRepository::get_line_group_ids_by_station_group_ids(
+            &[1001, 1002, 1003],
+            &mut conn,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.get(&1001), Some(&vec![301, 302]));
+        assert!(!result.contains_key(&1002));
+        assert_eq!(result.get(&1003), Some(&vec![305]));
 
         cleanup_test_data(&pool).await;
     }
