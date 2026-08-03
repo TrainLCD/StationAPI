@@ -1265,7 +1265,7 @@ where
             }
 
             let mut next_states = Vec::new();
-            for state in states {
+            'expand_states: for state in states {
                 if expanded_states >= CONNECTED_ROUTE_MAX_STATES {
                     break;
                 }
@@ -1341,7 +1341,7 @@ where
                                     completed.push(candidate);
                                 }
                                 if completed.len() >= CONNECTED_ROUTE_MAX_RESULTS {
-                                    break;
+                                    break 'expand_states;
                                 }
                             } else if next_states.len() + expanded_states
                                 < CONNECTED_ROUTE_MAX_STATES
