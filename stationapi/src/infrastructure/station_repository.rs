@@ -12,11 +12,6 @@ use crate::{
     proto::StopCondition,
 };
 
-#[derive(sqlx::FromRow)]
-struct TrainTypesCountRow {
-    train_types_count: Option<i32>,
-}
-
 #[derive(sqlx::FromRow, Clone)]
 struct StationRow {
     pub station_cd: i32,
@@ -322,25 +317,13 @@ impl StationRepository for MyStationRepository {
         direction_id: Option<u32>,
     ) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        match station_id {
-            Some(station_id) => {
-                InternalStationRepository::get_by_line_id_and_station_id(
-                    line_id,
-                    station_id,
-                    direction_id,
-                    &mut conn,
-                )
-                .await
-            }
-            None => {
-                InternalStationRepository::get_by_line_id_without_train_types(
-                    line_id,
-                    direction_id,
-                    &mut conn,
-                )
-                .await
-            }
-        }
+        InternalStationRepository::get_by_line_id_with_train_type(
+            line_id,
+            station_id,
+            direction_id,
+            &mut conn,
+        )
+        .await
     }
     async fn get_by_line_id_vec(&self, line_ids: &[u32]) -> Result<Vec<Station>, DomainError> {
         let mut conn = self.pool.acquire().await?;
@@ -481,28 +464,6 @@ impl StationRepository for MyStationRepository {
 struct InternalStationRepository {}
 
 impl InternalStationRepository {
-    async fn fetch_has_local_train_types_by_station_id(
-        id: u32,
-        conn: &mut PgConnection,
-    ) -> Result<bool, DomainError> {
-        let row: TrainTypesCountRow = sqlx::query_as!(
-            TrainTypesCountRow,
-            "SELECT COUNT(sst.line_group_cd)::integer AS train_types_count
-            FROM station_station_types AS sst
-                JOIN types AS t ON t.type_cd = sst.type_cd
-            WHERE sst.station_cd = $1
-                AND (
-                    t.kind IN (0, 1)
-                    OR t.priority > 0
-                )",
-            id as i32,
-        )
-        .fetch_one(conn)
-        .await?;
-
-        Ok(row.train_types_count.unwrap_or(0) > 0)
-    }
-
     async fn find_by_id(id: u32, conn: &mut PgConnection) -> Result<Option<Station>, DomainError> {
         let rows: Option<StationRow> = sqlx::query_as!(
             StationRow,
@@ -702,99 +663,6 @@ impl InternalStationRepository {
         }
 
         let rows = query.fetch_all(conn).await?;
-        let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
-
-        Ok(stations)
-    }
-
-    async fn get_by_line_id_without_train_types(
-        line_id: u32,
-        direction_id: Option<u32>,
-        conn: &mut PgConnection,
-    ) -> Result<Vec<Station>, DomainError> {
-        // When direction_id = 1 (上り) or 2 (下り), reverse the order
-        let order_clause = if matches!(direction_id, Some(1) | Some(2)) {
-            "ORDER BY s.e_sort DESC, s.station_cd DESC"
-        } else {
-            "ORDER BY s.e_sort ASC, s.station_cd ASC"
-        };
-
-        let query_str = format!(
-            r#"SELECT
-              s.station_cd,
-              s.station_g_cd,
-              s.station_name,
-              s.station_name_k,
-              s.station_name_r,
-              s.station_name_rn,
-              s.station_name_zh,
-              s.station_name_ko,
-              s.station_number1,
-              s.station_number2,
-              s.station_number3,
-              s.station_number4,
-              s.three_letter_code,
-              s.line_cd,
-              s.pref_cd,
-              s.post,
-              s.address,
-              s.lon,
-              s.lat,
-              s.open_ymd,
-              s.close_ymd,
-              s.e_status,
-              s.e_sort,
-              l.company_cd,
-              COALESCE(NULLIF(COALESCE(a.line_name, l.line_name), ''), NULL) AS line_name,
-              COALESCE(NULLIF(COALESCE(a.line_name_k, l.line_name_k), ''), NULL) AS line_name_k,
-              COALESCE(NULLIF(COALESCE(a.line_name_h, l.line_name_h), ''), NULL) AS line_name_h,
-              COALESCE(NULLIF(COALESCE(a.line_name_r, l.line_name_r), ''), NULL) AS line_name_r,
-              COALESCE(NULLIF(COALESCE(a.line_name_zh, l.line_name_zh), ''), NULL) AS line_name_zh,
-              COALESCE(NULLIF(COALESCE(a.line_name_ko, l.line_name_ko), ''), NULL) AS line_name_ko,
-              COALESCE(NULLIF(COALESCE(a.line_color_c, l.line_color_c), ''), NULL) AS line_color_c,
-              l.line_type,
-              l.line_symbol1,
-              l.line_symbol2,
-              l.line_symbol3,
-              l.line_symbol4,
-              l.line_symbol1_color,
-              l.line_symbol2_color,
-              l.line_symbol3_color,
-              l.line_symbol4_color,
-              l.line_symbol1_shape,
-              l.line_symbol2_shape,
-              l.line_symbol3_shape,
-              l.line_symbol4_shape,
-              COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
-              NULL::int AS type_id,
-              NULL::int AS sst_id,
-              NULL::int AS type_cd,
-              NULL::int AS line_group_cd,
-              NULL::int AS pass,
-              NULL::text AS type_name,
-              NULL::text AS type_name_k,
-              NULL::text AS type_name_r,
-              NULL::text AS type_name_zh,
-              NULL::text AS type_name_ko,
-              NULL::text AS color,
-              NULL::int AS direction,
-              NULL::int AS kind,
-              s.transport_type
-            FROM stations AS s
-            JOIN lines AS l ON l.line_cd = s.line_cd
-            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
-            LEFT JOIN aliases AS a ON a.id = la.alias_cd
-            WHERE l.line_cd = $1
-              AND s.e_status = 0
-              AND l.e_status = 0
-            {order_clause}"#
-        );
-
-        let rows = sqlx::query_as::<_, StationRow>(&query_str)
-            .bind(line_id as i32)
-            .fetch_all(conn)
-            .await?;
-
         let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(stations)
@@ -1002,31 +870,27 @@ impl InternalStationRepository {
         Ok(stations)
     }
 
-    async fn get_by_line_id_and_station_id(
+    async fn get_by_line_id_with_train_type(
         line_id: u32,
-        station_id: u32,
+        station_id: Option<u32>,
         direction_id: Option<u32>,
         conn: &mut PgConnection,
     ) -> Result<Vec<Station>, DomainError> {
-        let stations: Vec<Station> = match Self::fetch_has_local_train_types_by_station_id(
-            station_id, conn,
-        )
-        .await?
-        {
-            true => {
-                // When direction_id = 1 (上り) or 2 (下り), reverse the order
-                let order_clause = if matches!(direction_id, Some(1) | Some(2)) {
-                    "ORDER BY sst.id DESC"
-                } else {
-                    "ORDER BY sst.id ASC"
-                };
+        // When direction_id = 1 (上り) or 2 (下り), reverse the order
+        let order_clause = if matches!(direction_id, Some(1) | Some(2)) {
+            "ORDER BY sst.id DESC"
+        } else {
+            "ORDER BY sst.id ASC"
+        };
 
-                let query_str = format!(
-                    r#"WITH target_line_group AS (
+        let query_str = format!(
+            r#"WITH target_line_group AS (
                             SELECT sst_inner.line_group_cd
                             FROM station_station_types AS sst_inner
                               LEFT JOIN types AS t_inner ON sst_inner.type_cd = t_inner.type_cd
-                            WHERE sst_inner.station_cd = $1
+                            JOIN stations AS seed_station ON seed_station.station_cd = sst_inner.station_cd
+                            WHERE seed_station.line_cd = $1
+                            AND ($2::int IS NULL OR sst_inner.station_cd = $2)
                             AND (
                                 (t_inner.priority > 0 AND sst_inner.pass <> 1 AND sst_inner.type_cd = t_inner.type_cd)
                                 OR (NOT (t_inner.priority > 0 AND sst_inner.pass <> 1) AND t_inner.kind IN (0,1))
@@ -1102,16 +966,14 @@ impl InternalStationRepository {
                           WHERE s.e_status = 0
                             AND l.e_status = 0
                           {order_clause}"#
-                );
+        );
 
-                let rows = sqlx::query_as::<_, StationRow>(&query_str)
-                    .bind(station_id as i32)
-                    .fetch_all(conn)
-                    .await?;
-                rows.into_iter().map(|row| row.into()).collect()
-            }
-            false => Self::get_by_line_id_without_train_types(line_id, direction_id, conn).await?,
-        };
+        let rows = sqlx::query_as::<_, StationRow>(&query_str)
+            .bind(line_id as i32)
+            .bind(station_id.map(|id| id as i32))
+            .fetch_all(conn)
+            .await?;
+        let stations = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(stations)
     }

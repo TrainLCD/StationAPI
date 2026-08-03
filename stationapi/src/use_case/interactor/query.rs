@@ -1037,31 +1037,13 @@ where
         to_station_id: u32,
         line_group_id: Option<u32>,
     ) -> Result<Vec<proto::TrainRouteSegment>, UseCaseError> {
-        // line_group_id 未指定は種別なし(各駅停車)の単一路線走行。
-        // from駅の所属路線の駅列をそのまま経路として扱う。
-        let stations = match line_group_id {
-            Some(line_group_id) => {
-                self.get_stations_by_line_group_id(line_group_id, TransportTypeFilter::RailAndBus)
-                    .await?
-            }
-            None => {
-                let from_station = self
-                    .station_repository
-                    .find_by_id(from_station_id)
-                    .await?
-                    .ok_or_else(|| UseCaseError::NotFound {
-                        entity_type: "station",
-                        entity_id: from_station_id.to_string(),
-                    })?;
-                self.get_stations_by_line_id(
-                    from_station.line_cd as u32,
-                    None,
-                    None,
-                    TransportTypeFilter::RailAndBus,
-                )
-                .await?
-            }
-        };
+        let line_group_id = line_group_id.ok_or_else(|| UseCaseError::NotFound {
+            entity_type: "line group",
+            entity_id: "unspecified".to_string(),
+        })?;
+        let stations = self
+            .get_stations_by_line_group_id(line_group_id, TransportTypeFilter::RailAndBus)
+            .await?;
 
         let from_idx = stations
             .iter()
@@ -1609,17 +1591,22 @@ where
     }
 
     fn build_route_tree_map<'a>(&self, stops: &'a [Station]) -> BTreeMap<i32, Vec<&'a Station>> {
-        stops.iter().fold(
-            BTreeMap::new(),
-            |mut acc: BTreeMap<i32, Vec<&'a Station>>, value| {
-                if let Some(line_group_cd) = value.line_group_cd {
-                    acc.entry(line_group_cd).or_default().push(value);
-                } else {
-                    acc.entry(value.line_cd).or_default().push(value);
-                };
-                acc
-            },
-        )
+        stops
+            .iter()
+            .map(|stop| {
+                (
+                    stop.line_group_cd
+                        .expect("route stop must belong to a train type group"),
+                    stop,
+                )
+            })
+            .fold(
+                BTreeMap::new(),
+                |mut acc: BTreeMap<i32, Vec<&'a Station>>, (line_group_cd, stop)| {
+                    acc.entry(line_group_cd).or_default().push(stop);
+                    acc
+                },
+            )
     }
 
     fn build_station_from_row(
@@ -2701,7 +2688,7 @@ mod tests {
             data.iter()
                 .enumerate()
                 .map(|(i, &(cd, lat, lon))| {
-                    let mut s = create_test_station(cd, 9930100, 99301, None);
+                    let mut s = create_test_station(cd, 9930100, 99301, Some(9930100));
                     s.lat = lat;
                     s.lon = lon;
                     s.e_sort = 9930101 + i as i32;
@@ -2780,7 +2767,7 @@ mod tests {
             data.iter()
                 .enumerate()
                 .map(|(i, &(cd, lat, lon))| {
-                    let mut s = create_test_station(cd, cd, 28008, None);
+                    let mut s = create_test_station(cd, cd, 28008, Some(2800800));
                     s.lat = lat;
                     s.lon = lon;
                     s.e_sort = 2800801 + i as i32;
@@ -2799,7 +2786,8 @@ mod tests {
         /// 修正前は種別倍率(×1.15)が掛かり駅間別較正も外れて約15分に縮んでいた。
         #[tokio::test]
         async fn test_estimate_route_arrival_times_through_express_all_stops_matches_local() {
-            let local = build_interactor(hanzomon_stops(None), vec![], vec![], vec![]);
+            let default_kind = Some(proto::TrainTypeKind::Default as i32);
+            let local = build_interactor(hanzomon_stops(default_kind), vec![], vec![], vec![]);
             let local_est = local
                 .estimate_route_arrival_times(2800813, 2800807, &[], None)
                 .await
@@ -3137,18 +3125,12 @@ mod tests {
         }
 
         #[test]
-        fn test_build_route_tree_map_groups_by_line_cd_when_no_line_group() {
+        #[should_panic(expected = "route stop must belong to a train type group")]
+        fn test_build_route_tree_map_requires_line_group() {
             let interactor = create_interactor();
-            let stops = vec![
-                create_test_station(1, 1, 100, None),
-                create_test_station(2, 2, 100, None),
-                create_test_station(3, 3, 200, None),
-            ];
-            let result = interactor.build_route_tree_map(&stops);
+            let stops = vec![create_test_station(1, 1, 100, None)];
 
-            assert_eq!(result.len(), 2);
-            assert_eq!(result.get(&100).unwrap().len(), 2);
-            assert_eq!(result.get(&200).unwrap().len(), 1);
+            interactor.build_route_tree_map(&stops);
         }
 
         #[test]
@@ -4943,9 +4925,6 @@ mod tests {
                 // line_group 300: 発着駅を含まない → 除外
                 create_route_stop(3105, 5, 33, Some(300)),
                 create_route_stop(3106, 6, 33, Some(300)),
-                // line_group_cdなし: line_cd(44)でグループ化され種別なし
-                create_route_stop(4101, 1, 44, None),
-                create_route_stop(4103, 3, 44, None),
             ];
             let lines = vec![
                 create_route_line(11, 100),
@@ -4959,7 +4938,7 @@ mod tests {
 
             // 発着駅を含まないline_group 300は除外され、BTreeMapのキー順に並ぶ
             let route_ids: Vec<u32> = routes.iter().map(|r| r.id).collect();
-            assert_eq!(route_ids, vec![44, 100, 200]);
+            assert_eq!(route_ids, vec![100, 200]);
 
             // 路線の取得は経路候補ごとではなく一括1回で、
             // 除外されたグループ(300)のIDは要求されない
@@ -4991,11 +4970,6 @@ mod tests {
                 let line_ids: Vec<u32> = tt.lines.iter().map(|l| l.id).collect();
                 assert_eq!(line_ids, vec![22]);
             }
-
-            // line_group_cdなしのグループは種別を持たない
-            let route44 = routes.iter().find(|r| r.id == 44).unwrap();
-            assert_eq!(route44.stops.len(), 2);
-            assert!(route44.stops.iter().all(|s| s.train_type.is_none()));
         }
 
         #[tokio::test]
