@@ -93,6 +93,29 @@ const PERFORMANCE_INDEXES: &[(&str, &str)] = &[
     ),
 ];
 
+const DEFAULT_RAIL_TYPE_CD: i32 = 100;
+const LOCAL_RAIL_TYPE_CD: i32 = 101;
+const VIRTUAL_RAIL_LINE_GROUP_BASE: i32 = 1_000_000_000;
+
+/// Lines whose operator-facing local-service label is 「各駅停車」 rather than
+/// 「普通」. Every other uncovered rail line uses `DEFAULT_RAIL_TYPE_CD`.
+///
+/// This is intentionally line-based instead of company-based: operators such as
+/// JR East use both labels depending on the line. Keep this list in sync when a
+/// newly-added line uses 「各駅停車」 as its Japanese service name.
+const LOCAL_SERVICE_RAIL_LINE_IDS: &[i32] = &[
+    11309, // JR East Sagami Line
+    11318, // JR East Hachiko Line
+    11345, // Disney Resort Line
+    99101, // Sapporo Subway Tozai Line
+    99102, // Sapporo Subway Namboku Line
+    99103, // Sapporo Subway Toho Line
+    99301, // Toei Oedo Line
+    99305, // Tokyo Sakura Tram
+    99342, // Nippori-Toneri Liner
+    99649, // Rokko Liner
+];
+
 /// Create required extensions and tables before running data imports.
 /// Must be called before `import_csv` and `import_gtfs` can run in parallel.
 pub async fn create_schema() -> Result<(), Box<dyn std::error::Error>> {
@@ -251,10 +274,133 @@ pub async fn import_csv() -> Result<(), Box<dyn std::error::Error>> {
             .await?;
     }
 
+    generate_virtual_local_rail_services(&mut conn).await?;
+
     sqlx::query("ANALYZE;").execute(&mut conn).await?;
 
     info!("CSV import completed successfully.");
 
+    Ok(())
+}
+
+/// Fill rail lines containing at least one station with no train type with one
+/// deterministic, complete local service. The canonical CSV files remain
+/// untouched; generated rows live only in the database rebuilt at startup.
+///
+/// `station_station_types.id` determines stop order in repository queries, so
+/// the INSERT is ordered by line and station order. Bus lines are excluded both
+/// at the line and station level and continue to be managed by GTFS integration.
+async fn generate_virtual_local_rail_services(
+    conn: &mut PgConnection,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let missing_type_ids: Vec<i32> = sqlx::query_scalar(
+        "SELECT required.type_cd
+         FROM unnest($1::int[]) AS required(type_cd)
+         WHERE NOT EXISTS (
+             SELECT 1 FROM types AS t WHERE t.type_cd = required.type_cd
+         )
+         ORDER BY required.type_cd",
+    )
+    .bind(vec![DEFAULT_RAIL_TYPE_CD, LOCAL_RAIL_TYPE_CD])
+    .fetch_all(&mut *conn)
+    .await?;
+    if !missing_type_ids.is_empty() {
+        return Err(format!(
+            "cannot generate virtual rail services: missing types.type_cd values {missing_type_ids:?}"
+        )
+        .into());
+    }
+
+    let colliding_group_ids: Vec<i32> = sqlx::query_scalar(
+        "WITH lines_needing_local_service AS (
+             SELECT l.line_cd
+             FROM lines AS l
+             WHERE l.e_status = 0
+               AND l.transport_type = 0
+               AND EXISTS (
+                   SELECT 1 FROM stations AS s
+                   WHERE s.line_cd = l.line_cd
+                     AND s.e_status = 0
+                     AND s.transport_type = 0
+                     AND NOT EXISTS (
+                         SELECT 1 FROM station_station_types AS sst
+                         WHERE sst.station_cd = s.station_cd
+                     )
+               )
+         )
+         SELECT DISTINCT sst.line_group_cd
+         FROM lines_needing_local_service AS ul
+         JOIN station_station_types AS sst
+           ON sst.line_group_cd = $1 + ul.line_cd
+         ORDER BY sst.line_group_cd",
+    )
+    .bind(VIRTUAL_RAIL_LINE_GROUP_BASE)
+    .fetch_all(&mut *conn)
+    .await?;
+    if !colliding_group_ids.is_empty() {
+        return Err(format!(
+            "cannot generate virtual rail services: line_group_cd collision for {colliding_group_ids:?}"
+        )
+        .into());
+    }
+
+    let result = sqlx::query(
+        "WITH lines_needing_local_service AS MATERIALIZED (
+             SELECT
+                 l.line_cd,
+                 COALESCE(
+                     (
+                         SELECT sst.type_cd
+                         FROM stations AS typed_station
+                         JOIN station_station_types AS sst
+                           ON sst.station_cd = typed_station.station_cd
+                         WHERE typed_station.line_cd = l.line_cd
+                           AND typed_station.e_status = 0
+                           AND typed_station.transport_type = 0
+                           AND sst.type_cd IN ($2, $3)
+                         GROUP BY sst.type_cd
+                         ORDER BY COUNT(*) DESC, sst.type_cd
+                         LIMIT 1
+                     ),
+                     CASE
+                         WHEN l.line_cd = ANY($1::int[]) THEN $3
+                         ELSE $2
+                     END
+                 ) AS type_cd,
+                 $4 + l.line_cd AS line_group_cd
+             FROM lines AS l
+             WHERE l.e_status = 0
+               AND l.transport_type = 0
+               AND EXISTS (
+                   SELECT 1 FROM stations AS s
+                   WHERE s.line_cd = l.line_cd
+                     AND s.e_status = 0
+                     AND s.transport_type = 0
+                     AND NOT EXISTS (
+                         SELECT 1 FROM station_station_types AS sst
+                         WHERE sst.station_cd = s.station_cd
+                     )
+               )
+         )
+         INSERT INTO station_station_types (station_cd, type_cd, line_group_cd, pass)
+         SELECT s.station_cd, ul.type_cd, ul.line_group_cd, 0
+         FROM lines_needing_local_service AS ul
+         JOIN stations AS s ON s.line_cd = ul.line_cd
+         WHERE s.e_status = 0
+           AND s.transport_type = 0
+         ORDER BY ul.line_cd, s.e_sort, s.station_cd",
+    )
+    .bind(LOCAL_SERVICE_RAIL_LINE_IDS)
+    .bind(DEFAULT_RAIL_TYPE_CD)
+    .bind(LOCAL_RAIL_TYPE_CD)
+    .bind(VIRTUAL_RAIL_LINE_GROUP_BASE)
+    .execute(&mut *conn)
+    .await?;
+
+    info!(
+        "Generated {} virtual local-service station rows for rail lines with untyped stations.",
+        result.rows_affected()
+    );
     Ok(())
 }
 
@@ -4381,6 +4527,118 @@ mod tests {
     fn test_parse_gtfs_time_with_leading_zeros() {
         assert_eq!(parse_gtfs_time("01:02:03"), Some("01:02:03".to_string()));
         assert_eq!(parse_gtfs_time("00:00:01"), Some("00:00:01".to_string()));
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_generate_virtual_local_rail_services_covers_partial_lines_and_excludes_bus() {
+        use sqlx::{Executor, Row};
+
+        let mut conn = stop_route_mapping_fixtures::open_conn().await;
+        let schema = stop_route_mapping_fixtures::unique_schema_name();
+        conn.execute(format!("CREATE SCHEMA \"{schema}\"").as_str())
+            .await
+            .expect("create schema");
+        conn.execute(format!("SET search_path TO \"{schema}\"").as_str())
+            .await
+            .expect("set search_path");
+        conn.execute(
+            r#"
+            CREATE TABLE types (type_cd INTEGER PRIMARY KEY);
+            CREATE TABLE lines (
+                line_cd INTEGER PRIMARY KEY,
+                e_status INTEGER NOT NULL,
+                transport_type INTEGER NOT NULL
+            );
+            CREATE TABLE stations (
+                station_cd INTEGER PRIMARY KEY,
+                line_cd INTEGER NOT NULL,
+                e_status INTEGER NOT NULL,
+                transport_type INTEGER NOT NULL,
+                e_sort INTEGER NOT NULL
+            );
+            CREATE TABLE station_station_types (
+                id SERIAL PRIMARY KEY,
+                station_cd INTEGER NOT NULL,
+                type_cd INTEGER NOT NULL,
+                line_group_cd INTEGER NOT NULL,
+                pass INTEGER NOT NULL DEFAULT 0
+            );
+            INSERT INTO types VALUES (100), (101), (555);
+            INSERT INTO lines VALUES
+                (11309, 0, 0),
+                (500, 0, 0),
+                (600, 0, 0),
+                (700, 0, 1);
+            INSERT INTO stations VALUES
+                (1, 11309, 0, 0, 1),
+                (2, 11309, 0, 0, 2),
+                (3, 11309, 0, 0, 3),
+                (4, 500, 0, 0, 1),
+                (5, 500, 0, 0, 2),
+                (6, 600, 0, 0, 1),
+                (7, 600, 0, 0, 2),
+                (8, 700, 0, 1, 1);
+            INSERT INTO station_station_types
+                (station_cd, type_cd, line_group_cd, pass)
+            VALUES
+                (1, 555, 50, 0),
+                (4, 100, 60, 0),
+                (6, 100, 70, 0),
+                (7, 100, 70, 0);
+            "#,
+        )
+        .await
+        .expect("create virtual rail service fixtures");
+
+        generate_virtual_local_rail_services(&mut conn)
+            .await
+            .expect("generate virtual rail services");
+        generate_virtual_local_rail_services(&mut conn)
+            .await
+            .expect("second generation is idempotent");
+
+        let generated = sqlx::query(
+            "SELECT station_cd, type_cd, line_group_cd, pass
+             FROM station_station_types
+             WHERE line_group_cd >= $1
+             ORDER BY line_group_cd, id",
+        )
+        .bind(VIRTUAL_RAIL_LINE_GROUP_BASE)
+        .fetch_all(&mut conn)
+        .await
+        .expect("read generated rows");
+        let actual: Vec<(i32, i32, i32, i32)> = generated
+            .iter()
+            .map(|row| {
+                (
+                    row.get("station_cd"),
+                    row.get("type_cd"),
+                    row.get("line_group_cd"),
+                    row.get("pass"),
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            actual,
+            vec![
+                (4, 100, VIRTUAL_RAIL_LINE_GROUP_BASE + 500, 0),
+                (5, 100, VIRTUAL_RAIL_LINE_GROUP_BASE + 500, 0),
+                (1, 101, VIRTUAL_RAIL_LINE_GROUP_BASE + 11309, 0),
+                (2, 101, VIRTUAL_RAIL_LINE_GROUP_BASE + 11309, 0),
+                (3, 101, VIRTUAL_RAIL_LINE_GROUP_BASE + 11309, 0),
+            ]
+        );
+
+        let bus_generated: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM station_station_types WHERE station_cd = 8")
+                .fetch_one(&mut conn)
+                .await
+                .expect("count bus rows");
+        assert_eq!(bus_generated, 0);
+
+        stop_route_mapping_fixtures::drop_schema(&mut conn, &schema).await;
     }
 
     // ============================================================================
