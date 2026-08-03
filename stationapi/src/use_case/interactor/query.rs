@@ -1206,7 +1206,7 @@ where
         let params = EstimationParams::default();
 
         let mut result: Vec<EstimatedStop> = Vec::new();
-        for (_line_group_cd, group_stops) in route_row_tree_map.iter() {
+        for group_stops in route_row_tree_map.values() {
             // 先頭駅が末尾にも重複格納された「閉じた」環状データ(ポートライナー等)は、
             // そのままだとラップ時に閉じ駅が二重になるため重複終端を除いてから
             // 環状判定・弧選択する。
