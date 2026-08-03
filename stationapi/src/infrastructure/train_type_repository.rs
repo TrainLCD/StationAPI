@@ -616,6 +616,7 @@ mod tests {
             "CREATE TABLE stations (
                 station_cd INTEGER PRIMARY KEY,
                 station_g_cd INTEGER NOT NULL,
+                line_cd INTEGER,
                 e_status INTEGER NOT NULL DEFAULT 0
             )",
         )

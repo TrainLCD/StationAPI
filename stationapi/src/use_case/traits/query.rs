@@ -124,10 +124,10 @@ pub trait QueryUseCase: Send + Sync + 'static {
         line_name: String,
         limit: Option<u32>,
     ) -> Result<Vec<Line>, UseCaseError>;
-    async fn get_connected_stations(
+    async fn get_connected_routes(
         &self,
-        from_station_id: u32,
-        to_station_id: u32,
+        from_station_group_id: u32,
+        to_station_group_id: u32,
     ) -> Result<Vec<Route>, UseCaseError>;
     async fn estimate_route_arrival_times(
         &self,

@@ -201,7 +201,8 @@ CREATE INDEX idx_performance_station_name_trgm ON stations
 候補ごとの N+1 クエリを発生させません。
 
 探索中は通過駅を乗換地点にせず、利用済みの列車種別および訪問済みの駅グループを
-再訪しません。探索は最大 8 列車種別、4,096 展開状態、32 返却候補に制限します。
+再訪しません。探索は最大 8 列車種別、4,096 展開状態、65,536 評価候補、
+32 返却候補に制限します。
 完成した経路は接続駅を一度だけ含む駅列へ連結し、各区間の `stop_condition` を保持します。
 返却時には経路の列車種別列と駅グループ列から決定的な仮想 `lineGroupId` を生成し、
 経路内の全 `station.train_type.group_id` に同じ値を設定します。仮想 ID は既存の
@@ -212,7 +213,8 @@ PostgreSQL `INTEGER` ID と衝突しない `uint32` 上位半分を使用しま�
 階層あたり 2 回で、候補経路ごとの N+1 クエリや同じ列車種別の再取得はありません。
 取得後は駅グループと `line_group_cd` を `HashMap` に一度だけ分類し、状態と駅列を
 毎回総当たりする O(n×m) の処理を、入力件数に比例する O(n+m) の参照へ置き換えます。
-探索そのものの最悪計算量は分岐数に依存しますが、上記の状態数上限で制御されます。
+探索そのものの最悪計算量は各状態の始点候補数と駅列長の積にも依存するため、状態数とは
+独立した評価候補数の上限で `start_indices × pattern.len()` の走査も制御します。
 
 SQL は `stations.station_g_cd`、`station_station_types.station_cd`、
 `station_station_types.line_group_cd` の既存 btree index を利用できます。列車種別の存在確認に

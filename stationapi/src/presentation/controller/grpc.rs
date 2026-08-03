@@ -411,7 +411,7 @@ impl StationApi for MyApi {
 
         match self
             .query_use_case
-            .get_connected_stations(from_station_group_id, to_station_group_id)
+            .get_connected_routes(from_station_group_id, to_station_group_id)
             .await
         {
             Ok(routes) => Ok(Response::new(RouteResponse {
@@ -922,10 +922,10 @@ mod tests {
             Ok(vec![])
         }
 
-        async fn get_connected_stations(
+        async fn get_connected_routes(
             &self,
-            _from_station_id: u32,
-            _to_station_id: u32,
+            _from_station_group_id: u32,
+            _to_station_group_id: u32,
         ) -> Result<Vec<Route>, UseCaseError> {
             Ok(vec![])
         }

@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 const CONNECTED_ROUTE_MAX_SEGMENTS: usize = 8;
 const CONNECTED_ROUTE_MAX_STATES: usize = 4096;
+const CONNECTED_ROUTE_MAX_CANDIDATES: usize = 65_536;
 const CONNECTED_ROUTE_MAX_RESULTS: usize = 32;
 
 #[derive(Clone)]
@@ -1185,19 +1186,19 @@ where
         Ok(lines)
     }
 
-    async fn get_connected_stations(
+    async fn get_connected_routes(
         &self,
-        from_station_id: u32,
-        to_station_id: u32,
+        from_station_group_id: u32,
+        to_station_group_id: u32,
     ) -> Result<Vec<Route>, UseCaseError> {
-        if from_station_id == to_station_id {
+        if from_station_group_id == to_station_group_id {
             return Ok(vec![]);
         }
 
         let mut states = vec![ConnectedRouteState {
-            current_group_id: from_station_id,
+            current_group_id: from_station_group_id,
             line_group_ids: vec![],
-            visited_station_groups: HashSet::from([from_station_id]),
+            visited_station_groups: HashSet::from([from_station_group_id]),
             stops: vec![],
         }];
         let mut line_groups_by_station: HashMap<u32, Vec<u32>> = HashMap::new();
@@ -1205,11 +1206,13 @@ where
         let mut completed = Vec::new();
         let mut completed_signatures = HashSet::new();
         let mut expanded_states = 0usize;
+        let mut evaluated_candidates = 0usize;
 
         for _ in 0..CONNECTED_ROUTE_MAX_SEGMENTS {
             if states.is_empty()
                 || completed.len() >= CONNECTED_ROUTE_MAX_RESULTS
                 || expanded_states >= CONNECTED_ROUTE_MAX_STATES
+                || evaluated_candidates >= CONNECTED_ROUTE_MAX_CANDIDATES
             {
                 break;
             }
@@ -1295,6 +1298,10 @@ where
 
                     for start_index in start_indices {
                         for end_index in 0..pattern.len() {
+                            if evaluated_candidates >= CONNECTED_ROUTE_MAX_CANDIDATES {
+                                break 'expand_states;
+                            }
+                            evaluated_candidates += 1;
                             let destination = &pattern[end_index];
                             let destination_group_id = destination.station_g_cd as u32;
                             if end_index == start_index
@@ -1335,7 +1342,7 @@ where
                                 visited_station_groups,
                                 stops,
                             };
-                            if destination_group_id == to_station_id {
+                            if destination_group_id == to_station_group_id {
                                 let signature = connected_route_signature(&candidate);
                                 if completed_signatures.insert(signature) {
                                     completed.push(candidate);
@@ -1366,7 +1373,7 @@ where
                 .into_iter()
                 .map(|row| {
                     let extracted_line = self.extract_line_from_station(&row);
-                    let mut train_type = TrainType {
+                    let train_type = TrainType {
                         id: row.type_id,
                         station_cd: Some(row.station_cd),
                         type_cd: row.type_cd,
@@ -1383,7 +1390,6 @@ where
                         line: Some(Box::new(extracted_line.clone())),
                         lines: vec![extracted_line.clone()],
                     };
-                    train_type.line_group_cd = Some(virtual_line_group_id as i32);
                     let mut stop = self.build_station_from_row(
                         &row,
                         &extracted_line,
@@ -4907,10 +4913,10 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn test_get_connected_stations_returns_direct_and_three_segment_routes() {
+        async fn test_get_connected_routes_returns_direct_and_three_segment_routes() {
             let interactor = create_connected_route_interactor();
 
-            let routes = interactor.get_connected_stations(1, 4).await.unwrap();
+            let routes = interactor.get_connected_routes(1, 4).await.unwrap();
 
             assert!(routes.iter().any(|route| route.stops.len() == 2));
             let connected = routes
@@ -4943,11 +4949,11 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn test_get_connected_stations_is_deterministic_and_handles_cycles_and_no_route() {
+        async fn test_get_connected_routes_is_deterministic_and_handles_cycles_and_no_route() {
             let interactor = create_connected_route_interactor();
 
-            let first = interactor.get_connected_stations(1, 4).await.unwrap();
-            let second = interactor.get_connected_stations(1, 4).await.unwrap();
+            let first = interactor.get_connected_routes(1, 4).await.unwrap();
+            let second = interactor.get_connected_routes(1, 4).await.unwrap();
             assert_eq!(
                 first.iter().map(|route| route.id).collect::<Vec<_>>(),
                 second.iter().map(|route| route.id).collect::<Vec<_>>()
@@ -4960,8 +4966,15 @@ mod tests {
                     .collect::<HashSet<_>>()
                     .len()
             );
+            for route in &first {
+                assert_eq!(
+                    route.stops.iter().filter(|stop| stop.group_id == 1).count(),
+                    1,
+                    "origin station group must appear once per route"
+                );
+            }
 
-            let unreachable = interactor.get_connected_stations(1, 99).await.unwrap();
+            let unreachable = interactor.get_connected_routes(1, 99).await.unwrap();
             assert!(unreachable.is_empty());
         }
     }
