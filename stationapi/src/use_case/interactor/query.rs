@@ -10,7 +10,14 @@ struct ConnectedRouteState {
     current_group_id: u32,
     line_group_ids: Vec<u32>,
     visited_station_groups: HashSet<u32>,
-    stops: Vec<Station>,
+    stops: Vec<ConnectedRouteStopRef>,
+}
+
+#[derive(Clone, Copy)]
+struct ConnectedRouteStopRef {
+    line_group_id: u32,
+    station_station_type_id: i32,
+    station_group_id: u32,
 }
 
 /// Maximum distance in meters to search for nearby bus stops from a rail station
@@ -51,8 +58,10 @@ use crate::{
         },
         normalize::normalize_for_search,
         repository::{
-            company_repository::CompanyRepository, line_repository::LineRepository,
-            station_repository::StationRepository, train_type_repository::TrainTypeRepository,
+            company_repository::CompanyRepository,
+            line_repository::LineRepository,
+            station_repository::{ConnectedRoutePatternStop, StationRepository},
+            train_type_repository::TrainTypeRepository,
         },
         segment_speed_table::{segment_override_applies_to_kind, segment_speed_override_kmh},
     },
@@ -1184,7 +1193,7 @@ where
             stops: vec![],
         }];
         let mut line_groups_by_station: HashMap<u32, Vec<u32>> = HashMap::new();
-        let mut stops_by_line_group: HashMap<u32, Vec<Station>> = HashMap::new();
+        let mut stops_by_line_group: HashMap<u32, Vec<ConnectedRoutePatternStop>> = HashMap::new();
         let mut completed = Vec::new();
         let mut completed_signatures = HashSet::new();
         let mut expanded_states = 0usize;
@@ -1235,18 +1244,16 @@ where
                 .collect();
             let fetched_stops = self
                 .station_repository
-                .get_by_line_group_id_vec(&missing_line_groups)
+                .get_connected_route_pattern_stops(&missing_line_groups)
                 .await?;
             for line_group_id in &missing_line_groups {
                 stops_by_line_group.insert(*line_group_id, vec![]);
             }
             for stop in fetched_stops {
-                if let Some(line_group_id) = stop.line_group_cd.map(|id| id as u32) {
-                    stops_by_line_group
-                        .entry(line_group_id)
-                        .or_default()
-                        .push(stop);
-                }
+                stops_by_line_group
+                    .entry(stop.line_group_id)
+                    .or_default()
+                    .push(stop);
             }
 
             let mut next_states = Vec::new();
@@ -1272,8 +1279,7 @@ where
                         .iter()
                         .enumerate()
                         .filter(|(_, stop)| {
-                            stop.station_g_cd as u32 == state.current_group_id
-                                && stop.pass != Some(1)
+                            stop.station_group_id == state.current_group_id && stop.pass != Some(1)
                         })
                         .map(|(index, _)| index)
                         .collect();
@@ -1285,7 +1291,7 @@ where
                             }
                             evaluated_candidates += 1;
                             let destination = &pattern[end_index];
-                            let destination_group_id = destination.station_g_cd as u32;
+                            let destination_group_id = destination.station_group_id;
                             if end_index == start_index
                                 || destination.pass == Some(1)
                                 || state.visited_station_groups.contains(&destination_group_id)
@@ -1293,28 +1299,56 @@ where
                                 continue;
                             }
 
-                            let segment: Vec<Station> = if start_index < end_index {
-                                pattern[start_index..=end_index].to_vec()
+                            let intersects_visited = if start_index < end_index {
+                                pattern[start_index + 1..=end_index].iter().any(|stop| {
+                                    state
+                                        .visited_station_groups
+                                        .contains(&stop.station_group_id)
+                                })
                             } else {
-                                pattern[end_index..=start_index]
-                                    .iter()
-                                    .rev()
-                                    .cloned()
-                                    .collect()
+                                pattern[end_index..start_index].iter().any(|stop| {
+                                    state
+                                        .visited_station_groups
+                                        .contains(&stop.station_group_id)
+                                })
                             };
-                            if segment.iter().skip(1).any(|stop| {
-                                state
-                                    .visited_station_groups
-                                    .contains(&(stop.station_g_cd as u32))
-                            }) {
+                            if intersects_visited {
                                 continue;
                             }
                             let mut visited_station_groups = state.visited_station_groups.clone();
-                            visited_station_groups.extend(
-                                segment.iter().skip(1).map(|stop| stop.station_g_cd as u32),
-                            );
                             let mut stops = state.stops.clone();
-                            stops.extend(segment.into_iter().skip(usize::from(!stops.is_empty())));
+                            let append_stop =
+                                |stops: &mut Vec<ConnectedRouteStopRef>, pattern_index: usize| {
+                                    stops.push(ConnectedRouteStopRef {
+                                        line_group_id,
+                                        station_station_type_id: pattern[pattern_index]
+                                            .station_station_type_id,
+                                        station_group_id: pattern[pattern_index].station_group_id,
+                                    });
+                                };
+                            if start_index < end_index {
+                                visited_station_groups.extend(
+                                    pattern[start_index + 1..=end_index]
+                                        .iter()
+                                        .map(|stop| stop.station_group_id),
+                                );
+                                let append_from = start_index + usize::from(!stops.is_empty());
+                                for pattern_index in append_from..=end_index {
+                                    append_stop(&mut stops, pattern_index);
+                                }
+                            } else {
+                                visited_station_groups.extend(
+                                    pattern[end_index..start_index]
+                                        .iter()
+                                        .map(|stop| stop.station_group_id),
+                                );
+                                if stops.is_empty() {
+                                    append_stop(&mut stops, start_index);
+                                }
+                                for pattern_index in (end_index..start_index).rev() {
+                                    append_stop(&mut stops, pattern_index);
+                                }
+                            }
                             let mut line_group_ids = state.line_group_ids.clone();
                             line_group_ids.push(line_group_id);
 
@@ -1344,14 +1378,48 @@ where
             states = next_states;
         }
 
+        if completed.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let detailed_line_group_ids: Vec<u32> = completed
+            .iter()
+            .flat_map(|candidate| candidate.line_group_ids.iter().copied())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        let detailed_stops = self
+            .station_repository
+            .get_by_line_group_id_vec(&detailed_line_group_ids)
+            .await?;
+        let mut detailed_stops_by_id: HashMap<(u32, i32), Station> = HashMap::new();
+        for stop in detailed_stops {
+            if let (Some(line_group_id), Some(station_station_type_id)) =
+                (stop.line_group_cd.map(|id| id as u32), stop.sst_id)
+            {
+                detailed_stops_by_id.insert((line_group_id, station_station_type_id), stop);
+            }
+        }
+
         let mut used_virtual_ids = HashSet::new();
         let mut routes = Vec::new();
         for candidate in completed {
             let signature = connected_route_signature(&candidate);
             let virtual_line_group_id =
                 connected_route_virtual_id(&signature, &mut used_virtual_ids);
-            let stops = candidate
+            let Some(detailed_stops): Option<Vec<Station>> = candidate
                 .stops
+                .iter()
+                .map(|stop| {
+                    detailed_stops_by_id
+                        .get(&(stop.line_group_id, stop.station_station_type_id))
+                        .cloned()
+                })
+                .collect()
+            else {
+                continue;
+            };
+            let stops = detailed_stops
                 .into_iter()
                 .map(|row| {
                     let extracted_line = self.extract_line_from_station(&row);
@@ -1920,7 +1988,7 @@ fn connected_route_signature(route: &ConnectedRouteState) -> Vec<u8> {
     }
     signature.extend_from_slice(&(route.stops.len() as u32).to_le_bytes());
     for stop in &route.stops {
-        signature.extend_from_slice(&(stop.station_g_cd as u32).to_le_bytes());
+        signature.extend_from_slice(&stop.station_group_id.to_le_bytes());
     }
     signature
 }
@@ -4843,6 +4911,7 @@ mod tests {
                 Some(line_group_id),
             );
             station.type_id = Some(line_group_id);
+            station.sst_id = Some(station_cd);
             station.type_cd = Some(line_group_id);
             station.type_name = Some(format!("種別{line_group_id}"));
             station.type_name_k = Some(format!("シュベツ{line_group_id}"));

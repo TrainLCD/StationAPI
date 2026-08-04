@@ -5,6 +5,14 @@ use crate::domain::{
     error::DomainError,
 };
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ConnectedRoutePatternStop {
+    pub line_group_id: u32,
+    pub station_station_type_id: i32,
+    pub station_group_id: u32,
+    pub pass: Option<i32>,
+}
+
 #[async_trait]
 pub trait StationRepository: Send + Sync + 'static {
     async fn find_by_id(&self, id: u32) -> Result<Option<Station>, DomainError>;
@@ -51,6 +59,29 @@ pub trait StationRepository: Send + Sync + 'static {
         &self,
         line_group_ids: &[u32],
     ) -> Result<Vec<Station>, DomainError>;
+    /// Fetch only the fields needed while exploring connected routes.
+    ///
+    /// The default keeps lightweight test repositories source-compatible.
+    /// Production repositories should override this to avoid materializing full
+    /// `Station` entities for every explored line group.
+    async fn get_connected_route_pattern_stops(
+        &self,
+        line_group_ids: &[u32],
+    ) -> Result<Vec<ConnectedRoutePatternStop>, DomainError> {
+        Ok(self
+            .get_by_line_group_id_vec(line_group_ids)
+            .await?
+            .into_iter()
+            .filter_map(|stop| {
+                Some(ConnectedRoutePatternStop {
+                    line_group_id: stop.line_group_cd? as u32,
+                    station_station_type_id: stop.sst_id?,
+                    station_group_id: stop.station_g_cd as u32,
+                    pass: stop.pass,
+                })
+            })
+            .collect())
+    }
     async fn get_bus_stops_near_stations(
         &self,
         coords: &[(u32, f64, f64)], // (station_g_cd, lat, lon)
