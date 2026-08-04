@@ -58,7 +58,8 @@ use crate::{
         },
         normalize::normalize_for_search,
         repository::{
-            company_repository::CompanyRepository, line_repository::LineRepository,
+            company_repository::CompanyRepository,
+            line_repository::LineRepository,
             station_repository::{ConnectedRoutePatternStop, StationRepository},
             train_type_repository::TrainTypeRepository,
         },
@@ -1210,8 +1211,7 @@ where
             stops: vec![],
         }];
         let mut line_groups_by_station: HashMap<u32, Vec<u32>> = HashMap::new();
-        let mut stops_by_line_group: HashMap<u32, Vec<ConnectedRoutePatternStop>> =
-            HashMap::new();
+        let mut stops_by_line_group: HashMap<u32, Vec<ConnectedRoutePatternStop>> = HashMap::new();
         let mut completed = Vec::new();
         let mut completed_signatures = HashSet::new();
         let mut expanded_states = 0usize;
@@ -1335,15 +1335,15 @@ where
                             }
                             let mut visited_station_groups = state.visited_station_groups.clone();
                             let mut stops = state.stops.clone();
-                            let append_stop = |stops: &mut Vec<ConnectedRouteStopRef>,
-                                               pattern_index: usize| {
-                                stops.push(ConnectedRouteStopRef {
-                                    line_group_id,
-                                    station_station_type_id: pattern[pattern_index]
-                                        .station_station_type_id,
-                                    station_group_id: pattern[pattern_index].station_group_id,
-                                });
-                            };
+                            let append_stop =
+                                |stops: &mut Vec<ConnectedRouteStopRef>, pattern_index: usize| {
+                                    stops.push(ConnectedRouteStopRef {
+                                        line_group_id,
+                                        station_station_type_id: pattern[pattern_index]
+                                            .station_station_type_id,
+                                        station_group_id: pattern[pattern_index].station_group_id,
+                                    });
+                                };
                             if start_index < end_index {
                                 visited_station_groups.extend(
                                     pattern[start_index + 1..=end_index]

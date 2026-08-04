@@ -443,11 +443,8 @@ impl StationRepository for MyStationRepository {
         line_group_ids: &[u32],
     ) -> Result<Vec<ConnectedRoutePatternStop>, DomainError> {
         let mut conn = self.pool.acquire().await?;
-        InternalStationRepository::get_connected_route_pattern_stops(
-            line_group_ids,
-            &mut conn,
-        )
-        .await
+        InternalStationRepository::get_connected_route_pattern_stops(line_group_ids, &mut conn)
+            .await
     }
 
     async fn get_bus_stops_near_stations(
