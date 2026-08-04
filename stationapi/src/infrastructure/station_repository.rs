@@ -7,7 +7,7 @@ use crate::{
         entity::{gtfs::TransportType, station::Station},
         error::DomainError,
         normalize::normalize_for_search,
-        repository::station_repository::StationRepository,
+        repository::station_repository::{ConnectedRoutePatternStop, StationRepository},
     },
     proto::StopCondition,
 };
@@ -15,6 +15,14 @@ use crate::{
 #[derive(sqlx::FromRow)]
 struct TrainTypesCountRow {
     train_types_count: Option<i32>,
+}
+
+#[derive(sqlx::FromRow)]
+struct ConnectedRoutePatternStopRow {
+    line_group_cd: i32,
+    station_station_type_id: i32,
+    station_g_cd: i32,
+    pass: Option<i32>,
 }
 
 #[derive(sqlx::FromRow, Clone)]
@@ -430,6 +438,15 @@ impl StationRepository for MyStationRepository {
         InternalStationRepository::get_by_line_group_id_vec(line_group_ids, &mut conn).await
     }
 
+    async fn get_connected_route_pattern_stops(
+        &self,
+        line_group_ids: &[u32],
+    ) -> Result<Vec<ConnectedRoutePatternStop>, DomainError> {
+        let mut conn = self.pool.acquire().await?;
+        InternalStationRepository::get_connected_route_pattern_stops(line_group_ids, &mut conn)
+            .await
+    }
+
     async fn get_bus_stops_near_stations(
         &self,
         coords: &[(u32, f64, f64)],
@@ -481,6 +498,41 @@ impl StationRepository for MyStationRepository {
 struct InternalStationRepository {}
 
 impl InternalStationRepository {
+    async fn get_connected_route_pattern_stops(
+        line_group_ids: &[u32],
+        conn: &mut PgConnection,
+    ) -> Result<Vec<ConnectedRoutePatternStop>, DomainError> {
+        if line_group_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let line_group_ids: Vec<i32> = line_group_ids.iter().map(|id| *id as i32).collect();
+        let rows = sqlx::query_as::<_, ConnectedRoutePatternStopRow>(
+            r#"SELECT sst.line_group_cd, sst.id AS station_station_type_id,
+                      s.station_g_cd, sst.pass
+               FROM station_station_types AS sst
+               JOIN stations AS s ON s.station_cd = sst.station_cd
+               JOIN lines AS l ON l.line_cd = s.line_cd
+               WHERE sst.line_group_cd = ANY($1)
+                 AND s.e_status = 0
+                 AND l.e_status = 0
+               ORDER BY array_position($1, sst.line_group_cd), sst.id"#,
+        )
+        .bind(&line_group_ids)
+        .fetch_all(conn)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| ConnectedRoutePatternStop {
+                line_group_id: row.line_group_cd as u32,
+                station_station_type_id: row.station_station_type_id,
+                station_group_id: row.station_g_cd as u32,
+                pass: row.pass,
+            })
+            .collect())
+    }
+
     async fn fetch_has_local_train_types_by_station_id(
         id: u32,
         conn: &mut PgConnection,
