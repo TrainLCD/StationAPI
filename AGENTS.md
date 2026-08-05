@@ -64,6 +64,7 @@ This guide explains how automation agents and human contributors should work wit
 - Changes to the service contract require coordinated updates to `proto/stationapi.proto`, regenerated code via `tonic-build`, and corresponding adjustments in both presentation and use-case layers.
 
 ## Contribution Guidelines
+- **Git-flow** – Follow Git-flow with `dev` serving as this repository's `develop` branch. Create ordinary work branches from the latest `origin/dev`, use the `feature/<description>` naming convention, and target their pull requests to `dev`. Do not create or target a branch named `develop`.
 - **Prioritize quality and performance over implementation speed** – Always favor code quality and runtime performance over velocity. Be mindful of algorithmic complexity and look for opportunities to replace O(n×m) linear scans with O(n+m) indexed lookups (e.g., HashMaps). Avoid unnecessary JOINs and redundant queries at the SQL level. When a change affects performance, document the before/after complexity and query plan impact in the pull request.
 - Document the commands you executed (for example, ``cargo fmt && cargo clippy --all-targets --all-features && make test-unit``) and their outcomes in every pull request.
 - For database, gRPC, or schema updates, add architectural notes under `docs/` and synchronize README references so onboarding materials stay accurate.
