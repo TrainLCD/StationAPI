@@ -39,6 +39,7 @@ This guide explains how automation agents and human contributors should work wit
 ## Data Management
 - CSV import order depends on the numeric prefix (`1!`, `2!`, ...). When adding datasets, choose a prefix that preserves foreign-key dependencies.
 - `data/create_table.sql` drops and recreates tables, indexes, and foreign keys. Update this script alongside any schema or CSV column changes.
+- **Through-service junction stations** – When a train type runs through a station where its lines connect, add a `5!station_station_types.csv` row for every line-specific `station_cd` at that station, even when those rows share one `station_g_cd`. The only exception is when the train type explicitly identifies a direction or line-specific operation that excludes one side. Omitting either ID makes the train type selectable from only one line in the app. For example, Hida at Gifu must include both the Takayama Main Line station (`1141601`) and the Tokaido Main Line station (`1150239`). Audit both sides whenever adding or editing a through-service pattern.
 - `data_validator` currently verifies that `5!station_station_types.csv` references valid station and type IDs, and that order-sensitive station sequences in `3!stations.csv` stay intact under `ORDER BY e_sort, station_cd` (e.g. the Toei Oedo Line's Tochomae rows, whose misordering silently drops the station from ETA estimation). Extend the validator when new cross-references or order-sensitive spots are introduced and keep the process fail-fast (panic on invalid data).
 
 ## Testing and Quality
