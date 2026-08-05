@@ -39,6 +39,7 @@ This guide explains how automation agents and human contributors should work wit
 ## Data Management
 - CSV import order depends on the numeric prefix (`1!`, `2!`, ...). When adding datasets, choose a prefix that preserves foreign-key dependencies.
 - `data/create_table.sql` drops and recreates tables, indexes, and foreign keys. Update this script alongside any schema or CSV column changes.
+- **Through-service junction stations** – When a train type runs through a station where its lines connect, add a `5!station_station_types.csv` row for every line-specific `station_cd` at that station, even when those rows share one `station_g_cd`. The only exception is when the train type explicitly identifies a direction or line-specific operation that excludes one side. Omitting either ID makes the train type selectable from only one line in the app. For example, Hida at Gifu must include both the Takayama Main Line station (`1141601`) and the Tokaido Main Line station (`1150239`). Audit both sides whenever adding or editing a through-service pattern.
 - `data_validator` currently verifies that `5!station_station_types.csv` references valid station and type IDs, and that order-sensitive station sequences in `3!stations.csv` stay intact under `ORDER BY e_sort, station_cd` (e.g. the Toei Oedo Line's Tochomae rows, whose misordering silently drops the station from ETA estimation). Extend the validator when new cross-references or order-sensitive spots are introduced and keep the process fail-fast (panic on invalid data).
 
 ## Testing and Quality
@@ -63,6 +64,8 @@ This guide explains how automation agents and human contributors should work wit
 - Changes to the service contract require coordinated updates to `proto/stationapi.proto`, regenerated code via `tonic-build`, and corresponding adjustments in both presentation and use-case layers.
 
 ## Contribution Guidelines
+- **Git-flow** – Follow Git-flow with `dev` serving as this repository's `develop` branch. Create ordinary work branches from the latest `origin/dev`, use the `feature/<description>` naming convention, and target their pull requests to `dev`. Do not create or target a branch named `develop`.
+- **Pull requests** – Assign every pull request to `@TinyKitten` when creating it, open it as ready for review rather than as a draft, and use `.github/pull_request_template.md` without omitting or replacing its sections or checklists.
 - **Prioritize quality and performance over implementation speed** – Always favor code quality and runtime performance over velocity. Be mindful of algorithmic complexity and look for opportunities to replace O(n×m) linear scans with O(n+m) indexed lookups (e.g., HashMaps). Avoid unnecessary JOINs and redundant queries at the SQL level. When a change affects performance, document the before/after complexity and query plan impact in the pull request.
 - Document the commands you executed (for example, ``cargo fmt && cargo clippy --all-targets --all-features && make test-unit``) and their outcomes in every pull request.
 - For database, gRPC, or schema updates, add architectural notes under `docs/` and synchronize README references so onboarding materials stay accurate.
