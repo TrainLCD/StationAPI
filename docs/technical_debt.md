@@ -93,7 +93,6 @@ pub struct Station {
 |----------|--------|------|
 | `stationapi/src/use_case/interactor/query.rs` | 604 | `// TODO: SQLで同等の処理を行う` - 経路検証がアプリケーション側で実行 |
 | `stationapi/src/use_case/interactor/query.rs` | 702 | `// TODO: SQLで同等の処理を行う` - 経路フィルタリングがアプリケーション層で処理 |
-| `stationapi/src/use_case/interactor/query.rs` | 843 | `// TODO: 未実装` - `get_connected_stations()` が空配列を返却 |
 
 ```rust
 // query.rs:604-610
@@ -319,5 +318,4 @@ let station_numbers_raw = [
 | **中** | Row 構造体のコード生成検討 | `src/infrastructure/*.rs` | メンテナンス性 |
 | **中** | メソッド命名の改善 | `src/domain/repository/line_repository.rs:23` | 可読性 |
 | **中** | ハードコード値の定数化 | 複数ファイル | 保守性 |
-| **低** | get_connected_stations の実装 | `src/use_case/interactor/query.rs:843` | 機能完成度 |
 | **低** | UI レイヤーのテスト追加 | `src/presentation/` | テストカバレッジ |
