@@ -1037,6 +1037,11 @@ impl InternalStationRepository {
         Ok(stations)
     }
 
+    /// 種別情報を使わずに路線の全駅を `e_sort` 順で返す。
+    ///
+    /// `get_by_line_id_with_train_type` で種別グループが見つからない路線
+    /// (BusRoute種別しか持たないバス路線)のフォールバックとして使う。
+    /// 返される駅の種別関連フィールドはすべて `NULL` になる。
     async fn get_by_line_id_without_train_types(
         line_id: u32,
         direction_id: Option<u32>,
@@ -2902,6 +2907,7 @@ mod tests {
 
         static SCHEMA_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+        /// 並列実行してもテスト同士が衝突しない一意なスキーマ名を生成する。
         pub fn unique_schema_name() -> String {
             let id = SCHEMA_COUNTER.fetch_add(1, Ordering::SeqCst);
             let nanos = std::time::SystemTime::now()
@@ -2911,6 +2917,7 @@ mod tests {
             format!("gbli_test_{nanos}_{id}")
         }
 
+        /// `TEST_DATABASE_URL`(未設定時は既定のローカルDB)へ接続する。
         pub async fn open_conn() -> PgConnection {
             let database_url = env::var("TEST_DATABASE_URL")
                 .unwrap_or_else(|_| "postgres://test:test@localhost/stationapi_test".to_string());
@@ -3046,6 +3053,7 @@ mod tests {
             schema
         }
 
+        /// テストで作成した隔離スキーマを破棄する。
         pub async fn drop_schema(conn: &mut PgConnection, schema: &str) {
             conn.execute(format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE").as_str())
                 .await
