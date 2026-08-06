@@ -1022,9 +1022,115 @@ impl InternalStationRepository {
         let rows = sqlx::query_as::<_, StationRow>(&query_str)
             .bind(line_id as i32)
             .bind(station_id.map(|id| id as i32))
+            .fetch_all(&mut *conn)
+            .await?;
+
+        // バス路線の種別はBusRoute(kind=7, priority=0)のみで、target_line_groupの
+        // 鉄道向けフィルタ(kind 0/1・priority>0)に一致せず0件になる。
+        // その場合は種別なしの駅一覧(路線の全停留所)へフォールバックする。
+        if rows.is_empty() {
+            return Self::get_by_line_id_without_train_types(line_id, direction_id, conn).await;
+        }
+
+        let stations = rows.into_iter().map(|row| row.into()).collect();
+
+        Ok(stations)
+    }
+
+    /// 種別情報を使わずに路線の全駅を `e_sort` 順で返す。
+    ///
+    /// `get_by_line_id_with_train_type` で種別グループが見つからない路線
+    /// (BusRoute種別しか持たないバス路線)のフォールバックとして使う。
+    /// 返される駅の種別関連フィールドはすべて `NULL` になる。
+    async fn get_by_line_id_without_train_types(
+        line_id: u32,
+        direction_id: Option<u32>,
+        conn: &mut PgConnection,
+    ) -> Result<Vec<Station>, DomainError> {
+        // When direction_id = 1 (上り) or 2 (下り), reverse the order
+        let order_clause = if matches!(direction_id, Some(1) | Some(2)) {
+            "ORDER BY s.e_sort DESC, s.station_cd DESC"
+        } else {
+            "ORDER BY s.e_sort ASC, s.station_cd ASC"
+        };
+
+        let query_str = format!(
+            r#"SELECT
+              s.station_cd,
+              s.station_g_cd,
+              s.station_name,
+              s.station_name_k,
+              s.station_name_r,
+              s.station_name_rn,
+              s.station_name_zh,
+              s.station_name_ko,
+              s.station_number1,
+              s.station_number2,
+              s.station_number3,
+              s.station_number4,
+              s.three_letter_code,
+              s.line_cd,
+              s.pref_cd,
+              s.post,
+              s.address,
+              s.lon,
+              s.lat,
+              s.open_ymd,
+              s.close_ymd,
+              s.e_status,
+              s.e_sort,
+              l.company_cd,
+              COALESCE(NULLIF(COALESCE(a.line_name, l.line_name), ''), NULL) AS line_name,
+              COALESCE(NULLIF(COALESCE(a.line_name_k, l.line_name_k), ''), NULL) AS line_name_k,
+              COALESCE(NULLIF(COALESCE(a.line_name_h, l.line_name_h), ''), NULL) AS line_name_h,
+              COALESCE(NULLIF(COALESCE(a.line_name_r, l.line_name_r), ''), NULL) AS line_name_r,
+              COALESCE(NULLIF(COALESCE(a.line_name_zh, l.line_name_zh), ''), NULL) AS line_name_zh,
+              COALESCE(NULLIF(COALESCE(a.line_name_ko, l.line_name_ko), ''), NULL) AS line_name_ko,
+              COALESCE(NULLIF(COALESCE(a.line_color_c, l.line_color_c), ''), NULL) AS line_color_c,
+              l.line_type,
+              l.line_symbol1,
+              l.line_symbol2,
+              l.line_symbol3,
+              l.line_symbol4,
+              l.line_symbol1_color,
+              l.line_symbol2_color,
+              l.line_symbol3_color,
+              l.line_symbol4_color,
+              l.line_symbol1_shape,
+              l.line_symbol2_shape,
+              l.line_symbol3_shape,
+              l.line_symbol4_shape,
+              COALESCE(l.average_distance, 0.0)::DOUBLE PRECISION AS average_distance,
+              NULL::int AS type_id,
+              NULL::int AS sst_id,
+              NULL::int AS type_cd,
+              NULL::int AS line_group_cd,
+              NULL::int AS pass,
+              NULL::text AS type_name,
+              NULL::text AS type_name_k,
+              NULL::text AS type_name_r,
+              NULL::text AS type_name_zh,
+              NULL::text AS type_name_ko,
+              NULL::text AS color,
+              NULL::int AS direction,
+              NULL::int AS kind,
+              s.transport_type
+            FROM stations AS s
+            JOIN lines AS l ON l.line_cd = s.line_cd
+            LEFT JOIN line_aliases AS la ON la.station_cd = s.station_cd
+            LEFT JOIN aliases AS a ON a.id = la.alias_cd
+            WHERE l.line_cd = $1
+              AND s.e_status = 0
+              AND l.e_status = 0
+            {order_clause}"#
+        );
+
+        let rows = sqlx::query_as::<_, StationRow>(&query_str)
+            .bind(line_id as i32)
             .fetch_all(conn)
             .await?;
-        let stations = rows.into_iter().map(|row| row.into()).collect();
+
+        let stations: Vec<Station> = rows.into_iter().map(|row| row.into()).collect();
 
         Ok(stations)
     }
@@ -2792,5 +2898,242 @@ mod tests {
     #[ignore] // Requires actual database setup
     async fn test_get_route_stops_by_station_cd_reverse_order() {
         // direction_id=1または2で駅の並び順がDESCに反転されることを確認
+    }
+
+    mod get_by_line_id_fixtures {
+        use sqlx::{Connection, Executor, PgConnection};
+        use std::env;
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        static SCHEMA_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+        /// 並列実行してもテスト同士が衝突しない一意なスキーマ名を生成する。
+        pub fn unique_schema_name() -> String {
+            let id = SCHEMA_COUNTER.fetch_add(1, Ordering::SeqCst);
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0);
+            format!("gbli_test_{nanos}_{id}")
+        }
+
+        /// `TEST_DATABASE_URL`(未設定時は既定のローカルDB)へ接続する。
+        pub async fn open_conn() -> PgConnection {
+            let database_url = env::var("TEST_DATABASE_URL")
+                .unwrap_or_else(|_| "postgres://test:test@localhost/stationapi_test".to_string());
+            PgConnection::connect(&database_url)
+                .await
+                .expect("Failed to connect to test database. Set TEST_DATABASE_URL.")
+        }
+
+        /// 隔離スキーマに get_by_line_id_with_train_type が参照する最小テーブル群を
+        /// 作成し、鉄道路線(種別あり)とバス路線(BusRoute種別のみ)を投入する。
+        pub async fn setup_schema(conn: &mut PgConnection) -> String {
+            let schema = unique_schema_name();
+            conn.execute(format!("CREATE SCHEMA \"{schema}\"").as_str())
+                .await
+                .expect("create schema");
+            conn.execute(format!("SET search_path TO \"{schema}\"").as_str())
+                .await
+                .expect("set search_path");
+            conn.execute(
+                r#"
+                CREATE TABLE stations (
+                    station_cd INTEGER PRIMARY KEY,
+                    station_g_cd INTEGER NOT NULL,
+                    station_name TEXT NOT NULL,
+                    station_name_k TEXT NOT NULL,
+                    station_name_r TEXT,
+                    station_name_rn TEXT,
+                    station_name_zh TEXT,
+                    station_name_ko TEXT,
+                    station_number1 TEXT,
+                    station_number2 TEXT,
+                    station_number3 TEXT,
+                    station_number4 TEXT,
+                    three_letter_code TEXT,
+                    line_cd INTEGER NOT NULL,
+                    pref_cd INTEGER NOT NULL DEFAULT 13,
+                    post TEXT NOT NULL DEFAULT '',
+                    address TEXT NOT NULL DEFAULT '',
+                    lon DOUBLE PRECISION NOT NULL DEFAULT 139.0,
+                    lat DOUBLE PRECISION NOT NULL DEFAULT 35.0,
+                    open_ymd TEXT NOT NULL DEFAULT '',
+                    close_ymd TEXT NOT NULL DEFAULT '',
+                    e_status INTEGER NOT NULL DEFAULT 0,
+                    e_sort INTEGER NOT NULL,
+                    transport_type INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE lines (
+                    line_cd INTEGER PRIMARY KEY,
+                    company_cd INTEGER,
+                    line_name TEXT,
+                    line_name_k TEXT,
+                    line_name_h TEXT,
+                    line_name_r TEXT,
+                    line_name_zh TEXT,
+                    line_name_ko TEXT,
+                    line_color_c TEXT,
+                    line_type INTEGER,
+                    line_symbol1 TEXT,
+                    line_symbol2 TEXT,
+                    line_symbol3 TEXT,
+                    line_symbol4 TEXT,
+                    line_symbol1_color TEXT,
+                    line_symbol2_color TEXT,
+                    line_symbol3_color TEXT,
+                    line_symbol4_color TEXT,
+                    line_symbol1_shape TEXT,
+                    line_symbol2_shape TEXT,
+                    line_symbol3_shape TEXT,
+                    line_symbol4_shape TEXT,
+                    average_distance DOUBLE PRECISION,
+                    e_status INTEGER NOT NULL DEFAULT 0,
+                    transport_type INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE types (
+                    id SERIAL PRIMARY KEY,
+                    type_cd INTEGER UNIQUE NOT NULL,
+                    type_name TEXT NOT NULL,
+                    type_name_k TEXT,
+                    type_name_r TEXT,
+                    type_name_zh TEXT,
+                    type_name_ko TEXT,
+                    color TEXT,
+                    direction INTEGER,
+                    kind INTEGER NOT NULL,
+                    priority INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE station_station_types (
+                    id SERIAL PRIMARY KEY,
+                    station_cd INTEGER NOT NULL,
+                    type_cd INTEGER NOT NULL,
+                    line_group_cd INTEGER NOT NULL,
+                    pass INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE line_aliases (
+                    id SERIAL PRIMARY KEY,
+                    station_cd INTEGER NOT NULL,
+                    alias_cd INTEGER NOT NULL
+                );
+                CREATE TABLE aliases (
+                    id INTEGER PRIMARY KEY,
+                    line_name TEXT,
+                    line_name_k TEXT,
+                    line_name_h TEXT,
+                    line_name_r TEXT,
+                    line_name_zh TEXT,
+                    line_name_ko TEXT,
+                    line_color_c TEXT
+                );
+                -- 鉄道路線: 各駅停車グループ(kind=0)を持つ
+                INSERT INTO lines (line_cd, company_cd, line_name, e_status, transport_type)
+                VALUES (100, 1, 'テスト鉄道線', 0, 0), (200, 2, 'テストバス路線', 0, 1);
+                INSERT INTO types (type_cd, type_name, kind, priority)
+                VALUES (100, '普通', 0, 0), (900, '循環', 7, 0);
+                INSERT INTO stations
+                    (station_cd, station_g_cd, station_name, station_name_k, line_cd, e_sort, transport_type)
+                VALUES
+                    (1, 1, '鉄道駅A', 'テツドウエキエー', 100, 1, 0),
+                    (2, 2, '鉄道駅B', 'テツドウエキビー', 100, 2, 0),
+                    (11, 11, 'バス停A', 'バステイエー', 200, 1, 1),
+                    (12, 12, 'バス停B', 'バステイビー', 200, 2, 1),
+                    (13, 13, 'バス停C', 'バステイシー', 200, 3, 1);
+                INSERT INTO station_station_types (station_cd, type_cd, line_group_cd, pass)
+                VALUES
+                    (1, 100, 1000000100, 0),
+                    (2, 100, 1000000100, 0),
+                    (11, 900, 555, 0),
+                    (12, 900, 555, 0),
+                    (13, 900, 555, 0);
+                "#,
+            )
+            .await
+            .expect("create get_by_line_id fixtures");
+            schema
+        }
+
+        /// テストで作成した隔離スキーマを破棄する。
+        pub async fn drop_schema(conn: &mut PgConnection, schema: &str) {
+            conn.execute(format!("DROP SCHEMA IF EXISTS \"{schema}\" CASCADE").as_str())
+                .await
+                .expect("drop schema");
+        }
+    }
+
+    /// バス路線(種別がBusRouteのみ)でも get_by_line_id が停留所一覧を返すこと、
+    /// および鉄道路線では従来どおり種別グループの駅列を返すことを確認する。
+    #[tokio::test]
+    #[cfg_attr(not(feature = "integration-tests"), ignore)]
+    async fn test_get_by_line_id_with_train_type_falls_back_for_bus_lines() {
+        let mut conn = get_by_line_id_fixtures::open_conn().await;
+        let schema = get_by_line_id_fixtures::setup_schema(&mut conn).await;
+
+        // 鉄道路線: 各駅停車グループの駅列が返る
+        let rail_stations = InternalStationRepository::get_by_line_id_with_train_type(
+            100,
+            Some(1),
+            None,
+            &mut conn,
+        )
+        .await
+        .expect("rail stations");
+        assert_eq!(
+            rail_stations
+                .iter()
+                .map(|s| (s.station_cd, s.line_group_cd))
+                .collect::<Vec<_>>(),
+            vec![(1, Some(1000000100)), (2, Some(1000000100))]
+        );
+
+        // バス路線 + 停留所指定: BusRoute種別はグループ選択にマッチしないため、
+        // 種別なしの全停留所一覧にフォールバックする
+        let bus_stations = InternalStationRepository::get_by_line_id_with_train_type(
+            200,
+            Some(11),
+            None,
+            &mut conn,
+        )
+        .await
+        .expect("bus stations");
+        assert_eq!(
+            bus_stations
+                .iter()
+                .map(|s| (s.station_cd, s.line_group_cd))
+                .collect::<Vec<_>>(),
+            vec![(11, None), (12, None), (13, None)]
+        );
+
+        // バス路線 + 停留所未指定(プリセット復元経路)でも同様に返る
+        let bus_stations_no_seed =
+            InternalStationRepository::get_by_line_id_with_train_type(200, None, None, &mut conn)
+                .await
+                .expect("bus stations without seed");
+        assert_eq!(
+            bus_stations_no_seed
+                .iter()
+                .map(|s| s.station_cd)
+                .collect::<Vec<_>>(),
+            vec![11, 12, 13]
+        );
+
+        // direction_id指定時は並び順が反転する
+        let bus_stations_reversed = InternalStationRepository::get_by_line_id_with_train_type(
+            200,
+            Some(11),
+            Some(1),
+            &mut conn,
+        )
+        .await
+        .expect("bus stations reversed");
+        assert_eq!(
+            bus_stations_reversed
+                .iter()
+                .map(|s| s.station_cd)
+                .collect::<Vec<_>>(),
+            vec![13, 12, 11]
+        );
+
+        get_by_line_id_fixtures::drop_schema(&mut conn, &schema).await;
     }
 }
