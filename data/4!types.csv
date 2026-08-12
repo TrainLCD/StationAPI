@@ -330,3 +330,5 @@ DEFAULT,538,モーニングライナー,モーニングライナー,Morning Line
 DEFAULT,539,イブニングライナー,イブニングライナー,Evening Liner,Evening Liner,이브닝 라이너,#9400d3,0,4,0,,COMPLETE
 DEFAULT,540,臨時ライナー,リンジライナー,Special Liner,临时Liner,임시 라이너,#add8e6,0,4,0,,COMPLETE
 DEFAULT,541,GRAN 天空,グランテンクウ,GRAN Tenkū,GRAN 天空,GRAN 텐쿠,#AD7E2A,0,4,0,,COMPLETE
+DEFAULT,542,みすず,ミスズ,Misuzu,水篶,미스즈,#DC143C,2,2,0,長野方面,COMPLETE
+DEFAULT,543,みすず,ミスズ,Misuzu,水篶,미스즈,#DC143C,1,2,0,飯田方面,COMPLETE

@@ -65,12 +65,13 @@ fn audit_dataset(dataset: &Dataset) -> Result<(), Box<dyn std::error::Error>> {
         }
 
         total_names += 1;
-        if romanized_name_to_ipa(name_roman).is_none() {
+        // カタカナ側にフォールバックさせず、ローマ字表記だけで IPA を解決できるか判定する。
+        if station_name_to_ipa("", Some(name_roman)).is_none() {
             unresolved_names += 1;
         }
 
         for token in extract_tokens(name_roman) {
-            if word_to_ipa(&token).is_some() {
+            if word_to_tts_segments(&token).is_some() {
                 continue;
             }
             let entry = unresolved_tokens.entry(token).or_default();
