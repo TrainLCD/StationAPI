@@ -397,7 +397,30 @@ fn is_name_token_char(c: char) -> bool {
     c.is_ascii_alphanumeric()
         || matches!(
             c,
-            '\'' | '.' | 'Ā' | 'Ī' | 'Ū' | 'Ē' | 'Ō' | 'ā' | 'ī' | 'ū' | 'ē' | 'ō'
+            '\'' | '.'
+                | 'Ā'
+                | 'Ī'
+                | 'Ū'
+                | 'Ē'
+                | 'Ō'
+                | 'ā'
+                | 'ī'
+                | 'ū'
+                | 'ē'
+                | 'ō'
+                // 日本式ローマ字のサーカムフレックス長音 (Kyûjômae / Sessokyô / Okuôi)。
+                // トークン文字に含めないと長音記号が区切り文字扱いになり、
+                // "Kyûjômae" が "Ky" / "j" / "mae" に割れて読みが崩れる。
+                | 'Â'
+                | 'Î'
+                | 'Û'
+                | 'Ê'
+                | 'Ô'
+                | 'â'
+                | 'î'
+                | 'û'
+                | 'ê'
+                | 'ô'
         )
 }
 
@@ -411,13 +434,15 @@ fn normalize_name_token(token: &str) -> String {
         .to_lowercase()
 }
 
+/// マクロン (ā/ī/ū/ē/ō) とサーカムフレックス (â/î/û/ê/ô) の長音表記を、
+/// romaji_to_katakana が解釈できる母音の並びへ展開する。
 fn normalize_name_char(c: char) -> Vec<char> {
     match c {
-        'Ā' | 'ā' => vec!['a', 'a'],
-        'Ī' | 'ī' => vec!['i', 'i'],
-        'Ū' | 'ū' => vec!['u', 'u'],
-        'Ē' | 'ē' => vec!['e', 'i'],
-        'Ō' | 'ō' => vec!['o', 'u'],
+        'Ā' | 'ā' | 'Â' | 'â' => vec!['a', 'a'],
+        'Ī' | 'ī' | 'Î' | 'î' => vec!['i', 'i'],
+        'Ū' | 'ū' | 'Û' | 'û' => vec!['u', 'u'],
+        'Ē' | 'ē' | 'Ê' | 'ê' => vec!['e', 'i'],
+        'Ō' | 'ō' | 'Ô' | 'ô' => vec!['o', 'u'],
         _ => vec![c],
     }
 }
@@ -685,6 +710,74 @@ fn lookup_english_word_ipa(word: &str) -> Option<&'static str> {
         "t" => Some("tiː"),
         "trans" => Some("tɹæns"),
         "zoological" => Some("zuːəlɑdʒɪkəl"),
+        // ここから下は `make ipa-audit` で未解決として報告された語。
+        // 英語・カタカナ外来語由来のもの。
+        "bayside" => Some("beɪsaɪd"),
+        "disney" => Some("dɪzni"),
+        "disneyland" => Some("dɪznilænd"),
+        // "DisneySea" は camelCase 分割で "Disney" + "Sea" になる。"sea" を登録しないと
+        // romaji_to_katakana が「セア」と読んでしまい、監査には出ないまま誤読が残る。
+        "sea" => Some("siː"),
+        "girls'" => Some("gɝlz"),
+        "gran" => Some("gɹɑːn"),
+        "playpia" => Some("pleɪpiə"),
+        "portopia" => Some("pɔɹtoʊpiə"),
+        "pref.art" => Some("pɹɛf ɑɹt"),
+        "pref.sports" => Some("pɹɛf spɔɹts"),
+        "race" => Some("ɹeɪs"),
+        "resort" => Some("ɹɪzɔɹt"),
+        "river" => Some("ɹɪvɚ"),
+        "royce'" => Some("ɹɔɪs"),
+        "ruins" => Some("ɹuːɪnz"),
+        "screen" => Some("skɹiːn"),
+        "shop" => Some("ʃɑp"),
+        "socio" => Some("soʊʃioʊ"),
+        // 「ウェスパ椿山」の "WeSPa" は camelCase 分割で "We" + "SPa" に割れるため、
+        // 英単語の we (wiː) ではなくカタカナ読みに寄せた wɛ を割り当てる。
+        "we" => Some("wɛ"),
+        "spa" => Some("spɑː"),
+        "st" => Some("seɪnt"),
+        "tennis" => Some("tɛnɪs"),
+        "toyopet" => Some("toʊjoʊpɛt"),
+        "univ" => Some("juːnəvɚsəti"),
+        "vogel" => Some("foʊgəl"),
+        "yomiuriland" => Some("jomiɯɾilænd"),
+        "yrp" => Some("waɪ ɑɹ piː"),
+        // 訓令式・非ヘボン式のローマ字表記など、romaji_to_katakana が解釈できない日本語読み。
+        // IPA は katakana_to_ipa() の出力に合わせ、長音のみ既存エントリと同じ ː 表記に畳んでいる。
+        "3choume" => Some("sant͡ɕoːme"),
+        "4choume" => Some("jont͡ɕoːme"),
+        "daiunzi" => Some("daiɯɲdʑi"),
+        "etchuujima" => Some("ett͡ɕɯːdʑima"),
+        "golfjomae" => Some("gɑlf dʑoːmae"),
+        "hasirano" => Some("haɕiɾano"),
+        "hatcho" => Some("hatt͡ɕoː"),
+        "hatchome" => Some("hatt͡ɕoːme"),
+        "hatchonawate" => Some("hatt͡ɕoːnawate"),
+        "hatchoubori" => Some("hatt͡ɕoːboɾi"),
+        "hatcomuta" => Some("hatt͡ɕoːmɯta"),
+        "inadazutumi" => Some("inadadzɯt͡sɯmi"),
+        "inuboh" => Some("inɯboː"),
+        "itchumae" => Some("itt͡ɕɯːmae"),
+        "itihana" => Some("it͡ɕihana"),
+        "juitchome" => Some("dʑɯːitt͡ɕoːme"),
+        "kohjiro" => Some("koːdʑiɾo"),
+        "kozyou" => Some("kodʑoː"),
+        "mitumatu" => Some("mit͡sɯmat͡sɯ"),
+        "mitusawa" => Some("mit͡sɯsawa"),
+        "nijuhatchome" => Some("ɲidʑɯːhatt͡ɕoːme"),
+        "oh" => Some("oː"),
+        "ohda" => Some("oːda"),
+        "ohmisaki" => Some("oːmisakʲi"),
+        "ohshou" => Some("oːɕoː"),
+        "saidaizi" => Some("saidaidʑi"),
+        "saigoh" => Some("saigoː"),
+        "shicikenjaya" => Some("ɕit͡ɕikeɲdʑaja"),
+        "sirokanedai" => Some("ɕiɾokanedai"),
+        "sizuoka" => Some("ɕizɯoka"),
+        "suzi" => Some("sɯdʑi"),
+        "tamati" => Some("tamat͡ɕi"),
+        "tsudumigaura" => Some("t͡sɯdzɯmigaɯɾa"),
         _ => None,
     }
 }
@@ -1549,6 +1642,98 @@ mod tests {
         assert_eq!(
             station_name_to_ipa("メイテツイチノミヤ", Some("Meitetsu Ichinomiya")),
             Some("me.itet͡sɯ it͡ɕinomija".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_kunrei_style_romanization() {
+        // 訓令式 (si/ti/tu/zi) は romaji_to_katakana が解釈できないため辞書で補う。
+        assert_eq!(
+            station_name_to_ipa("シロカネダイ", Some("Sirokanedai")),
+            Some("ɕilokanedai".to_string())
+        );
+        assert_eq!(
+            station_name_to_ipa("タマチ", Some("Tamati")),
+            Some("tamat͡ɕi".to_string())
+        );
+        assert_eq!(
+            station_name_to_ipa("シンサイダイジチョウスジ", Some("Shin-saidaizi-cho-suzi")),
+            Some("ɕiɴ saidaidʑi t͡ɕo sɯdʑi".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_expands_circumflex_long_vowels() {
+        // サーカムフレックスをトークン文字として扱わないと "Ky" / "j" / "mae" に割れる。
+        assert_eq!(
+            station_name_to_ipa("キュウジョウマエ", Some("Kyûjômae")),
+            Some("kʲɯ.ɯdʑo.ɯma.e".to_string())
+        );
+        assert_eq!(
+            station_name_to_ipa("セッソキョウオンセン", Some("Sessokyô Onsen")),
+            Some("sessokʲo.ɯ onseɴ".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_oh_style_long_vowels() {
+        // 「オウ」を oh と綴る表記 (犬吠 / 西郷 / 海の王迎)。
+        assert_eq!(
+            station_name_to_ipa("イヌボウ", Some("Inuboh")),
+            Some("inɯboː".to_string())
+        );
+        assert_eq!(
+            station_name_to_ipa("ウミノオウムカエ", Some("Umino-oh-mukae")),
+            Some("ɯmino oː mɯka.e".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_chome_variants() {
+        assert_eq!(
+            station_name_to_ipa("ニシハッチョウメ", Some("Nishi hatchome")),
+            Some("ɲiɕi hatt͡ɕoːme".to_string())
+        );
+        assert_eq!(
+            station_name_to_ipa("テヅカヤマサンチョウメ", Some("Tezukayama-3chōme")),
+            Some("tezɯkajama sant͡ɕoːme".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_facility_brand_words() {
+        assert_eq!(
+            station_name_to_ipa(
+                "トウキョウディズニーランド・ステーション",
+                Some("Tokyo Disneyland Station")
+            ),
+            Some("tokʲo dɪznilænd steɪʃən".to_string())
+        );
+        // "DisneySea" は camelCase 分割で "Disney" + "Sea" になる。
+        assert_eq!(
+            station_name_to_ipa(
+                "トウキョウディズニーシー・ステーション",
+                Some("Tokyo DisneySea Station")
+            ),
+            Some("tokʲo dɪzni siː steɪʃən".to_string())
+        );
+    }
+
+    #[test]
+    fn test_station_name_ipa_supports_abbreviated_english_words() {
+        // "St." / "Univ." は normalize_name_token が末尾のピリオドを落とす。
+        assert_eq!(
+            station_name_to_ipa("セイマリアビョウインマエ", Some("St. Mary's Hospital")),
+            Some("seɪnt mɛɹiz hɑspɪtəl".to_string())
+        );
+        assert_eq!(
+            station_name_to_ipa("アイダイイガクブミナミグチ", Some("Ehime Univ. Hospital")),
+            Some("eçime juːnəvɚsəti hɑspɪtəl".to_string())
+        );
+        // "Pref.Art" はピリオドが語中にあるため 1 トークンのまま引かれる。
+        assert_eq!(
+            station_name_to_ipa("ケンリツビジュツカンマエ", Some("Pref.Art Museum")),
+            Some("pɹɛf ɑɹt mjuːziəm".to_string())
         );
     }
 
