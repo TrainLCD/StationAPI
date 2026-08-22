@@ -96,6 +96,14 @@ async fn route(req: Request) -> Result<Response> {
     if method == Method::Options {
         return grpc_web::preflight();
     }
+    // 疎通確認用。データに一切触らないので、/__health との差を見れば
+    // データ初期化のコストを外から切り分けられる。
+    //
+    // NOTE: Workers は Spectre 対策で同期コード中に Date.now() が進まないため、
+    // プロセス内での区間計測はできない。計測は外から分布を比べる形になる。
+    if method == Method::Get && path == "/__ping" {
+        return Response::ok("pong");
+    }
     // 索引の件数確認とウォームアップ用
     if method == Method::Get && path == "/__health" {
         return Response::ok(format!(
