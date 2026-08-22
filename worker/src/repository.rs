@@ -288,13 +288,80 @@ impl StationRepository for MemStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         Ok(stations_of_line_groups(line_group_ids))
     }
+    /// 既存 SQL (CTE 構成) を素直に写したもの:
+    /// - common_lines: from と to の両方に有効な駅がある line_cd (via 指定時はさらに絞る)
+    /// - sst_cte: from と to の双方に pass <> 1 で停車する line_group_cd に属する sst
+    /// - 最終的に `LEFT JOIN sst_cte ... WHERE sst.line_group_cd IS NULL` で、
+    ///   その種別経路に含まれない駅 (= 各駅停車として扱う駅) だけを残す
+    ///
+    /// from_cte / to_cte には e_status 条件が無い点も SQL に合わせている。
     async fn get_route_stops(
         &self,
-        _from_station_id: u32,
-        _to_station_id: u32,
-        _via_line_ids: &[u32],
+        from_station_id: u32,
+        to_station_id: u32,
+        via_line_ids: &[u32],
     ) -> Result<Vec<Station>, DomainError> {
-        Err(todo_err("get_route_stops"))
+        // common_lines (e_status = 0 が条件、via 指定があれば限定)
+        let from_lines: HashSet<i32> = index::stations_by_group(from_station_id as i32)
+            .filter(|s| s.e_status == 0)
+            .filter(|s| via_line_ids.is_empty() || via_line_ids.contains(&(s.line_cd as u32)))
+            .map(|s| s.line_cd)
+            .collect();
+        let to_lines: HashSet<i32> = index::stations_by_group(to_station_id as i32)
+            .filter(|s| s.e_status == 0)
+            .map(|s| s.line_cd)
+            .collect();
+        let common_lines: Vec<i32> = from_lines.intersection(&to_lines).copied().collect();
+        if common_lines.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // sst_cte_c1 / sst_cte_c2 (from_cte / to_cte は e_status を見ない)
+        let groups_of = |group_id: u32| -> HashSet<i32> {
+            index::stations_by_group(group_id as i32)
+                .flat_map(|s| index::sst_by_station(s.station_cd))
+                .filter(|sst| sst.pass != Some(1))
+                .filter_map(|sst| sst.line_group_cd)
+                .collect()
+        };
+        let from_groups = groups_of(from_station_id);
+        let to_groups = groups_of(to_station_id);
+
+        // sst_cte に現れる station_cd = 除外対象 (sst.line_group_cd IS NULL の否定)
+        let mut excluded: HashSet<i32> = HashSet::new();
+        for group in from_groups.intersection(&to_groups) {
+            for sst in index::sst_by_group(*group) {
+                excluded.insert(sst.station_cd);
+            }
+        }
+
+        let mut records: Vec<&index::StationRecord> = Vec::new();
+        for line_cd in common_lines {
+            let Some(line) = index::line_by_cd(line_cd) else {
+                continue;
+            };
+            if line.e_status != 0 {
+                continue;
+            }
+            for record in index::stations_by_line(line_cd) {
+                if record.e_status != 0 || excluded.contains(&record.station_cd) {
+                    continue;
+                }
+                records.push(record);
+            }
+        }
+
+        // ORDER BY sta.e_sort, sta.station_cd
+        records.sort_by(|a, b| {
+            a.e_sort
+                .cmp(&b.e_sort)
+                .then_with(|| a.station_cd.cmp(&b.station_cd))
+        });
+
+        Ok(records
+            .into_iter()
+            .map(|record| record.to_entity(index::line_by_cd(record.line_cd)))
+            .collect())
     }
     async fn get_route_stops_by_station_cd(
         &self,
@@ -415,11 +482,42 @@ impl LineRepository for MemLineRepository {
         }
         Ok(out)
     }
+    /// `get_by_line_group_id_vec` とほぼ同じ結合だが、
+    /// `DISTINCT ON (sst.id, l.line_cd)` と `ORDER BY sst.id, l.line_cd` が付く。
     async fn get_by_line_group_id_vec_for_routes(
         &self,
-        _line_group_id_vec: &[u32],
+        line_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
-        Err(todo_err("get_by_line_group_id_vec_for_routes"))
+        // (sst.id, line_cd, Line) を並べ替えてから重複を落とす
+        let mut rows: Vec<(i32, i32, Line)> = Vec::new();
+        for &group_id in line_group_id_vec {
+            for sst in index::sst_by_group(group_id as i32) {
+                if sst.pass == Some(1) {
+                    continue;
+                }
+                let Some(station) = index::station_by_cd(sst.station_cd) else {
+                    continue;
+                };
+                if station.e_status != 0 {
+                    continue;
+                }
+                let Some(line) = index::line_by_cd(station.line_cd) else {
+                    continue;
+                };
+                if line.e_status != 0 {
+                    continue;
+                }
+                let mut line = line.clone();
+                line.line_group_cd = sst.line_group_cd;
+                line.type_cd = Some(sst.type_cd);
+                line.station_cd = Some(station.station_cd);
+                line.station_g_cd = Some(station.station_g_cd);
+                rows.push((sst.id, line.line_cd, line));
+            }
+        }
+        rows.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        rows.dedup_by(|a, b| a.0 == b.0 && a.1 == b.1);
+        Ok(rows.into_iter().map(|(_, _, line)| line).collect())
     }
     /// 既存 SQL は駅名検索と違い正規化を行わず、全列に同じ `%入力%` を当てる。
     /// line_name_rn も ILIKE ではなく LIKE (大小を区別する)。

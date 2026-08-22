@@ -17,9 +17,11 @@ use stationapi::proto::{
     GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
     GetLinesByNameRequest, GetStationByLineIdListRequest, GetStationsByLineGroupIdListRequest,
     GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
+    EstimateArrivalTimesRequest, EstimatedArrivalResponse, EstimatedArrivalRoute,
+    EstimatedArrivalStop, GetConnectedStationsRequest, GetRouteRequest, GetTrainRouteRequest,
     GetTrainTypesByStationIdRequest, MultipleLineResponse, MultipleStationResponse,
-    MultipleTrainTypeResponse, SingleLineResponse, SingleStationResponse,
-    TransportType as GrpcTransportType,
+    MultipleTrainTypeResponse, RouteResponse, RouteTypeResponse, SingleLineResponse,
+    SingleStationResponse, TrainRouteResponse, TransportType as GrpcTransportType,
 };
 use stationapi::use_case::interactor::query::QueryInteractor;
 use stationapi::use_case::traits::query::QueryUseCase;
@@ -41,6 +43,12 @@ const LINE_BY_ID_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetLineById";
 const LINES_BY_ID_LIST_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetLinesByIdList";
 const LINES_BY_NAME_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetLinesByName";
 const BY_LINE_ID_LIST_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationsByLineIdList";
+const ROUTES_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetRoutes";
+const ROUTE_TYPES_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetRouteTypes";
+const CONNECTED_ROUTES_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetConnectedRoutes";
+const TRAIN_ROUTE_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetTrainRoute";
+const ROUTES_MINIMAL_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetRoutesMinimal";
+const ESTIMATE_ARRIVAL_PATH: &str = "/app.trainlcd.grpc.StationAPI/EstimateArrivalTimes";
 
 type Interactor = QueryInteractor<
     MemStationRepository,
@@ -72,7 +80,15 @@ fn convert_transport_type(proto_type: Option<i32>) -> TransportTypeFilter {
 #[event(fetch)]
 async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
     console_error_panic_hook::set_once();
+    // Workers は 500 の本文を伏せるので、失敗理由をログに残す
+    let result = route(req).await;
+    if let Err(e) = &result {
+        console_error!("request failed: {e}");
+    }
+    result
+}
 
+async fn route(req: Request) -> Result<Response> {
     let method = req.method();
     let path = req.path();
 
@@ -123,6 +139,24 @@ async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
     }
     if method == Method::Post && path == BY_LINE_ID_LIST_PATH {
         return handle_get_stations_by_line_id_list(req).await;
+    }
+    if method == Method::Post && path == ROUTES_PATH {
+        return handle_get_routes(req).await;
+    }
+    if method == Method::Post && path == ROUTE_TYPES_PATH {
+        return handle_get_route_types(req).await;
+    }
+    if method == Method::Post && path == CONNECTED_ROUTES_PATH {
+        return handle_get_connected_routes(req).await;
+    }
+    if method == Method::Post && path == TRAIN_ROUTE_PATH {
+        return handle_get_train_route(req).await;
+    }
+    if method == Method::Post && path == ROUTES_MINIMAL_PATH {
+        return handle_get_routes_minimal(req).await;
+    }
+    if method == Method::Post && path == ESTIMATE_ARRIVAL_PATH {
+        return handle_estimate_arrival_times(req).await;
     }
 
     Response::error("Not Found", 404)
@@ -193,8 +227,12 @@ async fn decode_request<M: Message + Default>(req: &mut Request) -> Result<M> {
     M::decode(payload).map_err(|e| Error::RustError(format!("protobuf decode failed: {e}")))
 }
 
+/// Workers は 500 の本文を "INTERNAL SERVER ERROR" に伏せるため、
+/// 原因を追えるようログにも出す。
 fn use_case_err(e: impl std::fmt::Display) -> Error {
-    Error::RustError(format!("{e}"))
+    let message = format!("{e}");
+    console_error!("use_case error: {message}");
+    Error::RustError(message)
 }
 
 async fn handle_get_station_by_id(mut req: Request) -> Result<Response> {
@@ -314,5 +352,125 @@ async fn handle_get_stations_by_line_id_list(mut req: Request) -> Result<Respons
 
     grpc_web::encode_response(&MultipleStationResponse {
         stations: stations.into_iter().map(Into::into).collect(),
+    })
+}
+
+async fn handle_get_routes(mut req: Request) -> Result<Response> {
+    let request: GetRouteRequest = decode_request(&mut req).await?;
+    let routes = use_case()
+        .get_routes(
+            request.from_station_group_id,
+            request.to_station_group_id,
+            request.via_line_id,
+        )
+        .await
+        .map_err(use_case_err)?;
+
+    // NOTE: ページングは未対応 (next_page_token は空)
+    grpc_web::encode_response(&RouteResponse {
+        routes: routes.into_iter().map(Into::into).collect(),
+        next_page_token: String::new(),
+    })
+}
+
+async fn handle_get_route_types(mut req: Request) -> Result<Response> {
+    let request: GetRouteRequest = decode_request(&mut req).await?;
+    let train_types = use_case()
+        .get_train_types(
+            request.from_station_group_id,
+            request.to_station_group_id,
+            request.via_line_id,
+        )
+        .await
+        .map_err(use_case_err)?;
+
+    grpc_web::encode_response(&RouteTypeResponse {
+        train_types: train_types.into_iter().map(Into::into).collect(),
+        next_page_token: String::new(),
+    })
+}
+
+async fn handle_get_connected_routes(mut req: Request) -> Result<Response> {
+    let request: GetConnectedStationsRequest = decode_request(&mut req).await?;
+    let routes = use_case()
+        .get_connected_routes(request.from_station_group_id, request.to_station_group_id)
+        .await
+        .map_err(use_case_err)?;
+
+    grpc_web::encode_response(&RouteResponse {
+        routes: routes.into_iter().map(Into::into).collect(),
+        next_page_token: String::new(),
+    })
+}
+
+async fn handle_get_train_route(mut req: Request) -> Result<Response> {
+    let request: GetTrainRouteRequest = decode_request(&mut req).await?;
+    let segments = use_case()
+        .get_train_route(
+            request.from_station_id,
+            request.to_station_id,
+            request.line_group_id,
+        )
+        .await
+        .map_err(use_case_err)?;
+
+    grpc_web::encode_response(&TrainRouteResponse { segments })
+}
+
+async fn handle_get_routes_minimal(mut req: Request) -> Result<Response> {
+    let request: GetRouteRequest = decode_request(&mut req).await?;
+    // UseCase が RouteMinimalResponse をそのまま組み立てて返す
+    let response = use_case()
+        .get_routes_minimal(
+            request.from_station_group_id,
+            request.to_station_group_id,
+            request.via_line_id,
+        )
+        .await
+        .map_err(use_case_err)?;
+
+    grpc_web::encode_response(&response)
+}
+
+async fn handle_estimate_arrival_times(mut req: Request) -> Result<Response> {
+    let request: EstimateArrivalTimesRequest = decode_request(&mut req).await?;
+    let stops = use_case()
+        .estimate_route_arrival_times(
+            request.from_station_id,
+            request.to_station_id,
+            &request.via_line_ids,
+            request.direction_id,
+        )
+        .await
+        .map_err(use_case_err)?;
+
+    // presentation 層と同じ畳み込み: line_group_cd が連続する区間を 1 ルートにまとめる
+    let mut routes: Vec<EstimatedArrivalRoute> = Vec::new();
+    for stop in &stops {
+        let proto_stop = EstimatedArrivalStop {
+            station_id: stop.station_cd as u32,
+            station_group_id: stop.station_g_cd as u32,
+            cumulative_minutes: stop.cumulative_minutes,
+            departure_cumulative_minutes: stop.departure_cumulative_minutes,
+            stops_here: stop.stops_here,
+        };
+        let route_id = stop.line_group_cd.unwrap_or(0) as u32;
+        let merge = stop.line_group_cd.is_some() && routes.last().is_some_and(|r| r.id == route_id);
+
+        if merge {
+            if let Some(last) = routes.last_mut() {
+                last.stops.push(proto_stop);
+            }
+        } else {
+            routes.push(EstimatedArrivalRoute {
+                id: route_id,
+                stops: vec![proto_stop],
+            });
+        }
+    }
+
+    grpc_web::encode_response(&EstimatedArrivalResponse {
+        routes,
+        next_page_token: String::new(),
     })
 }
