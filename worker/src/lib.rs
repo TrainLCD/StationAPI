@@ -1,20 +1,57 @@
 //! StationAPI を Cloudflare Workers 上で動かす PoC。
+//!
 //! sqlx / tonic を使わず、埋め込み CSV のインメモリ索引と自前の gRPC-Web フレーミングで
-//! 既存クライアント互換の応答を返す。
+//! 既存クライアント互換の応答を返す。UseCase 層 (`QueryInteractor`) は一切変更せず、
+//! repository トレイトの実装だけを差し替えている。
 
 mod grpc_web;
 mod index;
+mod repository;
 
 use prost::Message;
 use worker::*;
 
+use stationapi::domain::entity::gtfs::TransportTypeFilter;
 use stationapi::proto::{
     GetStationByCoordinatesRequest, GetStationsByNameRequest, MultipleStationResponse,
-    Station as GrpcStation,
+    TransportType as GrpcTransportType,
+};
+use stationapi::use_case::interactor::query::QueryInteractor;
+use stationapi::use_case::traits::query::QueryUseCase;
+
+use repository::{
+    MemCompanyRepository, MemLineRepository, MemStationRepository, MemTrainTypeRepository,
 };
 
 const COORDINATES_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationsByCoordinates";
 const BY_NAME_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationsByName";
+
+type Interactor = QueryInteractor<
+    MemStationRepository,
+    MemLineRepository,
+    MemTrainTypeRepository,
+    MemCompanyRepository,
+>;
+
+/// repository は状態を持たない (索引は OnceLock 側にある) ので毎回生成して問題ない。
+fn use_case() -> Interactor {
+    QueryInteractor {
+        station_repository: MemStationRepository,
+        line_repository: MemLineRepository,
+        train_type_repository: MemTrainTypeRepository,
+        company_repository: MemCompanyRepository,
+    }
+}
+
+/// presentation 層の convert_transport_type と同じ変換 (未指定は鉄道のみ)
+fn convert_transport_type(proto_type: Option<i32>) -> TransportTypeFilter {
+    match proto_type.and_then(|v| GrpcTransportType::try_from(v).ok()) {
+        Some(GrpcTransportType::Rail) => TransportTypeFilter::Rail,
+        Some(GrpcTransportType::Bus) => TransportTypeFilter::Bus,
+        Some(GrpcTransportType::RailAndBus) => TransportTypeFilter::RailAndBus,
+        _ => TransportTypeFilter::Rail,
+    }
+}
 
 #[event(fetch)]
 async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
@@ -28,7 +65,12 @@ async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
     }
     // 索引の件数確認とウォームアップ用
     if method == Method::Get && path == "/__health" {
-        return Response::ok(format!("stations={}", index::stations().len()));
+        return Response::ok(format!(
+            "stations={} lines={} companies={}",
+            index::stations().len(),
+            index::lines().len(),
+            index::companies().len()
+        ));
     }
     if method == Method::Post && path == COORDINATES_PATH {
         return handle_get_stations_by_coordinates(req).await;
@@ -46,16 +88,19 @@ async fn handle_get_stations_by_coordinates(mut req: Request) -> Result<Response
     let request = GetStationByCoordinatesRequest::decode(payload)
         .map_err(|e| Error::RustError(format!("protobuf decode failed: {e}")))?;
 
-    // 既存 SQL の LIMIT $3 と同じく未指定なら 1 件
-    let limit = request.limit.unwrap_or(1).clamp(1, 100) as usize;
-    let found = index::nearest(request.latitude, request.longitude, limit);
+    let stations = use_case()
+        .get_stations_by_coordinates(
+            request.latitude,
+            request.longitude,
+            request.limit,
+            convert_transport_type(request.transport_type),
+        )
+        .await
+        .map_err(|e| Error::RustError(format!("{e}")))?;
 
-    let stations = found
-        .into_iter()
-        .map(|(record, distance_km)| to_proto_station(record, Some(distance_km)))
-        .collect();
-
-    grpc_web::encode_response(&MultipleStationResponse { stations })
+    grpc_web::encode_response(&MultipleStationResponse {
+        stations: stations.into_iter().map(Into::into).collect(),
+    })
 }
 
 async fn handle_get_stations_by_name(mut req: Request) -> Result<Response> {
@@ -64,40 +109,17 @@ async fn handle_get_stations_by_name(mut req: Request) -> Result<Response> {
     let request = GetStationsByNameRequest::decode(payload)
         .map_err(|e| Error::RustError(format!("protobuf decode failed: {e}")))?;
 
-    // NOTE: 既存実装は limit 未指定で LIMIT NULL (全件) になる。PoC では上限を設ける。
-    // NOTE: from_station_group_id による乗り換え可否フィルタは PoC では未対応。
-    let limit = request.limit.unwrap_or(50).clamp(1, 200) as usize;
-    let found = index::search_by_name(&request.station_name, limit);
+    let stations = use_case()
+        .get_stations_by_name(
+            request.station_name,
+            request.limit,
+            request.from_station_group_id,
+            convert_transport_type(request.transport_type),
+        )
+        .await
+        .map_err(|e| Error::RustError(format!("{e}")))?;
 
-    let stations = found
-        .into_iter()
-        .map(|record| to_proto_station(record, None))
-        .collect();
-
-    grpc_web::encode_response(&MultipleStationResponse { stations })
-}
-
-/// PoC 段階では路線・列車種別は付与しない (lines / line / train_type は空)。
-/// 本実装では QueryInteractor 経由で属性を付与する。
-fn to_proto_station(record: &index::StationRecord, distance_km: Option<f64>) -> GrpcStation {
-    GrpcStation {
-        id: record.station_cd,
-        group_id: record.station_g_cd,
-        name: record.name.clone(),
-        name_katakana: record.name_katakana.clone(),
-        name_roman: record.name_roman.clone(),
-        name_chinese: record.name_chinese.clone(),
-        name_korean: record.name_korean.clone(),
-        three_letter_code: record.three_letter_code.clone(),
-        prefecture_id: record.pref_cd,
-        postal_code: record.postal_code.clone(),
-        address: record.address.clone(),
-        latitude: record.lat,
-        longitude: record.lon,
-        opened_at: record.opened_at.clone(),
-        closed_at: record.closed_at.clone(),
-        status: record.e_status,
-        distance: distance_km.map(|km| km * 1000.0),
-        ..Default::default()
-    }
+    grpc_web::encode_response(&MultipleStationResponse {
+        stations: stations.into_iter().map(Into::into).collect(),
+    })
 }

@@ -1,21 +1,73 @@
 //! CSV をバイナリに埋め込み、isolate 起動時に一度だけパースしてメモリに保持する。
-//! PostgreSQL の `point(lat,lon) <-> point($1,$2)` によるソートを全件走査で置き換える。
+//! PostgreSQL のクエリを全件走査・HashMap 参照で置き換える。
 
+use stationapi::domain::entity::company::Company;
+use stationapi::domain::entity::gtfs::TransportType;
+use stationapi::domain::entity::line::Line;
+use stationapi::domain::entity::station::Station;
 use stationapi::domain::normalize::normalize_for_search;
+use stationapi::proto::StopCondition;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-/// 鉄道駅データ。ビルド時にバイナリへ埋め込まれる (raw 2.2MB / gzip 684KB)。
 const STATIONS_CSV: &str = include_str!("../../data/3!stations.csv");
-/// 路線データ。駅の所属路線を JOIN 相当で絞り込むために使う。
 const LINES_CSV: &str = include_str!("../../data/2!lines.csv");
+const COMPANIES_CSV: &str = include_str!("../../data/1!companies.csv");
 
-/// 検索と応答生成に必要な列だけを持つ軽量レコード。
-/// Station エンティティ (66 フィールド) はレスポンス生成時にのみ組み立てる。
-#[allow(dead_code)] // line_cd は路線付与を実装する次段階で使う
+// ---------------------------------------------------------------- CSV ヘルパー
+
+struct Cols {
+    headers: csv::StringRecord,
+}
+
+impl Cols {
+    fn of(headers: &csv::StringRecord) -> Self {
+        Self {
+            headers: headers.clone(),
+        }
+    }
+    fn at(&self, name: &str) -> Option<usize> {
+        self.headers.iter().position(|h| h.trim() == name)
+    }
+}
+
+fn text(r: &csv::StringRecord, i: Option<usize>) -> String {
+    i.and_then(|i| r.get(i)).unwrap_or("").to_string()
+}
+
+/// 空文字は NULL 相当として扱う (CSV には NULL 表現がないため)
+fn opt_text(r: &csv::StringRecord, i: Option<usize>) -> Option<String> {
+    i.and_then(|i| r.get(i))
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_string)
+}
+
+fn opt_i32(r: &csv::StringRecord, i: Option<usize>) -> Option<i32> {
+    i.and_then(|i| r.get(i)).and_then(|v| v.trim().parse().ok())
+}
+
+fn i32_or(r: &csv::StringRecord, i: Option<usize>, default: i32) -> i32 {
+    opt_i32(r, i).unwrap_or(default)
+}
+
+fn opt_f64(r: &csv::StringRecord, i: Option<usize>) -> Option<f64> {
+    i.and_then(|i| r.get(i)).and_then(|v| v.trim().parse().ok())
+}
+
+fn reader(csv_text: &'static str) -> csv::Reader<&'static [u8]> {
+    csv::ReaderBuilder::new()
+        .has_headers(true)
+        .from_reader(csv_text.as_bytes())
+}
+
+// ---------------------------------------------------------------- 駅
+
+/// 検索に必要な列だけを持つ軽量レコード。
+/// Station エンティティ (66 フィールド) は応答生成時にのみ組み立てる。
 pub struct StationRecord {
-    pub station_cd: u32,
-    pub station_g_cd: u32,
+    pub station_cd: i32,
+    pub station_g_cd: i32,
     pub name: String,
     pub name_katakana: String,
     pub name_roman: Option<String>,
@@ -23,9 +75,13 @@ pub struct StationRecord {
     pub name_roman_normalized: Option<String>,
     pub name_chinese: Option<String>,
     pub name_korean: Option<String>,
+    pub station_number1: Option<String>,
+    pub station_number2: Option<String>,
+    pub station_number3: Option<String>,
+    pub station_number4: Option<String>,
     pub three_letter_code: Option<String>,
-    pub line_cd: u32,
-    pub pref_cd: u32,
+    pub line_cd: i32,
+    pub pref_cd: i32,
     pub postal_code: String,
     pub address: String,
     pub lat: f64,
@@ -33,143 +89,311 @@ pub struct StationRecord {
     pub opened_at: String,
     pub closed_at: String,
     pub e_status: i32,
+    pub e_sort: i32,
 }
 
-static INDEX: OnceLock<Vec<StationRecord>> = OnceLock::new();
-static LINE_STATUS: OnceLock<HashMap<u32, i32>> = OnceLock::new();
-
-fn line_status() -> &'static HashMap<u32, i32> {
-    LINE_STATUS.get_or_init(build_line_status)
-}
-
-fn build_line_status() -> HashMap<u32, i32> {
-    let mut reader = csv::ReaderBuilder::new()
-        .has_headers(true)
-        .from_reader(LINES_CSV.as_bytes());
-    let headers = match reader.headers() {
-        Ok(h) => h.clone(),
-        Err(_) => return HashMap::new(),
-    };
-    let col = |name: &str| headers.iter().position(|h| h.trim() == name);
-    let (Some(c_cd), Some(c_status)) = (col("line_cd"), col("e_status")) else {
-        return HashMap::new();
-    };
-
-    let mut map = HashMap::with_capacity(1024);
-    for record in reader.records().flatten() {
-        let (Some(cd), Some(status)) = (
-            record.get(c_cd).and_then(|v| v.trim().parse::<u32>().ok()),
-            record.get(c_status).and_then(|v| v.trim().parse::<i32>().ok()),
-        ) else {
-            continue;
-        };
-        map.insert(cd, status);
+impl StationRecord {
+    /// 既存 SQL の `stations JOIN lines` 相当。路線側の属性を埋めた Station を返す。
+    /// 列車種別 (type_* / line_group_cd / pass) は UseCase 層が後から付与する。
+    pub fn to_entity(&self, line: Option<&Line>) -> Station {
+        Station {
+            station_cd: self.station_cd,
+            station_g_cd: self.station_g_cd,
+            station_name: self.name.clone(),
+            station_name_k: self.name_katakana.clone(),
+            station_name_r: self.name_roman.clone(),
+            station_name_zh: self.name_chinese.clone(),
+            station_name_ko: self.name_korean.clone(),
+            station_numbers: vec![],
+            station_number1: self.station_number1.clone(),
+            station_number2: self.station_number2.clone(),
+            station_number3: self.station_number3.clone(),
+            station_number4: self.station_number4.clone(),
+            three_letter_code: self.three_letter_code.clone(),
+            line_cd: self.line_cd,
+            line: None,
+            lines: vec![],
+            pref_cd: self.pref_cd,
+            post: self.postal_code.clone(),
+            address: self.address.clone(),
+            lon: self.lon,
+            lat: self.lat,
+            open_ymd: self.opened_at.clone(),
+            close_ymd: self.closed_at.clone(),
+            e_status: self.e_status,
+            e_sort: self.e_sort,
+            stop_condition: StopCondition::All,
+            distance: None,
+            train_type: None,
+            has_train_types: false,
+            company_cd: line.map(|l| l.company_cd),
+            line_name: line.map(|l| l.line_name.clone()),
+            line_name_k: line.map(|l| l.line_name_k.clone()),
+            line_name_h: line.map(|l| l.line_name_h.clone()),
+            line_name_r: line.and_then(|l| l.line_name_r.clone()),
+            line_name_zh: line.and_then(|l| l.line_name_zh.clone()),
+            line_name_ko: line.and_then(|l| l.line_name_ko.clone()),
+            line_color_c: line.and_then(|l| l.line_color_c.clone()),
+            line_type: line.and_then(|l| l.line_type),
+            line_symbol1: line.and_then(|l| l.line_symbol1.clone()),
+            line_symbol2: line.and_then(|l| l.line_symbol2.clone()),
+            line_symbol3: line.and_then(|l| l.line_symbol3.clone()),
+            line_symbol4: line.and_then(|l| l.line_symbol4.clone()),
+            line_symbol1_color: line.and_then(|l| l.line_symbol1_color.clone()),
+            line_symbol2_color: line.and_then(|l| l.line_symbol2_color.clone()),
+            line_symbol3_color: line.and_then(|l| l.line_symbol3_color.clone()),
+            line_symbol4_color: line.and_then(|l| l.line_symbol4_color.clone()),
+            line_symbol1_shape: line.and_then(|l| l.line_symbol1_shape.clone()),
+            line_symbol2_shape: line.and_then(|l| l.line_symbol2_shape.clone()),
+            line_symbol3_shape: line.and_then(|l| l.line_symbol3_shape.clone()),
+            line_symbol4_shape: line.and_then(|l| l.line_symbol4_shape.clone()),
+            average_distance: line.and_then(|l| l.average_distance),
+            type_id: None,
+            sst_id: None,
+            type_cd: None,
+            line_group_cd: None,
+            pass: None,
+            type_name: None,
+            type_name_k: None,
+            type_name_r: None,
+            type_name_zh: None,
+            type_name_ko: None,
+            color: None,
+            direction: None,
+            kind: None,
+            transport_type: TransportType::Rail,
+        }
     }
-    map
 }
 
-/// `stations JOIN lines ON s.line_cd = l.line_cd` (INNER) 相当。
-/// lines に無い line_cd の駅は既存 SQL でも結果に出ない。座標検索がこの条件。
-fn joins_line(record: &StationRecord) -> bool {
-    line_status().contains_key(&record.line_cd)
-}
-
-/// 名前検索の JOIN は `AND l.e_status = 0` を追加で要求する。
-/// これを見ないと廃止路線 (例: 成田エクスプレス, e_status=3) の駅が混ざる。
-fn joins_active_line(record: &StationRecord) -> bool {
-    line_status().get(&record.line_cd) == Some(&0)
-}
+static STATIONS: OnceLock<Vec<StationRecord>> = OnceLock::new();
 
 pub fn stations() -> &'static [StationRecord] {
-    INDEX.get_or_init(build)
+    STATIONS.get_or_init(build_stations)
 }
 
-/// 列順の変更に耐えるようヘッダ名から位置を引く。
-fn build() -> Vec<StationRecord> {
-    let mut reader = csv::ReaderBuilder::new()
-        .has_headers(true)
-        .from_reader(STATIONS_CSV.as_bytes());
-
-    let headers = match reader.headers() {
-        Ok(h) => h.clone(),
-        Err(_) => return Vec::new(),
+fn build_stations() -> Vec<StationRecord> {
+    let mut rdr = reader(STATIONS_CSV);
+    let Ok(headers) = rdr.headers().cloned() else {
+        return Vec::new();
     };
-    let col = |name: &str| headers.iter().position(|h| h.trim() == name);
-
-    let (Some(c_cd), Some(c_gcd), Some(c_name), Some(c_kana), Some(c_line), Some(c_lat), Some(c_lon)) = (
-        col("station_cd"),
-        col("station_g_cd"),
-        col("station_name"),
-        col("station_name_k"),
-        col("line_cd"),
-        col("lat"),
-        col("lon"),
+    let c = Cols::of(&headers);
+    let (Some(i_cd), Some(i_gcd), Some(i_lat), Some(i_lon)) = (
+        c.at("station_cd"),
+        c.at("station_g_cd"),
+        c.at("lat"),
+        c.at("lon"),
     ) else {
         return Vec::new();
     };
-    let c_roman = col("station_name_r");
-    let c_roman_n = col("station_name_rn");
-    let c_zh = col("station_name_zh");
-    let c_ko = col("station_name_ko");
-    let c_tlc = col("three_letter_code");
-    let c_pref = col("pref_cd");
-    let c_post = col("post");
-    let c_addr = col("address");
-    let c_open = col("open_ymd");
-    let c_close = col("close_ymd");
-    let c_status = col("e_status");
-
-    let text = |r: &csv::StringRecord, i: usize| r.get(i).unwrap_or("").to_string();
-    let opt = |r: &csv::StringRecord, i: Option<usize>| {
-        i.and_then(|i| r.get(i))
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-            .map(str::to_string)
-    };
-    let num = |r: &csv::StringRecord, i: Option<usize>| -> Option<f64> {
-        i.and_then(|i| r.get(i)).and_then(|v| v.trim().parse().ok())
-    };
 
     let mut out = Vec::with_capacity(12_000);
-    for record in reader.records().flatten() {
-        // 座標か ID が壊れている行は索引から落とす (検索対象にならない)
+    for r in rdr.records().flatten() {
+        // 座標か ID が壊れている行は索引に載せない
         let (Some(station_cd), Some(station_g_cd), Some(lat), Some(lon)) = (
-            record.get(c_cd).and_then(|v| v.trim().parse::<u32>().ok()),
-            record.get(c_gcd).and_then(|v| v.trim().parse::<u32>().ok()),
-            record.get(c_lat).and_then(|v| v.trim().parse::<f64>().ok()),
-            record.get(c_lon).and_then(|v| v.trim().parse::<f64>().ok()),
+            opt_i32(&r, Some(i_cd)),
+            opt_i32(&r, Some(i_gcd)),
+            opt_f64(&r, Some(i_lat)),
+            opt_f64(&r, Some(i_lon)),
         ) else {
             continue;
         };
-
         out.push(StationRecord {
             station_cd,
             station_g_cd,
-            name: text(&record, c_name),
-            name_katakana: text(&record, c_kana),
-            name_roman: opt(&record, c_roman),
-            name_roman_normalized: opt(&record, c_roman_n),
-            name_chinese: opt(&record, c_zh),
-            name_korean: opt(&record, c_ko),
-            three_letter_code: opt(&record, c_tlc),
-            line_cd: record
-                .get(c_line)
-                .and_then(|v| v.trim().parse().ok())
-                .unwrap_or(0),
-            pref_cd: num(&record, c_pref).unwrap_or(0.0) as u32,
-            postal_code: opt(&record, c_post).unwrap_or_default(),
-            address: opt(&record, c_addr).unwrap_or_default(),
+            name: text(&r, c.at("station_name")),
+            name_katakana: text(&r, c.at("station_name_k")),
+            name_roman: opt_text(&r, c.at("station_name_r")),
+            name_roman_normalized: opt_text(&r, c.at("station_name_rn")),
+            name_chinese: opt_text(&r, c.at("station_name_zh")),
+            name_korean: opt_text(&r, c.at("station_name_ko")),
+            station_number1: opt_text(&r, c.at("station_number1")),
+            station_number2: opt_text(&r, c.at("station_number2")),
+            station_number3: opt_text(&r, c.at("station_number3")),
+            station_number4: opt_text(&r, c.at("station_number4")),
+            three_letter_code: opt_text(&r, c.at("three_letter_code")),
+            line_cd: i32_or(&r, c.at("line_cd"), 0),
+            pref_cd: i32_or(&r, c.at("pref_cd"), 0),
+            postal_code: text(&r, c.at("post")),
+            address: text(&r, c.at("address")),
             lat,
             lon,
-            opened_at: opt(&record, c_open).unwrap_or_default(),
-            closed_at: opt(&record, c_close).unwrap_or_default(),
-            e_status: num(&record, c_status).unwrap_or(0.0) as i32,
+            opened_at: text(&r, c.at("open_ymd")),
+            closed_at: text(&r, c.at("close_ymd")),
+            e_status: i32_or(&r, c.at("e_status"), 0),
+            e_sort: i32_or(&r, c.at("e_sort"), 0),
         });
     }
     out
 }
 
-/// 球面距離 (km)。既存 SQL のユークリッド距離より正確で、順序もほぼ一致する。
+/// station_cd -> stations() の添字
+static STATION_BY_CD: OnceLock<HashMap<i32, usize>> = OnceLock::new();
+/// station_g_cd -> stations() の添字リスト
+static STATION_BY_GROUP: OnceLock<HashMap<i32, Vec<usize>>> = OnceLock::new();
+
+pub fn station_by_cd(station_cd: i32) -> Option<&'static StationRecord> {
+    let idx = STATION_BY_CD.get_or_init(|| {
+        stations()
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.station_cd, i))
+            .collect()
+    });
+    idx.get(&station_cd).map(|&i| &stations()[i])
+}
+
+pub fn stations_by_group(station_g_cd: i32) -> impl Iterator<Item = &'static StationRecord> {
+    let idx = STATION_BY_GROUP.get_or_init(|| {
+        let mut map: HashMap<i32, Vec<usize>> = HashMap::with_capacity(10_000);
+        for (i, s) in stations().iter().enumerate() {
+            map.entry(s.station_g_cd).or_default().push(i);
+        }
+        map
+    });
+    idx.get(&station_g_cd)
+        .map(Vec::as_slice)
+        .unwrap_or(&[])
+        .iter()
+        .map(|&i| &stations()[i])
+}
+
+// ---------------------------------------------------------------- 路線
+
+static LINES: OnceLock<Vec<Line>> = OnceLock::new();
+static LINE_BY_CD: OnceLock<HashMap<i32, usize>> = OnceLock::new();
+
+pub fn lines() -> &'static [Line] {
+    LINES.get_or_init(build_lines)
+}
+
+pub fn line_by_cd(line_cd: i32) -> Option<&'static Line> {
+    let idx = LINE_BY_CD.get_or_init(|| {
+        lines()
+            .iter()
+            .enumerate()
+            .map(|(i, l)| (l.line_cd, i))
+            .collect()
+    });
+    idx.get(&line_cd).map(|&i| &lines()[i])
+}
+
+fn build_lines() -> Vec<Line> {
+    let mut rdr = reader(LINES_CSV);
+    let Ok(headers) = rdr.headers().cloned() else {
+        return Vec::new();
+    };
+    let c = Cols::of(&headers);
+    let Some(i_cd) = c.at("line_cd") else {
+        return Vec::new();
+    };
+
+    let mut out = Vec::with_capacity(1024);
+    for r in rdr.records().flatten() {
+        let Some(line_cd) = opt_i32(&r, Some(i_cd)) else {
+            continue;
+        };
+        out.push(Line {
+            line_cd,
+            company_cd: i32_or(&r, c.at("company_cd"), 0),
+            company: None,
+            line_name: text(&r, c.at("line_name")),
+            line_name_k: text(&r, c.at("line_name_k")),
+            line_name_h: text(&r, c.at("line_name_h")),
+            line_name_r: opt_text(&r, c.at("line_name_r")),
+            line_name_zh: opt_text(&r, c.at("line_name_zh")),
+            line_name_ko: opt_text(&r, c.at("line_name_ko")),
+            line_color_c: opt_text(&r, c.at("line_color_c")),
+            line_type: opt_i32(&r, c.at("line_type")),
+            line_symbols: vec![],
+            line_symbol1: opt_text(&r, c.at("line_symbol1")),
+            line_symbol2: opt_text(&r, c.at("line_symbol2")),
+            line_symbol3: opt_text(&r, c.at("line_symbol3")),
+            line_symbol4: opt_text(&r, c.at("line_symbol4")),
+            line_symbol1_color: opt_text(&r, c.at("line_symbol1_color")),
+            line_symbol2_color: opt_text(&r, c.at("line_symbol2_color")),
+            line_symbol3_color: opt_text(&r, c.at("line_symbol3_color")),
+            line_symbol4_color: opt_text(&r, c.at("line_symbol4_color")),
+            line_symbol1_shape: opt_text(&r, c.at("line_symbol1_shape")),
+            line_symbol2_shape: opt_text(&r, c.at("line_symbol2_shape")),
+            line_symbol3_shape: opt_text(&r, c.at("line_symbol3_shape")),
+            line_symbol4_shape: opt_text(&r, c.at("line_symbol4_shape")),
+            e_status: i32_or(&r, c.at("e_status"), 0),
+            e_sort: i32_or(&r, c.at("e_sort"), 0),
+            average_distance: opt_f64(&r, c.at("average_distance")),
+            station: None,
+            train_type: None,
+            line_group_cd: None,
+            station_cd: None,
+            station_g_cd: None,
+            type_cd: None,
+            transport_type: TransportType::Rail,
+        });
+    }
+    out
+}
+
+/// `stations JOIN lines ON s.line_cd = l.line_cd` (INNER) 相当。
+/// lines に無い line_cd の駅は既存 SQL でも結果に出ない。座標検索がこの条件。
+fn joins_line(record: &StationRecord) -> bool {
+    line_by_cd(record.line_cd).is_some()
+}
+
+/// 名前検索の JOIN は `AND l.e_status = 0` を追加で要求する。
+/// これを見ないと廃止路線 (例: 成田エクスプレス, e_status=3) の駅が混ざる。
+fn joins_active_line(record: &StationRecord) -> bool {
+    line_by_cd(record.line_cd).is_some_and(|l| l.e_status == 0)
+}
+
+// ---------------------------------------------------------------- 事業者
+
+static COMPANIES: OnceLock<Vec<Company>> = OnceLock::new();
+
+pub fn companies() -> &'static [Company] {
+    COMPANIES.get_or_init(build_companies)
+}
+
+fn build_companies() -> Vec<Company> {
+    let mut rdr = reader(COMPANIES_CSV);
+    let Ok(headers) = rdr.headers().cloned() else {
+        return Vec::new();
+    };
+    let c = Cols::of(&headers);
+    let Some(i_cd) = c.at("company_cd") else {
+        return Vec::new();
+    };
+
+    let mut out = Vec::with_capacity(256);
+    for r in rdr.records().flatten() {
+        let Some(company_cd) = opt_i32(&r, Some(i_cd)) else {
+            continue;
+        };
+        out.push(Company {
+            company_cd,
+            rr_cd: i32_or(&r, c.at("rr_cd"), 0),
+            company_name: text(&r, c.at("company_name")),
+            company_name_k: text(&r, c.at("company_name_k")),
+            company_name_h: text(&r, c.at("company_name_h")),
+            company_name_r: text(&r, c.at("company_name_r")),
+            company_name_en: text(&r, c.at("company_name_en")),
+            company_name_full_en: text(&r, c.at("company_name_full_en")),
+            company_url: opt_text(&r, c.at("company_url")),
+            company_type: i32_or(&r, c.at("company_type"), 0),
+            e_status: i32_or(&r, c.at("e_status"), 0),
+            e_sort: i32_or(&r, c.at("e_sort"), 0),
+        });
+    }
+    out
+}
+
+// ---------------------------------------------------------------- 検索
+
+/// 球面距離 (km)。
+///
+/// 既存 SQL は `point(lat,lon) <-> point($1,$2)` で度単位のユークリッド距離を使うため、
+/// 緯度と経度を同じスケールで扱い東西方向を過大評価する。こちらは実距離で並ぶ。
+/// 実測では上位14件が同着 (同一駅の路線別レコード) で、順序差が実質的に出るのは
+/// 18位以降・距離にして50-100m程度。集合としては既存と一致する。
 pub fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
     const EARTH_RADIUS_KM: f64 = 6371.0;
     let (p1, p2) = (lat1.to_radians(), lat2.to_radians());
@@ -220,8 +444,7 @@ pub fn search_by_name(query: &str, limit: usize) -> Vec<&'static StationRecord> 
         .filter(|s| joins_active_line(s))
         .filter(|s| {
             s.name.contains(query)
-                || s
-                    .name_roman_normalized
+                || s.name_roman_normalized
                     .as_deref()
                     .is_some_and(|v| v.to_lowercase().contains(&lowered))
                 || s.name_katakana.contains(&katakana)

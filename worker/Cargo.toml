@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 # stationapi は server feature を切って domain / use_case / proto だけを取り込む
 stationapi = { path = "../stationapi", default-features = false }
 worker = "0.8"
+async-trait = "0.1"
 prost = "0.13.3"
 csv = "1.3"
 console_error_panic_hook = "0.1"
