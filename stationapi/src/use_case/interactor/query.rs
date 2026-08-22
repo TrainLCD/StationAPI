@@ -1767,16 +1767,15 @@ where
         Ok(stations)
     }
 
+    /// 停車駅を系統ごとにまとめる。
+    ///
+    /// 経路の取得は系統に属さない駅も返す。それらは経路候補を構成しないので
+    /// ここで落とす。以前は `expect` していたため、そうした駅が 1 件でもあると
+    /// 応答を返せずに落ちていた。
     fn build_route_tree_map<'a>(&self, stops: &'a [Station]) -> BTreeMap<i32, Vec<&'a Station>> {
         stops
             .iter()
-            .map(|stop| {
-                (
-                    stop.line_group_cd
-                        .expect("route stop must belong to a train type group"),
-                    stop,
-                )
-            })
+            .filter_map(|stop| stop.line_group_cd.map(|group| (group, stop)))
             .fold(
                 BTreeMap::new(),
                 |mut acc: BTreeMap<i32, Vec<&'a Station>>, (line_group_cd, stop)| {
@@ -3336,12 +3335,19 @@ mod tests {
         }
 
         #[test]
-        #[should_panic(expected = "route stop must belong to a train type group")]
-        fn test_build_route_tree_map_requires_line_group() {
+        fn test_build_route_tree_map_skips_stops_without_line_group() {
             let interactor = create_interactor();
-            let stops = vec![create_test_station(1, 1, 100, None)];
+            let stops = vec![
+                create_test_station(1, 1, 100, None),
+                create_test_station(2, 2, 100, Some(1000)),
+            ];
 
-            interactor.build_route_tree_map(&stops);
+            let result = interactor.build_route_tree_map(&stops);
+
+            // 系統に属さない駅は経路候補にならないので落とす
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[&1000].len(), 1);
+            assert_eq!(result[&1000][0].station_cd, 2);
         }
 
         #[test]

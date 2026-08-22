@@ -598,10 +598,61 @@ impl StationRepository for MemStationRepository {
                 .then_with(|| a.station_cd.cmp(&b.station_cd))
         });
 
-        Ok(records
+        let mut out: Vec<Station> = records
             .into_iter()
             .map(|record| record.to_entity(index::line_by_cd(record.line_cd)))
-            .collect())
+            .collect();
+
+        // 種別ありの停車駅を後ろに連ねる。
+        // 発着の双方に停車する系統の停車駅を、路線をまたいだまま sst.id 順で返す。
+        // ここを落とすと直通列車の経路が 1 本も出なくなる。
+        // 出発・到着の駅グループはこちらでは e_status を見る。
+        let stopping_groups = |group_id: u32| -> HashSet<i32> {
+            index::stations_by_group(group_id as i32)
+                .filter(|s| s.e_status == 0)
+                .flat_map(|s| index::sst_by_station(s.station_cd))
+                .filter(|sst| sst.pass != Some(1))
+                .filter_map(|sst| sst.line_group_cd)
+                .collect()
+        };
+        let from_stopping = stopping_groups(from_station_id);
+        let to_stopping = stopping_groups(to_station_id);
+
+        let mut typed: Vec<(&index::SstRecord, &index::StationRecord, &index::TypeRecord)> =
+            Vec::new();
+        for group in from_stopping.intersection(&to_stopping) {
+            for sst in index::sst_by_group(*group) {
+                let Some(record) = index::station_by_cd(sst.station_cd) else {
+                    continue;
+                };
+                if record.e_status != 0 {
+                    continue;
+                }
+                if !via_line_ids.is_empty() && !via_line_ids.contains(&(record.line_cd as u32)) {
+                    continue;
+                }
+                let Some(line) = index::line_by_cd(record.line_cd) else {
+                    continue;
+                };
+                if line.e_status != 0 {
+                    continue;
+                }
+                // 種別が引けない系統は落とす
+                let Some(train_type) = index::type_by_cd(sst.type_cd) else {
+                    continue;
+                };
+                typed.push((sst, record, train_type));
+            }
+        }
+        typed.sort_by_key(|(sst, _, _)| sst.id);
+
+        out.extend(typed.into_iter().map(|(sst, record, train_type)| {
+            let mut station = record.to_entity(index::line_by_cd(record.line_cd));
+            apply_train_type(&mut station, sst, train_type);
+            station
+        }));
+
+        Ok(out)
     }
     /// 2 つの結果を連結して返す。
     /// 1. 種別経路に含まれない駅。e_sort, station_cd の昇順
