@@ -31,6 +31,30 @@ fn to_filter(value: Option<GqlTransportType>) -> TransportTypeFilter {
     }
 }
 
+/// GraphQL の Int は 32bit 符号付きなので負値が渡りうる。
+/// `as u32` で丸めると -1 が 4294967295 になり、上限件数を引き出せてしまう。
+fn to_limit(value: Option<i32>) -> Result<Option<u32>, async_graphql::Error> {
+    match value {
+        None => Ok(None),
+        Some(v) if v < 0 => Err(async_graphql::Error::new("limit には 0 以上を指定してください")),
+        Some(v) => Ok(Some(v as u32)),
+    }
+}
+
+/// 識別子も同様に負値を弾く。丸めると別のレコードを指しうるため。
+fn to_id(value: i32, name: &str) -> Result<u32, async_graphql::Error> {
+    if value < 0 {
+        return Err(async_graphql::Error::new(format!(
+            "{name} には 0 以上を指定してください"
+        )));
+    }
+    Ok(value as u32)
+}
+
+fn to_opt_id(value: Option<i32>, name: &str) -> Result<Option<u32>, async_graphql::Error> {
+    value.map(|v| to_id(v, name)).transpose()
+}
+
 fn use_case<'a>(ctx: &Context<'a>) -> &'a Interactor {
     ctx.data_unchecked::<Interactor>()
 }
@@ -56,7 +80,7 @@ impl QueryRoot {
         transport_type: Option<GqlTransportType>,
     ) -> GqlResult<Option<Station>> {
         let found = use_case(ctx)
-            .find_station_by_id(id as u32, to_filter(transport_type))
+            .find_station_by_id(to_id(id, "id")?, to_filter(transport_type))
             .await?;
         Ok(found.map(|s| Station::from(proto::Station::from(s))))
     }
@@ -67,7 +91,10 @@ impl QueryRoot {
         ids: Vec<i32>,
         transport_type: Option<GqlTransportType>,
     ) -> GqlResult<Vec<Station>> {
-        let ids: Vec<u32> = ids.into_iter().map(|v| v as u32).collect();
+        let ids: Vec<u32> = ids
+            .into_iter()
+            .map(|v| to_id(v, "ids"))
+            .collect::<Result<_, _>>()?;
         let found = use_case(ctx)
             .get_stations_by_id_vec(&ids, to_filter(transport_type))
             .await?;
@@ -86,7 +113,7 @@ impl QueryRoot {
             .get_stations_by_coordinates(
                 latitude,
                 longitude,
-                limit.map(|v| v as u32),
+                to_limit(limit)?,
                 to_filter(transport_type),
             )
             .await?;
@@ -104,7 +131,7 @@ impl QueryRoot {
         let found = use_case(ctx)
             .get_stations_by_name(
                 name,
-                limit.map(|v| v as u32),
+                to_limit(limit)?,
                 from_station_group_id.map(|v| v as u32),
                 to_filter(transport_type),
             )
@@ -119,7 +146,7 @@ impl QueryRoot {
         transport_type: Option<GqlTransportType>,
     ) -> GqlResult<Vec<Station>> {
         let found = use_case(ctx)
-            .get_stations_by_group_id(group_id as u32, to_filter(transport_type))
+            .get_stations_by_group_id(to_id(group_id, "groupId")?, to_filter(transport_type))
             .await?;
         Ok(stations_to_gql(found))
     }
@@ -133,18 +160,26 @@ impl QueryRoot {
         transport_type: Option<GqlTransportType>,
     ) -> GqlResult<Vec<Station>> {
         let found = use_case(ctx)
-            .get_stations_by_line_group_id(line_group_id as u32, to_filter(transport_type))
+            .get_stations_by_line_group_id(
+                to_id(line_group_id, "lineGroupId")?,
+                to_filter(transport_type),
+            )
             .await?;
         Ok(stations_to_gql(found))
     }
 
     async fn line(&self, ctx: &Context<'_>, line_id: i32) -> GqlResult<Option<Line>> {
-        let found = use_case(ctx).find_line_by_id(line_id as u32).await?;
+        let found = use_case(ctx)
+            .find_line_by_id(to_id(line_id, "lineId")?)
+            .await?;
         Ok(found.map(|l| Line::from(proto::Line::from(l))))
     }
 
     async fn lines(&self, ctx: &Context<'_>, line_ids: Vec<i32>) -> GqlResult<Vec<Line>> {
-        let ids: Vec<u32> = line_ids.into_iter().map(|v| v as u32).collect();
+        let ids: Vec<u32> = line_ids
+            .into_iter()
+            .map(|v| to_id(v, "lineIds"))
+            .collect::<Result<_, _>>()?;
         let found = use_case(ctx).get_lines_by_id_vec(&ids).await?;
         Ok(found
             .into_iter()
@@ -177,9 +212,9 @@ impl QueryRoot {
     ) -> GqlResult<Vec<Station>> {
         let found = use_case(ctx)
             .get_stations_by_line_id(
-                line_id as u32,
-                station_id.map(|v| v as u32),
-                direction_id.map(|v| v as u32),
+                to_id(line_id, "lineId")?,
+                to_opt_id(station_id, "stationId")?,
+                to_opt_id(direction_id, "directionId")?,
                 to_filter(transport_type),
             )
             .await?;
@@ -192,7 +227,10 @@ impl QueryRoot {
         line_ids: Vec<i32>,
         transport_type: Option<GqlTransportType>,
     ) -> GqlResult<Vec<Station>> {
-        let ids: Vec<u32> = line_ids.into_iter().map(|v| v as u32).collect();
+        let ids: Vec<u32> = line_ids
+            .into_iter()
+            .map(|v| to_id(v, "lineIds"))
+            .collect::<Result<_, _>>()?;
         let found = use_case(ctx)
             .get_stations_by_line_id_vec(&ids, to_filter(transport_type))
             .await?;
@@ -205,7 +243,10 @@ impl QueryRoot {
         line_group_ids: Vec<i32>,
         transport_type: Option<GqlTransportType>,
     ) -> GqlResult<Vec<Station>> {
-        let ids: Vec<u32> = line_group_ids.into_iter().map(|v| v as u32).collect();
+        let ids: Vec<u32> = line_group_ids
+            .into_iter()
+            .map(|v| to_id(v, "lineGroupIds"))
+            .collect::<Result<_, _>>()?;
         let found = use_case(ctx)
             .get_stations_by_line_group_id_vec(&ids, to_filter(transport_type))
             .await?;
@@ -218,7 +259,7 @@ impl QueryRoot {
         station_id: i32,
     ) -> GqlResult<Vec<TrainType>> {
         let found = use_case(ctx)
-            .get_train_types_by_station_id(station_id as u32)
+            .get_train_types_by_station_id(to_id(station_id, "stationId")?)
             .await?;
         Ok(found
             .into_iter()
@@ -238,9 +279,9 @@ impl QueryRoot {
     ) -> GqlResult<RoutePage> {
         let found = use_case(ctx)
             .get_routes(
-                from_station_group_id as u32,
-                to_station_group_id as u32,
-                via_line_id.map(|v| v as u32),
+                to_id(from_station_group_id, "fromStationGroupId")?,
+                to_id(to_station_group_id, "toStationGroupId")?,
+                to_opt_id(via_line_id, "viaLineId")?,
             )
             .await?;
         Ok(RoutePage {
@@ -260,9 +301,9 @@ impl QueryRoot {
     ) -> GqlResult<RouteTypePage> {
         let found = use_case(ctx)
             .get_train_types(
-                from_station_group_id as u32,
-                to_station_group_id as u32,
-                via_line_id.map(|v| v as u32),
+                to_id(from_station_group_id, "fromStationGroupId")?,
+                to_id(to_station_group_id, "toStationGroupId")?,
+                to_opt_id(via_line_id, "viaLineId")?,
             )
             .await?;
         Ok(RouteTypePage {
@@ -283,7 +324,10 @@ impl QueryRoot {
         to_station_group_id: i32,
     ) -> GqlResult<Vec<Route>> {
         let found = use_case(ctx)
-            .get_connected_routes(from_station_group_id as u32, to_station_group_id as u32)
+            .get_connected_routes(
+                to_id(from_station_group_id, "fromStationGroupId")?,
+                to_id(to_station_group_id, "toStationGroupId")?,
+            )
             .await?;
         Ok(found.into_iter().map(Into::into).collect())
     }
@@ -299,14 +343,14 @@ impl QueryRoot {
         let via: Vec<u32> = via_line_ids
             .unwrap_or_default()
             .into_iter()
-            .map(|v| v as u32)
-            .collect();
+            .map(|v| to_id(v, "viaLineIds"))
+            .collect::<Result<_, _>>()?;
         let stops = use_case(ctx)
             .estimate_route_arrival_times(
-                from_station_id as u32,
-                to_station_id as u32,
+                to_id(from_station_id, "fromStationId")?,
+                to_id(to_station_id, "toStationId")?,
                 &via,
-                direction_id.map(|v| v as u32),
+                to_opt_id(direction_id, "directionId")?,
             )
             .await?;
 
@@ -351,9 +395,9 @@ impl QueryRoot {
     ) -> GqlResult<TrainRouteResponse> {
         let segments = use_case(ctx)
             .get_train_route(
-                from_station_id as u32,
-                to_station_id as u32,
-                line_group_id.map(|v| v as u32),
+                to_id(from_station_id, "fromStationId")?,
+                to_id(to_station_id, "toStationId")?,
+                to_opt_id(line_group_id, "lineGroupId")?,
             )
             .await?;
         Ok(TrainRouteResponse {

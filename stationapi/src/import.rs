@@ -642,10 +642,16 @@ fn is_tokyu_community_route(busroute: &str) -> bool {
     )
 }
 
+/// ODPT の JSON を取得する。
+///
+/// 7 日以内のキャッシュがあればそれを使う。`token` が `None` の場合は
+/// キャッシュだけを頼りにし、無ければエラーを返す。こうしておかないと
+/// トークン未設定の環境で毎回ダウンロードを試みて失敗し、その結果
+/// 東急バスのデータが取り込まれずに消えてしまう。
 fn download_odpt_json<T>(
     client: &reqwest::blocking::Client,
     resource: &str,
-    token: &str,
+    token: Option<&str>,
 ) -> Result<Vec<T>, Box<dyn std::error::Error + Send + Sync>>
 where
     T: DeserializeOwned + Serialize,
@@ -666,6 +672,13 @@ where
             return read_tokyu_odpt_items(&cache_path);
         }
     }
+
+    let Some(token) = token else {
+        return Err(format!(
+            "Tokyu Bus {resource} JSON requires ODPT_ACCESS_TOKEN (no usable cache found)"
+        )
+        .into());
+    };
 
     let url = format!("https://api.odpt.org/api/v4/{}.json", resource);
     let mut response = client
@@ -711,15 +724,17 @@ where
 }
 
 fn download_tokyu_odpt_data() -> Result<TokyuOdptData, Box<dyn std::error::Error + Send + Sync>> {
-    let token = env::var("ODPT_ACCESS_TOKEN")
-        .map_err(|_| "Tokyu Bus ODPT JSON requires ODPT_ACCESS_TOKEN in the environment")?;
+    // トークンが無くてもキャッシュがあれば取り込めるようにする。
+    // ここで早期リターンすると、キャッシュ判定に到達せず既存の東急バス
+    // データが消える (import_gtfs は gtfs_* を削除してからコミットするため)。
+    let token = env::var("ODPT_ACCESS_TOKEN").ok();
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(300))
         .build()?;
     Ok(TokyuOdptData {
-        patterns: download_odpt_json(&client, "odpt:BusroutePattern", &token)?,
-        stops: download_odpt_json(&client, "odpt:BusstopPole", &token)?,
-        timetables: download_odpt_json(&client, "odpt:BusTimetable", &token)?,
+        patterns: download_odpt_json(&client, "odpt:BusroutePattern", token.as_deref())?,
+        stops: download_odpt_json(&client, "odpt:BusstopPole", token.as_deref())?,
+        timetables: download_odpt_json(&client, "odpt:BusTimetable", token.as_deref())?,
     })
 }
 
@@ -923,7 +938,10 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
             Some(data)
         }
         Ok(Err(e)) => {
-            warn!("Failed to download Tokyu Bus ODPT JSON: {e}. Skipping this feed.");
+            warn!(
+                "Failed to download Tokyu Bus ODPT JSON: {e}. \
+                 Skipping this feed; existing Tokyu Bus rows will be removed from gtfs_* tables."
+            );
             None
         }
         Err(join_err) => {

@@ -61,10 +61,28 @@ fn main() {
         stage_csv(&out_dir, "lines.csv", "../data/2!lines.csv"),
         stage_csv(&out_dir, "companies.csv", "../data/1!companies.csv"),
         stage_csv(&out_dir, "types.csv", "../data/4!types.csv"),
+        // station_station_types は下の sst 変換でも参照するが、
+        // 混在判定に含めるためここでも存在を見る
+        Path::new("generated/station_station_types.csv").is_file(),
     ];
-    if !staged.iter().all(|v| *v) {
+    // 混在を許すと、例えば generated の station_station_types だけが入り
+    // stations が data/*.csv のままになる。生成された系統の station_cd が
+    // 駅索引に存在せず、列車種別が欠落した Worker が出来上がってしまう。
+    // cargo:warning は CI で見落とされるため、混在はビルドを止める。
+    let generated_count = staged.iter().filter(|v| **v).count();
+    if generated_count != 0 && generated_count != staged.len() {
+        panic!(
+            "worker/generated が {} / {} ファイルしかありません。\n\
+             生成物と data/*.csv が混ざるとデータが不整合になります。\n\
+             `stationapi --export-worker-data worker/generated` で全テーブルを書き出すか、\n\
+             worker/generated を削除して data/*.csv だけを使ってください。",
+            generated_count,
+            staged.len()
+        );
+    }
+    if generated_count == 0 {
         println!(
-            "cargo:warning=worker/generated が揃っていないため data/*.csv を使用します。\
+            "cargo:warning=worker/generated が無いため data/*.csv を使用します。\
              生成される各駅停車の系統や GTFS 由来のバスデータが含まれないため、\
              本番と挙動が異なります"
         );

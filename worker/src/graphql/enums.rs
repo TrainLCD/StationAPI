@@ -117,10 +117,3 @@ from_i32!(TransportType, TransportType::TransportTypeUnspecified,
     0 => TransportTypeUnspecified, 1 => Rail, 2 => Bus, 3 => RailAndBus);
 from_i32!(TtsAlphabet, TtsAlphabet::TtsAlphabetUnspecified,
     0 => TtsAlphabetUnspecified, 1 => Ipa, 2 => Yomigana, 3 => Plain);
-
-impl TransportType {
-    /// GraphQL の引数を proto の値へ戻す。未指定は既定 (鉄道のみ) に倒す。
-    pub fn to_proto(self) -> i32 {
-        self as i32
-    }
-}

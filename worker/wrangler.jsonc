@@ -39,6 +39,13 @@
       "workers_dev": true,
       "observability": {
         "enabled": true
+      },
+      // BFF の production route を移すまでは、このドメインは sapi-bff が
+      // 保持しているためデプロイに失敗する。手順は #1638 を参照。
+      "route": {
+        "custom_domain": true,
+        "pattern": "gql.trainlcd.app",
+        "zone_name": "trainlcd.app"
       }
     }
   }

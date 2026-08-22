@@ -184,14 +184,23 @@ fn build_stations() -> Vec<StationRecord> {
         return Vec::new();
     };
     let c = Cols::of(&headers);
+    // 応答に出る列が欠けたまま索引を作ると、名前が空の駅が黙って並ぶ。
+    // 生成 CSV は information_schema から列を取るので、DB のスキーマ変更が
+    // そのまま伝播する。列名の変化を検出できるよう必須列を明示する。
     let (Some(i_cd), Some(i_gcd), Some(i_lat), Some(i_lon)) = (
         c.at("station_cd"),
         c.at("station_g_cd"),
         c.at("lat"),
         c.at("lon"),
     ) else {
-        return Vec::new();
+        panic!("stations の CSV に station_cd / station_g_cd / lat / lon が必要です");
     };
+    for required in ["station_name", "station_name_k"] {
+        assert!(
+            c.at(required).is_some(),
+            "stations の CSV に {required} 列がありません"
+        );
+    }
 
     let mut out = Vec::with_capacity(12_000);
     for r in rdr.records().flatten() {
@@ -292,8 +301,14 @@ fn build_lines() -> Vec<Line> {
     };
     let c = Cols::of(&headers);
     let Some(i_cd) = c.at("line_cd") else {
-        return Vec::new();
+        panic!("lines の CSV に line_cd 列がありません");
     };
+    for required in ["line_name", "line_name_k", "line_name_h"] {
+        assert!(
+            c.at(required).is_some(),
+            "lines の CSV に {required} 列がありません"
+        );
+    }
 
     let mut out = Vec::with_capacity(1024);
     for r in rdr.records().flatten() {
@@ -367,8 +382,14 @@ fn build_companies() -> Vec<Company> {
     };
     let c = Cols::of(&headers);
     let Some(i_cd) = c.at("company_cd") else {
-        return Vec::new();
+        panic!("companies の CSV に company_cd 列がありません");
     };
+    for required in ["company_name", "company_name_k"] {
+        assert!(
+            c.at(required).is_some(),
+            "companies の CSV に {required} 列がありません"
+        );
+    }
 
     let mut out = Vec::with_capacity(256);
     for r in rdr.records().flatten() {
@@ -589,6 +610,10 @@ fn build_types() -> Vec<TypeRecord> {
         return Vec::new();
     };
 
+    // 生成物には SERIAL 採番後の実 id がある。PostgreSQL は取り込んだ全行に
+    // 採番するので、こちらで行をスキップすると id がずれる。この id は
+    // station.type_id として応答に出るため、ずれていたら索引構築を中断する。
+    let i_id = c.at("id");
     let mut out = Vec::with_capacity(512);
     let mut serial = 0i32;
     for r in rdr.records().flatten() {
@@ -596,6 +621,12 @@ fn build_types() -> Vec<TypeRecord> {
             continue;
         };
         serial += 1;
+        if let Some(actual) = opt_i32(&r, i_id) {
+            assert_eq!(
+                actual, serial,
+                "types.csv の id が連番ではない (期待 {serial}, 実際 {actual})"
+            );
+        }
         out.push(TypeRecord {
             id: serial,
             type_cd,

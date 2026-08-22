@@ -1054,11 +1054,9 @@ impl TrainTypeRepository for MemTrainTypeRepository {
         line_group_id: u32,
         line_id: u32,
     ) -> Result<Option<TrainType>, DomainError> {
-        let target_group = line_group_id as i32;
         let target_line = line_id as i32;
-        Ok(index::ssts()
-            .iter()
-            .filter(|sst| sst.line_group_cd == Some(target_group))
+        // 全 SST の走査ではなく、系統の索引から辿る (sst.id 昇順で返る)
+        Ok(index::sst_by_group(line_group_id as i32)
             .filter(|sst| sst_is_stop(sst))
             .find(|sst| {
                 index::station_by_cd(sst.station_cd).is_some_and(|s| s.line_cd == target_line)

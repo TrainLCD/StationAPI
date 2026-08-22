@@ -19,6 +19,9 @@ name: Build Cloudflare Worker
 
 env:
   SQLX_OFFLINE: true
+  # ビルド結果を再現できるよう、ツールのバージョンを固定する
+  WORKER_BUILD_VERSION: "0.8.5"
+  WRANGLER_VERSION: "4.125.0"
 
 jobs:
   build:
@@ -88,7 +91,17 @@ jobs:
           echo "bus stops: $bus"
 
       - name: Install worker-build
-        run: cargo install worker-build --locked
+        run: cargo install worker-build --locked --version "$WORKER_BUILD_VERSION"
+
+      # worker は workspace から除外されているため ci.yml の対象にならない。
+      # ここで fmt / clippy を通す。
+      - name: Check worker formatting
+        run: cargo fmt --manifest-path worker/Cargo.toml -- --check
+
+      - name: Clippy worker
+        run: |
+          cargo clippy --manifest-path worker/Cargo.toml \
+            --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings
 
       - name: Build worker
         working-directory: worker
@@ -99,8 +112,8 @@ jobs:
       - name: Compare GraphQL schema with BFF
         working-directory: worker
         run: |
-          npx --yes wrangler dev --port 8787 &
-          for i in $(seq 1 120); do
+          npx --yes "wrangler@$WRANGLER_VERSION" dev --port 8787 &
+          for _ in $(seq 1 120); do
             curl -sf http://127.0.0.1:8787/__ping >/dev/null 2>&1 && break
             sleep 2
           done
