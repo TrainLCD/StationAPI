@@ -57,12 +57,79 @@ async fn main() -> std::result::Result<(), anyhow::Error> {
     run().await
 }
 
+#[derive(sqlx::FromRow)]
+struct SstExportRow {
+    id: i32,
+    station_cd: i32,
+    type_cd: i32,
+    line_group_cd: Option<i32>,
+    pass: Option<i32>,
+}
+
+/// スキーマ作成と CSV 取り込みを行い、その結果を Workers 用に書き出す。
+///
+/// `import_csv` は最後に `generate_virtual_local_rail_services` を実行し、
+/// 列車種別を持たない路線へ各駅停車の系統を DB 上で生成する。この行は
+/// data/*.csv には存在しないため、CSV を直接読むだけでは本番と挙動が変わる
+/// (2,268 駅が has_train_types = false になる)。ここで生成後の状態を
+/// 書き出すことで、Workers 側もサーバーと同じデータを持てる。
+async fn export_worker_data(out_dir: &str) -> std::result::Result<(), anyhow::Error> {
+    info!("Exporting worker data into {out_dir}");
+
+    import::create_schema()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to create schema: {}", e))?;
+    import::import_csv()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to import CSV: {}", e))?;
+
+    let db_url = fetch_database_url();
+    let mut conn = PgConnection::connect(&db_url).await?;
+
+    // sst.id は停車順序そのものなので、必ず id 昇順で書き出す
+    let rows: Vec<SstExportRow> = sqlx::query_as(
+        "SELECT id, station_cd, type_cd, line_group_cd, pass
+         FROM station_station_types ORDER BY id",
+    )
+    .fetch_all(&mut conn)
+    .await?;
+
+    std::fs::create_dir_all(out_dir)?;
+    let path = std::path::Path::new(out_dir).join("station_station_types.csv");
+    let mut writer = csv::Writer::from_path(&path)?;
+    writer.write_record(["id", "station_cd", "type_cd", "line_group_cd", "pass"])?;
+    for row in &rows {
+        writer.write_record([
+            row.id.to_string(),
+            row.station_cd.to_string(),
+            row.type_cd.to_string(),
+            row.line_group_cd.map(|v| v.to_string()).unwrap_or_default(),
+            row.pass.map(|v| v.to_string()).unwrap_or_default(),
+        ])?;
+    }
+    writer.flush()?;
+
+    info!("Exported {} rows to {}", rows.len(), path.display());
+    Ok(())
+}
+
 async fn run() -> std::result::Result<(), anyhow::Error> {
     tracing_subscriber::fmt::init();
 
     if dotenv::from_filename(".env.local").is_err() {
         warn!("Could not load .env.local");
     };
+
+    // データ生成のみ行って終了するモード。
+    // Workers 版はサーバーを起動せずデータだけを必要とするため、CI から呼ぶ。
+    let args: Vec<String> = env::args().collect();
+    if let Some(pos) = args.iter().position(|a| a == "--export-worker-data") {
+        let out_dir = args
+            .get(pos + 1)
+            .cloned()
+            .unwrap_or_else(|| "worker/generated".to_string());
+        return export_worker_data(&out_dir).await;
+    }
 
     // Initialize Prometheus metrics exporter on a separate HTTP port
     let metrics_host = fetch_metrics_host();

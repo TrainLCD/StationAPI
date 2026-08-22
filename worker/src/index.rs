@@ -71,10 +71,10 @@ pub struct StationRecord {
     pub name: String,
     pub name_katakana: String,
     pub name_roman: Option<String>,
-    /// マクロンを含まない正規化ローマ字 (station_name_rn)。ILIKE 検索の対象。
-    pub name_roman_normalized: Option<String>,
-    /// 上を小文字化したもの。ILIKE 相当の比較を全件走査で行うため、
-    /// 検索のたびに 11,148 件分 to_lowercase() を呼ばないよう索引時に持つ。
+    /// station_name_rn (マクロンを含まない綴り) を小文字化したもの。
+    /// ILIKE 相当の比較を全件走査で行うため、検索のたびに 11,148 件分
+    /// to_lowercase() を呼ばないよう索引時に持つ。応答には使わないので
+    /// 小文字版だけを保持する。
     name_roman_lower: Option<String>,
     pub name_chinese: Option<String>,
     pub name_korean: Option<String>,
@@ -207,7 +207,6 @@ fn build_stations() -> Vec<StationRecord> {
             name: text(&r, c.at("station_name")),
             name_katakana: text(&r, c.at("station_name_k")),
             name_roman: opt_text(&r, c.at("station_name_r")),
-            name_roman_normalized: opt_text(&r, c.at("station_name_rn")),
             name_roman_lower: opt_text(&r, c.at("station_name_rn")).map(|v| v.to_lowercase()),
             name_chinese: opt_text(&r, c.at("station_name_zh")),
             name_korean: opt_text(&r, c.at("station_name_ko")),

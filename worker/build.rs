@@ -4,19 +4,40 @@
 //! 大半を占める。全列が整数なので 1 行 = i32 x 4 の固定長にしておけば、
 //! ランタイムではスライスを読むだけで済む。
 
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, path::Path, path::PathBuf};
 
 /// CSV に NULL 表現が無いため、欠損値を i32::MIN で表す
 const NULL_I32: i32 = i32::MIN;
 
 fn main() {
-    let csv_path = "../data/5!station_station_types.csv";
+    // 本番と同じデータを使うには、サーバー側の取り込み後の状態が要る。
+    // `import_csv` は最後に generate_virtual_local_rail_services を実行し、
+    // 列車種別を持たない路線へ各駅停車の系統を DB 上で生成する (約2,400行)。
+    // この行は data/*.csv に存在しないため、CSV を直接読むと 2,268 駅の
+    // has_train_types が false になり本番と挙動がずれる。
+    //
+    // CI では `stationapi --export-worker-data worker/generated` で生成後の
+    // 状態を書き出し、それをここで優先して読む。
+    let generated = Path::new("generated/station_station_types.csv");
+    let fallback = Path::new("../data/5!station_station_types.csv");
+    let (csv_path, has_generated) = if generated.is_file() {
+        (generated, true)
+    } else {
+        println!(
+            "cargo:warning=worker/generated/station_station_types.csv が無いため \
+             data/5!station_station_types.csv を使用します。生成される各駅停車の系統が \
+             含まれないため、本番と挙動が異なります"
+        );
+        (fallback, false)
+    };
+    let csv_path = csv_path.to_string_lossy().to_string();
     println!("cargo:rerun-if-changed={csv_path}");
+    println!("cargo:rerun-if-changed=generated/station_station_types.csv");
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(true)
-        .from_path(csv_path)
+        .from_path(&csv_path)
         .expect("station_station_types.csv を開けない");
 
     let headers = reader.headers().expect("ヘッダを読めない").clone();
@@ -26,6 +47,8 @@ fn main() {
     };
     let i_group = col("line_group_cd");
     let i_pass = col("pass");
+    // 生成物は SERIAL 採番後の実 id を持つ。CSV は "DEFAULT" なので行順で採番する。
+    let i_id = if has_generated { col("id") } else { None };
 
     let num = |r: &csv::StringRecord, i: Option<usize>| -> i32 {
         i.and_then(|i| r.get(i))
@@ -34,12 +57,23 @@ fn main() {
     };
 
     let mut out: Vec<u8> = Vec::with_capacity(45_000 * 16);
+    let mut expected_id = 0i32;
     for record in reader.records().flatten() {
         let station_cd = num(&record, Some(i_station));
         let type_cd = num(&record, Some(i_type));
         // ランタイム側の CSV パースと同じく、必須列が壊れている行は落とす
         if station_cd == NULL_I32 || type_cd == NULL_I32 {
             continue;
+        }
+        // ランタイムは行順で id を振り直すため、生成物の id が連番でなければ
+        // 停車順序がずれる。ずれていたらビルドを止める。
+        expected_id += 1;
+        if let Some(i) = i_id {
+            let actual = num(&record, Some(i));
+            assert_eq!(
+                actual, expected_id,
+                "station_station_types.id が連番ではない (期待 {expected_id}, 実際 {actual})"
+            );
         }
         for value in [
             station_cd,

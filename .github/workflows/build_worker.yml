@@ -1,0 +1,109 @@
+on:
+  pull_request:
+    paths:
+      - "worker/**"
+      - "data/**"
+      - "stationapi/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+  push:
+    paths:
+      - "worker/**"
+      - "data/**"
+      - "stationapi/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+  workflow_dispatch:
+
+name: Build Cloudflare Worker
+
+env:
+  SQLX_OFFLINE: true
+  # バスデータは ODPT トークンが必要なため、この時点では鉄道のみを対象にする
+  DISABLE_BUS_FEATURE: "true"
+
+jobs:
+  build:
+    name: Export data and build worker
+    runs-on: ubuntu-latest
+
+    # Worker が読むデータは data/*.csv そのままではない。
+    # import_csv は最後に generate_virtual_local_rail_services を実行し、
+    # 列車種別を持たない路線へ各駅停車の系統を DB 上で生成する(約2,400行)。
+    # これを取り込むため、CI でも PostgreSQL を立てて取り込みを一度通す。
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: stationapi
+          POSTGRES_PASSWORD: stationapi
+          POSTGRES_DB: stationapi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://stationapi:stationapi@127.0.0.1:5432/stationapi
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            worker/target
+          key: worker-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Create required PostgreSQL extensions
+        run: psql "$DATABASE_URL" -f docker/postgres/00_extensions.sql
+
+      - name: Export worker data
+        run: cargo run --release --package stationapi --bin stationapi -- --export-worker-data worker/generated
+
+      - name: Verify exported data
+        run: |
+          test -s worker/generated/station_station_types.csv
+          echo "exported rows: $(($(wc -l < worker/generated/station_station_types.csv) - 1))"
+
+      - name: Install worker-build
+        run: cargo install worker-build --locked
+
+      - name: Build worker
+        working-directory: worker
+        run: worker-build --release
+
+      - name: Report bundle size
+        working-directory: worker
+        run: |
+          raw=$(stat -c%s build/index_bg.wasm)
+          gz=$(gzip -9 -c build/index_bg.wasm | wc -c)
+          echo "wasm raw: $((raw / 1024)) KiB"
+          echo "wasm gzip: $((gz / 1024)) KiB (Workers upper limit is 10 MiB)"
+          # 上限を超える前に気付けるよう、8 MiB を閾値にする
+          if [ "$gz" -gt $((8 * 1024 * 1024)) ]; then
+            echo "::error::gzip size exceeds 8 MiB"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: worker-build
+          path: |
+            worker/build/
+            worker/generated/
+          retention-days: 7
