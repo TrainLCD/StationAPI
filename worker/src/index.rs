@@ -73,6 +73,9 @@ pub struct StationRecord {
     pub name_roman: Option<String>,
     /// マクロンを含まない正規化ローマ字 (station_name_rn)。ILIKE 検索の対象。
     pub name_roman_normalized: Option<String>,
+    /// 上を小文字化したもの。ILIKE 相当の比較を全件走査で行うため、
+    /// 検索のたびに 11,148 件分 to_lowercase() を呼ばないよう索引時に持つ。
+    name_roman_lower: Option<String>,
     pub name_chinese: Option<String>,
     pub name_korean: Option<String>,
     pub station_number1: Option<String>,
@@ -205,6 +208,7 @@ fn build_stations() -> Vec<StationRecord> {
             name_katakana: text(&r, c.at("station_name_k")),
             name_roman: opt_text(&r, c.at("station_name_r")),
             name_roman_normalized: opt_text(&r, c.at("station_name_rn")),
+            name_roman_lower: opt_text(&r, c.at("station_name_rn")).map(|v| v.to_lowercase()),
             name_chinese: opt_text(&r, c.at("station_name_zh")),
             name_korean: opt_text(&r, c.at("station_name_ko")),
             station_number1: opt_text(&r, c.at("station_number1")),
@@ -444,9 +448,9 @@ pub fn search_by_name(query: &str, limit: usize) -> Vec<&'static StationRecord> 
         .filter(|s| joins_active_line(s))
         .filter(|s| {
             s.name.contains(query)
-                || s.name_roman_normalized
+                || s.name_roman_lower
                     .as_deref()
-                    .is_some_and(|v| v.to_lowercase().contains(&lowered))
+                    .is_some_and(|v| v.contains(&lowered))
                 || s.name_katakana.contains(&katakana)
                 || s.name_chinese.as_deref().is_some_and(|v| v.contains(query))
                 || s.name_korean.as_deref().is_some_and(|v| v.contains(query))
@@ -466,7 +470,11 @@ pub fn search_by_name(query: &str, limit: usize) -> Vec<&'static StationRecord> 
 // ---------------------------------------------------------------- 列車種別
 
 const TYPES_CSV: &str = include_str!("../../data/4!types.csv");
-const SST_CSV: &str = include_str!("../../data/5!station_station_types.csv");
+/// build.rs が生成した固定長バイナリ (1 行 = i32 x 4, リトルエンディアン)。
+/// CSV のままだと 41,250 行のパースがコールドスタートの大半を占めるため。
+const SST_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/sst.bin"));
+/// build.rs 側と揃えた欠損値表現
+const NULL_I32: i32 = i32::MIN;
 
 /// types.csv の 1 行。`id` 列は CSV 上 DEFAULT で、PostgreSQL では SERIAL が
 /// 行順に採番する (`t.id AS type_id` として応答に出る)。ここでも同じ順で振る。
@@ -557,34 +565,29 @@ pub fn ssts() -> &'static [SstRecord] {
 }
 
 fn build_ssts() -> Vec<SstRecord> {
-    let mut rdr = reader(SST_CSV);
-    let Ok(headers) = rdr.headers().cloned() else {
-        return Vec::new();
+    const ROW: usize = 16; // i32 x 4
+    let read = |chunk: &[u8], i: usize| -> i32 {
+        i32::from_le_bytes([
+            chunk[i * 4],
+            chunk[i * 4 + 1],
+            chunk[i * 4 + 2],
+            chunk[i * 4 + 3],
+        ])
     };
-    let c = Cols::of(&headers);
-    let (Some(i_station), Some(i_type)) = (c.at("station_cd"), c.at("type_cd")) else {
-        return Vec::new();
-    };
+    let nullable = |v: i32| (v != NULL_I32).then_some(v);
 
-    let mut out = Vec::with_capacity(45_000);
-    // SERIAL 相当。COPY の行順で 1 から採番される
-    let mut serial = 0i32;
-    for r in rdr.records().flatten() {
-        let (Some(station_cd), Some(type_cd)) =
-            (opt_i32(&r, Some(i_station)), opt_i32(&r, Some(i_type)))
-        else {
-            continue;
-        };
-        serial += 1;
-        out.push(SstRecord {
-            id: serial,
-            station_cd,
-            type_cd,
-            line_group_cd: opt_i32(&r, c.at("line_group_cd")),
-            pass: opt_i32(&r, c.at("pass")),
-        });
-    }
-    out
+    SST_BIN
+        .chunks_exact(ROW)
+        .enumerate()
+        .map(|(i, chunk)| SstRecord {
+            // SERIAL 相当。build.rs が CSV の行順を保っているのでここで採番できる
+            id: i as i32 + 1,
+            station_cd: read(chunk, 0),
+            type_cd: read(chunk, 1),
+            line_group_cd: nullable(read(chunk, 2)),
+            pass: nullable(read(chunk, 3)),
+        })
+        .collect()
 }
 
 /// station_cd に紐づく station_station_types を sst.id 昇順で返す。
