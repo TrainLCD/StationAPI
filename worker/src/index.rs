@@ -1,10 +1,14 @@
 //! CSV をバイナリに埋め込み、isolate 起動時に一度だけパースしてメモリに保持する。
 //! PostgreSQL の `point(lat,lon) <-> point($1,$2)` によるソートを全件走査で置き換える。
 
+use stationapi::domain::normalize::normalize_for_search;
+use std::collections::HashMap;
 use std::sync::OnceLock;
 
 /// 鉄道駅データ。ビルド時にバイナリへ埋め込まれる (raw 2.2MB / gzip 684KB)。
 const STATIONS_CSV: &str = include_str!("../../data/3!stations.csv");
+/// 路線データ。駅の所属路線を JOIN 相当で絞り込むために使う。
+const LINES_CSV: &str = include_str!("../../data/2!lines.csv");
 
 /// 検索と応答生成に必要な列だけを持つ軽量レコード。
 /// Station エンティティ (66 フィールド) はレスポンス生成時にのみ組み立てる。
@@ -15,6 +19,8 @@ pub struct StationRecord {
     pub name: String,
     pub name_katakana: String,
     pub name_roman: Option<String>,
+    /// マクロンを含まない正規化ローマ字 (station_name_rn)。ILIKE 検索の対象。
+    pub name_roman_normalized: Option<String>,
     pub name_chinese: Option<String>,
     pub name_korean: Option<String>,
     pub three_letter_code: Option<String>,
@@ -30,6 +36,49 @@ pub struct StationRecord {
 }
 
 static INDEX: OnceLock<Vec<StationRecord>> = OnceLock::new();
+static LINE_STATUS: OnceLock<HashMap<u32, i32>> = OnceLock::new();
+
+fn line_status() -> &'static HashMap<u32, i32> {
+    LINE_STATUS.get_or_init(build_line_status)
+}
+
+fn build_line_status() -> HashMap<u32, i32> {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .from_reader(LINES_CSV.as_bytes());
+    let headers = match reader.headers() {
+        Ok(h) => h.clone(),
+        Err(_) => return HashMap::new(),
+    };
+    let col = |name: &str| headers.iter().position(|h| h.trim() == name);
+    let (Some(c_cd), Some(c_status)) = (col("line_cd"), col("e_status")) else {
+        return HashMap::new();
+    };
+
+    let mut map = HashMap::with_capacity(1024);
+    for record in reader.records().flatten() {
+        let (Some(cd), Some(status)) = (
+            record.get(c_cd).and_then(|v| v.trim().parse::<u32>().ok()),
+            record.get(c_status).and_then(|v| v.trim().parse::<i32>().ok()),
+        ) else {
+            continue;
+        };
+        map.insert(cd, status);
+    }
+    map
+}
+
+/// `stations JOIN lines ON s.line_cd = l.line_cd` (INNER) 相当。
+/// lines に無い line_cd の駅は既存 SQL でも結果に出ない。座標検索がこの条件。
+fn joins_line(record: &StationRecord) -> bool {
+    line_status().contains_key(&record.line_cd)
+}
+
+/// 名前検索の JOIN は `AND l.e_status = 0` を追加で要求する。
+/// これを見ないと廃止路線 (例: 成田エクスプレス, e_status=3) の駅が混ざる。
+fn joins_active_line(record: &StationRecord) -> bool {
+    line_status().get(&record.line_cd) == Some(&0)
+}
 
 pub fn stations() -> &'static [StationRecord] {
     INDEX.get_or_init(build)
@@ -59,6 +108,7 @@ fn build() -> Vec<StationRecord> {
         return Vec::new();
     };
     let c_roman = col("station_name_r");
+    let c_roman_n = col("station_name_rn");
     let c_zh = col("station_name_zh");
     let c_ko = col("station_name_ko");
     let c_tlc = col("three_letter_code");
@@ -98,6 +148,7 @@ fn build() -> Vec<StationRecord> {
             name: text(&record, c_name),
             name_katakana: text(&record, c_kana),
             name_roman: opt(&record, c_roman),
+            name_roman_normalized: opt(&record, c_roman_n),
             name_chinese: opt(&record, c_zh),
             name_korean: opt(&record, c_ko),
             three_letter_code: opt(&record, c_tlc),
@@ -133,6 +184,7 @@ pub fn nearest(lat: f64, lon: f64, limit: usize) -> Vec<(&'static StationRecord,
     let mut scored: Vec<(&StationRecord, f64)> = stations()
         .iter()
         .filter(|s| s.e_status == 0)
+        .filter(|s| joins_line(s))
         .map(|s| (s, haversine_km(lat, lon, s.lat, s.lon)))
         .collect();
 
@@ -146,4 +198,44 @@ pub fn nearest(lat: f64, lon: f64, limit: usize) -> Vec<(&'static StationRecord,
     }
     scored.sort_unstable_by(cmp);
     scored
+}
+
+/// 既存 SQL の WHERE 句と同じ部分一致セマンティクス。
+///
+/// PostgreSQL 側の `pg_trgm` は `LIKE '%...%'` を高速化する GIN インデックスであって
+/// 類似度検索ではないため、`contains()` で論理的に等価な結果が得られる。
+/// 正規化には domain 層の `normalize_for_search` をそのまま使うので挙動も一致する。
+pub fn search_by_name(query: &str, limit: usize) -> Vec<&'static StationRecord> {
+    if query.is_empty() {
+        return Vec::new();
+    }
+    // s.station_name_k LIKE $4 用: ひらがな→カタカナ、全角→半角
+    let katakana = normalize_for_search(query);
+    // s.station_name_rn ILIKE $3 用
+    let lowered = query.to_lowercase();
+
+    let mut hits: Vec<&'static StationRecord> = stations()
+        .iter()
+        .filter(|s| s.e_status == 0)
+        .filter(|s| joins_active_line(s))
+        .filter(|s| {
+            s.name.contains(query)
+                || s
+                    .name_roman_normalized
+                    .as_deref()
+                    .is_some_and(|v| v.to_lowercase().contains(&lowered))
+                || s.name_katakana.contains(&katakana)
+                || s.name_chinese.as_deref().is_some_and(|v| v.contains(query))
+                || s.name_korean.as_deref().is_some_and(|v| v.contains(query))
+        })
+        .collect();
+
+    // ORDER BY station_g_cd, station_name
+    hits.sort_unstable_by(|a, b| {
+        a.station_g_cd
+            .cmp(&b.station_g_cd)
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    hits.truncate(limit);
+    hits
 }
