@@ -104,7 +104,7 @@ jobs:
             curl -sf http://127.0.0.1:8787/__ping >/dev/null 2>&1 && break
             sleep 2
           done
-          curl -sf http://127.0.0.1:8787/graphql/schema -o /tmp/generated.graphql
+          curl -sf http://127.0.0.1:8787/__schema -o /tmp/generated.graphql
           kill %1 || true
           python3 scripts/compare_schema.py schema/bff.graphql /tmp/generated.graphql
 

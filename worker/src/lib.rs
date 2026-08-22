@@ -4,6 +4,9 @@
 //! こちらは GraphQL をそのまま返すので BFF を挟まない。
 //! スキーマは BFF のものと一致させてあり、CI で SDL を突き合わせている。
 //!
+//! エンドポイントも BFF に合わせ、サブドメイン直下 (`/`) でクエリを受ける。
+//! `/__schema` などの内部向けは `__` を前置して区別している。
+//!
 //! sqlx / tonic は wasm32 で動かないため、前者は埋め込みデータの
 //! インメモリ索引、後者は不要 (GraphQL 化により) となっている。
 //! UseCase 層は一切変更せず、repository トレイトの実装だけを差し替えている。
@@ -71,14 +74,15 @@ async fn route(req: Request) -> Result<Response> {
         ));
     }
     // スキーマを配る。CI はこれと BFF の schema.graphql を突き合わせる。
-    if method == Method::Get && path == "/graphql/schema" {
+    if method == Method::Get && path == "/__schema" {
         let schema = graphql::build_schema(interactor());
         return with_cors(Response::ok(schema.sdl())?);
     }
-    if method == Method::Get && path == "/graphql" {
-        return Response::from_html(GraphiQLSource::build().endpoint("/graphql").finish());
+    // BFF と同じく、サブドメイン直下で GraphQL を受ける
+    if method == Method::Get && path == "/" {
+        return Response::from_html(GraphiQLSource::build().endpoint("/").finish());
     }
-    if method == Method::Post && path == "/graphql" {
+    if method == Method::Post && path == "/" {
         return handle_graphql(req).await;
     }
 
