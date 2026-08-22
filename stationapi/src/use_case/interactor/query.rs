@@ -65,7 +65,7 @@ use crate::{
         },
         segment_speed_table::{segment_override_applies_to_kind, segment_speed_override_kmh},
     },
-    proto::{self, Route},
+    model::{self, Route},
     use_case::{
         dto::simulation::resolve_speed_profile, error::UseCaseError, traits::query::QueryUseCase,
     },
@@ -662,7 +662,7 @@ where
 
         // TODO: SQLで同等の処理を行う
         // 発着駅を含まない経路候補はレスポンスに含まれないため、
-        // 路線の取得やproto変換を行う前にここで除外する
+        // 路線の取得やモデル変換を行う前にここで除外する
         let route_groups: Vec<(&i32, &Vec<&Station>)> = route_row_tree_map
             .iter()
             .filter(|(_, stops)| {
@@ -773,7 +773,7 @@ where
 
                     stop.into()
                 })
-                .collect::<Vec<proto::Station>>();
+                .collect::<Vec<model::Station>>();
 
             routes.push(Route {
                 id: *id as u32,
@@ -943,7 +943,7 @@ where
         from_station_id: u32,
         to_station_id: u32,
         line_group_id: Option<u32>,
-    ) -> Result<Vec<proto::TrainRouteSegment>, UseCaseError> {
+    ) -> Result<Vec<model::TrainRouteSegment>, UseCaseError> {
         let line_group_id = line_group_id.ok_or_else(|| UseCaseError::NotFound {
             entity_type: "line group",
             entity_id: "unspecified".to_string(),
@@ -975,7 +975,7 @@ where
             v
         };
 
-        let mut segments: Vec<proto::TrainRouteSegment> = Vec::with_capacity(sliced.len());
+        let mut segments: Vec<model::TrainRouteSegment> = Vec::with_capacity(sliced.len());
         // 経路スライス内で路線ごとに通過駅があるか。通過駅が無い路線では優等種別でも
         // 実質各駅停車として走る(東急田園都市線の急行が半蔵門線内で各駅停車になる
         // 直通など)ため、種別の速度を適用せず各停(Default)として扱う。
@@ -987,13 +987,13 @@ where
         for (i, station) in sliced.iter().enumerate() {
             let is_endpoint = i == 0 || i + 1 == sliced_len;
             let passed = !is_endpoint
-                && (station.stop_condition == proto::StopCondition::Not || station.pass == Some(1));
+                && (station.stop_condition == model::StopCondition::Not || station.pass == Some(1));
             let entry = line_has_pass.entry(station.line_cd).or_insert(false);
             *entry = *entry || passed;
         }
         let mut prev_stop: Option<(f64, f64, i32)> = None;
         for station in sliced {
-            let stops = station.stop_condition != proto::StopCondition::Not;
+            let stops = station.stop_condition != model::StopCondition::Not;
 
             let distance_from_previous = match prev_stop {
                 Some((plat, plon, _)) => haversine_distance(plat, plon, station.lat, station.lon),
@@ -1026,9 +1026,9 @@ where
             }
             prev_stop = Some((station.lat, station.lon, station.station_cd));
 
-            let grpc_station: proto::Station = station.into();
-            segments.push(proto::TrainRouteSegment {
-                station: Some(grpc_station),
+            let model_station: model::Station = station.into();
+            segments.push(model::TrainRouteSegment {
+                station: Some(model_station),
                 stops,
                 distance_from_previous,
                 max_speed: profile.max_speed,
@@ -1331,7 +1331,7 @@ where
                         Some(Box::new(train_type)),
                     );
                     stop.line_group_cd = Some(virtual_line_group_id as i32);
-                    proto::Station::from(stop)
+                    model::Station::from(stop)
                 })
                 .collect();
             routes.push(Route {
@@ -1940,7 +1940,7 @@ fn haversine_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 mod tests {
     use super::*;
     use crate::domain::entity::gtfs::TransportType;
-    use crate::proto::StopCondition;
+    use crate::model::StopCondition;
 
     /// Helper to create a minimal Station for testing
     fn create_test_station(
@@ -2998,14 +2998,14 @@ mod tests {
         /// 修正前は種別倍率(×1.15)が掛かり駅間別較正も外れて約15分に縮んでいた。
         #[tokio::test]
         async fn test_estimate_route_arrival_times_through_express_all_stops_matches_local() {
-            let default_kind = Some(proto::TrainTypeKind::Default as i32);
+            let default_kind = Some(model::TrainTypeKind::Default as i32);
             let local = build_interactor(hanzomon_stops(default_kind), vec![], vec![], vec![]);
             let local_est = local
                 .estimate_route_arrival_times(2800813, 2800807, &[], None)
                 .await
                 .unwrap();
 
-            let express_kind = Some(proto::TrainTypeKind::Express as i32);
+            let express_kind = Some(model::TrainTypeKind::Express as i32);
             let express = build_interactor(hanzomon_stops(express_kind), vec![], vec![], vec![]);
             let express_est = express
                 .estimate_route_arrival_times(2800813, 2800807, &[], None)

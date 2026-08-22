@@ -10,7 +10,7 @@
 
 ### TransportType
 
-```protobuf
+```graphql
 enum TransportType {
   TransportTypeUnspecified = 0;  // 鉄道駅のみ（デフォルト）
   Rail = 1;                       // 鉄道駅のみ
@@ -52,7 +52,7 @@ enum TransportType {
 
 ### 鉄道駅のみを取得（デフォルト）
 
-```protobuf
+```graphql
 // transport_type未指定で鉄道駅のみを取得
 GetStationByGroupIdRequest {
   group_id: 1130201
@@ -67,7 +67,7 @@ GetStationByGroupIdRequest {
 
 ### バス停のみを取得
 
-```protobuf
+```graphql
 GetStationByGroupIdRequest {
   group_id: 1130201
   transport_type: Bus
@@ -76,7 +76,7 @@ GetStationByGroupIdRequest {
 
 ### 鉄道駅とバス停の両方を取得
 
-```protobuf
+```graphql
 GetStationByGroupIdRequest {
   group_id: 1130201
   transport_type: RailAndBus
@@ -87,9 +87,10 @@ GetStationByGroupIdRequest {
 
 ### 関連ファイル
 
-- `proto/stationapi.proto`: リクエスト定義
-- `src/use_case/interactor/query.rs`: ビジネスロジック
-- `src/presentation/controller/grpc.rs`: gRPCコントローラー
+- `schema/public.graphql`: 公開スキーマ
+- `stationapi/src/use_case/interactor/query.rs`: ビジネスロジック
+- `src/graphql/query.rs`: GraphQL リゾルバ
+- `src/repository.rs`: 近傍バス停の検索 (インメモリ索引)
 
 ### 定数
 
@@ -107,7 +108,7 @@ async fn get_nearby_bus_lines(&self, ref_lat: f64, ref_lon: f64) -> Result<Vec<L
 
 ## バス停の `has_train_types`
 
-バス停も鉄道駅と同様に `TrainType` を持ち、`Station.has_train_types` が `true` になります。これは GTFS インポート時に `(route_id, shape_id)` のバリエーション (循環ループ / 短ターン / サンシャインシティ経由など) ごとに `types` (`kind = TrainTypeKind::BusRoute (= 7)`) と `station_station_types` を生成しているためです。詳細は [`architecture.md` のバス統合節](./architecture.md) と `src/import.rs::integrate_gtfs_trip_variations_to_types` を参照してください。
+バス停も鉄道駅と同様に `TrainType` を持ち、`Station.has_train_types` が `true` になります。これは GTFS インポート時に `(route_id, shape_id)` のバリエーション (循環ループ / 短ターン / サンシャインシティ経由など) ごとに `types` (`kind = TrainTypeKind::BusRoute (= 7)`) と `station_station_types` を生成しているためです。詳細は [`architecture.md` のバス統合節](./architecture.md) と `preprocessor/src/gtfs/integrate.rs` の `trip_variations_to_types` を参照してください。
 
 クライアントは `GetTrainTypesByStationId` でバス停の系統バリエーションを取得し、UI 上で「池袋駅東口 (循環)」「新宿伊勢丹前 ⇔ 池袋駅東口」のように切り替え表示できます。なお、停留所集合が同じで方向だけが違う shape ペアは 1 つの TrainType に畳まれ、`direction = Both` (双方向) として返されます。
 

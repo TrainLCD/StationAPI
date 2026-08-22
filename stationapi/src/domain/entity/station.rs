@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::proto::StopCondition;
+use crate::model::StopCondition;
 
 use super::{
     gtfs::TransportType, line::Line, station_number::StationNumber,
@@ -221,7 +221,7 @@ impl Station {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proto::StopCondition;
+    use crate::model::StopCondition;
 
     fn create_test_station_number() -> StationNumber {
         StationNumber::new(

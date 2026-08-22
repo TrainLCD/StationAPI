@@ -8,7 +8,7 @@ use crate::{
             station::Station, station_number::StationNumber, train_type::TrainType,
         },
     },
-    proto::{Route, TrainRouteSegment},
+    model::{Route, TrainRouteSegment},
     use_case::error::UseCaseError,
 };
 

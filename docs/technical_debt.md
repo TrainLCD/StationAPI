@@ -1,6 +1,16 @@
 # StationAPI 技術負債分析レポート
 
-> 最終更新: 2026年1月
+> 最終更新: 2026年1月 (分析時点)
+>
+> **注意: 本書は Cloudflare Workers への移行前 (gRPC + PostgreSQL 構成) の分析です。**
+> ここで挙げている `infrastructure/` (sqlx リポジトリ)、`presentation/` (tonic)、
+> `import.rs` (PostgreSQL 取り込み) はいずれも削除済みで、
+> 「SQL クエリの未最適化」「複雑な SQL クエリ」「gRPC コントローラーテスト」
+> といった項目は対象コードごと無くなっています。
+> 現在の構成は [architecture.md](./architecture.md) を参照してください。
+>
+> 一方、**Station エンティティが 66 フィールドある**、**clone が多い**、
+> **ハードコードされた値**といった domain / use_case 層の指摘は今も有効です。
 
 ## 目次
 
@@ -25,7 +35,7 @@
 | 項目 | 内容 |
 |------|------|
 | 言語 | Rust (Edition 2021) |
-| アーキテクチャ | クリーンアーキテクチャ (Domain/UseCase/Infrastructure/Presentation) |
+| アーキテクチャ | クリーンアーキテクチャ (Domain/UseCase/Infrastructure/Presentation) ※分析時点 |
 | 主要依存関係 | tokio 1.28.0, sqlx 0.8.3, tonic 0.12.3 |
 | コード規模 | 約 10,600 行 (Rust) |
 | データ | 8つの CSV ファイル (日本の鉄道データ) |
@@ -234,7 +244,6 @@ let station_numbers_raw = [
 
 - **テスト関数数**: 200個
 - **テスト範囲**: Repository 層中心
-- **テストドキュメント**: `docs/repository_testing.md`
 
 #### 不足している領域
 

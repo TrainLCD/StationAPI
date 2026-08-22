@@ -52,7 +52,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    | プレフィックス | 採用条件 |
    | ---- | ---- |
    | `fix/` | 変更内容や直近コミット件名にバグ修正・`fix`・`修正`・`不具合` を示唆する語がある |
-   | `data/` | 変更が `data/**/*.csv` / `data/create_table.sql` などデータ系のみ |
+   | `data/` | 変更が `data/**/*.csv` などデータ系のみ |
    | `chore/` | 依存更新（`Cargo.toml` / `Cargo.lock`）・ビルド設定など雑務のみ |
    | `release/` | リリース作業（バージョンバンプなど。ユーザーが明示した場合のみ） |
    | `feature/` | 上記いずれにも当たらない場合の既定（新機能・通常の改修） |
@@ -71,8 +71,8 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    ```
    - コミット前に下記の品質チェックを通す（`CONTRIBUTING.md` ルール、手順 3 で定義する「コード本体パス」に変更が無ければ省略可）:
      - `cargo fmt --all -- --check`
-     - `SQLX_OFFLINE=true cargo clippy -- -D warnings`
-     - `SQLX_OFFLINE=true cargo test`
+     - `make clippy`
+     - `make test`
    - データのみの変更（`data/*.csv` 等）を含む場合は `cargo run -p data_validator` も流す。
    - push は新規ブランチなので安全だが、実行前にユーザーへ要約（ブランチ名・含めるファイル・コミットメッセージ案）を提示して承認を取る。
 
@@ -105,7 +105,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    - `tools/**`
    - `docker/**`
    - `Cargo.toml` / `Cargo.lock`
-   - `compose.yml`
+   - `wrangler.jsonc`
 
    **コード本体変更ありの場合 — コミット件名ベース**
 
@@ -119,7 +119,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
    | 項目 | パターン |
    | ---- | ---- |
-   | データの修正・追加 | `data/**/*.csv`, `data/create_table.sql`, `data/*.sql` |
+   | データの修正・追加 | `data/**/*.csv` |
    | ドキュメント | 変更が `*.md` / `docs/**` / `README*` / `.claude/**` / `AGENTS.md` / `CONTRIBUTING.md` のみ、またはそれらを主体とする |
    | CI/CD | `.github/workflows/**`, `.github/**/*.yml`, `Makefile` のいずれかを含む |
 
@@ -151,7 +151,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    - 「変更内容」節: コミット件名と変更ファイルから短い箇条書きを生成。`summary` があればそれを優先。データのみの PR では追加・修正した路線・駅などを箇条書きで列挙すると親切。
    - 「テスト」節:
      - **判定基準: 手順 3 の「コード本体パス」（`stationapi/src/**` ほか）に変更が無い場合は Step 1 の `cargo` チェックを省略したとみなし、3 項目すべて OFF**（`skip_checks` より優先）。本文末尾に「省略: コード変更なし」等の短い注記を残す。
-     - 上記に該当しない場合は `skip_checks` が真なら 3 項目すべて OFF、偽なら 3 項目すべて ON。テキストはテンプレのまま（`cargo fmt --all -- --check` / `cargo clippy -- -D warnings` / `cargo test`（`SQLX_OFFLINE=true`））。
+     - 上記に該当しない場合は `skip_checks` が真なら 3 項目すべて OFF、偽なら 3 項目すべて ON。テキストはテンプレのまま（`make fmt` / `make clippy` / `make test`）。
    - 「関連Issue」節: `related_issue` が指定されていればユーザー入力を最優先で出力（`#N` のみなら `Closes #N`、`Closes/Fixes/Refs #N` 形式なら接頭語を維持）。空のときに限りコミット件名から `Closes/Fixes/Refs #N` を抽出。どちらも無ければコメントのみ。
    - 「スクリーンショット」節: 常にコメントのみ（API レスポンスの diff など必要なら呼び出し側が後から編集する前提）。
 

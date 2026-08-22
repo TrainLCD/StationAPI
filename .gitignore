@@ -1,13 +1,10 @@
 /target
-/worker/target
-/worker/build
-/worker/.wrangler
-/worker/generated
+/build
+/.wrangler
+/generated
 .env.local
 server.crt
 server.key
-api_descriptor.pb
-tmp.sql
 .vscode/
 data/ToeiBus-GTFS/
 data/SeibuBus-GTFS/

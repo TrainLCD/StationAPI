@@ -19,7 +19,7 @@
 //! - 公開 GTFS 時刻表が利用できる路線は `scripts/compute_speed_table.py` で
 //!   自動較正し、下部の自動生成ブロックへ書き込む(手動テーブルが優先)。
 
-use crate::proto::TrainTypeKind;
+use crate::model::TrainTypeKind;
 
 /// (line_cd, kind, 実効最高速度 km/h)。kind は `TrainTypeKind` の値。
 /// 較正ベンチマーク: 各行のコメントの実所要時間(日中標準)に対し誤差 ±10% 以内。
