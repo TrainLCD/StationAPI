@@ -648,9 +648,28 @@ impl StationRepository for MemStationRepository {
 #[derive(Clone, Default)]
 pub struct MemLineRepository;
 
+/// 既存 SQL の
+/// `AND ((sst.line_group_cd IS NOT NULL AND sst.pass <> 1) OR sst.line_group_cd IS NULL)`
+/// に対応する。LEFT JOIN なので、
+/// - 系統を1つも持たない駅 -> 通す (sst 側が NULL)
+/// - 系統を持つ駅 -> 停車する系統が1つでもあれば通す
+fn passes_stop_condition(station_cd: i32) -> bool {
+    let mut has_group = false;
+    for sst in index::sst_by_station(station_cd) {
+        if sst.line_group_cd.is_some() {
+            has_group = true;
+            if sst.pass != Some(1) {
+                return true;
+            }
+        }
+    }
+    !has_group
+}
+
 /// 駅グループに属する各駅の所属路線を、JOIN 結果と同じく駅の識別子付きで返す。
 /// UseCase 層は `line.station_g_cd` で駅に紐付けるため、ここを埋める必要がある。
-fn lines_of_groups(group_ids: &[u32]) -> Vec<Line> {
+/// `require_stop` は types を JOIN する版 (通過のみの系統を除く) かどうか。
+fn lines_of_groups_inner(group_ids: &[u32], require_stop: bool) -> Vec<Line> {
     let mut out = Vec::new();
     for &gid in group_ids {
         for record in index::stations_by_group(gid as i32) {
@@ -665,6 +684,9 @@ fn lines_of_groups(group_ids: &[u32]) -> Vec<Line> {
             if line.e_status != 0 {
                 continue;
             }
+            if require_stop && !passes_stop_condition(record.station_cd) {
+                continue;
+            }
             let mut line = line.clone();
             line.station_cd = Some(record.station_cd);
             line.station_g_cd = Some(record.station_g_cd);
@@ -676,25 +698,27 @@ fn lines_of_groups(group_ids: &[u32]) -> Vec<Line> {
 
 #[async_trait]
 impl LineRepository for MemLineRepository {
+    /// SQL は sst を LEFT JOIN し、通過のみの系統しか持たない駅を除く
     async fn get_by_station_group_id_vec(
         &self,
         station_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
-        Ok(lines_of_groups(station_group_id_vec))
+        Ok(lines_of_groups_inner(station_group_id_vec, true))
     }
 
+    /// no_types 版は sst を JOIN しないので通過条件は掛からない
     async fn get_by_station_group_id_vec_no_types(
         &self,
         station_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
-        Ok(lines_of_groups(station_group_id_vec))
+        Ok(lines_of_groups_inner(station_group_id_vec, false))
     }
 
     async fn get_by_station_group_id(
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Line>, DomainError> {
-        Ok(lines_of_groups(&[station_group_id]))
+        self.get_by_station_group_id_vec(&[station_group_id]).await
     }
 
     /// 既存 SQL は WHERE l.e_status = 0
@@ -712,10 +736,23 @@ impl LineRepository for MemLineRepository {
             .collect())
     }
 
+    /// 既存 SQL は sst を `LEFT JOIN ... AND sst.pass <> 1` して
+    /// line_group_cd / type_cd を返す。停車する系統が無ければ NULL のまま。
     async fn find_by_station_id(&self, station_id: u32) -> Result<Option<Line>, DomainError> {
-        Ok(index::station_by_cd(station_id as i32)
-            .and_then(|r| index::line_by_cd(r.line_cd))
-            .cloned())
+        let Some(record) = index::station_by_cd(station_id as i32) else {
+            return Ok(None);
+        };
+        let Some(line) = index::line_by_cd(record.line_cd) else {
+            return Ok(None);
+        };
+        let mut line = line.clone();
+        line.station_cd = Some(record.station_cd);
+        line.station_g_cd = Some(record.station_g_cd);
+        if let Some(sst) = index::sst_by_station(record.station_cd).find(|s| s.pass != Some(1)) {
+            line.line_group_cd = sst.line_group_cd;
+            line.type_cd = Some(sst.type_cd);
+        }
+        Ok(Some(line))
     }
 
     async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Line>, DomainError> {
