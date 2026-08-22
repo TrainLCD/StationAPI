@@ -660,15 +660,18 @@ where
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
 
-        // 発着駅を含まない経路候補はレスポンスに含まれないため、
+        // 発着駅の両方を含まない経路候補はレスポンスに含まれないため、
         // 路線の取得やモデル変換を行う前にここで除外する
         let route_groups: Vec<(&i32, &Vec<&Station>)> = route_row_tree_map
             .iter()
             .filter(|(_, stops)| {
-                stops.iter().any(|row| {
-                    row.station_g_cd as u32 == from_station_id
-                        || row.station_g_cd as u32 == to_station_id
-                })
+                let has_from = stops
+                    .iter()
+                    .any(|row| row.station_g_cd as u32 == from_station_id);
+                let has_to = stops
+                    .iter()
+                    .any(|row| row.station_g_cd as u32 == to_station_id);
+                has_from && has_to
             })
             .collect();
 
@@ -5342,6 +5345,32 @@ mod tests {
                 let line_ids: Vec<u32> = tt.lines.iter().map(|l| l.id).collect();
                 assert_eq!(line_ids, vec![22]);
             }
+        }
+
+        #[tokio::test]
+        async fn test_get_routes_excludes_group_with_only_one_endpoint() {
+            let stops = vec![
+                // line_group 100: 発着駅(1, 3)の両方を含む → 採用
+                create_route_stop(1101, 1, 11, Some(100)),
+                create_route_stop(1103, 3, 11, Some(100)),
+                // line_group 400: 出発駅しか含まない → 除外
+                create_route_stop(4101, 1, 44, Some(400)),
+                create_route_stop(4104, 4, 44, Some(400)),
+                // line_group 500: 到着駅しか含まない → 除外
+                create_route_stop(5103, 3, 55, Some(500)),
+                create_route_stop(5105, 5, 55, Some(500)),
+            ];
+            let lines = vec![
+                create_route_line(11, 100),
+                create_route_line(44, 400),
+                create_route_line(55, 500),
+            ];
+            let interactor = build_interactor(stops, lines);
+
+            let routes = interactor.get_routes(1, 3, None).await.unwrap();
+
+            let route_ids: Vec<u32> = routes.iter().map(|r| r.id).collect();
+            assert_eq!(route_ids, vec![100]);
         }
 
         #[tokio::test]
