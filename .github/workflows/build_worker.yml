@@ -1,5 +1,15 @@
+# データと Worker のビルドが通ることと、公開スキーマから外れていないことを
+# 検証するだけのワークフロー。デプロイはしない。
+#
+# デプロイは環境ごとに別ファイルへ分けてある:
+#   dev    -> deploy_staging.yml    (stationapi-stg)
+#   master -> deploy_production.yml (stationapi)
+# デプロイ先をトリガとファイルで固定することで、他のブランチが誤って
+# どこかの環境へ向くことがないようにしている。
 on:
   pull_request:
+    # GitHub Actions は YAML のアンカー / エイリアスを解釈しないため、
+    # このリストは push 側と二重に書く必要がある。片方だけ直さないこと。
     paths:
       - "src/**"
       - "schema/**"
@@ -11,7 +21,14 @@ on:
       - "wrangler.jsonc"
       - "Cargo.lock"
       - "Cargo.toml"
+      - ".github/actions/build-worker/action.yml"
+      - ".github/workflows/build_worker.yml"
   push:
+    # dev / master は deploy_staging.yml / deploy_production.yml が同じ
+    # composite action で検証してからデプロイするため、ここでは走らせない。
+    branches-ignore:
+      - dev
+      - master
     paths:
       - "src/**"
       - "schema/**"
@@ -23,87 +40,35 @@ on:
       - "wrangler.jsonc"
       - "Cargo.lock"
       - "Cargo.toml"
+      - ".github/actions/build-worker/action.yml"
+      - ".github/workflows/build_worker.yml"
   workflow_dispatch:
 
 name: Build Cloudflare Worker
-
-env:
-  # ビルド結果を再現できるよう、ツールのバージョンを固定する
-  WORKER_BUILD_VERSION: "0.8.5"
-  WRANGLER_VERSION: "4.125.0"
 
 jobs:
   build:
     name: Build data and worker
     runs-on: ubuntu-latest
 
-    env:
-      # トークンが無ければトークン不要のフィード (都営バス) だけが取り込まれ、
-      # 他は警告を出してスキップされる。バスごと外したい場合は
-      # DISABLE_BUS_FEATURE=true を設定する。
-      ODPT_ACCESS_TOKEN: ${{ secrets.ODPT_ACCESS_TOKEN }}
-
+    # ここでは environment を宣言しない。environment は if: と違って
+    # ジョブが走れば必ず適用されるため、宣言すると全ブランチ・全 PR が
+    # その環境へのデプロイとして履歴に載り、環境 Secret (デプロイ用の
+    # CLOUDFLARE_API_TOKEN を含む) が任意のブランチのビルドから触れる。
+    #
+    # その代わり ODPT_ACCESS_TOKEN は空になり、トークンが要るバスフィードは
+    # 取り込まれない。検証としては成立する (スキーマもバンドルサイズもバスの
+    # 有無に依らない) ため、ここでは警告に留める。デプロイ経路では
+    # fail-on-missing-bus-feeds を有効にして取りこぼしを失敗にしている。
     steps:
+      # checkout は既定で GITHUB_TOKEN を .git/config に残す。後続の
+      # cargo install / npx は取得したパッケージのコードを実行するため
+      # 読み取られうる。ここから先で git 認証は使わない。
       - uses: actions/checkout@v4
-
-      - name: Install wasm target
-        run: rustup target add wasm32-unknown-unknown
-
-      - name: Cache cargo
-        uses: actions/cache@v4
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: worker-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          persist-credentials: false
 
-      # data/*.csv をそのまま Worker へ渡すと本番と挙動が変わる。列車種別を
-      # 持たない路線には各駅停車の系統を補う必要があり (約2,400行)、バス停と
-      # バス路線は GTFS / ODPT から起こす必要があるため。
-      - name: Build generated data
-        run: cargo run --profile tool -p stationapi-preprocessor
-
-      - name: Verify generated data
-        run: |
-          for t in companies lines stations types station_station_types aliases line_aliases; do
-            test -s "generated/$t.csv" || { echo "::error::$t.csv が空"; exit 1; }
-            echo "$t: $(python3 -c "import csv,sys;print(sum(1 for _ in csv.reader(open(sys.argv[1]))) - 1)" "generated/$t.csv") rows"
-          done
-          # バスが取り込めたかを可視化する (取り込めなくてもビルドは続行する)
-          bus=$(awk -F, 'NR>1 && $NF == 1' generated/stations.csv | wc -l)
-          echo "bus stops: $bus"
-
-      - name: Install worker-build
-        run: cargo install worker-build --locked --version "$WORKER_BUILD_VERSION"
-
-      - name: Build worker
-        run: worker-build --release
-
-      # 公開スキーマから外れるとクライアントが壊れる。SDL を取り出して
-      # schema/public.graphql と突き合わせる。
-      - name: Verify GraphQL schema
-        run: |
-          npx --yes "wrangler@$WRANGLER_VERSION" dev --port 8787 &
-          for _ in $(seq 1 120); do
-            curl -sf http://127.0.0.1:8787/__ping >/dev/null 2>&1 && break
-            sleep 2
-          done
-          curl -sf http://127.0.0.1:8787/__schema -o /tmp/generated.graphql
-          kill %1 || true
-          python3 scripts/compare_schema.py schema/public.graphql /tmp/generated.graphql
-
-      - name: Report bundle size
-        run: |
-          raw=$(stat -c%s build/index_bg.wasm)
-          gz=$(gzip -9 -c build/index_bg.wasm | wc -c)
-          echo "wasm raw: $((raw / 1024)) KiB"
-          echo "wasm gzip: $((gz / 1024)) KiB (Workers upper limit is 10 MiB)"
-          # 上限を超える前に気付けるよう、8 MiB を閾値にする
-          if [ "$gz" -gt $((8 * 1024 * 1024)) ]; then
-            echo "::error::gzip size exceeds 8 MiB"
-            exit 1
-          fi
+      - uses: ./.github/actions/build-worker
 
       - uses: actions/upload-artifact@v4
         with:

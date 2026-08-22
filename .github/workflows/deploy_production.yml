@@ -1,0 +1,70 @@
+# master を production (stationapi) へデプロイする。
+#
+# デプロイ先はこのファイルとトリガで固定してある。ブランチを式で判定して
+# 環境を選ぶ作りにすると、environment は if: と違ってジョブが走れば必ず
+# 適用されるため、意図しないブランチがこの環境の履歴と Secret に触れる。
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "src/**"
+      - "schema/**"
+      - "scripts/compare_schema.py"
+      - "stationapi/**"
+      - "preprocessor/**"
+      - "data/**"
+      - "build.rs"
+      - "wrangler.jsonc"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - ".github/actions/build-worker/action.yml"
+      - ".github/workflows/deploy_production.yml"
+  workflow_dispatch:
+
+name: Deploy to production
+
+env:
+  # composite action の既定値と Makefile の WRANGLER_VERSION に揃えること。
+  WRANGLER_VERSION: "4.125.0"
+
+# 同時に流れると、先に始まった古い版が後から上書きしうる。
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy to production
+    runs-on: ubuntu-latest
+
+    # workflow_dispatch にはブランチ絞り込みが無いので、ここで塞ぐ。
+    # push は on: branches で master に限定済み。
+    if: github.ref == 'refs/heads/master'
+
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # 検証用ビルドと違い、バスフィードの取りこぼしを失敗として扱う。
+      # preprocessor は取り込めなくても警告して続行するため、これが無いと
+      # 欠損したデータのまま production へ出ていく。
+      - uses: ./.github/actions/build-worker
+        with:
+          odpt-access-token: ${{ secrets.ODPT_ACCESS_TOKEN }}
+          fail-on-missing-bus-feeds: "true"
+          wrangler-version: ${{ env.WRANGLER_VERSION }}
+
+      # wrangler deploy は wrangler.jsonc の build.command (worker-build --release)
+      # を必ず実行し、これを飛ばすフラグは無い。直前のビルドで generated/ が
+      # 揃っているので、検証したのと同じ入力から同じ wasm が組み上がる。
+      #
+      # production は wrangler.jsonc の env.production を指す。
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes "wrangler@$WRANGLER_VERSION" deploy --env production

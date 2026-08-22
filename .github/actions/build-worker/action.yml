@@ -1,0 +1,125 @@
+name: Build worker
+description: >-
+  generated/*.csv を組み立てて Worker (wasm) をビルドし、公開スキーマとの差分と
+  バンドルサイズを検証する。検証用ワークフローとデプロイ用ワークフローで同じ
+  手順を使うため composite action に切り出してある。
+
+inputs:
+  odpt-access-token:
+    description: >-
+      ODPT の consumer key。空にすると西武バス・京王バス・東急バスと
+      そのコミュニティ路線が HTTP 403 で落ち、都営バスだけが取り込まれる。
+      preprocessor は警告して続行するため、欠損に気付けるよう
+      fail-on-missing-bus-feeds と併用すること。
+    required: false
+    default: ""
+  fail-on-missing-bus-feeds:
+    description: >-
+      true にすると、トークンが要るバスフィードを 1 つでも取り込めなかった
+      場合にビルドを失敗させる。デプロイ用ワークフローで有効にして、欠損した
+      データが staging / production へ出ていくのを止める。
+    required: false
+    default: "false"
+  worker-build-version:
+    description: worker-build のバージョン (ビルド結果を再現できるよう固定する)
+    required: false
+    default: "0.8.5"
+  wrangler-version:
+    description: wrangler のバージョン (Makefile の WRANGLER_VERSION と揃えること)
+    required: false
+    default: "4.125.0"
+
+# ローカル action は checkout 済みでないと解決できないため、checkout は
+# 呼び出し側のワークフローに置いてある。
+runs:
+  using: composite
+  steps:
+    - name: Install wasm target
+      shell: bash
+      run: rustup target add wasm32-unknown-unknown
+
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: worker-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
+    # data/*.csv をそのまま Worker へ渡すと本番と挙動が変わる。列車種別を
+    # 持たない路線には各駅停車の系統を補う必要があり (約2,400行)、バス停と
+    # バス路線は GTFS / ODPT から起こす必要があるため。
+    - name: Build generated data
+      shell: bash
+      env:
+        ODPT_ACCESS_TOKEN: ${{ inputs.odpt-access-token }}
+      run: cargo run --profile tool -p stationapi-preprocessor 2>&1 | tee /tmp/preprocessor.log
+
+    # preprocessor はフィードを取り込めなくても警告だけ出して続行する。
+    # 欠損したデータのままビルドが緑で通り、そのままデプロイされうるので、
+    # デプロイ経路では取りこぼしを失敗として扱う。
+    - name: Verify bus feeds
+      shell: bash
+      env:
+        STRICT: ${{ inputs.fail-on-missing-bus-feeds }}
+      run: |
+        # preprocessor がフィードを 1 つ丸ごと飛ばすのは gtfs/mod.rs の
+        # 3 経路 (download 失敗 / 読み込み失敗 / 東急バス ODPT JSON) だけで、
+        # いずれもこの文言で終わる。個別のエラー文 (「の取得に失敗」など) で
+        # 拾うと、読み込み失敗と、外側の文言に含まれない東急バスを取りこぼす。
+        if grep -q "このフィードを飛ばす" /tmp/preprocessor.log; then
+          grep "このフィードを飛ばす" /tmp/preprocessor.log
+          if [ "$STRICT" = "true" ]; then
+            echo "::error::取り込めなかったバスフィードがある。ODPT_ACCESS_TOKEN を確認すること"
+            exit 1
+          fi
+          echo "::warning::取り込めなかったバスフィードがある (検証ビルドのため続行する)"
+        else
+          echo "すべてのバスフィードを取り込んだ"
+        fi
+
+    - name: Verify generated data
+      shell: bash
+      run: |
+        for t in companies lines stations types station_station_types aliases line_aliases; do
+          test -s "generated/$t.csv" || { echo "::error::$t.csv が空"; exit 1; }
+          echo "$t: $(python3 -c "import csv,sys;print(sum(1 for _ in csv.reader(open(sys.argv[1]))) - 1)" "generated/$t.csv") rows"
+        done
+        bus=$(awk -F, 'NR>1 && $NF == 1' generated/stations.csv | wc -l)
+        echo "bus stops: $bus"
+
+    - name: Install worker-build
+      shell: bash
+      run: cargo install worker-build --locked --version "${{ inputs.worker-build-version }}"
+
+    - name: Build worker
+      shell: bash
+      run: worker-build --release
+
+    # 公開スキーマから外れるとクライアントが壊れる。SDL を取り出して
+    # schema/public.graphql と突き合わせる。
+    - name: Verify GraphQL schema
+      shell: bash
+      run: |
+        npx --yes "wrangler@${{ inputs.wrangler-version }}" dev --port 8787 &
+        for _ in $(seq 1 120); do
+          curl -sf http://127.0.0.1:8787/__ping >/dev/null 2>&1 && break
+          sleep 2
+        done
+        curl -sf http://127.0.0.1:8787/__schema -o /tmp/generated.graphql
+        kill %1 || true
+        python3 scripts/compare_schema.py schema/public.graphql /tmp/generated.graphql
+
+    - name: Report bundle size
+      shell: bash
+      run: |
+        raw=$(stat -c%s build/index_bg.wasm)
+        gz=$(gzip -9 -c build/index_bg.wasm | wc -c)
+        echo "wasm raw: $((raw / 1024)) KiB"
+        echo "wasm gzip: $((gz / 1024)) KiB (Workers upper limit is 10 MiB)"
+        # 上限を超える前に気付けるよう、8 MiB を閾値にする
+        if [ "$gz" -gt $((8 * 1024 * 1024)) ]; then
+          echo "::error::gzip size exceeds 8 MiB"
+          exit 1
+        fi
