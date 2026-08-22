@@ -720,8 +720,7 @@ fn passes_stop_condition(station_cd: i32) -> bool {
 
 /// 駅グループに属する各駅の所属路線を、駅の識別子付きで返す。
 /// UseCase 層は `line.station_g_cd` で駅に紐付けるため、ここを埋める必要がある。
-/// `require_stop` は通過のみの系統しか持たない駅を除くかどうか。
-fn lines_of_groups_inner(group_ids: &[u32], require_stop: bool) -> Vec<Line> {
+fn lines_of_groups(group_ids: &[u32]) -> Vec<Line> {
     let mut out = Vec::new();
     for &gid in group_ids {
         for record in index::stations_by_group(gid as i32) {
@@ -735,7 +734,7 @@ fn lines_of_groups_inner(group_ids: &[u32], require_stop: bool) -> Vec<Line> {
             if line.e_status != 0 {
                 continue;
             }
-            if require_stop && !passes_stop_condition(record.station_cd) {
+            if !passes_stop_condition(record.station_cd) {
                 continue;
             }
             let mut line = line.clone();
@@ -755,15 +754,17 @@ impl LineRepository for MemLineRepository {
         &self,
         station_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
-        Ok(lines_of_groups_inner(station_group_id_vec, true))
+        Ok(lines_of_groups(station_group_id_vec))
     }
 
-    /// no_types 版は通過条件を掛けない
+    /// no_types 版が省くのはネストした駅に載せる種別情報だけで、返す路線の
+    /// 集合は types 版と同じ。通過のみの系統しか持たない駅をここで通すと、
+    /// 中央線(快速) の代々木のように停車しない路線が lines に出てしまう。
     async fn get_by_station_group_id_vec_no_types(
         &self,
         station_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
-        Ok(lines_of_groups_inner(station_group_id_vec, false))
+        Ok(lines_of_groups(station_group_id_vec))
     }
 
     async fn get_by_station_group_id(
