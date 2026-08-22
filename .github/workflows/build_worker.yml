@@ -1,0 +1,143 @@
+on:
+  pull_request:
+    paths:
+      - "worker/**"
+      - "data/**"
+      - "stationapi/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+  push:
+    paths:
+      - "worker/**"
+      - "data/**"
+      - "stationapi/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+  workflow_dispatch:
+
+name: Build Cloudflare Worker
+
+env:
+  SQLX_OFFLINE: true
+  # ビルド結果を再現できるよう、ツールのバージョンを固定する
+  WORKER_BUILD_VERSION: "0.8.5"
+  WRANGLER_VERSION: "4.125.0"
+
+jobs:
+  build:
+    name: Export data and build worker
+    runs-on: ubuntu-latest
+
+    # Worker が読むデータは data/*.csv そのままではない。
+    # import_csv は最後に generate_virtual_local_rail_services を実行し、
+    # 列車種別を持たない路線へ各駅停車の系統を DB 上で生成する(約2,400行)。
+    # これを取り込むため、CI でも PostgreSQL を立てて取り込みを一度通す。
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: stationapi
+          POSTGRES_PASSWORD: stationapi
+          POSTGRES_DB: stationapi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://stationapi:stationapi@127.0.0.1:5432/stationapi
+      # トークンが無ければトークン不要のフィード (都営バス) だけが取り込まれ、
+      # 他は警告を出してスキップされる。バスごと外したい場合は
+      # DISABLE_BUS_FEATURE=true を設定する。
+      ODPT_ACCESS_TOKEN: ${{ secrets.ODPT_ACCESS_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            worker/target
+          key: worker-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Create required PostgreSQL extensions
+        run: psql "$DATABASE_URL" -f docker/postgres/00_extensions.sql
+
+      - name: Export worker data
+        run: cargo run --release --package stationapi --bin stationapi -- --export-worker-data worker/generated
+
+      - name: Verify exported data
+        run: |
+          for t in companies lines stations types station_station_types; do
+            test -s "worker/generated/$t.csv" || { echo "::error::$t.csv が空"; exit 1; }
+            echo "$t: $(($(wc -l < "worker/generated/$t.csv") - 1)) rows"
+          done
+          # バスが取り込めたかを可視化する (取り込めなくてもビルドは続行する)
+          bus=$(awk -F, 'NR>1 && $NF == 1' worker/generated/stations.csv | wc -l)
+          echo "bus stops: $bus"
+
+      - name: Install worker-build
+        run: cargo install worker-build --locked --version "$WORKER_BUILD_VERSION"
+
+      # worker は workspace から除外されているため ci.yml の対象にならない。
+      # ここで fmt / clippy を通す。
+      - name: Check worker formatting
+        run: cargo fmt --manifest-path worker/Cargo.toml -- --check
+
+      - name: Clippy worker
+        run: |
+          cargo clippy --manifest-path worker/Cargo.toml \
+            --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings
+
+      - name: Build worker
+        working-directory: worker
+        run: worker-build --release
+
+      # 公開スキーマから外れるとクライアントが壊れる。SDL を取り出して
+      # worker/schema/public.graphql と突き合わせる。
+      - name: Verify GraphQL schema
+        working-directory: worker
+        run: |
+          npx --yes "wrangler@$WRANGLER_VERSION" dev --port 8787 &
+          for _ in $(seq 1 120); do
+            curl -sf http://127.0.0.1:8787/__ping >/dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -sf http://127.0.0.1:8787/__schema -o /tmp/generated.graphql
+          kill %1 || true
+          python3 scripts/compare_schema.py schema/public.graphql /tmp/generated.graphql
+
+      - name: Report bundle size
+        working-directory: worker
+        run: |
+          raw=$(stat -c%s build/index_bg.wasm)
+          gz=$(gzip -9 -c build/index_bg.wasm | wc -c)
+          echo "wasm raw: $((raw / 1024)) KiB"
+          echo "wasm gzip: $((gz / 1024)) KiB (Workers upper limit is 10 MiB)"
+          # 上限を超える前に気付けるよう、8 MiB を閾値にする
+          if [ "$gz" -gt $((8 * 1024 * 1024)) ]; then
+            echo "::error::gzip size exceeds 8 MiB"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: worker-build
+          path: |
+            worker/build/
+            worker/generated/
+          retention-days: 7

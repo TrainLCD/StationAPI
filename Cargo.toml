@@ -1,1 +1,3 @@
-workspace = { resolver = "2", members = ["stationapi", "data_validator"] }
+# worker は wasm32 専用 crate のため workspace から除外する
+# (cargo check --workspace がネイティブターゲットで走ると壊れるため)
+workspace = { resolver = "2", members = ["stationapi", "data_validator"], exclude = ["worker"] }

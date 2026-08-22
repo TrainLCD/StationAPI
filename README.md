@@ -16,6 +16,7 @@ A gRPC-Web API that provides nearby Japanese train stations.
 - For contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 - For system architecture and design decisions, see [docs/architecture.md](docs/architecture.md).
 - For technical debt analysis and architectural concerns, see [docs/technical_debt.md](docs/technical_debt.md).
+- For the Cloudflare Workers migration, see [docs/cloudflare-workers-migration.md](docs/cloudflare-workers-migration.md).
 
 ## Data Contribution
 
