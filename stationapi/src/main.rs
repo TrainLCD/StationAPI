@@ -69,6 +69,11 @@ const EXPORT_TABLES: &[(&str, &str)] = &[
     ("types", "ORDER BY t.id"),
     // sst.id は停車順序そのものなので必ず id 昇順で出す
     ("station_station_types", "ORDER BY t.id"),
+    // 路線名の別名 (例: 東武伊勢崎線 -> 東武スカイツリーライン)。
+    // 多くの SQL が line_aliases / aliases を LEFT JOIN し、
+    // 別名があれば line_name 系 7 列を差し替える。
+    ("aliases", "ORDER BY t.id"),
+    ("line_aliases", "ORDER BY t.id"),
 ];
 
 /// スキーマ作成と取り込みを行い、その結果を Workers 用に書き出す。

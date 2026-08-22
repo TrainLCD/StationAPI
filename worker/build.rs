@@ -61,6 +61,8 @@ fn main() {
         stage_csv(&out_dir, "lines.csv", "../data/2!lines.csv"),
         stage_csv(&out_dir, "companies.csv", "../data/1!companies.csv"),
         stage_csv(&out_dir, "types.csv", "../data/4!types.csv"),
+        stage_csv(&out_dir, "aliases.csv", "../data/6!aliases.csv"),
+        stage_csv(&out_dir, "line_aliases.csv", "../data/7!line_aliases.csv"),
         // station_station_types は下の sst 変換でも参照するが、
         // 混在判定に含めるためここでも存在を見る
         Path::new("generated/station_station_types.csv").is_file(),

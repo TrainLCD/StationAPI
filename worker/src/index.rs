@@ -101,7 +101,16 @@ pub struct StationRecord {
 impl StationRecord {
     /// 既存 SQL の `stations JOIN lines` 相当。路線側の属性を埋めた Station を返す。
     /// 列車種別 (type_* / line_group_cd / pass) は UseCase 層が後から付与する。
+    ///
+    /// 路線名の 7 列は `line_aliases` / `aliases` による別名があればそちらを使う。
+    /// 既存 SQL の `COALESCE(NULLIF(COALESCE(a.line_name, l.line_name), ''), NULL)`
+    /// に対応する (別名が空文字なら元の値へフォールバックする)。
     pub fn to_entity(&self, line: Option<&Line>) -> Station {
+        let alias = alias_by_station(self.station_cd);
+        // 別名を優先し、無ければ路線の値を使う
+        let pick = |a: Option<&String>, l: Option<String>| -> Option<String> {
+            a.cloned().filter(|v| !v.is_empty()).or(l)
+        };
         Station {
             station_cd: self.station_cd,
             station_g_cd: self.station_g_cd,
@@ -133,13 +142,13 @@ impl StationRecord {
             train_type: None,
             has_train_types: false,
             company_cd: line.map(|l| l.company_cd),
-            line_name: line.map(|l| l.line_name.clone()),
-            line_name_k: line.map(|l| l.line_name_k.clone()),
-            line_name_h: line.map(|l| l.line_name_h.clone()),
-            line_name_r: line.and_then(|l| l.line_name_r.clone()),
-            line_name_zh: line.and_then(|l| l.line_name_zh.clone()),
-            line_name_ko: line.and_then(|l| l.line_name_ko.clone()),
-            line_color_c: line.and_then(|l| l.line_color_c.clone()),
+            line_name: pick(alias.and_then(|a| a.line_name.as_ref()), line.map(|l| l.line_name.clone())),
+            line_name_k: pick(alias.and_then(|a| a.line_name_k.as_ref()), line.map(|l| l.line_name_k.clone())),
+            line_name_h: pick(alias.and_then(|a| a.line_name_h.as_ref()), line.map(|l| l.line_name_h.clone())),
+            line_name_r: pick(alias.and_then(|a| a.line_name_r.as_ref()), line.and_then(|l| l.line_name_r.clone())),
+            line_name_zh: pick(alias.and_then(|a| a.line_name_zh.as_ref()), line.and_then(|l| l.line_name_zh.clone())),
+            line_name_ko: pick(alias.and_then(|a| a.line_name_ko.as_ref()), line.and_then(|l| l.line_name_ko.clone())),
+            line_color_c: pick(alias.and_then(|a| a.line_color_c.as_ref()), line.and_then(|l| l.line_color_c.clone())),
             line_type: line.and_then(|l| l.line_type),
             line_symbol1: line.and_then(|l| l.line_symbol1.clone()),
             line_symbol2: line.and_then(|l| l.line_symbol2.clone()),
@@ -763,4 +772,126 @@ pub fn stations_by_line(line_cd: i32) -> impl Iterator<Item = &'static StationRe
         .unwrap_or(&[])
         .iter()
         .map(|&i| &stations()[i])
+}
+
+// ---------------------------------------------------------------- 路線名の別名
+
+const ALIASES_CSV: &str = include_str!(concat!(env!("OUT_DIR"), "/aliases.csv"));
+const LINE_ALIASES_CSV: &str = include_str!(concat!(env!("OUT_DIR"), "/line_aliases.csv"));
+
+/// aliases.csv の 1 行。路線名を差し替えるための別名。
+/// 例: 東武伊勢崎線 -> 東武スカイツリーライン
+pub struct AliasRecord {
+    pub line_name: Option<String>,
+    pub line_name_k: Option<String>,
+    pub line_name_h: Option<String>,
+    pub line_name_r: Option<String>,
+    pub line_name_zh: Option<String>,
+    pub line_name_ko: Option<String>,
+    pub line_color_c: Option<String>,
+}
+
+/// station_cd -> 別名。
+///
+/// 既存 SQL は
+/// `LEFT JOIN line_aliases la ON la.station_cd = s.station_cd`
+/// `LEFT JOIN aliases a ON a.id = la.alias_cd`
+/// として駅ごとに引き、`COALESCE(NULLIF(COALESCE(a.line_name, l.line_name), ''), NULL)`
+/// で路線名 7 列を差し替える。
+static ALIAS_BY_STATION: OnceLock<HashMap<i32, AliasRecord>> = OnceLock::new();
+
+pub fn alias_by_station(station_cd: i32) -> Option<&'static AliasRecord> {
+    ALIAS_BY_STATION.get_or_init(build_alias_index).get(&station_cd)
+}
+
+fn build_alias_index() -> HashMap<i32, AliasRecord> {
+    // まず alias 本体を id で引けるようにする
+    let mut by_id: HashMap<i32, AliasRecord> = HashMap::new();
+    {
+        let mut rdr = reader(ALIASES_CSV);
+        let Ok(headers) = rdr.headers().cloned() else {
+            return HashMap::new();
+        };
+        let c = Cols::of(&headers);
+        let Some(i_id) = c.at("id") else {
+            panic!("aliases の CSV に id 列がありません");
+        };
+        for r in rdr.records().flatten() {
+            let Some(id) = opt_i32(&r, Some(i_id)) else {
+                continue;
+            };
+            by_id.insert(
+                id,
+                AliasRecord {
+                    line_name: opt_text(&r, c.at("line_name")),
+                    line_name_k: opt_text(&r, c.at("line_name_k")),
+                    line_name_h: opt_text(&r, c.at("line_name_h")),
+                    line_name_r: opt_text(&r, c.at("line_name_r")),
+                    line_name_zh: opt_text(&r, c.at("line_name_zh")),
+                    line_name_ko: opt_text(&r, c.at("line_name_ko")),
+                    line_color_c: opt_text(&r, c.at("line_color_c")),
+                },
+            );
+        }
+    }
+
+    // 駅ごとの紐付けを引く
+    let mut out: HashMap<i32, AliasRecord> = HashMap::new();
+    let mut rdr = reader(LINE_ALIASES_CSV);
+    let Ok(headers) = rdr.headers().cloned() else {
+        return out;
+    };
+    let c = Cols::of(&headers);
+    let (Some(i_station), Some(i_alias)) = (c.at("station_cd"), c.at("alias_cd")) else {
+        panic!("line_aliases の CSV に station_cd / alias_cd が必要です");
+    };
+    for r in rdr.records().flatten() {
+        let (Some(station_cd), Some(alias_cd)) =
+            (opt_i32(&r, Some(i_station)), opt_i32(&r, Some(i_alias)))
+        else {
+            continue;
+        };
+        if let Some(alias) = by_id.get(&alias_cd) {
+            out.insert(
+                station_cd,
+                AliasRecord {
+                    line_name: alias.line_name.clone(),
+                    line_name_k: alias.line_name_k.clone(),
+                    line_name_h: alias.line_name_h.clone(),
+                    line_name_r: alias.line_name_r.clone(),
+                    line_name_zh: alias.line_name_zh.clone(),
+                    line_name_ko: alias.line_name_ko.clone(),
+                    line_color_c: alias.line_color_c.clone(),
+                },
+            );
+        }
+    }
+    out
+}
+
+/// 駅に紐づく別名を Line へ反映する。
+///
+/// 既存 SQL は Line を返すクエリでも `line_aliases` / `aliases` を LEFT JOIN し、
+/// 路線名 7 列を差し替える。Line 単体で引く API (find_by_id / get_by_ids) には
+/// この JOIN が無いので、駅を伴う経路でのみ適用する。
+pub fn apply_line_alias(line: &mut Line, station_cd: i32) {
+    let Some(alias) = alias_by_station(station_cd) else {
+        return;
+    };
+    let pick = |a: Option<&String>, current: Option<String>| -> Option<String> {
+        a.cloned().filter(|v| !v.is_empty()).or(current)
+    };
+    if let Some(v) = pick(alias.line_name.as_ref(), Some(line.line_name.clone())) {
+        line.line_name = v;
+    }
+    if let Some(v) = pick(alias.line_name_k.as_ref(), Some(line.line_name_k.clone())) {
+        line.line_name_k = v;
+    }
+    if let Some(v) = pick(alias.line_name_h.as_ref(), Some(line.line_name_h.clone())) {
+        line.line_name_h = v;
+    }
+    line.line_name_r = pick(alias.line_name_r.as_ref(), line.line_name_r.clone());
+    line.line_name_zh = pick(alias.line_name_zh.as_ref(), line.line_name_zh.clone());
+    line.line_name_ko = pick(alias.line_name_ko.as_ref(), line.line_name_ko.clone());
+    line.line_color_c = pick(alias.line_color_c.as_ref(), line.line_color_c.clone());
 }

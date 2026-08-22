@@ -690,6 +690,7 @@ fn lines_of_groups_inner(group_ids: &[u32], require_stop: bool) -> Vec<Line> {
             let mut line = line.clone();
             line.station_cd = Some(record.station_cd);
             line.station_g_cd = Some(record.station_g_cd);
+            index::apply_line_alias(&mut line, record.station_cd);
             out.push(line);
         }
     }
@@ -748,6 +749,7 @@ impl LineRepository for MemLineRepository {
         let mut line = line.clone();
         line.station_cd = Some(record.station_cd);
         line.station_g_cd = Some(record.station_g_cd);
+        index::apply_line_alias(&mut line, record.station_cd);
         if let Some(sst) = index::sst_by_station(record.station_cd).find(|s| s.pass != Some(1)) {
             line.line_group_cd = sst.line_group_cd;
             line.type_cd = Some(sst.type_cd);
@@ -791,6 +793,7 @@ impl LineRepository for MemLineRepository {
                 line.type_cd = Some(sst.type_cd);
                 line.station_cd = Some(station.station_cd);
                 line.station_g_cd = Some(station.station_g_cd);
+                index::apply_line_alias(&mut line, station.station_cd);
                 out.push(line);
             }
         }
@@ -826,6 +829,7 @@ impl LineRepository for MemLineRepository {
                 line.type_cd = Some(sst.type_cd);
                 line.station_cd = Some(station.station_cd);
                 line.station_g_cd = Some(station.station_g_cd);
+                index::apply_line_alias(&mut line, station.station_cd);
                 rows.push((sst.id, line.line_cd, line));
             }
         }
