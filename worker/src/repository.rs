@@ -51,11 +51,7 @@ fn stations_of_groups(group_ids: &[u32]) -> Vec<Station> {
 
 /// `JOIN station_station_types sst` と `JOIN types t` の結果を Station に反映する。
 /// 既存の `StationRow -> Station` 変換と同じ対応付け。
-fn apply_train_type(
-    station: &mut Station,
-    sst: &index::SstRecord,
-    ty: &index::TypeRecord,
-) {
+fn apply_train_type(station: &mut Station, sst: &index::SstRecord, ty: &index::TypeRecord) {
     station.sst_id = Some(sst.id);
     station.type_cd = Some(sst.type_cd);
     station.line_group_cd = sst.line_group_cd;
@@ -549,7 +545,8 @@ impl StationRepository for MemStationRepository {
         direction_id: Option<u32>,
     ) -> Result<Vec<Station>, DomainError> {
         let reverse = direction_id == Some(1);
-        let via_ok = |line_cd: i32| via_line_ids.is_empty() || via_line_ids.contains(&(line_cd as u32));
+        let via_ok =
+            |line_cd: i32| via_line_ids.is_empty() || via_line_ids.contains(&(line_cd as u32));
 
         let (Some(from_record), Some(to_record)) = (
             index::station_by_cd(from_station_cd as i32),
@@ -1017,7 +1014,9 @@ impl TrainTypeRepository for MemTrainTypeRepository {
             .iter()
             .filter(|sst| sst.line_group_cd.is_some_and(|g| targets.contains(&g)))
             .filter(|sst| sst_is_stop(sst))
-            .filter_map(|sst| index::type_by_cd(sst.type_cd).map(|ty| (build_train_type(sst, ty), ty.priority)))
+            .filter_map(|sst| {
+                index::type_by_cd(sst.type_cd).map(|ty| (build_train_type(sst, ty), ty.priority))
+            })
             .collect();
         sort_by_priority_then_id(&mut scored);
         Ok(scored.into_iter().map(|(t, _)| t).collect())

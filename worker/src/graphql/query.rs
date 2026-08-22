@@ -36,7 +36,9 @@ fn to_filter(value: Option<GqlTransportType>) -> TransportTypeFilter {
 fn to_limit(value: Option<i32>) -> Result<Option<u32>, async_graphql::Error> {
     match value {
         None => Ok(None),
-        Some(v) if v < 0 => Err(async_graphql::Error::new("limit には 0 以上を指定してください")),
+        Some(v) if v < 0 => Err(async_graphql::Error::new(
+            "limit には 0 以上を指定してください",
+        )),
         Some(v) => Ok(Some(v as u32)),
     }
 }
@@ -60,9 +62,7 @@ fn use_case<'a>(ctx: &Context<'a>) -> &'a Interactor {
 }
 
 /// domain エンティティ列を GraphQL の Station 列へ変換する
-fn stations_to_gql(
-    stations: Vec<stationapi::domain::entity::station::Station>,
-) -> Vec<Station> {
+fn stations_to_gql(stations: Vec<stationapi::domain::entity::station::Station>) -> Vec<Station> {
     stations
         .into_iter()
         .map(|s| Station::from(proto::Station::from(s)))
@@ -365,8 +365,8 @@ impl QueryRoot {
                 departure_cumulative_minutes: Some(stop.departure_cumulative_minutes),
             };
             let route_id = stop.line_group_cd.unwrap_or(0);
-            let merge =
-                stop.line_group_cd.is_some() && routes.last().is_some_and(|r| r.id == Some(route_id));
+            let merge = stop.line_group_cd.is_some()
+                && routes.last().is_some_and(|r| r.id == Some(route_id));
 
             if merge {
                 if let Some(last) = routes.last_mut() {

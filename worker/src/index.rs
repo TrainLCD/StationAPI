@@ -142,13 +142,34 @@ impl StationRecord {
             train_type: None,
             has_train_types: false,
             company_cd: line.map(|l| l.company_cd),
-            line_name: pick(alias.and_then(|a| a.line_name.as_ref()), line.map(|l| l.line_name.clone())),
-            line_name_k: pick(alias.and_then(|a| a.line_name_k.as_ref()), line.map(|l| l.line_name_k.clone())),
-            line_name_h: pick(alias.and_then(|a| a.line_name_h.as_ref()), line.map(|l| l.line_name_h.clone())),
-            line_name_r: pick(alias.and_then(|a| a.line_name_r.as_ref()), line.and_then(|l| l.line_name_r.clone())),
-            line_name_zh: pick(alias.and_then(|a| a.line_name_zh.as_ref()), line.and_then(|l| l.line_name_zh.clone())),
-            line_name_ko: pick(alias.and_then(|a| a.line_name_ko.as_ref()), line.and_then(|l| l.line_name_ko.clone())),
-            line_color_c: pick(alias.and_then(|a| a.line_color_c.as_ref()), line.and_then(|l| l.line_color_c.clone())),
+            line_name: pick(
+                alias.and_then(|a| a.line_name.as_ref()),
+                line.map(|l| l.line_name.clone()),
+            ),
+            line_name_k: pick(
+                alias.and_then(|a| a.line_name_k.as_ref()),
+                line.map(|l| l.line_name_k.clone()),
+            ),
+            line_name_h: pick(
+                alias.and_then(|a| a.line_name_h.as_ref()),
+                line.map(|l| l.line_name_h.clone()),
+            ),
+            line_name_r: pick(
+                alias.and_then(|a| a.line_name_r.as_ref()),
+                line.and_then(|l| l.line_name_r.clone()),
+            ),
+            line_name_zh: pick(
+                alias.and_then(|a| a.line_name_zh.as_ref()),
+                line.and_then(|l| l.line_name_zh.clone()),
+            ),
+            line_name_ko: pick(
+                alias.and_then(|a| a.line_name_ko.as_ref()),
+                line.and_then(|l| l.line_name_ko.clone()),
+            ),
+            line_color_c: pick(
+                alias.and_then(|a| a.line_color_c.as_ref()),
+                line.and_then(|l| l.line_color_c.clone()),
+            ),
             line_type: line.and_then(|l| l.line_type),
             line_symbol1: line.and_then(|l| l.line_symbol1.clone()),
             line_symbol2: line.and_then(|l| l.line_symbol2.clone()),
@@ -511,11 +532,7 @@ fn nearest_inner(
 /// PostgreSQL 側の `pg_trgm` は `LIKE '%...%'` を高速化する GIN インデックスであって
 /// 類似度検索ではないため、`contains()` で論理的に等価な結果が得られる。
 /// 正規化には domain 層の `normalize_for_search` をそのまま使うので挙動も一致する。
-pub fn search_by_name(
-    query: &str,
-    limit: usize,
-    want: Option<i32>,
-) -> Vec<&'static StationRecord> {
+pub fn search_by_name(query: &str, limit: usize, want: Option<i32>) -> Vec<&'static StationRecord> {
     if query.is_empty() {
         return Vec::new();
     }
@@ -801,7 +818,9 @@ pub struct AliasRecord {
 static ALIAS_BY_STATION: OnceLock<HashMap<i32, AliasRecord>> = OnceLock::new();
 
 pub fn alias_by_station(station_cd: i32) -> Option<&'static AliasRecord> {
-    ALIAS_BY_STATION.get_or_init(build_alias_index).get(&station_cd)
+    ALIAS_BY_STATION
+        .get_or_init(build_alias_index)
+        .get(&station_cd)
 }
 
 fn build_alias_index() -> HashMap<i32, AliasRecord> {

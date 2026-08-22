@@ -165,9 +165,7 @@ macro_rules! define_station {
                     opened_at: Some(v.opened_at),
                     closed_at: Some(v.closed_at),
                     status: Some(OperationStatus::from(v.status)),
-                    station_numbers: Some(
-                        v.station_numbers.into_iter().map(Into::into).collect(),
-                    ),
+                    station_numbers: Some(v.station_numbers.into_iter().map(Into::into).collect()),
                     stop_condition: Some(StopCondition::from(v.stop_condition)),
                     distance: v.distance,
                     has_train_types: v.has_train_types,
