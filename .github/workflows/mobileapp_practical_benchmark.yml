@@ -1,0 +1,203 @@
+name: MobileApp practical GraphQL benchmark
+
+on:
+  push:
+    branches:
+      - bench/mobileapp-practical-20260823
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch MobileApp query definitions
+        run: |
+          git clone --depth 1 --branch dev https://github.com/TrainLCD/MobileApp.git /tmp/MobileApp
+      - name: Run practical benchmark
+        shell: python
+        run: |
+          import json, re, statistics, time, urllib.request
+          from pathlib import Path
+
+          PROD = 'https://gql.trainlcd.app'
+          STG = 'https://gql-stg.trainlcd.app'
+          ENVS = {'prod': PROD, 'stg': STG}
+          TOKYO = {'latitude': 35.681236, 'longitude': 139.767125}
+          WARMUPS = 3
+          SAMPLES = 15
+
+          src = Path('/tmp/MobileApp/src/lib/graphql/queries.ts').read_text()
+          defs = dict(re.findall(r'export const (\w+) = gql`([\s\S]*?)`;', src))
+          def resolve(name, stack=()):
+              if name in stack:
+                  raise RuntimeError(f'fragment cycle: {stack} -> {name}')
+              body = defs[name]
+              return re.sub(r'\$\{(\w+)\}', lambda m: resolve(m.group(1), stack + (name,)), body)
+
+          wanted = [
+              'GET_STATIONS_NEARBY',
+              'GET_STATIONS_BY_NAME',
+              'GET_ROUTE_TYPES_LIGHT',
+              'GET_LINE_GROUP_STATIONS',
+              'GET_LINE_LIST_STATIONS_LIGHT',
+              'ESTIMATE_ARRIVAL_TIMES',
+              'GET_TRAIN_ROUTE',
+          ]
+          docs = {k: resolve(k) for k in wanted}
+
+          def post(url, query, variables, timeout=30):
+              payload = json.dumps({'query': query, 'variables': variables}).encode()
+              req = urllib.request.Request(url, data=payload, headers={
+                  'content-type': 'application/json',
+                  'accept': 'application/json',
+                  'user-agent': 'TrainLCD-MobileApp-Practical-Benchmark/1.0',
+              })
+              t0 = time.perf_counter()
+              try:
+                  with urllib.request.urlopen(req, timeout=timeout) as r:
+                      raw = r.read()
+                      status = r.status
+              except Exception as e:
+                  dt = (time.perf_counter() - t0) * 1000
+                  return {'ms': dt, 'status': getattr(e, 'code', 0), 'error': str(e), 'json': None, 'bytes': 0}
+              dt = (time.perf_counter() - t0) * 1000
+              try:
+                  obj = json.loads(raw)
+              except Exception:
+                  obj = None
+              err = None
+              if isinstance(obj, dict) and obj.get('errors'):
+                  err = '; '.join(str(x.get('message', x)) for x in obj['errors'])
+              return {'ms': dt, 'status': status, 'error': err, 'json': obj, 'bytes': len(raw)}
+
+          # Per-environment bootstrap by the same physical names/coordinates.
+          ctx = {}
+          for env, url in ENVS.items():
+              near = post(url, docs['GET_STATIONS_NEARBY'], {**TOKYO, 'limit': 10})
+              stations = ((near['json'] or {}).get('data') or {}).get('stationsNearby') or []
+              if not stations:
+                  raise RuntimeError(f'{env}: no station near Tokyo coords: {near}')
+              tokyo = next((s for s in stations if s.get('name') == '東京'), stations[0])
+              from_gid = tokyo.get('groupId')
+
+              search = post(url, docs['GET_STATIONS_BY_NAME'], {'name':'新宿','limit':100,'fromStationGroupId':from_gid})
+              found = ((search['json'] or {}).get('data') or {}).get('stationsByName') or []
+              if not found:
+                  raise RuntimeError(f'{env}: Shinjuku search empty: {search}')
+              shinjuku = next((s for s in found if s.get('name') == '新宿'), found[0])
+              to_gid = shinjuku.get('groupId')
+              via_line_id = (shinjuku.get('line') or {}).get('id')
+
+              rt = post(url, docs['GET_ROUTE_TYPES_LIGHT'], {
+                  'fromStationGroupId': from_gid,
+                  'toStationGroupId': to_gid,
+                  'pageSize': 100,
+                  'viaLineId': via_line_id,
+              })
+              train_types = ((((rt['json'] or {}).get('data') or {}).get('routeTypes') or {}).get('trainTypes') or [])
+              line_group_id = next((t.get('groupId') for t in train_types if t.get('groupId') is not None), None)
+
+              # Derive route endpoints the same way the app ultimately does: fetch the selected group/line station list.
+              if line_group_id is not None:
+                  lgs = post(url, docs['GET_LINE_GROUP_STATIONS'], {'lineGroupId': line_group_id})
+                  route_stations = ((lgs['json'] or {}).get('data') or {}).get('lineGroupStations') or []
+              else:
+                  route_stations = []
+              if not route_stations:
+                  # fallback to the destination's line through lineListStationsLight is not suitable for full route,
+                  # so use the physical Tokyo->Shinjuku rows as endpoint fallback.
+                  route_stations = [tokyo, shinjuku]
+
+              from_id = route_stations[0].get('id')
+              to_id = route_stations[-1].get('id')
+              via_line_ids = []
+              for s in route_stations:
+                  lid = (s.get('line') or {}).get('id')
+                  if lid is not None and lid not in via_line_ids:
+                      via_line_ids.append(lid)
+
+              current_line_ids = []
+              for l in (tokyo.get('lines') or []):
+                  if l and l.get('id') is not None and l['id'] not in current_line_ids:
+                      current_line_ids.append(l['id'])
+              if not current_line_ids and (tokyo.get('line') or {}).get('id') is not None:
+                  current_line_ids = [tokyo['line']['id']]
+
+              ctx[env] = {
+                  'tokyo': {'id': tokyo.get('id'), 'groupId': from_gid, 'name': tokyo.get('name')},
+                  'shinjuku': {'id': shinjuku.get('id'), 'groupId': to_gid, 'name': shinjuku.get('name'), 'viaLineId': via_line_id},
+                  'lineGroupId': line_group_id,
+                  'fromId': from_id,
+                  'toId': to_id,
+                  'viaLineIds': via_line_ids,
+                  'currentLineIds': current_line_ids,
+                  'routeStationCount': len(route_stations),
+              }
+
+          print('BOOTSTRAP')
+          print(json.dumps(ctx, ensure_ascii=False, indent=2))
+
+          scenarios = [
+              ('startup_nearby_1', 'GET_STATIONS_NEARBY', lambda c: {**TOKYO, 'limit': 1}, '起動時の最寄り駅取得'),
+              ('station_modal_nearby_10', 'GET_STATIONS_NEARBY', lambda c: {**TOKYO, 'limit': 10}, '駅検索モーダルの周辺10駅'),
+              ('route_search_name_100', 'GET_STATIONS_BY_NAME', lambda c: {'name':'新宿','limit':100,'fromStationGroupId':c['tokyo']['groupId']}, '行き先検索'),
+              ('destination_route_types_100', 'GET_ROUTE_TYPES_LIGHT', lambda c: {'fromStationGroupId':c['tokyo']['groupId'],'toStationGroupId':c['shinjuku']['groupId'],'pageSize':100,'viaLineId':c['shinjuku']['viaLineId']}, '行き先タップ後の種別候補'),
+              ('destination_line_group_stations', 'GET_LINE_GROUP_STATIONS', lambda c: {'lineGroupId':c['lineGroupId']}, '種別決定後の駅一覧'),
+              ('station_cache_lines_light', 'GET_LINE_LIST_STATIONS_LIGHT', lambda c: {'lineIds':c['currentLineIds']}, '現在駅の所属路線キャッシュ'),
+              ('eta_full_route', 'ESTIMATE_ARRIVAL_TIMES', lambda c: {'fromStationId':c['fromId'],'toStationId':c['toId'],'viaLineIds':c['viaLineIds'],'directionId':0}, 'LCD表示用ETA'),
+              ('auto_mode_train_route', 'GET_TRAIN_ROUTE', lambda c: {'fromStationId':c['fromId'],'toStationId':c['toId'],'lineGroupId':c['lineGroupId']}, 'Autoモード速度プロファイル'),
+          ]
+
+          all_results = {}
+          for key, doc_name, mkvars, label in scenarios:
+              # Validate both sides first. Do not compare a scenario if either side is structurally invalid.
+              valid = {}
+              for env, url in ENVS.items():
+                  vars_ = mkvars(ctx[env])
+                  if any(v is None for v in vars_.values()):
+                      valid[env] = {'ok': False, 'reason':'null bootstrap variable'}
+                      continue
+                  r = post(url, docs[doc_name], vars_)
+                  valid[env] = {'ok': r['status']==200 and not r['error'], 'reason': r['error'], 'status':r['status']}
+              if not all(v['ok'] for v in valid.values()):
+                  all_results[key] = {'label':label,'skipped':True,'valid':valid}
+                  continue
+
+              # Equal warmup count on each side.
+              for _ in range(WARMUPS):
+                  for env in ('prod','stg'):
+                      post(ENVS[env], docs[doc_name], mkvars(ctx[env]))
+
+              samples = {'prod':[], 'stg':[]}
+              sizes = {'prod':[], 'stg':[]}
+              errors = {'prod':[], 'stg':[]}
+              # Alternate order every iteration to reduce temporal/order bias.
+              for i in range(SAMPLES):
+                  order = ('prod','stg') if i % 2 == 0 else ('stg','prod')
+                  for env in order:
+                      r = post(ENVS[env], docs[doc_name], mkvars(ctx[env]))
+                      samples[env].append(r['ms'])
+                      sizes[env].append(r['bytes'])
+                      if r['status'] != 200 or r['error']:
+                          errors[env].append({'status':r['status'],'error':r['error']})
+
+              def stats(xs):
+                  ys = sorted(xs)
+                  p95 = ys[max(0, int((len(ys)-1)*0.95))]
+                  return {'median_ms':statistics.median(xs),'mean_ms':statistics.mean(xs),'p95_ms':p95,'min_ms':min(xs),'max_ms':max(xs)}
+              ps, ss = stats(samples['prod']), stats(samples['stg'])
+              all_results[key] = {
+                  'label':label,
+                  'prod': ps,
+                  'stg': ss,
+                  'speedup_x': ps['median_ms']/ss['median_ms'] if ss['median_ms'] else None,
+                  'saved_ms': ps['median_ms']-ss['median_ms'],
+                  'median_bytes': {e: statistics.median(sizes[e]) for e in sizes},
+                  'errors': errors,
+                  'variables': {'prod':mkvars(ctx['prod']), 'stg':mkvars(ctx['stg'])},
+              }
+
+          print('RESULT_JSON_START')
+          print(json.dumps(all_results, ensure_ascii=False, indent=2))
+          print('RESULT_JSON_END')
