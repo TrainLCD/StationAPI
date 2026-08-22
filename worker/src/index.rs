@@ -468,8 +468,10 @@ pub fn search_by_name(query: &str, limit: usize) -> Vec<&'static StationRecord> 
 const TYPES_CSV: &str = include_str!("../../data/4!types.csv");
 const SST_CSV: &str = include_str!("../../data/5!station_station_types.csv");
 
-/// types.csv の 1 行。`id` 列は SERIAL 用の DEFAULT なので使わず、type_cd で引く。
+/// types.csv の 1 行。`id` 列は CSV 上 DEFAULT で、PostgreSQL では SERIAL が
+/// 行順に採番する (`t.id AS type_id` として応答に出る)。ここでも同じ順で振る。
 pub struct TypeRecord {
+    pub id: i32,
     pub type_cd: i32,
     pub type_name: String,
     pub type_name_k: String,
@@ -527,11 +529,14 @@ fn build_types() -> Vec<TypeRecord> {
     };
 
     let mut out = Vec::with_capacity(512);
+    let mut serial = 0i32;
     for r in rdr.records().flatten() {
         let Some(type_cd) = opt_i32(&r, Some(i_cd)) else {
             continue;
         };
+        serial += 1;
         out.push(TypeRecord {
+            id: serial,
             type_cd,
             type_name: text(&r, c.at("type_name")),
             type_name_k: text(&r, c.at("type_name_k")),
@@ -624,4 +629,51 @@ pub fn sst_by_group(line_group_cd: i32) -> impl Iterator<Item = &'static SstReco
         .unwrap_or(&[])
         .iter()
         .map(|&i| &ssts()[i])
+}
+
+/// line_cd -> line_name_rn。
+/// Line エンティティは line_name_rn を持たない (検索専用列) ため別に保持する。
+static LINE_NAME_RN: OnceLock<HashMap<i32, String>> = OnceLock::new();
+
+pub fn line_name_rn(line_cd: i32) -> Option<&'static str> {
+    LINE_NAME_RN
+        .get_or_init(|| {
+            let mut rdr = reader(LINES_CSV);
+            let Ok(headers) = rdr.headers().cloned() else {
+                return HashMap::new();
+            };
+            let c = Cols::of(&headers);
+            let (Some(i_cd), Some(i_rn)) = (c.at("line_cd"), c.at("line_name_rn")) else {
+                return HashMap::new();
+            };
+            let mut map = HashMap::with_capacity(1024);
+            for r in rdr.records().flatten() {
+                let (Some(cd), Some(rn)) = (opt_i32(&r, Some(i_cd)), opt_text(&r, Some(i_rn)))
+                else {
+                    continue;
+                };
+                map.insert(cd, rn);
+            }
+            map
+        })
+        .get(&line_cd)
+        .map(String::as_str)
+}
+
+/// line_cd -> stations() の添字リスト
+static STATION_BY_LINE: OnceLock<HashMap<i32, Vec<usize>>> = OnceLock::new();
+
+pub fn stations_by_line(line_cd: i32) -> impl Iterator<Item = &'static StationRecord> {
+    let idx = STATION_BY_LINE.get_or_init(|| {
+        let mut map: HashMap<i32, Vec<usize>> = HashMap::with_capacity(1_024);
+        for (i, s) in stations().iter().enumerate() {
+            map.entry(s.line_cd).or_default().push(i);
+        }
+        map
+    });
+    idx.get(&line_cd)
+        .map(Vec::as_slice)
+        .unwrap_or(&[])
+        .iter()
+        .map(|&i| &stations()[i])
 }

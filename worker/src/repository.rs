@@ -5,7 +5,7 @@
 //! 残りは明示的にエラーを返す (黙って空を返すと未実装が正常応答に見えるため)。
 
 use async_trait::async_trait;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use stationapi::domain::entity::company::Company;
 use stationapi::domain::entity::gtfs::TransportType;
@@ -17,6 +17,7 @@ use stationapi::domain::repository::company_repository::CompanyRepository;
 use stationapi::domain::repository::line_repository::LineRepository;
 use stationapi::domain::repository::station_repository::StationRepository;
 use stationapi::domain::repository::train_type_repository::TrainTypeRepository;
+use stationapi::proto::StopCondition;
 
 use crate::index;
 
@@ -37,6 +38,72 @@ fn stations_of_groups(group_ids: &[u32]) -> Vec<Station> {
                 continue;
             };
             out.push(record.to_entity(Some(line)));
+        }
+    }
+    out
+}
+
+/// `JOIN station_station_types sst` と `JOIN types t` の結果を Station に反映する。
+/// 既存の `StationRow -> Station` 変換と同じ対応付け。
+fn apply_train_type(
+    station: &mut Station,
+    sst: &index::SstRecord,
+    ty: &index::TypeRecord,
+) {
+    station.sst_id = Some(sst.id);
+    station.type_cd = Some(sst.type_cd);
+    station.line_group_cd = sst.line_group_cd;
+    station.pass = sst.pass;
+    station.type_id = Some(ty.id);
+    station.type_name = Some(ty.type_name.clone());
+    station.type_name_k = Some(ty.type_name_k.clone());
+    station.type_name_r = ty.type_name_r.clone();
+    station.type_name_zh = ty.type_name_zh.clone();
+    station.type_name_ko = ty.type_name_ko.clone();
+    station.color = Some(ty.color.clone());
+    station.direction = ty.direction;
+    station.kind = ty.kind;
+    station.has_train_types = sst.line_group_cd.is_some();
+    station.stop_condition = match sst.pass.unwrap_or(0) {
+        1 => StopCondition::Not,
+        2 => StopCondition::Partial,
+        3 => StopCondition::Weekday,
+        4 => StopCondition::Holiday,
+        5 => StopCondition::PartialStop,
+        _ => StopCondition::All,
+    };
+}
+
+/// 既存 SQL:
+/// `FROM stations s JOIN lines l ON l.line_cd = s.line_cd AND l.e_status = 0`
+/// `JOIN sst ON sst.line_group_cd IN (..) AND sst.station_cd = s.station_cd`
+/// `JOIN types t ON t.type_cd = sst.type_cd WHERE s.e_status = 0`
+/// `ORDER BY CASE sst.line_group_cd .. END, sst.id`
+///
+/// 入力順に走査し、各グループ内は sst.id 昇順なので ORDER BY と一致する。
+fn stations_of_line_groups(group_ids: &[u32]) -> Vec<Station> {
+    let mut out = Vec::new();
+    for &group_id in group_ids {
+        for sst in index::sst_by_group(group_id as i32) {
+            let Some(record) = index::station_by_cd(sst.station_cd) else {
+                continue;
+            };
+            if record.e_status != 0 {
+                continue;
+            }
+            let Some(line) = index::line_by_cd(record.line_cd) else {
+                continue;
+            };
+            if line.e_status != 0 {
+                continue;
+            }
+            // JOIN types なので種別が引けない sst は落ちる
+            let Some(ty) = index::type_by_cd(sst.type_cd) else {
+                continue;
+            };
+            let mut station = record.to_entity(Some(line));
+            apply_train_type(&mut station, sst, ty);
+            out.push(station);
         }
     }
     out
@@ -140,23 +207,86 @@ impl StationRepository for MemStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         Err(todo_err("get_by_line_id"))
     }
-    async fn get_by_line_id_vec(&self, _line_ids: &[u32]) -> Result<Vec<Station>, DomainError> {
-        Err(todo_err("get_by_line_id_vec"))
+    /// 既存 SQL:
+    /// `WHERE l.line_cd IN (..) AND s.e_status = 0 AND l.e_status = 0`
+    /// `ORDER BY CASE l.line_cd .. END, s.e_sort ASC, s.station_cd ASC`
+    async fn get_by_line_id_vec(&self, line_ids: &[u32]) -> Result<Vec<Station>, DomainError> {
+        let mut out = Vec::new();
+        for &line_id in line_ids {
+            let Some(line) = index::line_by_cd(line_id as i32) else {
+                continue;
+            };
+            if line.e_status != 0 {
+                continue;
+            }
+            let mut records: Vec<_> = index::stations_by_line(line_id as i32)
+                .filter(|s| s.e_status == 0)
+                .collect();
+            records.sort_by(|a, b| {
+                a.e_sort
+                    .cmp(&b.e_sort)
+                    .then_with(|| a.station_cd.cmp(&b.station_cd))
+            });
+            for record in records {
+                let mut station = record.to_entity(Some(line));
+                // has_train_types 用サブクエリ相当
+                station.line_group_cd = index::first_line_group_cd(record.station_cd);
+                station.has_train_types = station.line_group_cd.is_some();
+                out.push(station);
+            }
+        }
+        Ok(out)
     }
+    /// 既存 SQL:
+    /// `WHERE s.station_g_cd IN (SELECT DISTINCT s2.station_g_cd FROM stations s2`
+    /// `  WHERE s2.line_cd IN (..) AND s2.e_status = 0)`
+    /// `AND s.e_status = 0 AND l.e_status = 0`
+    ///
+    /// 指定路線の駅が属する駅グループの全駅 (他路線の駅も含む) を返す。
+    /// ORDER BY は無く、並べ替えは UseCase 側が行う。
     async fn get_by_line_id_vec_with_group_stations(
         &self,
-        _line_ids: &[u32],
+        line_ids: &[u32],
     ) -> Result<Vec<Station>, DomainError> {
-        Err(todo_err("get_by_line_id_vec_with_group_stations"))
+        let mut group_ids: Vec<i32> = Vec::new();
+        let mut seen: HashSet<i32> = HashSet::new();
+        for &line_id in line_ids {
+            for record in index::stations_by_line(line_id as i32) {
+                if record.e_status == 0 && seen.insert(record.station_g_cd) {
+                    group_ids.push(record.station_g_cd);
+                }
+            }
+        }
+
+        let mut out = Vec::new();
+        for group_id in group_ids {
+            for record in index::stations_by_group(group_id) {
+                if record.e_status != 0 {
+                    continue;
+                }
+                let Some(line) = index::line_by_cd(record.line_cd) else {
+                    continue;
+                };
+                if line.e_status != 0 {
+                    continue;
+                }
+                let mut station = record.to_entity(Some(line));
+                station.line_group_cd = index::first_line_group_cd(record.station_cd);
+                station.has_train_types = station.line_group_cd.is_some();
+                out.push(station);
+            }
+        }
+        Ok(out)
     }
-    async fn get_by_line_group_id(&self, _line_group_id: u32) -> Result<Vec<Station>, DomainError> {
-        Err(todo_err("get_by_line_group_id"))
+    async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Station>, DomainError> {
+        Ok(stations_of_line_groups(&[line_group_id]))
     }
+
     async fn get_by_line_group_id_vec(
         &self,
-        _line_group_ids: &[u32],
+        line_group_ids: &[u32],
     ) -> Result<Vec<Station>, DomainError> {
-        Err(todo_err("get_by_line_group_id_vec"))
+        Ok(stations_of_line_groups(line_group_ids))
     }
     async fn get_route_stops(
         &self,
@@ -291,12 +421,39 @@ impl LineRepository for MemLineRepository {
     ) -> Result<Vec<Line>, DomainError> {
         Err(todo_err("get_by_line_group_id_vec_for_routes"))
     }
+    /// 既存 SQL は駅名検索と違い正規化を行わず、全列に同じ `%入力%` を当てる。
+    /// line_name_rn も ILIKE ではなく LIKE (大小を区別する)。
+    /// ORDER BY が無いためスキャン順 = CSV の並び順で LIMIT が効く。
     async fn get_by_name(
         &self,
-        _line_name: String,
-        _limit: Option<u32>,
+        line_name: String,
+        limit: Option<u32>,
     ) -> Result<Vec<Line>, DomainError> {
-        Err(todo_err("LineRepository::get_by_name"))
+        let limit = limit.unwrap_or(1) as usize;
+        let mut out = Vec::new();
+        for line in index::lines() {
+            if out.len() >= limit {
+                break;
+            }
+            if line.e_status != 0 {
+                continue;
+            }
+            let hit = line.line_name.contains(&line_name)
+                || index::line_name_rn(line.line_cd).is_some_and(|v| v.contains(&line_name))
+                || line.line_name_k.contains(&line_name)
+                || line
+                    .line_name_zh
+                    .as_deref()
+                    .is_some_and(|v| v.contains(&line_name))
+                || line
+                    .line_name_ko
+                    .as_deref()
+                    .is_some_and(|v| v.contains(&line_name));
+            if hit {
+                out.push(line.clone());
+            }
+        }
+        Ok(out)
     }
 }
 
