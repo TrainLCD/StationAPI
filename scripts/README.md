@@ -2,6 +2,37 @@
 
 データメンテナンス用のスクリプト置き場です。CI で実行されるスクリプト
 （`.github/scripts/`）とは別物で、メンテナが手元で実行してデータを更新するために使います。
+データ更新以外では、デプロイ済みエンドポイントを計測する `benchmark_graphql.py` も
+ここに置いています。
+
+## benchmark_graphql.py
+
+本番 (`gql.trainlcd.app`) とステージング (`gql-stg.trainlcd.app`) の GraphQL
+エンドポイントを同一条件で叩き、応答時間を比べます。`schema/public.graphql` の
+`Query` 型にあるルートフィールドを全て 1 件ずつ計測します。
+
+1 反復ごとに環境の順番を入れ替えて交互に投げるため、ネットワークの揺らぎが片方の環境
+だけに偏りません。接続は環境ごとに keep-alive で使い回すので、TLS ハンドシェイクの費用は
+warmup 分に吸われます。GraphQL を通さない `GET /__ping` も併せて測るので、
+サーバー側の処理時間とネットワークの下駄を切り分けられます。
+
+### 使い方
+
+```bash
+# 全クエリを 30 回ずつ計測して JSON も残す
+python3 scripts/benchmark_graphql.py --iterations 30 --warmup 3 --json-out bench.json
+
+# 気になるクエリだけ
+python3 scripts/benchmark_graphql.py --only routes connectedRoutes --iterations 10
+
+# 10 多重の並列プローブを追加する(直列の値が待ち行列由来か切り分ける)
+python3 scripts/benchmark_graphql.py --only station --iterations 10 --concurrency 10
+
+# ローカルの Worker (make dev) と本番を比べる
+python3 scripts/benchmark_graphql.py --staging http://127.0.0.1:8787/
+```
+
+依存は `requests` のみです。計測結果と読み取りは `docs/graphql-benchmark.md` にあります。
 
 ## compute_average_distance.py
 
