@@ -156,14 +156,16 @@ async fn export_table(
     let mut writer = csv::Writer::from_path(&path)?;
     writer.write_record(&columns)?;
     for row in &rows {
-        let values: Vec<String> = (0..columns.len())
-            .map(|i| {
-                row.try_get::<Option<String>, _>(i)
-                    .ok()
-                    .flatten()
-                    .unwrap_or_default()
-            })
-            .collect();
+        // エラーを握りつぶすと、列の取得に失敗した値が空文字として書き出される。
+        // Worker 側は空文字を NULL 相当として扱うため、データ欠損が警告なく
+        // 本番へ流れてしまう。呼び出し元へ伝播させる。
+        let mut values: Vec<String> = Vec::with_capacity(columns.len());
+        for (i, column) in columns.iter().enumerate() {
+            let value: Option<String> = row
+                .try_get(i)
+                .map_err(|e| anyhow::anyhow!("{table}.{column} を text として読めません: {e}"))?;
+            values.push(value.unwrap_or_default());
+        }
         writer.write_record(&values)?;
     }
     writer.flush()?;
