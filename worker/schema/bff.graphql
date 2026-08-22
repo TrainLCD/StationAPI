@@ -1,0 +1,312 @@
+schema {
+	query: Query
+}
+
+scalar UInt32
+
+enum LineType {
+	OtherLineType
+	BulletTrain
+	Normal
+	Subway
+	Tram
+	MonorailOrAGT
+}
+
+enum TrainTypeKind {
+	Default
+	Branch
+	Rapid
+	Express
+	LimitedExpress
+	HighSpeedRapid
+	CommuterRapid
+	BusRoute
+}
+
+enum OperationStatus {
+	InOperation
+	NotOpened
+	Closed
+}
+
+enum StopCondition {
+	All
+	Not
+	Partial
+	Weekday
+	Holiday
+	PartialStop
+}
+
+enum CompanyType {
+	OtherCompany
+	JR
+	Private
+	Major
+	SemiMajor
+}
+
+enum TrainDirection {
+	Both
+	Inbound
+	Outbound
+}
+
+enum TransportType {
+	TransportTypeUnspecified
+	Rail
+	Bus
+	RailAndBus
+}
+
+enum TtsAlphabet {
+	TtsAlphabetUnspecified
+	Ipa
+	Yomigana
+	Plain
+}
+
+type TtsSegment {
+	surface: String
+	fallbackText: String
+	pronunciation: String
+	alphabet: TtsAlphabet
+	lang: String
+	separator: String
+}
+
+type Query {
+	station(id: Int!, transportType: TransportType): Station
+	stations(ids: [Int!]!, transportType: TransportType): [Station!]!
+	stationsNearby(latitude: Float!, longitude: Float!, limit: Int, transportType: TransportType): [Station!]!
+	stationsByName(name: String!, limit: Int, fromStationGroupId: Int, transportType: TransportType): [Station!]!
+	stationGroupStations(groupId: Int!, transportType: TransportType): [Station!]!
+	lineGroupStations(lineGroupId: Int!, directionId: Int, transportType: TransportType): [Station!]!
+	line(lineId: Int!): Line
+	lines(lineIds: [Int!]!): [Line!]!
+	linesByName(name: String!, limit: Int): [Line!]!
+	lineStations(lineId: Int!, stationId: Int, directionId: Int, transportType: TransportType): [Station!]!
+	lineListStations(lineIds: [Int!]!, transportType: TransportType): [Station!]!
+	lineGroupListStations(lineGroupIds: [Int!]!, transportType: TransportType): [Station!]!
+	stationTrainTypes(stationId: Int!): [TrainType!]!
+	routes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int, pageSize: Int, pageToken: String): RoutePage!
+	routeTypes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int, pageSize: Int, pageToken: String): RouteTypePage!
+	connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!): [Route!]!
+	estimateArrivalTimes(fromStationId: Int!, toStationId: Int!, viaLineIds: [Int!], directionId: Int): EstimatedArrivalPage!
+	trainRoute(fromStationId: Int!, toStationId: Int!, lineGroupId: Int): TrainRouteResponse!
+}
+
+type RoutePage {
+	routes: [Route!]
+	nextPageToken: String
+}
+
+type RouteTypePage {
+	trainTypes: [TrainType!]
+	nextPageToken: String
+}
+
+type Station {
+	id: Int
+	groupId: UInt32
+	name: String
+	nameKatakana: String
+	nameRoman: String
+	nameChinese: String
+	nameKorean: String
+	threeLetterCode: String
+	prefectureId: Int
+	postalCode: String
+	address: String
+	latitude: Float
+	longitude: Float
+	openedAt: String
+	closedAt: String
+	status: OperationStatus
+	stationNumbers: [StationNumber!]
+	stopCondition: StopCondition
+	distance: Float
+	hasTrainTypes: Boolean
+	trainType: TrainTypeNested
+	lines: [LineNested!]
+	line: LineNested
+	transportType: TransportType
+	nameIpa: String
+	nameRomanIpa: String
+	nameTtsSegments: [TtsSegment!]
+}
+
+type StationNested {
+	id: Int
+	groupId: UInt32
+	name: String
+	nameKatakana: String
+	nameRoman: String
+	nameChinese: String
+	nameKorean: String
+	threeLetterCode: String
+	prefectureId: Int
+	postalCode: String
+	address: String
+	latitude: Float
+	longitude: Float
+	openedAt: String
+	closedAt: String
+	status: OperationStatus
+	stationNumbers: [StationNumber!]
+	stopCondition: StopCondition
+	distance: Float
+	hasTrainTypes: Boolean
+	trainType: TrainTypeNested
+	lines: [LineNested!]
+	line: LineNested
+	transportType: TransportType
+	nameIpa: String
+	nameRomanIpa: String
+	nameTtsSegments: [TtsSegment!]
+}
+
+type StationNumber {
+	lineSymbol: String
+	lineSymbolColor: String
+	lineSymbolShape: String
+	stationNumber: String
+}
+
+type Line {
+	id: Int
+	nameShort: String
+	nameKatakana: String
+	nameFull: String
+	nameRoman: String
+	nameChinese: String
+	nameKorean: String
+	color: String
+	lineType: LineType
+	lineSymbols: [LineSymbol!]
+	status: OperationStatus
+	station: StationNested
+	company: Company
+	trainType: TrainTypeNested
+	averageDistance: Float
+	transportType: TransportType
+	nameIpa: String
+	nameRomanIpa: String
+	nameTtsSegments: [TtsSegment!]
+}
+
+type LineNested {
+	id: Int
+	nameShort: String
+	nameKatakana: String
+	nameFull: String
+	nameRoman: String
+	nameChinese: String
+	nameKorean: String
+	color: String
+	lineType: LineType
+	lineSymbols: [LineSymbol!]
+	status: OperationStatus
+	station: StationNested
+	company: Company
+	trainType: TrainTypeNested
+	averageDistance: Float
+	transportType: TransportType
+	nameIpa: String
+	nameRomanIpa: String
+	nameTtsSegments: [TtsSegment!]
+}
+
+type LineSymbol {
+	symbol: String
+	color: String
+	shape: String
+}
+
+type Company {
+	id: Int
+	railroadId: Int
+	nameShort: String
+	nameKatakana: String
+	nameFull: String
+	nameEnglishShort: String
+	nameEnglishFull: String
+	url: String
+	type: CompanyType
+	status: OperationStatus
+	name: String
+}
+
+type TrainType {
+	id: Int
+	typeId: Int
+	groupId: UInt32
+	name: String
+	nameKatakana: String
+	nameRoman: String
+	nameChinese: String
+	nameKorean: String
+	color: String
+	lines: [LineNested!]
+	line: LineNested
+	direction: TrainDirection
+	kind: TrainTypeKind
+	nameIpa: String
+	nameRomanIpa: String
+	nameTtsSegments: [TtsSegment!]
+}
+
+type TrainTypeNested {
+	id: Int
+	typeId: Int
+	groupId: UInt32
+	name: String
+	nameKatakana: String
+	nameRoman: String
+	nameChinese: String
+	nameKorean: String
+	color: String
+	lines: [LineNested!]
+	line: LineNested
+	direction: TrainDirection
+	kind: TrainTypeKind
+	nameIpa: String
+	nameRomanIpa: String
+	nameTtsSegments: [TtsSegment!]
+}
+
+type Route {
+	id: UInt32
+	stops: [StationNested!]
+}
+
+type EstimatedArrivalStop {
+	stationId: Int
+	stationGroupId: UInt32
+	cumulativeMinutes: Float
+	stopsHere: Boolean
+	departureCumulativeMinutes: Float
+}
+
+type EstimatedArrivalRoute {
+	id: Int
+	stops: [EstimatedArrivalStop!]
+}
+
+type EstimatedArrivalPage {
+	routes: [EstimatedArrivalRoute!]
+}
+
+type TrainRouteSegment {
+	station: StationNested
+	stops: Boolean
+	distanceFromPrevious: Float
+	maxSpeed: Float
+	maxAcceleration: Float
+	maxDeceleration: Float
+}
+
+type TrainRouteResponse {
+	segments: [TrainRouteSegment!]
+}

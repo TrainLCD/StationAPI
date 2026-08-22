@@ -13,9 +13,9 @@ use crate::{
         GetStationByIdRequest, GetStationByLineIdListRequest, GetStationByLineIdRequest,
         GetStationsByLineGroupIdListRequest, GetStationsByLineGroupIdRequest,
         GetStationsByNameRequest, GetTrainRouteRequest, GetTrainTypesByStationIdRequest,
-        MultipleLineResponse, MultipleStationResponse, MultipleTrainTypeResponse,
-        RouteMinimalResponse, RouteResponse, RouteTypeResponse, SingleLineResponse,
-        SingleStationResponse, TrainRouteResponse, TransportType as GrpcTransportType,
+        MultipleLineResponse, MultipleStationResponse, MultipleTrainTypeResponse, RouteResponse,
+        RouteTypeResponse, SingleLineResponse, SingleStationResponse, TrainRouteResponse,
+        TransportType as GrpcTransportType,
     },
     use_case::{interactor::query::QueryInteractor, traits::query::QueryUseCase},
 };
@@ -295,26 +295,6 @@ impl StationApi for MyApi {
         }
     }
 
-    async fn get_routes_minimal(
-        &self,
-        request: tonic::Request<GetRouteRequest>,
-    ) -> Result<tonic::Response<RouteMinimalResponse>, tonic::Status> {
-        let from_id = request.get_ref().from_station_group_id;
-        let to_id = request.get_ref().to_station_group_id;
-        let via_line_id = request.get_ref().via_line_id;
-
-        match self
-            .query_use_case
-            .get_routes_minimal(from_id, to_id, via_line_id)
-            .await
-        {
-            Ok(response) => {
-                return Ok(Response::new(response));
-            }
-            Err(err) => Err(PresentationalError::from(err).into()),
-        }
-    }
-
     async fn get_route_types(
         &self,
         request: tonic::Request<GetRouteRequest>,
@@ -504,7 +484,7 @@ mod tests {
                 station::Station, station_number::StationNumber, train_type::TrainType,
             },
         },
-        proto::{Route, RouteMinimalResponse},
+        proto::Route,
         use_case::{error::UseCaseError, traits::query::QueryUseCase},
     };
     use async_trait::async_trait;
@@ -873,19 +853,6 @@ mod tests {
             _via_line_id: Option<u32>,
         ) -> Result<Vec<crate::proto::Route>, UseCaseError> {
             Ok(vec![])
-        }
-
-        async fn get_routes_minimal(
-            &self,
-            _from_station_id: u32,
-            _to_station_id: u32,
-            _via_line_id: Option<u32>,
-        ) -> Result<RouteMinimalResponse, UseCaseError> {
-            Ok(RouteMinimalResponse {
-                routes: vec![],
-                lines: vec![],
-                next_page_token: String::new(),
-            })
         }
 
         async fn get_train_types(

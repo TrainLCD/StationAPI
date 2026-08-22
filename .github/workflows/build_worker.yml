@@ -94,6 +94,20 @@ jobs:
         working-directory: worker
         run: worker-build --release
 
+      # Worker は GraphQL をそのまま返すので、BFF が公開しているスキーマと
+      # 一致していないとクライアントが壊れる。SDL を取り出して突き合わせる。
+      - name: Compare GraphQL schema with BFF
+        working-directory: worker
+        run: |
+          npx --yes wrangler dev --port 8787 &
+          for i in $(seq 1 120); do
+            curl -sf http://127.0.0.1:8787/__ping >/dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -sf http://127.0.0.1:8787/graphql/schema -o /tmp/generated.graphql
+          kill %1 || true
+          python3 scripts/compare_schema.py schema/bff.graphql /tmp/generated.graphql
+
       - name: Report bundle size
         working-directory: worker
         run: |

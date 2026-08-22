@@ -1,57 +1,28 @@
-//! StationAPI を Cloudflare Workers 上で動かす PoC。
+//! StationAPI を Cloudflare Workers 上で動かす。
 //!
-//! sqlx / tonic を使わず、埋め込み CSV のインメモリ索引と自前の gRPC-Web フレーミングで
-//! 既存クライアント互換の応答を返す。UseCase 層 (`QueryInteractor`) は一切変更せず、
-//! repository トレイトの実装だけを差し替えている。
+//! オンプレ版は gRPC-Web を返し BFF で GraphQL へ変換しているが、
+//! こちらは GraphQL をそのまま返すので BFF を挟まない。
+//! スキーマは BFF のものと一致させてあり、CI で SDL を突き合わせている。
+//!
+//! sqlx / tonic は wasm32 で動かないため、前者は埋め込みデータの
+//! インメモリ索引、後者は不要 (GraphQL 化により) となっている。
+//! UseCase 層は一切変更せず、repository トレイトの実装だけを差し替えている。
 
-mod grpc_web;
+mod graphql;
 mod index;
 mod repository;
 
-use prost::Message;
+use async_graphql::http::GraphiQLSource;
+use async_graphql::Request as GqlRequest;
 use worker::*;
 
-use stationapi::domain::entity::gtfs::TransportTypeFilter;
-use stationapi::proto::{
-    GetLineByIdRequest, GetLinesByIdListRequest, GetStationByCoordinatesRequest,
-    GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
-    GetLinesByNameRequest, GetStationByLineIdListRequest, GetStationByLineIdRequest, GetStationsByLineGroupIdListRequest,
-    GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
-    EstimateArrivalTimesRequest, EstimatedArrivalResponse, EstimatedArrivalRoute,
-    EstimatedArrivalStop, GetConnectedStationsRequest, GetRouteRequest, GetTrainRouteRequest,
-    GetTrainTypesByStationIdRequest, MultipleLineResponse, MultipleStationResponse,
-    MultipleTrainTypeResponse, RouteResponse, RouteTypeResponse, SingleLineResponse,
-    SingleStationResponse, TrainRouteResponse, TransportType as GrpcTransportType,
-};
 use stationapi::use_case::interactor::query::QueryInteractor;
-use stationapi::use_case::traits::query::QueryUseCase;
 
 use repository::{
     MemCompanyRepository, MemLineRepository, MemStationRepository, MemTrainTypeRepository,
 };
 
-const COORDINATES_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationsByCoordinates";
-const BY_NAME_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationsByName";
-const TRAIN_TYPES_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetTrainTypesByStationId";
-const BY_ID_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationById";
-const BY_ID_LIST_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationByIdList";
-const BY_GROUP_ID_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationsByGroupId";
-const BY_LINE_GROUP_ID_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationsByLineGroupId";
-const BY_LINE_GROUP_ID_LIST_PATH: &str =
-    "/app.trainlcd.grpc.StationAPI/GetStationsByLineGroupIdList";
-const LINE_BY_ID_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetLineById";
-const LINES_BY_ID_LIST_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetLinesByIdList";
-const LINES_BY_NAME_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetLinesByName";
-const BY_LINE_ID_LIST_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationsByLineIdList";
-const ROUTES_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetRoutes";
-const ROUTE_TYPES_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetRouteTypes";
-const CONNECTED_ROUTES_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetConnectedRoutes";
-const TRAIN_ROUTE_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetTrainRoute";
-const ROUTES_MINIMAL_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetRoutesMinimal";
-const ESTIMATE_ARRIVAL_PATH: &str = "/app.trainlcd.grpc.StationAPI/EstimateArrivalTimes";
-const BY_LINE_ID_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationsByLineId";
-
-type Interactor = QueryInteractor<
+pub type Interactor = QueryInteractor<
     MemStationRepository,
     MemLineRepository,
     MemTrainTypeRepository,
@@ -59,22 +30,12 @@ type Interactor = QueryInteractor<
 >;
 
 /// repository は状態を持たない (索引は OnceLock 側にある) ので毎回生成して問題ない。
-fn use_case() -> Interactor {
+fn interactor() -> Interactor {
     QueryInteractor {
         station_repository: MemStationRepository,
         line_repository: MemLineRepository,
         train_type_repository: MemTrainTypeRepository,
         company_repository: MemCompanyRepository,
-    }
-}
-
-/// presentation 層の convert_transport_type と同じ変換 (未指定は鉄道のみ)
-fn convert_transport_type(proto_type: Option<i32>) -> TransportTypeFilter {
-    match proto_type.and_then(|v| GrpcTransportType::try_from(v).ok()) {
-        Some(GrpcTransportType::Rail) => TransportTypeFilter::Rail,
-        Some(GrpcTransportType::Bus) => TransportTypeFilter::Bus,
-        Some(GrpcTransportType::RailAndBus) => TransportTypeFilter::RailAndBus,
-        _ => TransportTypeFilter::Rail,
     }
 }
 
@@ -94,17 +55,13 @@ async fn route(req: Request) -> Result<Response> {
     let path = req.path();
 
     if method == Method::Options {
-        return grpc_web::preflight();
+        return preflight();
     }
     // 疎通確認用。データに一切触らないので、/__health との差を見れば
     // データ初期化のコストを外から切り分けられる。
-    //
-    // NOTE: Workers は Spectre 対策で同期コード中に Date.now() が進まないため、
-    // プロセス内での区間計測はできない。計測は外から分布を比べる形になる。
     if method == Method::Get && path == "/__ping" {
         return Response::ok("pong");
     }
-    // 索引の件数確認とウォームアップ用
     if method == Method::Get && path == "/__health" {
         return Response::ok(format!(
             "stations={} lines={} companies={}",
@@ -113,393 +70,50 @@ async fn route(req: Request) -> Result<Response> {
             index::companies().len()
         ));
     }
-    if method == Method::Post && path == COORDINATES_PATH {
-        return handle_get_stations_by_coordinates(req).await;
+    // スキーマを配る。CI はこれと BFF の schema.graphql を突き合わせる。
+    if method == Method::Get && path == "/graphql/schema" {
+        let schema = graphql::build_schema(interactor());
+        return with_cors(Response::ok(schema.sdl())?);
     }
-    if method == Method::Post && path == BY_NAME_PATH {
-        return handle_get_stations_by_name(req).await;
+    if method == Method::Get && path == "/graphql" {
+        return Response::from_html(GraphiQLSource::build().endpoint("/graphql").finish());
     }
-    if method == Method::Post && path == TRAIN_TYPES_PATH {
-        return handle_get_train_types_by_station_id(req).await;
-    }
-    if method == Method::Post && path == BY_ID_PATH {
-        return handle_get_station_by_id(req).await;
-    }
-    if method == Method::Post && path == BY_ID_LIST_PATH {
-        return handle_get_station_by_id_list(req).await;
-    }
-    if method == Method::Post && path == BY_GROUP_ID_PATH {
-        return handle_get_stations_by_group_id(req).await;
-    }
-    if method == Method::Post && path == BY_LINE_GROUP_ID_PATH {
-        return handle_get_stations_by_line_group_id(req).await;
-    }
-    if method == Method::Post && path == BY_LINE_GROUP_ID_LIST_PATH {
-        return handle_get_stations_by_line_group_id_list(req).await;
-    }
-    if method == Method::Post && path == LINE_BY_ID_PATH {
-        return handle_get_line_by_id(req).await;
-    }
-    if method == Method::Post && path == LINES_BY_ID_LIST_PATH {
-        return handle_get_lines_by_id_list(req).await;
-    }
-    if method == Method::Post && path == LINES_BY_NAME_PATH {
-        return handle_get_lines_by_name(req).await;
-    }
-    if method == Method::Post && path == BY_LINE_ID_LIST_PATH {
-        return handle_get_stations_by_line_id_list(req).await;
-    }
-    if method == Method::Post && path == ROUTES_PATH {
-        return handle_get_routes(req).await;
-    }
-    if method == Method::Post && path == ROUTE_TYPES_PATH {
-        return handle_get_route_types(req).await;
-    }
-    if method == Method::Post && path == CONNECTED_ROUTES_PATH {
-        return handle_get_connected_routes(req).await;
-    }
-    if method == Method::Post && path == TRAIN_ROUTE_PATH {
-        return handle_get_train_route(req).await;
-    }
-    if method == Method::Post && path == ROUTES_MINIMAL_PATH {
-        return handle_get_routes_minimal(req).await;
-    }
-    if method == Method::Post && path == ESTIMATE_ARRIVAL_PATH {
-        return handle_estimate_arrival_times(req).await;
-    }
-    if method == Method::Post && path == BY_LINE_ID_PATH {
-        return handle_get_stations_by_line_id(req).await;
+    if method == Method::Post && path == "/graphql" {
+        return handle_graphql(req).await;
     }
 
     Response::error("Not Found", 404)
 }
 
-async fn handle_get_stations_by_coordinates(mut req: Request) -> Result<Response> {
-    let body = req.bytes().await?;
-    let payload = grpc_web::decode_frame(&body)?;
-    let request = GetStationByCoordinatesRequest::decode(payload)
-        .map_err(|e| Error::RustError(format!("protobuf decode failed: {e}")))?;
+async fn handle_graphql(mut req: Request) -> Result<Response> {
+    let body = req.text().await?;
+    let request: GqlRequest = serde_json::from_str(&body)
+        .map_err(|e| Error::RustError(format!("GraphQL リクエストを解釈できません: {e}")))?;
 
-    let stations = use_case()
-        .get_stations_by_coordinates(
-            request.latitude,
-            request.longitude,
-            request.limit,
-            convert_transport_type(request.transport_type),
-        )
-        .await
-        .map_err(|e| Error::RustError(format!("{e}")))?;
+    let schema = graphql::build_schema(interactor());
+    let response = schema.execute(request).await;
 
-    grpc_web::encode_response(&MultipleStationResponse {
-        stations: stations.into_iter().map(Into::into).collect(),
-    })
+    let payload = serde_json::to_string(&response)
+        .map_err(|e| Error::RustError(format!("GraphQL レスポンスを作れません: {e}")))?;
+
+    let headers = Headers::new();
+    headers.set("content-type", "application/json")?;
+    headers.set("access-control-allow-origin", "*")?;
+    Ok(Response::ok(payload)?.with_headers(headers))
 }
 
-async fn handle_get_stations_by_name(mut req: Request) -> Result<Response> {
-    let body = req.bytes().await?;
-    let payload = grpc_web::decode_frame(&body)?;
-    let request = GetStationsByNameRequest::decode(payload)
-        .map_err(|e| Error::RustError(format!("protobuf decode failed: {e}")))?;
-
-    let stations = use_case()
-        .get_stations_by_name(
-            request.station_name,
-            request.limit,
-            request.from_station_group_id,
-            convert_transport_type(request.transport_type),
-        )
-        .await
-        .map_err(|e| Error::RustError(format!("{e}")))?;
-
-    grpc_web::encode_response(&MultipleStationResponse {
-        stations: stations.into_iter().map(Into::into).collect(),
-    })
+fn preflight() -> Result<Response> {
+    let headers = Headers::new();
+    headers.set("access-control-allow-origin", "*")?;
+    headers.set("access-control-allow-methods", "POST,GET,OPTIONS")?;
+    headers.set("access-control-allow-headers", "content-type")?;
+    headers.set("access-control-max-age", "86400")?;
+    Ok(Response::empty()?.with_headers(headers))
 }
 
-async fn handle_get_train_types_by_station_id(mut req: Request) -> Result<Response> {
-    let body = req.bytes().await?;
-    let payload = grpc_web::decode_frame(&body)?;
-    let request = GetTrainTypesByStationIdRequest::decode(payload)
-        .map_err(|e| Error::RustError(format!("protobuf decode failed: {e}")))?;
-
-    let train_types = use_case()
-        .get_train_types_by_station_id(request.station_id)
-        .await
-        .map_err(|e| Error::RustError(format!("{e}")))?;
-
-    grpc_web::encode_response(&MultipleTrainTypeResponse {
-        train_types: train_types.into_iter().map(Into::into).collect(),
-    })
-}
-
-/// リクエストボディを取り出して protobuf にデコードする共通処理
-async fn decode_request<M: Message + Default>(req: &mut Request) -> Result<M> {
-    let body = req.bytes().await?;
-    let payload = grpc_web::decode_frame(&body)?;
-    M::decode(payload).map_err(|e| Error::RustError(format!("protobuf decode failed: {e}")))
-}
-
-/// Workers は 500 の本文を "INTERNAL SERVER ERROR" に伏せるため、
-/// 原因を追えるようログにも出す。
-fn use_case_err(e: impl std::fmt::Display) -> Error {
-    let message = format!("{e}");
-    console_error!("use_case error: {message}");
-    Error::RustError(message)
-}
-
-async fn handle_get_station_by_id(mut req: Request) -> Result<Response> {
-    let request: GetStationByIdRequest = decode_request(&mut req).await?;
-    let station = use_case()
-        .find_station_by_id(request.id, convert_transport_type(request.transport_type))
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&SingleStationResponse {
-        station: station.map(Into::into),
-    })
-}
-
-async fn handle_get_station_by_id_list(mut req: Request) -> Result<Response> {
-    let request: GetStationByIdListRequest = decode_request(&mut req).await?;
-    let stations = use_case()
-        .get_stations_by_id_vec(&request.ids, convert_transport_type(request.transport_type))
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&MultipleStationResponse {
-        stations: stations.into_iter().map(Into::into).collect(),
-    })
-}
-
-async fn handle_get_stations_by_group_id(mut req: Request) -> Result<Response> {
-    let request: GetStationByGroupIdRequest = decode_request(&mut req).await?;
-    let stations = use_case()
-        .get_stations_by_group_id(
-            request.group_id,
-            convert_transport_type(request.transport_type),
-        )
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&MultipleStationResponse {
-        stations: stations.into_iter().map(Into::into).collect(),
-    })
-}
-
-async fn handle_get_stations_by_line_group_id(mut req: Request) -> Result<Response> {
-    let request: GetStationsByLineGroupIdRequest = decode_request(&mut req).await?;
-    let stations = use_case()
-        .get_stations_by_line_group_id(
-            request.line_group_id,
-            convert_transport_type(request.transport_type),
-        )
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&MultipleStationResponse {
-        stations: stations.into_iter().map(Into::into).collect(),
-    })
-}
-
-async fn handle_get_stations_by_line_group_id_list(mut req: Request) -> Result<Response> {
-    let request: GetStationsByLineGroupIdListRequest = decode_request(&mut req).await?;
-    let stations = use_case()
-        .get_stations_by_line_group_id_vec(
-            &request.line_group_ids,
-            convert_transport_type(request.transport_type),
-        )
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&MultipleStationResponse {
-        stations: stations.into_iter().map(Into::into).collect(),
-    })
-}
-
-async fn handle_get_line_by_id(mut req: Request) -> Result<Response> {
-    let request: GetLineByIdRequest = decode_request(&mut req).await?;
-    let line = use_case()
-        .find_line_by_id(request.line_id)
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&SingleLineResponse {
-        line: line.map(Into::into),
-    })
-}
-
-async fn handle_get_lines_by_id_list(mut req: Request) -> Result<Response> {
-    let request: GetLinesByIdListRequest = decode_request(&mut req).await?;
-    let lines = use_case()
-        .get_lines_by_id_vec(&request.line_ids)
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&MultipleLineResponse {
-        lines: lines.into_iter().map(Into::into).collect(),
-    })
-}
-
-async fn handle_get_lines_by_name(mut req: Request) -> Result<Response> {
-    let request: GetLinesByNameRequest = decode_request(&mut req).await?;
-    let lines = use_case()
-        .get_lines_by_name(request.line_name, request.limit)
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&MultipleLineResponse {
-        lines: lines.into_iter().map(Into::into).collect(),
-    })
-}
-
-async fn handle_get_stations_by_line_id_list(mut req: Request) -> Result<Response> {
-    let request: GetStationByLineIdListRequest = decode_request(&mut req).await?;
-    let stations = use_case()
-        .get_stations_by_line_id_vec(
-            &request.line_ids,
-            convert_transport_type(request.transport_type),
-        )
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&MultipleStationResponse {
-        stations: stations.into_iter().map(Into::into).collect(),
-    })
-}
-
-async fn handle_get_routes(mut req: Request) -> Result<Response> {
-    let request: GetRouteRequest = decode_request(&mut req).await?;
-    let routes = use_case()
-        .get_routes(
-            request.from_station_group_id,
-            request.to_station_group_id,
-            request.via_line_id,
-        )
-        .await
-        .map_err(use_case_err)?;
-
-    // NOTE: ページングは未対応 (next_page_token は空)
-    grpc_web::encode_response(&RouteResponse {
-        routes,
-        next_page_token: String::new(),
-    })
-}
-
-async fn handle_get_route_types(mut req: Request) -> Result<Response> {
-    let request: GetRouteRequest = decode_request(&mut req).await?;
-    let train_types = use_case()
-        .get_train_types(
-            request.from_station_group_id,
-            request.to_station_group_id,
-            request.via_line_id,
-        )
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&RouteTypeResponse {
-        train_types: train_types.into_iter().map(Into::into).collect(),
-        next_page_token: String::new(),
-    })
-}
-
-async fn handle_get_connected_routes(mut req: Request) -> Result<Response> {
-    let request: GetConnectedStationsRequest = decode_request(&mut req).await?;
-    let routes = use_case()
-        .get_connected_routes(request.from_station_group_id, request.to_station_group_id)
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&RouteResponse {
-        routes,
-        next_page_token: String::new(),
-    })
-}
-
-async fn handle_get_train_route(mut req: Request) -> Result<Response> {
-    let request: GetTrainRouteRequest = decode_request(&mut req).await?;
-    let segments = use_case()
-        .get_train_route(
-            request.from_station_id,
-            request.to_station_id,
-            request.line_group_id,
-        )
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&TrainRouteResponse { segments })
-}
-
-async fn handle_get_routes_minimal(mut req: Request) -> Result<Response> {
-    let request: GetRouteRequest = decode_request(&mut req).await?;
-    // UseCase が RouteMinimalResponse をそのまま組み立てて返す
-    let response = use_case()
-        .get_routes_minimal(
-            request.from_station_group_id,
-            request.to_station_group_id,
-            request.via_line_id,
-        )
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&response)
-}
-
-async fn handle_estimate_arrival_times(mut req: Request) -> Result<Response> {
-    let request: EstimateArrivalTimesRequest = decode_request(&mut req).await?;
-    let stops = use_case()
-        .estimate_route_arrival_times(
-            request.from_station_id,
-            request.to_station_id,
-            &request.via_line_ids,
-            request.direction_id,
-        )
-        .await
-        .map_err(use_case_err)?;
-
-    // presentation 層と同じ畳み込み: line_group_cd が連続する区間を 1 ルートにまとめる
-    let mut routes: Vec<EstimatedArrivalRoute> = Vec::new();
-    for stop in &stops {
-        let proto_stop = EstimatedArrivalStop {
-            station_id: stop.station_cd as u32,
-            station_group_id: stop.station_g_cd as u32,
-            cumulative_minutes: stop.cumulative_minutes,
-            departure_cumulative_minutes: stop.departure_cumulative_minutes,
-            stops_here: stop.stops_here,
-        };
-        let route_id = stop.line_group_cd.unwrap_or(0) as u32;
-        let merge = stop.line_group_cd.is_some() && routes.last().is_some_and(|r| r.id == route_id);
-
-        if merge {
-            if let Some(last) = routes.last_mut() {
-                last.stops.push(proto_stop);
-            }
-        } else {
-            routes.push(EstimatedArrivalRoute {
-                id: route_id,
-                stops: vec![proto_stop],
-            });
-        }
-    }
-
-    grpc_web::encode_response(&EstimatedArrivalResponse {
-        routes,
-        next_page_token: String::new(),
-    })
-}
-
-async fn handle_get_stations_by_line_id(mut req: Request) -> Result<Response> {
-    let request: GetStationByLineIdRequest = decode_request(&mut req).await?;
-    let stations = use_case()
-        .get_stations_by_line_id(
-            request.line_id,
-            request.station_id,
-            request.direction_id,
-            convert_transport_type(request.transport_type),
-        )
-        .await
-        .map_err(use_case_err)?;
-
-    grpc_web::encode_response(&MultipleStationResponse {
-        stations: stations.into_iter().map(Into::into).collect(),
-    })
+fn with_cors(response: Response) -> Result<Response> {
+    let headers = Headers::new();
+    headers.set("access-control-allow-origin", "*")?;
+    headers.set("content-type", "text/plain; charset=utf-8")?;
+    Ok(response.with_headers(headers))
 }
