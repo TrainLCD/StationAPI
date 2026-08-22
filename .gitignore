@@ -1,4 +1,7 @@
 /target
+/worker/target
+/worker/build
+/worker/.wrangler
 .env.local
 server.crt
 server.key

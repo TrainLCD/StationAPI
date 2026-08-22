@@ -1,0 +1,11 @@
+{
+  "name": "stationapi-worker",
+  "main": "build/worker/shim.mjs",
+  "compatibility_date": "2026-08-01",
+  "build": {
+    "command": "worker-build --release"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

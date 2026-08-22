@@ -2,10 +2,13 @@ use std::{env, path::PathBuf};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    // server feature が無い場合 (wasm ビルド) は tonic のサービスコードを生成せず、
+    // prost のメッセージ型だけを出力する。
+    let server = env::var("CARGO_FEATURE_SERVER").is_ok();
 
     tonic_build::configure()
         .build_client(false)
-        .build_server(true)
+        .build_server(server)
         .type_attribute("Company", "#[derive(serde::Serialize, serde::Deserialize)]")
         .type_attribute(
             "LineSymbol",
