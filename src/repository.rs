@@ -791,10 +791,13 @@ impl LineRepository for MemLineRepository {
         Ok(active_line(id as i32).cloned())
     }
 
-    /// 無効な路線は ID を指定されても返さない。並びは指定された ID の順。
+    /// 無効な路線は ID を指定されても返さない。
+    /// 並びは指定された ID の順で、同じ ID を複数渡されても 1 件だけ返す。
     async fn get_by_ids(&self, ids: &[u32]) -> Result<Vec<Line>, DomainError> {
+        let mut seen = HashSet::with_capacity(ids.len());
         Ok(ids
             .iter()
+            .filter(|id| seen.insert(**id))
             .filter_map(|&id| active_line(id as i32))
             .cloned()
             .collect())

@@ -17,7 +17,7 @@ macro_rules! coded_enum {
     (
         $(#[$meta:meta])*
         pub enum $name:ident {
-            $($variant:ident = $value:expr),+ $(,)?
+            $($variant:ident = $value:literal),+ $(,)?
         }
         default = $default:ident;
     ) => {

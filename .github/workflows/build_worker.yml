@@ -3,6 +3,7 @@ on:
     paths:
       - "src/**"
       - "schema/**"
+      - "scripts/compare_schema.py"
       - "stationapi/**"
       - "preprocessor/**"
       - "data/**"
@@ -14,6 +15,7 @@ on:
     paths:
       - "src/**"
       - "schema/**"
+      - "scripts/compare_schema.py"
       - "stationapi/**"
       - "preprocessor/**"
       - "data/**"

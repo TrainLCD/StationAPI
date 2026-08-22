@@ -9,13 +9,12 @@ use stationapi::domain::arrival_estimation::haversine_distance;
 use stationapi::domain::romaji::strip_macrons;
 
 use super::model::{GtfsData, Stop};
-use crate::codes::{
-    bus_line_cd, bus_line_group_cd, bus_station_cd, bus_station_g_cd, bus_type_cd,
-    company_cd_for_gtfs_route, hiragana_to_katakana,
-};
-use crate::info;
+use anyhow::Result;
+
+use crate::codes::{bus_station_g_cd, company_cd_for_gtfs_route, hiragana_to_katakana, BusCodes};
 use crate::rail::{assign_serial, Dataset};
 use crate::table::{int, text, Cell};
+use crate::{info, warn};
 
 /// バス系統を表す `types.kind`。`TrainTypeKind::BusRoute` と同じ値。
 const BUS_ROUTE_KIND: i32 = 7;
@@ -28,32 +27,40 @@ const BUS_STOP_GROUPING_RADIUS_METERS: f64 = 250.0;
 pub type StopRouteMap = HashMap<String, Vec<(String, i32)>>;
 
 /// GTFS 一式を鉄道側のデータセットへ統合する。
-pub fn integrate(dataset: &mut Dataset, gtfs: &GtfsData) {
+pub fn integrate(dataset: &mut Dataset, gtfs: &GtfsData) -> Result<()> {
     if gtfs.routes.is_empty() {
         info!("GTFS の系統が無いため統合を省略する");
-        return;
+        return Ok(());
     }
 
-    routes_to_lines(dataset, gtfs);
+    let mut codes = BusCodes::default();
+    routes_to_lines(dataset, gtfs, &mut codes)?;
     let stop_route_map = build_stop_route_mapping(gtfs);
     info!("物理停留所 {} 件の停車順を決めた", stop_route_map.len());
-    stops_to_stations(dataset, gtfs, &stop_route_map);
-    trip_variations_to_types(dataset, gtfs);
+    stops_to_stations(dataset, gtfs, &stop_route_map, &mut codes)?;
+    trip_variations_to_types(dataset, gtfs, &mut codes)?;
+    if codes.collisions() > 0 {
+        info!(
+            "ハッシュがぶつかった {} 件は次の空き ID へずらした",
+            codes.collisions()
+        );
+    }
 
     // types / station_station_types はバス行を足したので採番し直す。
     assign_serial(&mut dataset.types, "id");
     assign_serial(&mut dataset.sst, "id");
+    Ok(())
 }
 
 /// gtfs_routes を lines へ。
-fn routes_to_lines(dataset: &mut Dataset, gtfs: &GtfsData) {
+fn routes_to_lines(dataset: &mut Dataset, gtfs: &GtfsData, codes: &mut BusCodes) -> Result<()> {
     let mut added = 0usize;
     for route in &gtfs.routes {
         // 接頭辞から事業者を引けない系統は取り込まない。
         let Some(company_cd) = company_cd_for_gtfs_route(&route.route_id) else {
             continue;
         };
-        let line_cd = bus_line_cd(&route.route_id);
+        let line_cd = codes.line_cd(&route.route_id)?;
         let line_name = route
             .route_short_name
             .clone()
@@ -107,6 +114,7 @@ fn routes_to_lines(dataset: &mut Dataset, gtfs: &GtfsData) {
         }
     }
     info!("バス系統 {added} 本を路線として取り込んだ");
+    Ok(())
 }
 
 /// 代表 shape を選ぶ順位。停留所数 -> 走行距離 -> direction -> shape_id の順に見る。
@@ -533,7 +541,12 @@ fn trip_is_better(candidate: &TripRank, current: &TripRank) -> bool {
 }
 
 /// 停留所を stations へ。物理停留所 1 件につき、通る系統の数だけ行を作る。
-fn stops_to_stations(dataset: &mut Dataset, gtfs: &GtfsData, stop_route_map: &StopRouteMap) {
+fn stops_to_stations(
+    dataset: &mut Dataset,
+    gtfs: &GtfsData,
+    stop_route_map: &StopRouteMap,
+    codes: &mut BusCodes,
+) -> Result<()> {
     // 親を持たない停留所だけが物理的な停留所。子は同じ停留所の別の乗り場。
     let stops: Vec<&Stop> = gtfs
         .stops
@@ -571,14 +584,11 @@ fn stops_to_stations(dataset: &mut Dataset, gtfs: &GtfsData, stop_route_map: &St
             .unwrap_or_else(|| stop.stop_name.clone());
 
         for (route_id, stop_sequence) in routes {
+            let station_cd = codes.station_cd(&stop.stop_id, route_id)?;
+            let line_cd = codes.line_cd(route_id)?;
             let mut row = dataset.stations.blank_row();
             let t = &dataset.stations;
-            set(
-                t,
-                &mut row,
-                "station_cd",
-                int(bus_station_cd(&stop.stop_id, route_id)),
-            );
+            set(t, &mut row, "station_cd", int(station_cd));
             set(t, &mut row, "station_g_cd", int(station_g_cd));
             set(t, &mut row, "station_name", text(stop.stop_name.clone()));
             set(t, &mut row, "station_name_k", text(station_name_k.clone()));
@@ -586,7 +596,7 @@ fn stops_to_stations(dataset: &mut Dataset, gtfs: &GtfsData, stop_route_map: &St
             set(t, &mut row, "station_name_rn", station_name_rn.clone());
             set(t, &mut row, "station_name_zh", stop.stop_name_zh.clone());
             set(t, &mut row, "station_name_ko", stop.stop_name_ko.clone());
-            set(t, &mut row, "line_cd", int(bus_line_cd(route_id)));
+            set(t, &mut row, "line_cd", int(line_cd));
             set(t, &mut row, "pref_cd", int(13));
             set(t, &mut row, "post", text(""));
             set(t, &mut row, "address", text(""));
@@ -603,6 +613,7 @@ fn stops_to_stations(dataset: &mut Dataset, gtfs: &GtfsData, stop_route_map: &St
         }
     }
     info!("バス停 {} 件から駅 {added} 行を作った", stops.len());
+    Ok(())
 }
 
 /// 同じ物理停留所の上下線ポールをひとつの `station_g_cd` へまとめる。
@@ -692,7 +703,11 @@ struct Variation<'a> {
 /// 1 つの shape が 1 つの運行パターンにあたる (池86 ならフルループ /
 /// サンシャインシティ経由 / 短ターン)。鉄道の のぞみ / ひかり / こだま と
 /// 同じように、クライアントはこれで運行パターンを切り替えられる。
-fn trip_variations_to_types(dataset: &mut Dataset, gtfs: &GtfsData) {
+fn trip_variations_to_types(
+    dataset: &mut Dataset,
+    gtfs: &GtfsData,
+    codes: &mut BusCodes,
+) -> Result<()> {
     let stop_times_by_trip = gtfs.stop_times_by_trip();
     let parent_of = gtfs.parent_stop_ids();
     let stop_by_id: HashMap<&str, &Stop> = gtfs
@@ -707,11 +722,15 @@ fn trip_variations_to_types(dataset: &mut Dataset, gtfs: &GtfsData) {
         .collect();
 
     // (系統, shape) ごとに代表の便を 1 本。決着は trip_id の小さい順。
+    // 停車時刻を持たない便は停車駅 0 件の種別を作ってしまうので対象にしない。
     let mut representative_trip: HashMap<(&str, &str), &super::model::Trip> = HashMap::new();
     for trip in &gtfs.trips {
         let Some(shape_id) = trip.shape_id.as_deref() else {
             continue;
         };
+        if !stop_times_by_trip.contains_key(trip.trip_id.as_str()) {
+            continue;
+        }
         representative_trip
             .entry((trip.route_id.as_str(), shape_id))
             .and_modify(|current| {
@@ -817,9 +836,10 @@ fn trip_variations_to_types(dataset: &mut Dataset, gtfs: &GtfsData) {
     // 同じ名前になった種別は停留所数を付けて区別する。
     let mut name_counter: HashMap<(&str, String), i32> = HashMap::new();
     let mut sst_added = 0usize;
+    let mut skipped_stops = 0usize;
     for (index, variation) in representatives.iter().enumerate() {
-        let type_cd = bus_type_cd(variation.route_id, variation.shape_id);
-        let line_group_cd = bus_line_group_cd(variation.route_id, variation.shape_id);
+        let type_cd = codes.type_cd(variation.route_id, variation.shape_id)?;
+        let line_group_cd = codes.line_group_cd(variation.route_id, variation.shape_id)?;
 
         let is_bidirectional = directions[index].len() > 1;
         let direction = if is_bidirectional {
@@ -890,14 +910,15 @@ fn trip_variations_to_types(dataset: &mut Dataset, gtfs: &GtfsData) {
         stops.sort_by(|a, b| a.1.cmp(&b.1).then(a.0.cmp(b.0)));
 
         for (parent, _) in &stops {
+            // 駅として書き出していない停留所は停車駅にできない。
+            // ここで新たに ID を振ると、存在しない駅を指す行ができる。
+            let Some(station_cd) = codes.existing_station_cd(parent, variation.route_id) else {
+                skipped_stops += 1;
+                continue;
+            };
             let mut row = dataset.sst.blank_row();
             let t = &dataset.sst;
-            set(
-                t,
-                &mut row,
-                "station_cd",
-                int(bus_station_cd(parent, variation.route_id)),
-            );
+            set(t, &mut row, "station_cd", int(station_cd));
             set(t, &mut row, "type_cd", int(type_cd));
             set(t, &mut row, "line_group_cd", int(line_group_cd));
             set(t, &mut row, "pass", int(0));
@@ -906,10 +927,15 @@ fn trip_variations_to_types(dataset: &mut Dataset, gtfs: &GtfsData) {
         }
     }
 
+    if skipped_stops > 0 {
+        warn!("駅として書き出せなかった停留所 {skipped_stops} 件を停車駅から外した");
+    }
+
     info!(
         "バスの運行パターン {} 件を種別として取り込んだ (station_station_types {sst_added} 行)",
         representatives.len()
     );
+    Ok(())
 }
 
 /// 循環系統の名前に使う「経由地」を選ぶ。

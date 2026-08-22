@@ -63,7 +63,7 @@ fn main() -> Result<()> {
         info!("DISABLE_BUS_FEATURE が立っているのでバスを取り込まない");
     } else {
         let gtfs = gtfs::load()?;
-        gtfs::integrate::integrate(&mut dataset, &gtfs);
+        gtfs::integrate::integrate(&mut dataset, &gtfs)?;
     }
 
     emit::write_all(&mut dataset, &out_dir)?;

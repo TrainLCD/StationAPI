@@ -118,6 +118,31 @@ impl GtfsData {
         self.stop_ids.contains(stop_id)
     }
 
+    /// 参照先が存在しない `parent_station` を取り除く。
+    ///
+    /// GTFS は親が子より後に現れてもよいので、全フィードを読み終えてから見る。
+    /// 残したままだと、駅として書き出されない停留所 ID を停車駅として
+    /// 参照する行ができてしまう。
+    pub fn drop_dangling_parents(&mut self) {
+        let known = self.stop_ids.clone();
+        let mut dropped = 0usize;
+        for stop in &mut self.stops {
+            if let Some(parent) = stop.parent_station.as_deref() {
+                if !known.contains(parent) {
+                    warn!(
+                        "停留所 {} の parent_station {parent} が stops に無いため無視する",
+                        stop.stop_id
+                    );
+                    stop.parent_station = None;
+                    dropped += 1;
+                }
+            }
+        }
+        if dropped > 0 {
+            warn!("参照先の無い parent_station を {dropped} 件外した");
+        }
+    }
+
     /// stop_id -> 物理停留所 ID の索引。
     pub fn parent_stop_ids(&self) -> HashMap<&str, &str> {
         self.stops

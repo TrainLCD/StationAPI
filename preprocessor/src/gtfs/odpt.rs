@@ -50,7 +50,7 @@ struct BusstopPole {
     title: String,
     #[serde(rename = "odpt:kana", default)]
     kana: String,
-    #[serde(rename = "odpt:operator", default)]
+    #[serde(rename = "odpt:operator", default, deserialize_with = "string_or_seq")]
     operators: Vec<String>,
     #[serde(rename = "geo:lat", default)]
     lat: f64,
@@ -82,6 +82,23 @@ struct BusTimetableObject {
     departure_time: Option<String>,
     #[serde(rename = "odpt:destinationSign")]
     destination_sign: Option<String>,
+}
+
+/// `odpt:operator` は資源によって文字列にも配列にもなる。どちらでも読めるようにする。
+fn string_or_seq<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<String>, D::Error> {
+    match serde_json::Value::deserialize(deserializer)? {
+        serde_json::Value::String(one) => Ok(vec![one]),
+        serde_json::Value::Array(many) => Ok(many
+            .into_iter()
+            .filter_map(|value| value.as_str().map(str::to_string))
+            .collect()),
+        serde_json::Value::Null => Ok(Vec::new()),
+        other => Err(serde::de::Error::custom(format!(
+            "odpt:operator が文字列でも配列でもない: {other}"
+        ))),
+    }
 }
 
 pub struct OdptData {
@@ -211,10 +228,11 @@ fn download_resource<T: DeserializeOwned + Serialize>(
         resource.rsplit(':').next().unwrap_or(resource)
     ));
 
-    if let Ok(metadata) = fs::metadata(&cache_path) {
-        let fresh = metadata
-            .modified()
+    let cached = fs::metadata(&cache_path).is_ok();
+    if cached {
+        let fresh = fs::metadata(&cache_path)
             .ok()
+            .and_then(|metadata| metadata.modified().ok())
             .and_then(|modified| modified.elapsed().ok())
             .is_some_and(|age| age < CACHE_MAX_AGE);
         if fresh {
@@ -224,6 +242,12 @@ fn download_resource<T: DeserializeOwned + Serialize>(
     }
 
     let Some(token) = token else {
+        // 取りに行けない以上、期限切れでもキャッシュを使ったほうが
+        // 東急バスが丸ごと欠けるよりましなので、あれば読む。
+        if cached {
+            warn!("東急バス {resource} は期限切れのキャッシュを使う (ODPT_ACCESS_TOKEN が無い)");
+            return read_items(&cache_path);
+        }
         bail!("東急バス {resource} の取得には ODPT_ACCESS_TOKEN が要る (使えるキャッシュも無い)");
     };
 

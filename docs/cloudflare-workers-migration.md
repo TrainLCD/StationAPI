@@ -54,13 +54,13 @@
 
 ### 移行前
 
-```
+```text
 TrainLCD -> BFF (GraphQL -> gRPC-Web 変換) -> StationAPI (gRPC) -> PostgreSQL
 ```
 
 ### 移行後
 
-```
+```text
 TrainLCD -> stationapi (GraphQL 直接) -> WASM に埋め込んだデータ
 ```
 
@@ -78,7 +78,7 @@ TrainLCD -> stationapi (GraphQL 直接) -> WASM に埋め込んだデータ
 
 移行の検証中は `stationapi` crate を `server` feature で分割し、worker を workspace から exclude していた。gRPC 削除後は Worker がルートの crate になり、共有部分だけが `stationapi` crate として残っている。
 
-```
+```text
 Cargo.toml       # stationapi-worker (wasm32 専用) + workspace
 build.rs         # データのバイナリ化と配置
 src/
@@ -147,7 +147,7 @@ preprocessor/    # generated/*.csv の生成 (純 Rust)
 `stationapi --export-worker-data` で書き出していた。gRPC 削除にあわせて
 同じ変換を純 Rust の `preprocessor` crate へ移し、PostgreSQL は不要になった。
 
-```
+```text
 make data     # cargo run --profile tool -p stationapi-preprocessor
 ```
 
@@ -209,7 +209,7 @@ CI (`.github/workflows/build_worker.yml`) がこの流れを実行する。
 
 staging (`gql-stg.trainlcd.app`) での測定。日本から東京エッジ (`cf-ray` は NRT)。
 
-```
+```text
 全18クエリ         : 成功
 サーバー処理       : 通常 12〜20ms (接続確立の TLS が 21〜40ms を占める)
 keep-alive 20回    : p50=0ms 最大58ms 平均3ms
@@ -275,7 +275,7 @@ Worker 移行とは独立した、既存実装の問題。gRPC 版で再現を�
 
 **環境の使い分け。** 他の Worker と揃えて、env 省略時を staging にしてある。
 
-```
+```text
 staging : wrangler deploy --env=""          -> stationapi-stg
 本番    : wrangler deploy --env production  -> stationapi
 ```

@@ -6,7 +6,7 @@ pub mod model;
 pub mod odpt;
 pub mod parse;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 
 use crate::warn;
 use model::GtfsData;
@@ -31,6 +31,18 @@ pub fn load() -> Result<GtfsData> {
     match odpt::download() {
         Ok(odpt_data) => odpt::load(&mut data, &odpt_data),
         Err(e) => warn!("東急バスの ODPT JSON を取得できない: {e}。このフィードを飛ばす"),
+    }
+
+    data.drop_dangling_parents();
+
+    // 1 つも取り込めていない場合は失敗させる。ここで成功にすると、バスが
+    // 丸ごと欠けた generated/*.csv がビルド成功として出てしまう。
+    // 鉄道だけで良い場合は DISABLE_BUS_FEATURE=true を使う。
+    if data.routes.is_empty() {
+        bail!(
+            "GTFS のフィードを 1 つも取り込めなかった。\
+             ODPT_ACCESS_TOKEN を設定するか、バスが不要なら DISABLE_BUS_FEATURE=true を指定する"
+        );
     }
 
     crate::info!(

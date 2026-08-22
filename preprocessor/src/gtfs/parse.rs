@@ -119,12 +119,25 @@ fn load_stops(
             stop_name_r,
             stop_name_zh: translation.and_then(|t| t.zh.clone()),
             stop_name_ko: translation.and_then(|t| t.ko.clone()),
-            stop_lat: record.get(4).unwrap_or("0").parse().unwrap_or(0.0),
-            stop_lon: record.get(5).unwrap_or("0").parse().unwrap_or(0.0),
+            stop_lat: coordinate(&record, 4, original_stop_id, "stop_lat"),
+            stop_lon: coordinate(&record, 5, original_stop_id, "stop_lon"),
             parent_station: cell(&record, 9).map(|s| scoped_id(feed, s)),
         });
     }
     Ok(())
+}
+
+/// 座標を読む。読めない値を黙って 0.0 にすると、ギニア湾の座標として
+/// 距離計算やまとめ処理へ流れてしまうので警告を出す。
+fn coordinate(record: &csv::StringRecord, index: usize, stop_id: &str, column: &str) -> f64 {
+    let raw = record.get(index).unwrap_or("");
+    match raw.trim().parse() {
+        Ok(value) => value,
+        Err(_) => {
+            warn!("停留所 {stop_id} の {column} を読めない (値: {raw:?})。0.0 として扱う");
+            0.0
+        }
+    }
 }
 
 fn load_trips(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
