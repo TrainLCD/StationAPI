@@ -121,11 +121,12 @@ impl StationRepository for MemStationRepository {
         latitude: f64,
         longitude: f64,
         limit: Option<u32>,
-        _transport_type: Option<TransportType>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, DomainError> {
         // 既存 SQL の LIMIT $3 と同じく未指定なら 1 件
         let limit = limit.unwrap_or(1).min(1_000) as usize;
-        Ok(index::nearest(latitude, longitude, limit)
+        let want = transport_type.map(|t| t as i32);
+        Ok(index::nearest(latitude, longitude, limit, want)
             .into_iter()
             .map(|(record, distance_km)| {
                 let mut station = record.to_entity(index::line_by_cd(record.line_cd));
@@ -143,11 +144,12 @@ impl StationRepository for MemStationRepository {
         station_name: String,
         limit: Option<u32>,
         _from_station_group_id: Option<u32>,
-        _transport_type: Option<TransportType>,
+        transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, DomainError> {
         // NOTE: 既存は limit 未指定で LIMIT NULL (全件)。PoC でも実質全件を許す。
         let limit = limit.unwrap_or(u32::MAX).min(10_000) as usize;
-        Ok(index::search_by_name(&station_name, limit)
+        let want = transport_type.map(|t| t as i32);
+        Ok(index::search_by_name(&station_name, limit, want)
             .into_iter()
             .map(|record| record.to_entity(index::line_by_cd(record.line_cd)))
             .collect())
@@ -190,13 +192,35 @@ impl StationRepository for MemStationRepository {
             .collect())
     }
 
-    /// バス機能は方針どおり後回し。鉄道のみのデータでは常に空。
+    /// 既存 SQL:
+    /// 各座標につき LATERAL で `transport_type = Bus` の最寄り N 件を取り、
+    /// そのあと `JOIN lines ... AND l.e_status = 0` で絞る。
+    /// 先に路線で絞ると件数が変わるため、この順序を保つ。
+    /// 並びは `ORDER BY ic.source_g_cd, 距離`。
     async fn get_bus_stops_near_stations(
         &self,
-        _coords: &[(u32, f64, f64)],
-        _limit_per_station: u32,
+        coords: &[(u32, f64, f64)],
+        limit_per_station: u32,
     ) -> Result<Vec<(u32, Station)>, DomainError> {
-        Ok(Vec::new())
+        let want = Some(TransportType::Bus as i32);
+        let limit = limit_per_station as usize;
+        let mut out = Vec::new();
+
+        for &(source_g_cd, lat, lon) in coords {
+            for (record, _distance) in index::nearest_without_line_join(lat, lon, limit, want) {
+                let Some(line) = index::line_by_cd(record.line_cd) else {
+                    continue;
+                };
+                if line.e_status != 0 {
+                    continue;
+                }
+                let mut station = record.to_entity(Some(line));
+                station.line_group_cd = index::first_line_group_cd(record.station_cd);
+                station.has_train_types = station.line_group_cd.is_some();
+                out.push((source_g_cd, station));
+            }
+        }
+        Ok(out)
     }
 
     /// 既存実装 (`get_by_line_id_with_train_type`) の写し。

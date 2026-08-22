@@ -908,17 +908,29 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-    let tokyu_odpt_data = tokio::task::spawn_blocking(download_tokyu_odpt_data)
-        .await
-        .map_err(|e| format!("Failed to spawn Tokyu Bus JSON download: {}", e))?
-        .map_err(|e| -> Box<dyn std::error::Error> { e })?;
-    info!(
-        "[gtfs:{}] downloaded ODPT JSON: {} patterns, {} stops, {} timetables",
-        TOKYU_ODPT_PREFIX,
-        tokyu_odpt_data.patterns.len(),
-        tokyu_odpt_data.stops.len(),
-        tokyu_odpt_data.timetables.len()
-    );
+    // 他のフィードと同じく、取得できなければ警告にとどめて先へ進む。
+    // ここで早期リターンすると、ODPT_ACCESS_TOKEN が無い環境では
+    // トークン不要な都営バスまで含めて GTFS 取り込みが一切行われなくなる。
+    let tokyu_odpt_data = match tokio::task::spawn_blocking(download_tokyu_odpt_data).await {
+        Ok(Ok(data)) => {
+            info!(
+                "[gtfs:{}] downloaded ODPT JSON: {} patterns, {} stops, {} timetables",
+                TOKYU_ODPT_PREFIX,
+                data.patterns.len(),
+                data.stops.len(),
+                data.timetables.len()
+            );
+            Some(data)
+        }
+        Ok(Err(e)) => {
+            warn!("Failed to download Tokyu Bus ODPT JSON: {e}. Skipping this feed.");
+            None
+        }
+        Err(join_err) => {
+            warn!("Failed to spawn Tokyu Bus JSON download: {join_err}. Skipping this feed.");
+            None
+        }
+    };
     info!(
         "[gtfs] download/extract finished in {:?}",
         download_start.elapsed()
@@ -1065,7 +1077,9 @@ pub async fn import_gtfs() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    import_tokyu_odpt_data(&mut tx, &tokyu_odpt_data).await?;
+    if let Some(tokyu_odpt_data) = tokyu_odpt_data.as_ref() {
+        import_tokyu_odpt_data(&mut tx, tokyu_odpt_data).await?;
+    }
 
     info!("[gtfs] committing transaction");
     let commit_start = std::time::Instant::now();

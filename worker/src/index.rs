@@ -93,6 +93,9 @@ pub struct StationRecord {
     pub closed_at: String,
     pub e_status: i32,
     pub e_sort: i32,
+    /// 0 = 鉄道, 1 = バス。GTFS 統合後の DB から書き出した CSV に含まれる。
+    /// data/*.csv にフォールバックした場合は列が無いので Rail 扱いになる。
+    pub transport_type: TransportType,
 }
 
 impl StationRecord {
@@ -164,7 +167,7 @@ impl StationRecord {
             color: None,
             direction: None,
             kind: None,
-            transport_type: TransportType::Rail,
+            transport_type: self.transport_type,
         }
     }
 }
@@ -225,6 +228,7 @@ fn build_stations() -> Vec<StationRecord> {
             closed_at: text(&r, c.at("close_ymd")),
             e_status: i32_or(&r, c.at("e_status"), 0),
             e_sort: i32_or(&r, c.at("e_sort"), 0),
+            transport_type: TransportType::from(i32_or(&r, c.at("transport_type"), 0)),
         });
     }
     out
@@ -330,7 +334,7 @@ fn build_lines() -> Vec<Line> {
             station_cd: None,
             station_g_cd: None,
             type_cd: None,
-            transport_type: TransportType::Rail,
+            transport_type: TransportType::from(i32_or(&r, c.at("transport_type"), 0)),
         });
     }
     out
@@ -407,16 +411,61 @@ pub fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 }
 
 /// 全件走査で最近傍 limit 件を返す。11,148 駅なので索引なしで十分速い。
-pub fn nearest(lat: f64, lon: f64, limit: usize) -> Vec<(&'static StationRecord, f64)> {
+///
+/// `want` は既存 SQL の `$4::int IS NULL OR COALESCE(s.transport_type, 0) = $4` に対応する。
+/// 未指定 (RailAndBus) のときは
+/// `ORDER BY CASE WHEN $4 IS NULL THEN COALESCE(s.transport_type, 0) ELSE 0 END, 距離`
+/// となり、鉄道を先・バスを後に並べたうえで距離順になる。
+pub fn nearest(
+    lat: f64,
+    lon: f64,
+    limit: usize,
+    want: Option<i32>,
+) -> Vec<(&'static StationRecord, f64)> {
+    nearest_inner(lat, lon, limit, want, true)
+}
+
+/// 路線の存在を条件にしないまま最近傍を取る。
+///
+/// `get_bus_stops_near_stations` の SQL は LATERAL の中で先に LIMIT を掛け、
+/// そのあと `JOIN lines` で絞る。先に路線で絞ると件数が変わるため、
+/// この順序を保つ用途で使う。
+pub fn nearest_without_line_join(
+    lat: f64,
+    lon: f64,
+    limit: usize,
+    want: Option<i32>,
+) -> Vec<(&'static StationRecord, f64)> {
+    nearest_inner(lat, lon, limit, want, false)
+}
+
+fn nearest_inner(
+    lat: f64,
+    lon: f64,
+    limit: usize,
+    want: Option<i32>,
+    require_line: bool,
+) -> Vec<(&'static StationRecord, f64)> {
     let mut scored: Vec<(&StationRecord, f64)> = stations()
         .iter()
         .filter(|s| s.e_status == 0)
-        .filter(|s| joins_line(s))
+        .filter(|s| !require_line || joins_line(s))
+        .filter(|s| want.is_none_or(|w| s.transport_type as i32 == w))
         .map(|s| (s, haversine_km(lat, lon, s.lat, s.lon)))
         .collect();
 
-    let cmp = |a: &(&StationRecord, f64), b: &(&StationRecord, f64)| {
-        a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+    // 種別指定がある場合は第1キーが定数 0 になるので距離だけで並ぶ
+    let rank = move |s: &StationRecord| -> i32 {
+        if want.is_none() {
+            s.transport_type as i32
+        } else {
+            0
+        }
+    };
+    let cmp = move |a: &(&StationRecord, f64), b: &(&StationRecord, f64)| {
+        rank(a.0)
+            .cmp(&rank(b.0))
+            .then_with(|| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
     };
     // 全体ソートを避け、上位 limit 件だけを確定させる
     if limit < scored.len() {
@@ -432,7 +481,11 @@ pub fn nearest(lat: f64, lon: f64, limit: usize) -> Vec<(&'static StationRecord,
 /// PostgreSQL 側の `pg_trgm` は `LIKE '%...%'` を高速化する GIN インデックスであって
 /// 類似度検索ではないため、`contains()` で論理的に等価な結果が得られる。
 /// 正規化には domain 層の `normalize_for_search` をそのまま使うので挙動も一致する。
-pub fn search_by_name(query: &str, limit: usize) -> Vec<&'static StationRecord> {
+pub fn search_by_name(
+    query: &str,
+    limit: usize,
+    want: Option<i32>,
+) -> Vec<&'static StationRecord> {
     if query.is_empty() {
         return Vec::new();
     }
@@ -445,6 +498,7 @@ pub fn search_by_name(query: &str, limit: usize) -> Vec<&'static StationRecord> 
         .iter()
         .filter(|s| s.e_status == 0)
         .filter(|s| joins_active_line(s))
+        .filter(|s| want.is_none_or(|w| s.transport_type as i32 == w))
         .filter(|s| {
             s.name.contains(query)
                 || s.name_roman_lower
