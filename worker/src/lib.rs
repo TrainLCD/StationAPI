@@ -15,7 +15,7 @@ use stationapi::domain::entity::gtfs::TransportTypeFilter;
 use stationapi::proto::{
     GetLineByIdRequest, GetLinesByIdListRequest, GetStationByCoordinatesRequest,
     GetStationByGroupIdRequest, GetStationByIdListRequest, GetStationByIdRequest,
-    GetLinesByNameRequest, GetStationByLineIdListRequest, GetStationsByLineGroupIdListRequest,
+    GetLinesByNameRequest, GetStationByLineIdListRequest, GetStationByLineIdRequest, GetStationsByLineGroupIdListRequest,
     GetStationsByLineGroupIdRequest, GetStationsByNameRequest,
     EstimateArrivalTimesRequest, EstimatedArrivalResponse, EstimatedArrivalRoute,
     EstimatedArrivalStop, GetConnectedStationsRequest, GetRouteRequest, GetTrainRouteRequest,
@@ -49,6 +49,7 @@ const CONNECTED_ROUTES_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetConnectedR
 const TRAIN_ROUTE_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetTrainRoute";
 const ROUTES_MINIMAL_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetRoutesMinimal";
 const ESTIMATE_ARRIVAL_PATH: &str = "/app.trainlcd.grpc.StationAPI/EstimateArrivalTimes";
+const BY_LINE_ID_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationsByLineId";
 
 type Interactor = QueryInteractor<
     MemStationRepository,
@@ -157,6 +158,9 @@ async fn route(req: Request) -> Result<Response> {
     }
     if method == Method::Post && path == ESTIMATE_ARRIVAL_PATH {
         return handle_estimate_arrival_times(req).await;
+    }
+    if method == Method::Post && path == BY_LINE_ID_PATH {
+        return handle_get_stations_by_line_id(req).await;
     }
 
     Response::error("Not Found", 404)
@@ -472,5 +476,22 @@ async fn handle_estimate_arrival_times(mut req: Request) -> Result<Response> {
     grpc_web::encode_response(&EstimatedArrivalResponse {
         routes,
         next_page_token: String::new(),
+    })
+}
+
+async fn handle_get_stations_by_line_id(mut req: Request) -> Result<Response> {
+    let request: GetStationByLineIdRequest = decode_request(&mut req).await?;
+    let stations = use_case()
+        .get_stations_by_line_id(
+            request.line_id,
+            request.station_id,
+            request.direction_id,
+            convert_transport_type(request.transport_type),
+        )
+        .await
+        .map_err(use_case_err)?;
+
+    grpc_web::encode_response(&MultipleStationResponse {
+        stations: stations.into_iter().map(Into::into).collect(),
     })
 }

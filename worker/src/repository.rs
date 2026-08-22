@@ -199,13 +199,112 @@ impl StationRepository for MemStationRepository {
         Ok(Vec::new())
     }
 
+    /// 既存実装 (`get_by_line_id_with_train_type`) の写し。
+    ///
+    /// 1. target_line_group: その路線 (station_id 指定時はその駅) に紐づく
+    ///    line_group_cd を priority 降順で 1 件選ぶ
+    /// 2. その系統の停車駅を `ORDER BY sst.id` で返す
+    /// 3. 空なら種別なし (`get_by_line_id_without_train_types`) へフォールバックし、
+    ///    `ORDER BY s.e_sort, s.station_cd` で路線の全駅を返す
+    ///
+    /// direction_id が 1 か 2 のときは並び順を反転する。
     async fn get_by_line_id(
         &self,
-        _line_id: u32,
-        _station_id: Option<u32>,
-        _direction_id: Option<u32>,
+        line_id: u32,
+        station_id: Option<u32>,
+        direction_id: Option<u32>,
     ) -> Result<Vec<Station>, DomainError> {
-        Err(todo_err("get_by_line_id"))
+        let reverse = matches!(direction_id, Some(1) | Some(2));
+
+        // target_line_group: ORDER BY t.priority DESC LIMIT 1
+        let mut candidates: Vec<(i32, i32)> = Vec::new(); // (priority, line_group_cd)
+        for seed in index::stations_by_line(line_id as i32) {
+            if let Some(target) = station_id {
+                if seed.station_cd != target as i32 {
+                    continue;
+                }
+            }
+            for sst in index::sst_by_station(seed.station_cd) {
+                let Some(ty) = index::type_by_cd(sst.type_cd) else {
+                    continue;
+                };
+                let prioritized = ty.priority > 0 && sst.pass != Some(1);
+                // (priority > 0 かつ通過しない) か、そうでなければ kind が 0/1 のもの
+                if !prioritized && !matches!(ty.kind, Some(0) | Some(1)) {
+                    continue;
+                }
+                if let Some(group) = sst.line_group_cd {
+                    candidates.push((ty.priority, group));
+                }
+            }
+        }
+        candidates.sort_by(|a, b| b.0.cmp(&a.0));
+
+        if let Some(&(_, target_group)) = candidates.first() {
+            let mut typed: Vec<(i32, &index::StationRecord, &index::SstRecord)> = Vec::new();
+            for sst in index::sst_by_group(target_group) {
+                let Some(record) = index::station_by_cd(sst.station_cd) else {
+                    continue;
+                };
+                if record.e_status != 0 {
+                    continue;
+                }
+                if index::type_by_cd(sst.type_cd).is_none() {
+                    continue;
+                }
+                let Some(line) = index::line_by_cd(record.line_cd) else {
+                    continue;
+                };
+                if line.e_status != 0 {
+                    continue;
+                }
+                typed.push((sst.id, record, sst));
+            }
+            if !typed.is_empty() {
+                typed.sort_by_key(|(id, _, _)| *id);
+                if reverse {
+                    typed.reverse();
+                }
+                return Ok(typed
+                    .into_iter()
+                    .map(|(_, record, sst)| {
+                        let mut station = record.to_entity(index::line_by_cd(record.line_cd));
+                        if let Some(ty) = index::type_by_cd(sst.type_cd) {
+                            apply_train_type(&mut station, sst, ty);
+                        }
+                        station
+                    })
+                    .collect());
+            }
+        }
+
+        // フォールバック: 種別を持たない路線として全駅を返す
+        let Some(line) = index::line_by_cd(line_id as i32) else {
+            return Ok(Vec::new());
+        };
+        if line.e_status != 0 {
+            return Ok(Vec::new());
+        }
+        let mut records: Vec<&index::StationRecord> = index::stations_by_line(line_id as i32)
+            .filter(|r| r.e_status == 0)
+            .collect();
+        records.sort_by(|a, b| {
+            a.e_sort
+                .cmp(&b.e_sort)
+                .then_with(|| a.station_cd.cmp(&b.station_cd))
+        });
+        if reverse {
+            records.reverse();
+        }
+        Ok(records
+            .into_iter()
+            .map(|record| {
+                let mut station = record.to_entity(Some(line));
+                station.line_group_cd = index::first_line_group_cd(record.station_cd);
+                station.has_train_types = station.line_group_cd.is_some();
+                station
+            })
+            .collect())
     }
     /// 既存 SQL:
     /// `WHERE l.line_cd IN (..) AND s.e_status = 0 AND l.e_status = 0`
@@ -363,14 +462,114 @@ impl StationRepository for MemStationRepository {
             .map(|record| record.to_entity(index::line_by_cd(record.line_cd)))
             .collect())
     }
+    /// 既存実装は 2 本のクエリを実行して結果を連結する。
+    /// 1. untyped: 種別経路に含まれない駅 (`sst.line_group_cd IS NULL`)、
+    ///    `ORDER BY sta.e_sort, sta.station_cd`
+    /// 2. typed: 種別経路に含まれる駅 (`JOIN types` が INNER)、`ORDER BY sst.id`
+    ///
+    /// direction_id = 1 のときは両方の並び順を反転する。
     async fn get_route_stops_by_station_cd(
         &self,
-        _from_station_cd: u32,
-        _to_station_cd: u32,
-        _via_line_ids: &[u32],
-        _direction_id: Option<u32>,
+        from_station_cd: u32,
+        to_station_cd: u32,
+        via_line_ids: &[u32],
+        direction_id: Option<u32>,
     ) -> Result<Vec<Station>, DomainError> {
-        Err(todo_err("get_route_stops_by_station_cd"))
+        let reverse = direction_id == Some(1);
+        let via_ok = |line_cd: i32| via_line_ids.is_empty() || via_line_ids.contains(&(line_cd as u32));
+
+        let (Some(from_record), Some(to_record)) = (
+            index::station_by_cd(from_station_cd as i32),
+            index::station_by_cd(to_station_cd as i32),
+        ) else {
+            return Ok(Vec::new());
+        };
+
+        // sst_cte: 双方の駅に pass <> 1 で停車する line_group_cd
+        let groups_of = |station_cd: i32| -> HashSet<i32> {
+            index::sst_by_station(station_cd)
+                .filter(|sst| sst.pass != Some(1))
+                .filter_map(|sst| sst.line_group_cd)
+                .collect()
+        };
+        let common_groups: Vec<i32> = groups_of(from_station_cd as i32)
+            .intersection(&groups_of(to_station_cd as i32))
+            .copied()
+            .collect();
+
+        let mut excluded: HashSet<i32> = HashSet::new();
+        for group in &common_groups {
+            for sst in index::sst_by_group(*group) {
+                excluded.insert(sst.station_cd);
+            }
+        }
+
+        // --- untyped: common_lines 上で種別経路に含まれない駅 ---
+        // station_cd は一意なので common_lines は「両駅が同じ line_cd を持つか」に帰着する
+        let mut untyped: Vec<&index::StationRecord> = Vec::new();
+        if from_record.e_status == 0
+            && to_record.e_status == 0
+            && from_record.line_cd == to_record.line_cd
+            && via_ok(from_record.line_cd)
+        {
+            if let Some(line) = index::line_by_cd(from_record.line_cd) {
+                if line.e_status == 0 {
+                    untyped.extend(
+                        index::stations_by_line(from_record.line_cd)
+                            .filter(|r| r.e_status == 0 && !excluded.contains(&r.station_cd)),
+                    );
+                }
+            }
+        }
+        untyped.sort_by(|a, b| {
+            a.e_sort
+                .cmp(&b.e_sort)
+                .then_with(|| a.station_cd.cmp(&b.station_cd))
+        });
+        if reverse {
+            untyped.reverse();
+        }
+
+        // --- typed: 種別経路に含まれる駅 (types と lines を INNER JOIN) ---
+        let mut typed: Vec<(i32, &index::StationRecord, &index::SstRecord)> = Vec::new();
+        for group in &common_groups {
+            for sst in index::sst_by_group(*group) {
+                let Some(record) = index::station_by_cd(sst.station_cd) else {
+                    continue;
+                };
+                if record.e_status != 0 || !via_ok(record.line_cd) {
+                    continue;
+                }
+                if index::type_by_cd(sst.type_cd).is_none() {
+                    continue;
+                }
+                let Some(line) = index::line_by_cd(record.line_cd) else {
+                    continue;
+                };
+                if line.e_status != 0 {
+                    continue;
+                }
+                typed.push((sst.id, record, sst));
+            }
+        }
+        typed.sort_by_key(|(id, _, _)| *id);
+        if reverse {
+            typed.reverse();
+        }
+
+        // untyped の後に typed を連結する (既存の rows.append と同じ順序)
+        let mut out: Vec<Station> = untyped
+            .into_iter()
+            .map(|record| record.to_entity(index::line_by_cd(record.line_cd)))
+            .collect();
+        for (_, record, sst) in typed {
+            let mut station = record.to_entity(index::line_by_cd(record.line_cd));
+            if let Some(ty) = index::type_by_cd(sst.type_cd) {
+                apply_train_type(&mut station, sst, ty);
+            }
+            out.push(station);
+        }
+        Ok(out)
     }
 }
 
