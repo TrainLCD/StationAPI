@@ -15,13 +15,19 @@ use super::types::*;
 use crate::Interactor;
 
 /// GraphQL の TransportType を UseCase のフィルタへ変換する。
-/// 未指定は presentation 層と同じく鉄道のみに倒す。
+///
+/// gRPC 版は未指定を Rail (鉄道のみ) として扱うが、Worker 版は RailAndBus を
+/// 既定とする。バスを含めた結果を既定で返したいため、意図的に挙動を変えている。
+/// TransportTypeUnspecified が明示された場合も同じ扱いにする。
+///
+/// 座標検索の SQL は種別未指定のとき
+/// `ORDER BY CASE WHEN $4 IS NULL THEN transport_type ELSE 0 END, 距離`
+/// となるため、鉄道が先・バスが後に並んだうえで距離順になる。
 fn to_filter(value: Option<GqlTransportType>) -> TransportTypeFilter {
     match value {
         Some(GqlTransportType::Rail) => TransportTypeFilter::Rail,
         Some(GqlTransportType::Bus) => TransportTypeFilter::Bus,
-        Some(GqlTransportType::RailAndBus) => TransportTypeFilter::RailAndBus,
-        _ => TransportTypeFilter::Rail,
+        _ => TransportTypeFilter::RailAndBus,
     }
 }
 

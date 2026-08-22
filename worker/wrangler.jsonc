@@ -24,6 +24,15 @@
     "enabled": true
   },
 
+  // BFF が持っていた staging の custom domain を引き継ぐ。
+  // 同じドメインは二重に登録できないため、TrainLCD/BFF#51 をマージして
+  // BFF 側から外したあとでないとデプロイに失敗する。
+  "route": {
+    "custom_domain": true,
+    "pattern": "gql-stg.trainlcd.app",
+    "zone_name": "trainlcd.app"
+  },
+
   "env": {
     "production": {
       "name": "stationapi",
