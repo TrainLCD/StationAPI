@@ -1,9 +1,7 @@
 //! GTFS を lines / stations / types / station_station_types へ統合する。
 //!
-//! かつては `gtfs_*` テーブルに対する SQL (再帰 CTE と窓関数) で行っていた処理を
-//! そのまま Rust に写したもの。並び順や同点時の決着条件は出力の
-//! `station_station_types.id` (= 停車順序) に直結するため、元の `ORDER BY` を
-//! 崩さないようにしてある。
+//! 並び順や同点時の決着条件は出力の `station_station_types.id` (= 停車順序) に
+//! 直結するため、変えると停車駅の並びが変わる。
 
 use std::collections::{HashMap, HashSet};
 
@@ -152,7 +150,7 @@ pub fn build_stop_route_mapping(gtfs: &GtfsData) -> StopRouteMap {
     let stop_times_by_trip = gtfs.stop_times_by_trip();
     let parent_of = gtfs.parent_stop_ids();
 
-    // 停留所を 1 件も持たない便は、SQL 側でも JOIN で落ちていたので除く。
+    // 停留所を 1 件も持たない便は代表になりえないので除く。
     let trips: Vec<&super::model::Trip> = gtfs
         .trips
         .iter()
@@ -304,12 +302,9 @@ pub fn build_stop_route_mapping(gtfs: &GtfsData) -> StopRouteMap {
                 (true, false) | (false, true) => 1,
                 (false, false) => 2,
             };
-            // SQL 版は (優先度, stop_sequence) までしか順序を決めておらず、
-            // 同点の行のどれが採られるかは PostgreSQL の実行計画任せだった。
-            // 実際に決着が付かない停留所があり (例: 京王 1972 系統の 1298_00 は
-            // 終点として現れる便と途中停車する便で next が食い違う)、
-            // 取り込むたびに停車順が変わりうる。ここでは trip_id まで見て
-            // 決め切る。
+            // (優先度, stop_sequence) だけでは決着しない停留所がある
+            // (例: 京王 1972 系統の 1298_00 は、終点として現れる便と途中停車する便で
+            // next が食い違う)。取り込むたびに停車順が変わらないよう trip_id まで見る。
             let rank = (priority, times[i].stop_sequence, trip.trip_id.as_str());
             let key = (route_id, *parent);
             if variant_rank.get(&key).is_none_or(|current| rank < *current) {

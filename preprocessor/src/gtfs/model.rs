@@ -1,10 +1,9 @@
 //! GTFS の中間表現。
 //!
-//! かつては `gtfs_*` テーブルへ一度書き込んでから SQL で統合していた。ここでは
-//! その中間テーブルをメモリ上に持つ。統合処理が実際に読む列だけを持たせてある
+//! 統合処理が実際に読む列だけを持たせてある
 //! (calendar / shapes / feed_info / agencies は出力に一切効かないので取り込まない)。
 //!
-//! 主キーの重複は `ON CONFLICT DO NOTHING` と同じく先勝ちで捨てる。
+//! 主キーの重複は先勝ちで捨てる。
 
 use std::collections::{HashMap, HashSet};
 

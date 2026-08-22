@@ -1,5 +1,5 @@
 //! CSV をバイナリに埋め込み、isolate 起動時に一度だけパースしてメモリに保持する。
-//! PostgreSQL のクエリを全件走査・HashMap 参照で置き換える。
+//! 検索は全件走査と HashMap 参照で行う。
 
 use stationapi::domain::entity::company::Company;
 use stationapi::domain::entity::gtfs::TransportType;
@@ -99,18 +99,15 @@ pub struct StationRecord {
 }
 
 impl StationRecord {
-    /// 既存 SQL の `stations JOIN lines` 相当。路線側の属性を埋めた Station を返す。
+    /// 路線側の属性を埋めた Station を返す。
     /// 列車種別 (type_* / line_group_cd / pass) は UseCase 層が後から付与する。
     ///
     /// 路線名の 7 列は `line_aliases` / `aliases` による別名があればそちらを使う。
-    /// 既存 SQL の `COALESCE(NULLIF(COALESCE(a.line_name, l.line_name), ''), NULL)`
-    /// に対応する (別名が空文字なら元の値へフォールバックする)。
     pub fn to_entity(&self, line: Option<&Line>) -> Station {
         let alias = alias_by_station(self.station_cd);
-        // 既存 SQL の `COALESCE(NULLIF(COALESCE(a.line_name, l.line_name), ''), NULL)` 相当。
-        // aliases 側は CSV の空欄が NULL なので、別名が空なら路線の値へ落ちる。
-        // 最後に空文字を NULL へ寄せるのが NULLIF の分で、これが無いと
-        // 路線名を持たないバス路線の駅で null ではなく空文字が出る。
+        // 別名が空なら路線の値へ落とし、それも空なら未設定にする。
+        // 最後の空文字判定が無いと、路線名を持たないバス路線の駅で
+        // null ではなく空文字が出る。
         let pick = |a: Option<&String>, l: Option<String>| -> Option<String> {
             a.cloned()
                 .filter(|v| !v.is_empty())
@@ -395,13 +392,13 @@ fn build_lines() -> Vec<Line> {
     out
 }
 
-/// `stations JOIN lines ON s.line_cd = l.line_cd` (INNER) 相当。
-/// lines に無い line_cd の駅は既存 SQL でも結果に出ない。座標検索がこの条件。
+/// 路線が存在する駅だけを通す。lines に無い line_cd の駅は結果に出さない。
+/// 座標検索がこの条件。
 fn joins_line(record: &StationRecord) -> bool {
     line_by_cd(record.line_cd).is_some()
 }
 
-/// 名前検索の JOIN は `AND l.e_status = 0` を追加で要求する。
+/// 名前検索は路線が有効であることも要求する。
 /// これを見ないと廃止路線 (例: 成田エクスプレス, e_status=3) の駅が混ざる。
 fn joins_active_line(record: &StationRecord) -> bool {
     line_by_cd(record.line_cd).is_some_and(|l| l.e_status == 0)
@@ -458,10 +455,8 @@ fn build_companies() -> Vec<Company> {
 
 /// 球面距離 (km)。
 ///
-/// 既存 SQL は `point(lat,lon) <-> point($1,$2)` で度単位のユークリッド距離を使うため、
-/// 緯度と経度を同じスケールで扱い東西方向を過大評価する。こちらは実距離で並ぶ。
-/// 実測では上位14件が同着 (同一駅の路線別レコード) で、順序差が実質的に出るのは
-/// 18位以降・距離にして50-100m程度。集合としては既存と一致する。
+/// 度単位のユークリッド距離だと緯度と経度を同じスケールで扱うことになり、
+/// 東西方向を過大評価する。ここでは実距離で並べる。
 pub fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
     const EARTH_RADIUS_KM: f64 = 6371.0;
     let (p1, p2) = (lat1.to_radians(), lat2.to_radians());
@@ -473,10 +468,8 @@ pub fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 
 /// 全件走査で最近傍 limit 件を返す。11,148 駅なので索引なしで十分速い。
 ///
-/// `want` は既存 SQL の `$4::int IS NULL OR COALESCE(s.transport_type, 0) = $4` に対応する。
-/// 未指定 (RailAndBus) のときは
-/// `ORDER BY CASE WHEN $4 IS NULL THEN COALESCE(s.transport_type, 0) ELSE 0 END, 距離`
-/// となり、鉄道を先・バスを後に並べたうえで距離順になる。
+/// `want` は種別の絞り込み。未指定 (RailAndBus) のときは
+/// 鉄道を先・バスを後に並べたうえで距離順になる。
 pub fn nearest(
     lat: f64,
     lon: f64,
@@ -488,9 +481,8 @@ pub fn nearest(
 
 /// 路線の存在を条件にしないまま最近傍を取る。
 ///
-/// `get_bus_stops_near_stations` の SQL は LATERAL の中で先に LIMIT を掛け、
-/// そのあと `JOIN lines` で絞る。先に路線で絞ると件数が変わるため、
-/// この順序を保つ用途で使う。
+/// 近傍バス停の検索は先に件数を絞ってから路線の有無を見る。
+/// 先に路線で絞ると件数が変わるため、この順序を保つ用途で使う。
 pub fn nearest_without_line_join(
     lat: f64,
     lon: f64,
@@ -537,12 +529,12 @@ fn nearest_inner(
     scored
 }
 
-/// 既存 SQL の WHERE 句と同じ部分一致セマンティクス。
+/// 駅名・読み・ローマ字・中国語・韓国語のいずれかへの部分一致で引く。
+/// 正規化には domain 層の `normalize_for_search` を使う。
 ///
-/// PostgreSQL 側の `pg_trgm` は `LIKE '%...%'` を高速化する GIN インデックスであって
-/// 類似度検索ではないため、`contains()` で論理的に等価な結果が得られる。
-/// 正規化には domain 層の `normalize_for_search` をそのまま使うので挙動も一致する。
-pub fn search_by_name(query: &str, limit: usize, want: Option<i32>) -> Vec<&'static StationRecord> {
+/// 件数の絞り込みは呼び出し側で行う。出発駅による絞り込みの後に件数を切る
+/// 必要があるため、ここで切ると結果が変わる。
+pub fn search_by_name(query: &str, want: Option<i32>) -> Vec<&'static StationRecord> {
     if query.is_empty() {
         return Vec::new();
     }
@@ -567,13 +559,11 @@ pub fn search_by_name(query: &str, limit: usize, want: Option<i32>) -> Vec<&'sta
         })
         .collect();
 
-    // ORDER BY station_g_cd, station_name
     hits.sort_unstable_by(|a, b| {
         a.station_g_cd
             .cmp(&b.station_g_cd)
             .then_with(|| a.name.cmp(&b.name))
     });
-    hits.truncate(limit);
     hits
 }
 
@@ -586,8 +576,8 @@ const SST_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/sst.bin"));
 /// build.rs 側と揃えた欠損値表現
 const NULL_I32: i32 = i32::MIN;
 
-/// types.csv の 1 行。`id` 列は CSV 上 DEFAULT で、PostgreSQL では SERIAL が
-/// 行順に採番する (`t.id AS type_id` として応答に出る)。ここでも同じ順で振る。
+/// types.csv の 1 行。`id` は行順に 1 始まりで振る
+/// (`TrainType.typeId` として応答に出る)。
 pub struct TypeRecord {
     pub id: i32,
     pub type_cd: i32,
@@ -599,15 +589,14 @@ pub struct TypeRecord {
     pub color: String,
     pub direction: Option<i32>,
     pub kind: Option<i32>,
-    /// ORDER BY t.priority DESC に使う
+    /// 系統の優先度。大きいものを優先する。
     pub priority: i32,
 }
 
 /// station_station_types.csv の 1 行。
 ///
-/// `id` 列は CSV 上 "DEFAULT" で、PostgreSQL では SERIAL が行順に採番する。
-/// この id は停車順序そのものとして使われる (`ORDER BY sst.id`) ため、
-/// ここでも取り込み順に 1 始まりの連番を振って一致させる。
+/// `id` は停車順序そのものとして使われるため、取り込み順に 1 始まりの
+/// 連番を振る。
 pub struct SstRecord {
     pub id: i32,
     pub station_cd: i32,
@@ -646,9 +635,9 @@ fn build_types() -> Vec<TypeRecord> {
         return Vec::new();
     };
 
-    // 生成物には SERIAL 採番後の実 id がある。PostgreSQL は取り込んだ全行に
-    // 採番するので、こちらで行をスキップすると id がずれる。この id は
-    // station.type_id として応答に出るため、ずれていたら索引構築を中断する。
+    // 生成物の id は全行に連番で振られている。こちらで行をスキップすると
+    // ずれるが、この id は station.type_id として応答に出るため、
+    // ずれていたら索引構築を中断する。
     let i_id = c.at("id");
     let mut out = Vec::with_capacity(512);
     let mut serial = 0i32;
@@ -728,8 +717,7 @@ pub fn sst_by_station(station_cd: i32) -> impl Iterator<Item = &'static SstRecor
 }
 
 /// 座標検索の has_train_types 用サブクエリ相当:
-/// `SELECT line_group_cd FROM station_station_types WHERE station_cd = ?
-///  AND line_group_cd IS NOT NULL ORDER BY id LIMIT 1`
+/// その駅が属する系統のうち、最も id の小さいものを返す。
 pub fn first_line_group_cd(station_cd: i32) -> Option<i32> {
     sst_by_station(station_cd).find_map(|s| s.line_group_cd)
 }
@@ -820,10 +808,7 @@ pub struct AliasRecord {
 
 /// station_cd -> 別名。
 ///
-/// 既存 SQL は
-/// `LEFT JOIN line_aliases la ON la.station_cd = s.station_cd`
-/// `LEFT JOIN aliases a ON a.id = la.alias_cd`
-/// として駅ごとに引き、`COALESCE(NULLIF(COALESCE(a.line_name, l.line_name), ''), NULL)`
+/// 別名は駅ごとに引く。
 /// で路線名 7 列を差し替える。
 static ALIAS_BY_STATION: OnceLock<HashMap<i32, AliasRecord>> = OnceLock::new();
 
@@ -900,9 +885,8 @@ fn build_alias_index() -> HashMap<i32, AliasRecord> {
 
 /// 駅に紐づく別名を Line へ反映する。
 ///
-/// 既存 SQL は Line を返すクエリでも `line_aliases` / `aliases` を LEFT JOIN し、
-/// 路線名 7 列を差し替える。Line 単体で引く API (find_by_id / get_by_ids) には
-/// この JOIN が無いので、駅を伴う経路でのみ適用する。
+/// 別名があれば路線名 7 列を差し替える。Line 単体で引く API
+/// (find_by_id / get_by_ids) は別名を見ないので、駅を伴う経路でのみ適用する。
 pub fn apply_line_alias(line: &mut Line, station_cd: i32) {
     let Some(alias) = alias_by_station(station_cd) else {
         return;

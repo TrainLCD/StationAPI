@@ -241,7 +241,7 @@ where
             .await?;
 
         // Build input order map for sorting main stations by requested line_id order.
-        // Preserve first-occurrence order for duplicate line IDs (matching SQL CASE WHEN behavior).
+        // Preserve first-occurrence order for duplicate line IDs.
         let mut line_id_order: std::collections::HashMap<i32, usize> =
             std::collections::HashMap::new();
         for (i, &id) in line_ids.iter().enumerate() {
@@ -258,7 +258,7 @@ where
             .cloned()
             .collect();
 
-        // Sort by input line_id order, then by e_sort, station_cd (matching original query ORDER BY)
+        // Sort by input line_id order, then by e_sort, station_cd.
         stations.sort_by(|a, b| {
             let order_a = line_id_order.get(&a.line_cd).copied().unwrap_or(usize::MAX);
             let order_b = line_id_order.get(&b.line_cd).copied().unwrap_or(usize::MAX);
@@ -362,7 +362,7 @@ where
             .collect();
 
         // lines, companies, station_numbers等を付与（train_typeはNoneで空になる）
-        // train_typeは後続のget_by_line_group_id_vecで取得するためJOIN不要
+        // train_typeは後続のget_by_line_group_id_vecで取得するためここでは付けない
         let mut stations = self
             .update_station_vec_with_attributes(stations, None, transport_type, true)
             .await?;
@@ -660,7 +660,6 @@ where
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
 
-        // TODO: SQLで同等の処理を行う
         // 発着駅を含まない経路候補はレスポンスに含まれないため、
         // 路線の取得やモデル変換を行う前にここで除外する
         let route_groups: Vec<(&i32, &Vec<&Station>)> = route_row_tree_map
@@ -1517,10 +1516,10 @@ where
             vec![]
         };
 
-        // Phase 1: independent queries in parallel
-        // When skip_types_join is true, skip the expensive JOINs to
-        // station_station_types and types tables (used by GetStationsByLineIdList)
-        // Also batch-fetch bus stop candidates in parallel
+        // Phase 1: independent lookups in parallel.
+        // When skip_types_join is true, skip the expensive train-type lookups
+        // (used by the lineListStations query).
+        // Also batch-fetch bus stop candidates in parallel.
         let (stations_by_group_ids, lines, bus_candidates_flat) = if skip_types_join {
             if let Some(prefetched) = prefetched_group_stations {
                 // Group stations already fetched by expanded primary query
@@ -1888,7 +1887,7 @@ fn connected_route_virtual_id(signature: &[u8], used_ids: &mut HashSet<u32>) -> 
         hash = hash.wrapping_mul(FNV_PRIME);
     }
 
-    // Persisted line_group_cd is a signed PostgreSQL integer. Reserving the
+    // Persisted line_group_cd is a signed 32-bit integer. Reserving the
     // upper half of u32 therefore guarantees that virtual IDs cannot overlap it.
     let mut candidate = hash | 0x8000_0000;
     while !used_ids.insert(candidate) {

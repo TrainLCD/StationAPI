@@ -8,8 +8,8 @@ use anyhow::{bail, Context, Result};
 use crate::table::{cell_i32, int, Table};
 use crate::{info, warn};
 
-/// 出力する 7 テーブルの列。PostgreSQL 版の `information_schema` 由来の並びと同じ。
-/// `transport_type` は後から `ALTER TABLE` で足された列なので末尾に来る。
+/// 出力する 7 テーブルの列。Worker 側 (`src/index.rs` と `build.rs`) が
+/// この並びを前提に読むので、順序を変えない。
 pub const COMPANY_COLUMNS: &[&str] = &[
     "company_cd",
     "rr_cd",
@@ -149,9 +149,8 @@ pub struct Dataset {
 impl Dataset {
     /// `data/` 配下の CSV を読み込む。
     ///
-    /// PostgreSQL 版は `INSERT INTO <table> VALUES (...)` を列指定なしで流していたため、
-    /// CSV に無い末尾の列 (`transport_type`) は DDL の既定値で埋まっていた。ここでも
-    /// 同じ既定値を入れる。`#` 始まりの列は取り込み対象外。
+    /// CSV に無い列 (`transport_type`) は既定値で埋める。
+    /// `#` 始まりの列は取り込み対象外。
     pub fn load(data_dir: &Path) -> Result<Self> {
         let mut dataset = Dataset {
             companies: Table::new(COMPANY_COLUMNS, Some("company_cd")),
@@ -426,10 +425,9 @@ fn fill_default(table: &mut Table, column: &str, default: &str) {
 
 /// `real` 列を 4 バイト浮動小数へ丸める。
 ///
-/// この列は API では `Float` (倍精度) として返る。元は PostgreSQL の `real` 列
-/// だったので、まず `f32` へ落としたうえで、その値を `f64` として書き出す。
-/// `f32` の最短表記 (31664.842) で書くと読み直したときに別の値になり、
-/// API の応答が 31664.842 と 31664.841796875 でずれる。
+/// この列は API では `Float` (倍精度) として返るが、値の精度は単精度ぶんしかない。
+/// まず `f32` へ落としたうえで、その値を `f64` として書き出す。`f32` の最短表記
+/// (31664.842) で書くと読み直したときに別の値になり、応答がずれる。
 fn normalize_real(table: &mut Table, column: &str) {
     let idx = table.col(column);
     for row in table.rows_mut() {

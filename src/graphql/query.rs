@@ -20,9 +20,7 @@ use crate::Interactor;
 /// 既定とする。バスを含めた結果を既定で返したいため、意図的に挙動を変えている。
 /// TransportTypeUnspecified が明示された場合も同じ扱いにする。
 ///
-/// 座標検索の SQL は種別未指定のとき
-/// `ORDER BY CASE WHEN $4 IS NULL THEN transport_type ELSE 0 END, 距離`
-/// となるため、鉄道が先・バスが後に並んだうえで距離順になる。
+/// 種別を指定しない座標検索は、鉄道を先・バスを後に並べたうえで距離順に返す。
 fn to_filter(value: Option<GqlTransportType>) -> TransportTypeFilter {
     match value {
         Some(GqlTransportType::Rail) => TransportTypeFilter::Rail,

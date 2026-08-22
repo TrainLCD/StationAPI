@@ -22,13 +22,13 @@ use stationapi::model::StopCondition;
 use crate::index;
 
 /// 有効な (e_status = 0) 路線だけを返す。
-/// 多くの SQL が `l.e_status = 0` を条件に持つため、無効な路線を混ぜないようにする。
+/// 大半の問い合わせは有効な路線しか対象にしないため、無効な路線を混ぜない。
 fn active_line(line_cd: i32) -> Option<&'static Line> {
     index::line_by_cd(line_cd).filter(|l| l.e_status == 0)
 }
 
-/// 駅グループ ID 群に属する有効な駅を、路線を JOIN した Station として返す。
-/// 対応する SQL は `JOIN lines l ... AND l.e_status = 0` なので無効な路線は除く。
+/// 駅グループ ID 群に属する有効な駅を、路線の属性を埋めた Station として返す。
+/// 無効な路線の駅は除く。
 fn stations_of_groups(group_ids: &[u32]) -> Vec<Station> {
     let mut out = Vec::new();
     for &gid in group_ids {
@@ -36,7 +36,7 @@ fn stations_of_groups(group_ids: &[u32]) -> Vec<Station> {
             if record.e_status != 0 {
                 continue;
             }
-            // stations JOIN lines (INNER) 相当
+            // 路線が引けない駅は返さない
             let Some(line) = index::line_by_cd(record.line_cd) else {
                 continue;
             };
@@ -49,8 +49,7 @@ fn stations_of_groups(group_ids: &[u32]) -> Vec<Station> {
     out
 }
 
-/// `JOIN station_station_types sst` と `JOIN types t` の結果を Station に反映する。
-/// 既存の `StationRow -> Station` 変換と同じ対応付け。
+/// 系統 (station_station_types) と列車種別 (types) の内容を Station に反映する。
 fn apply_train_type(station: &mut Station, sst: &index::SstRecord, ty: &index::TypeRecord) {
     station.sst_id = Some(sst.id);
     station.type_cd = Some(sst.type_cd);
@@ -76,17 +75,14 @@ fn apply_train_type(station: &mut Station, sst: &index::SstRecord, ty: &index::T
     };
 }
 
-/// `LEFT JOIN station_station_types ... LEFT JOIN types ... LIMIT 1` 相当。
-///
-/// 既存 SQL は ORDER BY を持たないが、取り込み直後のテーブルは物理順が
-/// sst.id 順なので、先頭 (= 最小の sst.id) を採るのが実際の挙動に合う。
+/// その駅が属する系統のうち先頭 (= 最小の sst.id) を 1 つだけ反映する。
 fn apply_first_train_type(station: &mut Station) {
     let Some(sst) = index::sst_by_station(station.station_cd).next() else {
         return;
     };
     match index::type_by_cd(sst.type_cd) {
         Some(ty) => apply_train_type(station, sst, ty),
-        // types 側が欠けていても LEFT JOIN なので sst の列は入る
+        // 種別が引けなくても系統の情報は入れる
         None => {
             station.sst_id = Some(sst.id);
             station.type_cd = Some(sst.type_cd);
@@ -97,13 +93,8 @@ fn apply_first_train_type(station: &mut Station) {
     }
 }
 
-/// 既存 SQL:
-/// `FROM stations s JOIN lines l ON l.line_cd = s.line_cd AND l.e_status = 0`
-/// `JOIN sst ON sst.line_group_cd IN (..) AND sst.station_cd = s.station_cd`
-/// `JOIN types t ON t.type_cd = sst.type_cd WHERE s.e_status = 0`
-/// `ORDER BY CASE sst.line_group_cd .. END, sst.id`
-///
-/// 入力順に走査し、各グループ内は sst.id 昇順なので ORDER BY と一致する。
+/// 指定した系統の停車駅を返す。並びは指定された系統の順、各系統内は sst.id 昇順。
+/// 駅・路線・種別のいずれかが引けない行は落とす。
 fn stations_of_line_groups(group_ids: &[u32]) -> Vec<Station> {
     let mut out = Vec::new();
     for &group_id in group_ids {
@@ -120,7 +111,7 @@ fn stations_of_line_groups(group_ids: &[u32]) -> Vec<Station> {
             if line.e_status != 0 {
                 continue;
             }
-            // JOIN types なので種別が引けない sst は落ちる
+            // 種別が引けない系統は落とす
             let Some(ty) = index::type_by_cd(sst.type_cd) else {
                 continue;
             };
@@ -146,17 +137,16 @@ impl StationRepository for MemStationRepository {
         limit: Option<u32>,
         transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, DomainError> {
-        // 既存 SQL の LIMIT $3 と同じく未指定なら 1 件
+        // 未指定なら 1 件
         let limit = limit.unwrap_or(1).min(1_000) as usize;
         let want = transport_type.map(|t| t as i32);
         Ok(index::nearest(latitude, longitude, limit, want)
             .into_iter()
             .map(|(record, distance_km)| {
-                // NOTE: 座標検索の SQL は JOIN lines のみで l.e_status を見ないため、
-                // ここでは無効な路線も除外しない
+                // NOTE: 座標検索は路線の有効・無効を見ない
                 let mut station = record.to_entity(index::line_by_cd(record.line_cd));
                 station.distance = Some(distance_km * 1000.0);
-                // 既存 SQL は has_train_types 用に line_group_cd をサブクエリで引く
+                // has_train_types 用に系統を 1 件だけ引く
                 station.line_group_cd = index::first_line_group_cd(record.station_cd);
                 station.has_train_types = station.line_group_cd.is_some();
                 station
@@ -164,24 +154,89 @@ impl StationRepository for MemStationRepository {
             .collect())
     }
 
+    /// 名前の部分一致に加えて、`from_station_group_id` が指定された場合は
+    /// 「その駅から乗り換えなしで行けるか」で絞り込む。条件は次のどちらか。
+    ///
+    /// - 出発駅と同じ系統に、通過ではない停車として含まれる
+    /// - 出発駅か目的駅のどちらかが系統を持たず、かつ同じ路線にある
+    ///
+    /// `from_station_group_id` が無ければ絞り込みは掛からない。
+    /// 件数の上限は絞り込みの後に効くため、切るのは最後。
     async fn get_by_name(
         &self,
         station_name: String,
         limit: Option<u32>,
-        _from_station_group_id: Option<u32>,
+        from_station_group_id: Option<u32>,
         transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, DomainError> {
-        // NOTE: 既存は limit 未指定で LIMIT NULL (全件)。PoC でも実質全件を許す。
+        // 未指定なら実質全件
         let limit = limit.unwrap_or(u32::MAX).min(10_000) as usize;
         let want = transport_type.map(|t| t as i32);
-        Ok(index::search_by_name(&station_name, limit, want)
-            .into_iter()
-            .map(|record| record.to_entity(index::line_by_cd(record.line_cd)))
-            .collect())
+        let hits = index::search_by_name(&station_name, want);
+
+        let Some(group_id) = from_station_group_id else {
+            return Ok(hits
+                .into_iter()
+                .take(limit)
+                .map(|record| record.to_entity(index::line_by_cd(record.line_cd)))
+                .collect());
+        };
+
+        // 出発駅グループ側をまとめる。
+        // - from_groups: 出発駅が属する系統 (分岐 A 用)
+        // - from_line_cds: 出発駅の路線 (分岐 B 用)
+        // - lines_without_types: 系統を持たない出発駅の路線 (分岐 B 用)
+        let mut from_groups: HashSet<i32> = HashSet::new();
+        let mut from_line_cds: HashSet<i32> = HashSet::new();
+        let mut lines_without_types: HashSet<i32> = HashSet::new();
+        for from in index::stations_by_group(group_id as i32).filter(|s| s.e_status == 0) {
+            from_line_cds.insert(from.line_cd);
+            let mut has_sst = false;
+            for sst in index::sst_by_station(from.station_cd) {
+                has_sst = true;
+                if let Some(group) = sst.line_group_cd {
+                    from_groups.insert(group);
+                }
+            }
+            if !has_sst {
+                lines_without_types.insert(from.line_cd);
+            }
+        }
+
+        let mut out = Vec::new();
+        for record in hits {
+            let mut dst_has_sst = false;
+            // 分岐 A: 出発駅と同じ系統に、通過ではない停車として含まれる
+            let mut shared_group = None;
+            for sst in index::sst_by_station(record.station_cd) {
+                dst_has_sst = true;
+                if shared_group.is_none() && sst.pass != Some(1) {
+                    shared_group = sst.line_group_cd.filter(|g| from_groups.contains(g));
+                }
+            }
+            // 分岐 B: 出発駅か目的駅のどちらかが系統を持たず、かつ同じ路線
+            let same_line = if dst_has_sst {
+                lines_without_types.contains(&record.line_cd)
+            } else {
+                from_line_cds.contains(&record.line_cd)
+            };
+            if shared_group.is_none() && !same_line {
+                continue;
+            }
+
+            let mut station = record.to_entity(index::line_by_cd(record.line_cd));
+            // has_train_types には出発駅と共有している系統を使う
+            station.line_group_cd = shared_group;
+            station.has_train_types = shared_group.is_some();
+            out.push(station);
+            if out.len() >= limit {
+                break;
+            }
+        }
+        Ok(out)
     }
 
-    /// 既存 SQL は `LEFT JOIN station_station_types sst` と `LEFT JOIN types t` を行い、
-    /// 駅に紐づく種別ごとに行を返す。種別を持たない駅は sst 側が NULL の 1 行になる。
+    /// 駅に紐づく種別ごとに 1 件返す。種別を持たない駅は種別なしで 1 件返す。
     async fn get_by_station_group_id_vec(
         &self,
         station_group_id_vec: &[u32],
@@ -199,7 +254,7 @@ impl StationRepository for MemStationRepository {
                     continue;
                 }
 
-                // LEFT JOIN なので、種別を持つ駅は sst の数だけ行が出る
+                // 種別を持つ駅は系統の数だけ行が出る
                 let mut matched = false;
                 for sst in index::sst_by_station(record.station_cd) {
                     let Some(ty) = index::type_by_cd(sst.type_cd) else {
@@ -218,8 +273,7 @@ impl StationRepository for MemStationRepository {
         Ok(out)
     }
 
-    /// 既存 SQL は types を JOIN しない代わりに、has_train_types 用の
-    /// `line_group_cd` をサブクエリで 1 件だけ引く。
+    /// 種別は付けず、has_train_types 用に系統を 1 件だけ引く。
     /// ここを埋めないと lines[].station.hasTrainTypes が常に false になる。
     async fn get_by_station_group_id_vec_no_types(
         &self,
@@ -240,8 +294,7 @@ impl StationRepository for MemStationRepository {
         self.get_by_station_group_id_vec(&[station_group_id]).await
     }
 
-    /// 既存 SQL は station_station_types と types を LEFT JOIN したうえで
-    /// `LIMIT 1` を取る。埋めないと hasTrainTypes が常に false になる。
+    /// 系統と種別を 1 件だけ反映する。埋めないと hasTrainTypes が常に false になる。
     async fn find_by_id(&self, id: u32) -> Result<Option<Station>, DomainError> {
         Ok(index::station_by_cd(id as i32)
             .filter(|r| r.e_status == 0)
@@ -253,8 +306,7 @@ impl StationRepository for MemStationRepository {
             }))
     }
 
-    /// 既存 SQL は types を JOIN せず、has_train_types 用の `line_group_cd` だけを
-    /// サブクエリで 1 件引く。並びは指定された ID の順。
+    /// 種別は付けず、has_train_types 用に系統を 1 件だけ引く。並びは指定された ID の順。
     async fn get_by_id_vec(&self, ids: &[u32]) -> Result<Vec<Station>, DomainError> {
         Ok(ids
             .iter()
@@ -270,11 +322,9 @@ impl StationRepository for MemStationRepository {
             .collect())
     }
 
-    /// 既存 SQL:
-    /// 各座標につき LATERAL で `transport_type = Bus` の最寄り N 件を取り、
-    /// そのあと `JOIN lines ... AND l.e_status = 0` で絞る。
+    /// 各座標につきバス停の最寄り N 件を取り、そのあと有効な路線を持つものだけに絞る。
     /// 先に路線で絞ると件数が変わるため、この順序を保つ。
-    /// 並びは `ORDER BY ic.source_g_cd, 距離`。
+    /// 並びは指定された座標の順、その中では距離順。
     async fn get_bus_stops_near_stations(
         &self,
         coords: &[(u32, f64, f64)],
@@ -301,13 +351,9 @@ impl StationRepository for MemStationRepository {
         Ok(out)
     }
 
-    /// 既存実装 (`get_by_line_id_with_train_type`) の写し。
-    ///
-    /// 1. target_line_group: その路線 (station_id 指定時はその駅) に紐づく
-    ///    line_group_cd を priority 降順で 1 件選ぶ
-    /// 2. その系統の停車駅を `ORDER BY sst.id` で返す
-    /// 3. 空なら種別なし (`get_by_line_id_without_train_types`) へフォールバックし、
-    ///    `ORDER BY s.e_sort, s.station_cd` で路線の全駅を返す
+    /// 1. その路線 (station_id 指定時はその駅) に紐づく系統を priority 降順で 1 件選ぶ
+    /// 2. その系統の停車駅を sst.id 順で返す
+    /// 3. 空なら路線の全駅を e_sort, station_cd 順で返す
     ///
     /// direction_id が 1 か 2 のときは並び順を反転する。
     async fn get_by_line_id(
@@ -318,7 +364,7 @@ impl StationRepository for MemStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         let reverse = matches!(direction_id, Some(1) | Some(2));
 
-        // target_line_group: ORDER BY t.priority DESC LIMIT 1
+        // priority が最大の系統を 1 件選ぶ
         let mut candidates: Vec<(i32, i32)> = Vec::new(); // (priority, line_group_cd)
         for seed in index::stations_by_line(line_id as i32) {
             if let Some(target) = station_id {
@@ -340,7 +386,7 @@ impl StationRepository for MemStationRepository {
                 }
             }
         }
-        // ORDER BY t.priority DESC
+        // priority の降順
         candidates.sort_by_key(|(priority, _)| std::cmp::Reverse(*priority));
 
         if let Some(&(_, target_group)) = candidates.first() {
@@ -409,9 +455,8 @@ impl StationRepository for MemStationRepository {
             })
             .collect())
     }
-    /// 既存 SQL:
-    /// `WHERE l.line_cd IN (..) AND s.e_status = 0 AND l.e_status = 0`
-    /// `ORDER BY CASE l.line_cd .. END, s.e_sort ASC, s.station_cd ASC`
+    /// 指定された路線の有効な駅を返す。並びは指定された路線の順、
+    /// その中では e_sort, station_cd の昇順。
     async fn get_by_line_id_vec(&self, line_ids: &[u32]) -> Result<Vec<Station>, DomainError> {
         let mut out = Vec::new();
         for &line_id in line_ids {
@@ -431,7 +476,7 @@ impl StationRepository for MemStationRepository {
             });
             for record in records {
                 let mut station = record.to_entity(Some(line));
-                // has_train_types 用サブクエリ相当
+                // has_train_types 用に系統を 1 件だけ引く
                 station.line_group_cd = index::first_line_group_cd(record.station_cd);
                 station.has_train_types = station.line_group_cd.is_some();
                 out.push(station);
@@ -439,13 +484,8 @@ impl StationRepository for MemStationRepository {
         }
         Ok(out)
     }
-    /// 既存 SQL:
-    /// `WHERE s.station_g_cd IN (SELECT DISTINCT s2.station_g_cd FROM stations s2`
-    /// `  WHERE s2.line_cd IN (..) AND s2.e_status = 0)`
-    /// `AND s.e_status = 0 AND l.e_status = 0`
-    ///
     /// 指定路線の駅が属する駅グループの全駅 (他路線の駅も含む) を返す。
-    /// ORDER BY は無く、並べ替えは UseCase 側が行う。
+    /// 並べ替えは UseCase 側が行う。
     async fn get_by_line_id_vec_with_group_stations(
         &self,
         line_ids: &[u32],
@@ -490,13 +530,11 @@ impl StationRepository for MemStationRepository {
     ) -> Result<Vec<Station>, DomainError> {
         Ok(stations_of_line_groups(line_group_ids))
     }
-    /// 既存 SQL (CTE 構成) を素直に写したもの:
-    /// - common_lines: from と to の両方に有効な駅がある line_cd (via 指定時はさらに絞る)
-    /// - sst_cte: from と to の双方に pass <> 1 で停車する line_group_cd に属する sst
-    /// - 最終的に `LEFT JOIN sst_cte ... WHERE sst.line_group_cd IS NULL` で、
-    ///   その種別経路に含まれない駅 (= 各駅停車として扱う駅) だけを残す
+    /// 1. from と to の両方に有効な駅がある路線を集める (via 指定時はさらに絞る)
+    /// 2. from と to の双方に停車する系統を集める
+    /// 3. その系統に含まれない駅 (= 各駅停車として扱う駅) だけを残す
     ///
-    /// from_cte / to_cte には e_status 条件が無い点も SQL に合わせている。
+    /// 出発・到着の駅グループを引く段階では e_status を見ない。
     async fn get_route_stops(
         &self,
         from_station_id: u32,
@@ -553,7 +591,7 @@ impl StationRepository for MemStationRepository {
             }
         }
 
-        // ORDER BY sta.e_sort, sta.station_cd
+        // e_sort, station_cd の昇順
         records.sort_by(|a, b| {
             a.e_sort
                 .cmp(&b.e_sort)
@@ -565,10 +603,9 @@ impl StationRepository for MemStationRepository {
             .map(|record| record.to_entity(index::line_by_cd(record.line_cd)))
             .collect())
     }
-    /// 既存実装は 2 本のクエリを実行して結果を連結する。
-    /// 1. untyped: 種別経路に含まれない駅 (`sst.line_group_cd IS NULL`)、
-    ///    `ORDER BY sta.e_sort, sta.station_cd`
-    /// 2. typed: 種別経路に含まれる駅 (`JOIN types` が INNER)、`ORDER BY sst.id`
+    /// 2 つの結果を連結して返す。
+    /// 1. 種別経路に含まれない駅。e_sort, station_cd の昇順
+    /// 2. 種別経路に含まれる駅。sst.id の昇順
     ///
     /// direction_id = 1 のときは両方の並び順を反転する。
     async fn get_route_stops_by_station_cd(
@@ -631,7 +668,7 @@ impl StationRepository for MemStationRepository {
             untyped.reverse();
         }
 
-        // --- typed: 種別経路に含まれる駅 (types と lines を INNER JOIN) ---
+        // --- 種別経路に含まれる駅 (種別と路線の両方が引けるもの) ---
         let mut typed: Vec<(i32, &index::StationRecord, &index::SstRecord)> = Vec::new();
         for group in &common_groups {
             for sst in index::sst_by_group(*group) {
@@ -658,7 +695,7 @@ impl StationRepository for MemStationRepository {
             typed.reverse();
         }
 
-        // untyped の後に typed を連結する (既存の rows.append と同じ順序)
+        // 種別なしの駅の後に種別ありの駅を連結する
         let mut out: Vec<Station> = untyped
             .into_iter()
             .map(|record| record.to_entity(active_line(record.line_cd)))
@@ -679,11 +716,8 @@ impl StationRepository for MemStationRepository {
 #[derive(Clone, Default)]
 pub struct MemLineRepository;
 
-/// 既存 SQL の
-/// `AND ((sst.line_group_cd IS NOT NULL AND sst.pass <> 1) OR sst.line_group_cd IS NULL)`
-/// に対応する。LEFT JOIN なので、
-/// - 系統を1つも持たない駅 -> 通す (sst 側が NULL)
-/// - 系統を持つ駅 -> 停車する系統が1つでもあれば通す
+/// - 系統を 1 つも持たない駅 -> 通す
+/// - 系統を持つ駅 -> 停車する系統が 1 つでもあれば通す
 fn passes_stop_condition(station_cd: i32) -> bool {
     let mut has_group = false;
     for sst in index::sst_by_station(station_cd) {
@@ -697,9 +731,9 @@ fn passes_stop_condition(station_cd: i32) -> bool {
     !has_group
 }
 
-/// 駅グループに属する各駅の所属路線を、JOIN 結果と同じく駅の識別子付きで返す。
+/// 駅グループに属する各駅の所属路線を、駅の識別子付きで返す。
 /// UseCase 層は `line.station_g_cd` で駅に紐付けるため、ここを埋める必要がある。
-/// `require_stop` は types を JOIN する版 (通過のみの系統を除く) かどうか。
+/// `require_stop` は通過のみの系統しか持たない駅を除くかどうか。
 fn lines_of_groups_inner(group_ids: &[u32], require_stop: bool) -> Vec<Line> {
     let mut out = Vec::new();
     for &gid in group_ids {
@@ -710,8 +744,7 @@ fn lines_of_groups_inner(group_ids: &[u32], require_stop: bool) -> Vec<Line> {
             let Some(line) = index::line_by_cd(record.line_cd) else {
                 continue;
             };
-            // 既存 SQL は WHERE l.e_status = 0。無効化された路線は返さない
-            // (例: 成田エクスプレスは e_status = 3)
+            // 無効化された路線は返さない (例: 成田エクスプレスは e_status = 3)
             if line.e_status != 0 {
                 continue;
             }
@@ -730,7 +763,7 @@ fn lines_of_groups_inner(group_ids: &[u32], require_stop: bool) -> Vec<Line> {
 
 #[async_trait]
 impl LineRepository for MemLineRepository {
-    /// SQL は sst を LEFT JOIN し、通過のみの系統しか持たない駅を除く
+    /// 通過のみの系統しか持たない駅を除く
     async fn get_by_station_group_id_vec(
         &self,
         station_group_id_vec: &[u32],
@@ -738,7 +771,7 @@ impl LineRepository for MemLineRepository {
         Ok(lines_of_groups_inner(station_group_id_vec, true))
     }
 
-    /// no_types 版は sst を JOIN しないので通過条件は掛からない
+    /// no_types 版は通過条件を掛けない
     async fn get_by_station_group_id_vec_no_types(
         &self,
         station_group_id_vec: &[u32],
@@ -753,15 +786,12 @@ impl LineRepository for MemLineRepository {
         self.get_by_station_group_id_vec(&[station_group_id]).await
     }
 
-    /// 既存 SQL は WHERE l.e_status = 0
+    /// 無効な路線は返さない
     async fn find_by_id(&self, id: u32) -> Result<Option<Line>, DomainError> {
         Ok(active_line(id as i32).cloned())
     }
 
-    /// 既存 SQL は `WHERE line_cd IN (...) AND e_status = 0` なので、
-    /// 無効な路線は ID を指定されても返さない。
-    ///
-    /// SQL に ORDER BY は無く並びは不定だったが、ここでは指定された ID の順で返す。
+    /// 無効な路線は ID を指定されても返さない。並びは指定された ID の順。
     async fn get_by_ids(&self, ids: &[u32]) -> Result<Vec<Line>, DomainError> {
         Ok(ids
             .iter()
@@ -770,9 +800,8 @@ impl LineRepository for MemLineRepository {
             .collect())
     }
 
-    /// 既存 SQL は sst を `LEFT JOIN ... AND sst.pass <> 1` して
-    /// line_group_cd / type_cd を返す。停車する系統が無ければ NULL のまま。
-    /// この SQL には l.e_status 条件が無いので、無効な路線も返す。
+    /// 停車する系統があれば line_group_cd / type_cd を埋める。無ければ未設定のまま。
+    /// 無効な路線も返す。
     async fn find_by_station_id(&self, station_id: u32) -> Result<Option<Line>, DomainError> {
         let Some(record) = index::station_by_cd(station_id as i32) else {
             return Ok(None);
@@ -795,10 +824,7 @@ impl LineRepository for MemLineRepository {
         self.get_by_line_group_id_vec(&[line_group_id]).await
     }
 
-    /// 既存 SQL:
-    /// `FROM lines l JOIN sst ON sst.line_group_cd IN (..) AND sst.pass <> 1`
-    /// `JOIN stations s ON s.station_cd = sst.station_cd AND s.e_status = 0`
-    /// `WHERE l.line_cd = s.line_cd AND l.e_status = 0`
+    /// 指定した系統に停車する有効な駅の、有効な所属路線を返す。
     async fn get_by_line_group_id_vec(
         &self,
         line_group_id_vec: &[u32],
@@ -833,8 +859,8 @@ impl LineRepository for MemLineRepository {
         }
         Ok(out)
     }
-    /// `get_by_line_group_id_vec` とほぼ同じ結合だが、
-    /// `DISTINCT ON (sst.id, l.line_cd)` と `ORDER BY sst.id, l.line_cd` が付く。
+    /// `get_by_line_group_id_vec` とほぼ同じだが、(sst.id, line_cd) で重複を除き
+    /// その順に並べる。
     async fn get_by_line_group_id_vec_for_routes(
         &self,
         line_group_id_vec: &[u32],
@@ -871,9 +897,8 @@ impl LineRepository for MemLineRepository {
         rows.dedup_by(|a, b| a.0 == b.0 && a.1 == b.1);
         Ok(rows.into_iter().map(|(_, _, line)| line).collect())
     }
-    /// 既存 SQL は駅名検索と違い正規化を行わず、全列に同じ `%入力%` を当てる。
-    /// line_name_rn も ILIKE ではなく LIKE (大小を区別する)。
-    /// ORDER BY が無いためスキャン順 = CSV の並び順で LIMIT が効く。
+    /// 駅名検索と違い正規化は行わず、全列に同じ部分一致を当てる。
+    /// line_name_rn も大小を区別する。並びは CSV の順のまま。
     async fn get_by_name(
         &self,
         line_name: String,
@@ -950,7 +975,7 @@ fn build_train_type(sst: &index::SstRecord, ty: &index::TypeRecord) -> TrainType
     }
 }
 
-/// 既存 SQL の共通条件: 駅が有効で、通過駅 (pass = 1) ではないこと。
+/// 共通条件: 駅が有効で、通過駅 (pass = 1) ではないこと。
 fn sst_is_stop(sst: &index::SstRecord) -> bool {
     if sst.pass == Some(1) {
         return false;
@@ -958,7 +983,7 @@ fn sst_is_stop(sst: &index::SstRecord) -> bool {
     index::station_by_cd(sst.station_cd).is_some_and(|s| s.e_status == 0)
 }
 
-/// `ORDER BY t.priority DESC, sst.id` 相当で並べる。
+/// priority の降順、次に sst.id の昇順で並べる。
 fn sort_by_priority_then_id(items: &mut [(TrainType, i32)]) {
     items.sort_by(|a, b| {
         b.1.cmp(&a.1)
@@ -968,8 +993,7 @@ fn sort_by_priority_then_id(items: &mut [(TrainType, i32)]) {
 
 #[async_trait]
 impl TrainTypeRepository for MemTrainTypeRepository {
-    /// 既存 SQL は `sst.line_group_cd = $N` を要求するため、
-    /// line_group_id が None のとき (= NULL 比較) は結果が空になる。
+    /// line_group_id が None のときは結果が空になる。
     async fn get_types_by_station_id_vec(
         &self,
         station_id_vec: &[u32],
@@ -1024,8 +1048,8 @@ impl TrainTypeRepository for MemTrainTypeRepository {
         Ok(scored.into_iter().map(|(t, _)| t).collect())
     }
 
-    /// 既存 SQL は `ORDER BY sst.id` のみで priority を見ない
-    /// (`get_by_station_id_vec` 側は `priority DESC, sst.id` なので分けている)。
+    /// 並びは sst.id のみで priority を見ない
+    /// (`get_by_station_id_vec` 側は priority 降順なので分けている)。
     async fn get_by_station_id(&self, station_id: u32) -> Result<Vec<TrainType>, DomainError> {
         let mut out: Vec<TrainType> = index::sst_by_station(station_id as i32)
             .filter(|sst| sst_is_stop(sst))
@@ -1095,13 +1119,8 @@ impl TrainTypeRepository for MemTrainTypeRepository {
         line_id: u32,
     ) -> Result<Option<TrainType>, DomainError> {
         let target_line = line_id as i32;
-        // 既存 SQL は
-        //   JOIN station_station_types ON line_group_cd = ?
-        //   JOIN types ON type_cd
-        //   WHERE station_cd IN (SELECT station_cd FROM stations
-        //                        WHERE line_cd = ? AND e_status = 0)
-        //   ORDER BY sst.id   (DISTINCT ON で先頭 1 件)
-        // 通過駅を除く条件 (pass <> 1) は無いので、ここでも掛けない。
+        // その系統に属し、指定路線の有効な駅にあたる行のうち sst.id が最小のもの。
+        // 通過駅かどうかは見ない。
         // 全 SST の走査ではなく、系統の索引から辿る (sst.id 昇順で返る)
         Ok(index::sst_by_group(line_group_id as i32)
             .filter(|sst| {
