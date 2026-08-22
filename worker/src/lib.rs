@@ -13,8 +13,8 @@ use worker::*;
 
 use stationapi::domain::entity::gtfs::TransportTypeFilter;
 use stationapi::proto::{
-    GetStationByCoordinatesRequest, GetStationsByNameRequest, MultipleStationResponse,
-    TransportType as GrpcTransportType,
+    GetStationByCoordinatesRequest, GetStationsByNameRequest, GetTrainTypesByStationIdRequest,
+    MultipleStationResponse, MultipleTrainTypeResponse, TransportType as GrpcTransportType,
 };
 use stationapi::use_case::interactor::query::QueryInteractor;
 use stationapi::use_case::traits::query::QueryUseCase;
@@ -25,6 +25,7 @@ use repository::{
 
 const COORDINATES_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationsByCoordinates";
 const BY_NAME_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetStationsByName";
+const TRAIN_TYPES_PATH: &str = "/app.trainlcd.grpc.StationAPI/GetTrainTypesByStationId";
 
 type Interactor = QueryInteractor<
     MemStationRepository,
@@ -78,6 +79,9 @@ async fn fetch(req: Request, _env: Env, _ctx: Context) -> Result<Response> {
     if method == Method::Post && path == BY_NAME_PATH {
         return handle_get_stations_by_name(req).await;
     }
+    if method == Method::Post && path == TRAIN_TYPES_PATH {
+        return handle_get_train_types_by_station_id(req).await;
+    }
 
     Response::error("Not Found", 404)
 }
@@ -121,5 +125,21 @@ async fn handle_get_stations_by_name(mut req: Request) -> Result<Response> {
 
     grpc_web::encode_response(&MultipleStationResponse {
         stations: stations.into_iter().map(Into::into).collect(),
+    })
+}
+
+async fn handle_get_train_types_by_station_id(mut req: Request) -> Result<Response> {
+    let body = req.bytes().await?;
+    let payload = grpc_web::decode_frame(&body)?;
+    let request = GetTrainTypesByStationIdRequest::decode(payload)
+        .map_err(|e| Error::RustError(format!("protobuf decode failed: {e}")))?;
+
+    let train_types = use_case()
+        .get_train_types_by_station_id(request.station_id)
+        .await
+        .map_err(|e| Error::RustError(format!("{e}")))?;
+
+    grpc_web::encode_response(&MultipleTrainTypeResponse {
+        train_types: train_types.into_iter().map(Into::into).collect(),
     })
 }

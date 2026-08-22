@@ -63,6 +63,9 @@ impl StationRepository for MemStationRepository {
             .map(|(record, distance_km)| {
                 let mut station = record.to_entity(index::line_by_cd(record.line_cd));
                 station.distance = Some(distance_km * 1000.0);
+                // 既存 SQL は has_train_types 用に line_group_cd をサブクエリで引く
+                station.line_group_cd = index::first_line_group_cd(record.station_cd);
+                station.has_train_types = station.line_group_cd.is_some();
                 station
             })
             .collect())
@@ -241,14 +244,46 @@ impl LineRepository for MemLineRepository {
             .cloned())
     }
 
-    async fn get_by_line_group_id(&self, _line_group_id: u32) -> Result<Vec<Line>, DomainError> {
-        Err(todo_err("LineRepository::get_by_line_group_id"))
+    async fn get_by_line_group_id(&self, line_group_id: u32) -> Result<Vec<Line>, DomainError> {
+        self.get_by_line_group_id_vec(&[line_group_id]).await
     }
+
+    /// 既存 SQL:
+    /// `FROM lines l JOIN sst ON sst.line_group_cd IN (..) AND sst.pass <> 1`
+    /// `JOIN stations s ON s.station_cd = sst.station_cd AND s.e_status = 0`
+    /// `WHERE l.line_cd = s.line_cd AND l.e_status = 0`
     async fn get_by_line_group_id_vec(
         &self,
-        _line_group_id_vec: &[u32],
+        line_group_id_vec: &[u32],
     ) -> Result<Vec<Line>, DomainError> {
-        Err(todo_err("LineRepository::get_by_line_group_id_vec"))
+        let mut out = Vec::new();
+        for &group_id in line_group_id_vec {
+            for sst in index::sst_by_group(group_id as i32) {
+                if sst.pass == Some(1) {
+                    continue;
+                }
+                let Some(station) = index::station_by_cd(sst.station_cd) else {
+                    continue;
+                };
+                if station.e_status != 0 {
+                    continue;
+                }
+                // l.line_cd = s.line_cd AND l.e_status = 0
+                let Some(line) = index::line_by_cd(station.line_cd) else {
+                    continue;
+                };
+                if line.e_status != 0 {
+                    continue;
+                }
+                let mut line = line.clone();
+                line.line_group_cd = sst.line_group_cd;
+                line.type_cd = Some(sst.type_cd);
+                line.station_cd = Some(station.station_cd);
+                line.station_g_cd = Some(station.station_g_cd);
+                out.push(line);
+            }
+        }
+        Ok(out)
     }
     async fn get_by_line_group_id_vec_for_routes(
         &self,
@@ -283,53 +318,198 @@ impl CompanyRepository for MemCompanyRepository {
 
 // ---------------------------------------------------------------- 列車種別
 
-/// 列車種別は types.csv と station_station_types.csv の取り込みが必要なため次段階。
-/// 空を返すと UseCase 層は「種別なし」として扱い、駅・路線・事業者の付与は正常に動く。
+/// 列車種別。types.csv と station_station_types.csv を索引から引く。
 #[derive(Clone, Default)]
 pub struct MemTrainTypeRepository;
 
+/// SstRecord + TypeRecord から TrainType を組み立てる。
+fn build_train_type(sst: &index::SstRecord, ty: &index::TypeRecord) -> TrainType {
+    TrainType {
+        id: Some(sst.id),
+        station_cd: Some(sst.station_cd),
+        type_cd: Some(sst.type_cd),
+        line_group_cd: sst.line_group_cd,
+        pass: sst.pass,
+        type_name: ty.type_name.clone(),
+        type_name_k: ty.type_name_k.clone(),
+        type_name_r: ty.type_name_r.clone(),
+        type_name_zh: ty.type_name_zh.clone(),
+        type_name_ko: ty.type_name_ko.clone(),
+        color: ty.color.clone(),
+        direction: ty.direction,
+        line: None,
+        lines: vec![],
+        kind: ty.kind,
+    }
+}
+
+/// 既存 SQL の共通条件: 駅が有効で、通過駅 (pass = 1) ではないこと。
+fn sst_is_stop(sst: &index::SstRecord) -> bool {
+    if sst.pass == Some(1) {
+        return false;
+    }
+    index::station_by_cd(sst.station_cd).is_some_and(|s| s.e_status == 0)
+}
+
+/// `ORDER BY t.priority DESC, sst.id` 相当で並べる。
+fn sort_by_priority_then_id(items: &mut [(TrainType, i32)]) {
+    items.sort_by(|a, b| {
+        b.1.cmp(&a.1)
+            .then_with(|| a.0.id.unwrap_or(0).cmp(&b.0.id.unwrap_or(0)))
+    });
+}
+
 #[async_trait]
 impl TrainTypeRepository for MemTrainTypeRepository {
+    /// 既存 SQL は `sst.line_group_cd = $N` を要求するため、
+    /// line_group_id が None のとき (= NULL 比較) は結果が空になる。
     async fn get_types_by_station_id_vec(
         &self,
-        _station_id_vec: &[u32],
-        _line_group_id: Option<u32>,
+        station_id_vec: &[u32],
+        line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, DomainError> {
-        Ok(Vec::new())
+        let Some(target_group) = line_group_id.map(|v| v as i32) else {
+            return Ok(Vec::new());
+        };
+
+        let mut scored: Vec<(TrainType, i32)> = Vec::new();
+        for &station_id in station_id_vec {
+            for sst in index::sst_by_station(station_id as i32) {
+                if sst.line_group_cd != Some(target_group) || !sst_is_stop(sst) {
+                    continue;
+                }
+                let Some(ty) = index::type_by_cd(sst.type_cd) else {
+                    continue;
+                };
+                scored.push((build_train_type(sst, ty), ty.priority));
+            }
+        }
+        sort_by_priority_then_id(&mut scored);
+        Ok(scored.into_iter().map(|(t, _)| t).collect())
     }
+
+    /// line_group_id が指定されればその系統に限定し、無ければ駅の全種別を返す。
     async fn get_by_station_id_vec(
         &self,
-        _station_id_vec: &[u32],
-        _line_group_id: Option<u32>,
+        station_id_vec: &[u32],
+        line_group_id: Option<u32>,
     ) -> Result<Vec<TrainType>, DomainError> {
-        Ok(Vec::new())
+        let target_group = line_group_id.map(|v| v as i32);
+
+        let mut scored: Vec<(TrainType, i32)> = Vec::new();
+        for &station_id in station_id_vec {
+            for sst in index::sst_by_station(station_id as i32) {
+                if let Some(group) = target_group {
+                    if sst.line_group_cd != Some(group) {
+                        continue;
+                    }
+                }
+                if !sst_is_stop(sst) {
+                    continue;
+                }
+                let Some(ty) = index::type_by_cd(sst.type_cd) else {
+                    continue;
+                };
+                scored.push((build_train_type(sst, ty), ty.priority));
+            }
+        }
+        sort_by_priority_then_id(&mut scored);
+        Ok(scored.into_iter().map(|(t, _)| t).collect())
     }
-    async fn get_by_station_id(&self, _station_id: u32) -> Result<Vec<TrainType>, DomainError> {
-        Ok(Vec::new())
+
+    /// 既存 SQL は `ORDER BY sst.id` のみで priority を見ない
+    /// (`get_by_station_id_vec` 側は `priority DESC, sst.id` なので分けている)。
+    async fn get_by_station_id(&self, station_id: u32) -> Result<Vec<TrainType>, DomainError> {
+        let mut out: Vec<TrainType> = index::sst_by_station(station_id as i32)
+            .filter(|sst| sst_is_stop(sst))
+            .filter_map(|sst| index::type_by_cd(sst.type_cd).map(|ty| build_train_type(sst, ty)))
+            .collect();
+        out.sort_by_key(|t| t.id.unwrap_or(0));
+        Ok(out)
     }
+
     async fn get_by_line_group_id(
         &self,
-        _line_group_id: u32,
+        line_group_id: u32,
     ) -> Result<Vec<TrainType>, DomainError> {
-        Ok(Vec::new())
+        self.get_by_line_group_id_vec(&[line_group_id]).await
     }
+
     async fn get_by_line_group_id_vec(
         &self,
-        _line_group_id_vec: &[u32],
+        line_group_id_vec: &[u32],
     ) -> Result<Vec<TrainType>, DomainError> {
-        Ok(Vec::new())
+        let targets: Vec<i32> = line_group_id_vec.iter().map(|&v| v as i32).collect();
+        let mut scored: Vec<(TrainType, i32)> = index::ssts()
+            .iter()
+            .filter(|sst| sst.line_group_cd.is_some_and(|g| targets.contains(&g)))
+            .filter(|sst| sst_is_stop(sst))
+            .filter_map(|sst| index::type_by_cd(sst.type_cd).map(|ty| (build_train_type(sst, ty), ty.priority)))
+            .collect();
+        sort_by_priority_then_id(&mut scored);
+        Ok(scored.into_iter().map(|(t, _)| t).collect())
     }
+
+    async fn get_line_group_ids_by_station_group_ids(
+        &self,
+        station_group_ids: &[u32],
+    ) -> Result<HashMap<u32, Vec<u32>>, DomainError> {
+        let mut out: HashMap<u32, Vec<u32>> = HashMap::new();
+        for &group_id in station_group_ids {
+            let mut groups: Vec<u32> = Vec::new();
+            for record in index::stations_by_group(group_id as i32) {
+                if record.e_status != 0 {
+                    continue;
+                }
+                for sst in index::sst_by_station(record.station_cd) {
+                    if !sst_is_stop(sst) {
+                        continue;
+                    }
+                    if let Some(lg) = sst.line_group_cd {
+                        let lg = lg as u32;
+                        if !groups.contains(&lg) {
+                            groups.push(lg);
+                        }
+                    }
+                }
+            }
+            if !groups.is_empty() {
+                out.insert(group_id, groups);
+            }
+        }
+        Ok(out)
+    }
+
     async fn find_by_line_group_id_and_line_id(
         &self,
-        _line_group_id: u32,
-        _line_id: u32,
+        line_group_id: u32,
+        line_id: u32,
     ) -> Result<Option<TrainType>, DomainError> {
-        Ok(None)
+        let target_group = line_group_id as i32;
+        let target_line = line_id as i32;
+        Ok(index::ssts()
+            .iter()
+            .filter(|sst| sst.line_group_cd == Some(target_group))
+            .filter(|sst| sst_is_stop(sst))
+            .find(|sst| {
+                index::station_by_cd(sst.station_cd).is_some_and(|s| s.line_cd == target_line)
+            })
+            .and_then(|sst| index::type_by_cd(sst.type_cd).map(|ty| build_train_type(sst, ty))))
     }
+
     async fn find_by_line_group_id_and_line_id_vec(
         &self,
-        _pairs: &[(u32, u32)],
+        pairs: &[(u32, u32)],
     ) -> Result<HashMap<(u32, u32), TrainType>, DomainError> {
-        Ok(HashMap::new())
+        let mut out = HashMap::with_capacity(pairs.len());
+        for &(line_group_id, line_id) in pairs {
+            if let Some(tt) = self
+                .find_by_line_group_id_and_line_id(line_group_id, line_id)
+                .await?
+            {
+                out.insert((line_group_id, line_id), tt);
+            }
+        }
+        Ok(out)
     }
 }

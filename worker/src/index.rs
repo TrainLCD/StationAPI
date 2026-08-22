@@ -462,3 +462,166 @@ pub fn search_by_name(query: &str, limit: usize) -> Vec<&'static StationRecord> 
     hits.truncate(limit);
     hits
 }
+
+// ---------------------------------------------------------------- 列車種別
+
+const TYPES_CSV: &str = include_str!("../../data/4!types.csv");
+const SST_CSV: &str = include_str!("../../data/5!station_station_types.csv");
+
+/// types.csv の 1 行。`id` 列は SERIAL 用の DEFAULT なので使わず、type_cd で引く。
+pub struct TypeRecord {
+    pub type_cd: i32,
+    pub type_name: String,
+    pub type_name_k: String,
+    pub type_name_r: Option<String>,
+    pub type_name_zh: Option<String>,
+    pub type_name_ko: Option<String>,
+    pub color: String,
+    pub direction: Option<i32>,
+    pub kind: Option<i32>,
+    /// ORDER BY t.priority DESC に使う
+    pub priority: i32,
+}
+
+/// station_station_types.csv の 1 行。
+///
+/// `id` 列は CSV 上 "DEFAULT" で、PostgreSQL では SERIAL が行順に採番する。
+/// この id は停車順序そのものとして使われる (`ORDER BY sst.id`) ため、
+/// ここでも取り込み順に 1 始まりの連番を振って一致させる。
+pub struct SstRecord {
+    pub id: i32,
+    pub station_cd: i32,
+    pub type_cd: i32,
+    pub line_group_cd: Option<i32>,
+    pub pass: Option<i32>,
+}
+
+static TYPES: OnceLock<Vec<TypeRecord>> = OnceLock::new();
+static TYPE_BY_CD: OnceLock<HashMap<i32, usize>> = OnceLock::new();
+static SSTS: OnceLock<Vec<SstRecord>> = OnceLock::new();
+static SST_BY_STATION: OnceLock<HashMap<i32, Vec<usize>>> = OnceLock::new();
+
+pub fn types() -> &'static [TypeRecord] {
+    TYPES.get_or_init(build_types)
+}
+
+pub fn type_by_cd(type_cd: i32) -> Option<&'static TypeRecord> {
+    let idx = TYPE_BY_CD.get_or_init(|| {
+        types()
+            .iter()
+            .enumerate()
+            .map(|(i, t)| (t.type_cd, i))
+            .collect()
+    });
+    idx.get(&type_cd).map(|&i| &types()[i])
+}
+
+fn build_types() -> Vec<TypeRecord> {
+    let mut rdr = reader(TYPES_CSV);
+    let Ok(headers) = rdr.headers().cloned() else {
+        return Vec::new();
+    };
+    let c = Cols::of(&headers);
+    let Some(i_cd) = c.at("type_cd") else {
+        return Vec::new();
+    };
+
+    let mut out = Vec::with_capacity(512);
+    for r in rdr.records().flatten() {
+        let Some(type_cd) = opt_i32(&r, Some(i_cd)) else {
+            continue;
+        };
+        out.push(TypeRecord {
+            type_cd,
+            type_name: text(&r, c.at("type_name")),
+            type_name_k: text(&r, c.at("type_name_k")),
+            type_name_r: opt_text(&r, c.at("type_name_r")),
+            type_name_zh: opt_text(&r, c.at("type_name_zh")),
+            type_name_ko: opt_text(&r, c.at("type_name_ko")),
+            color: text(&r, c.at("color")),
+            direction: opt_i32(&r, c.at("direction")),
+            kind: opt_i32(&r, c.at("kind")),
+            priority: i32_or(&r, c.at("priority"), 0),
+        });
+    }
+    out
+}
+
+pub fn ssts() -> &'static [SstRecord] {
+    SSTS.get_or_init(build_ssts)
+}
+
+fn build_ssts() -> Vec<SstRecord> {
+    let mut rdr = reader(SST_CSV);
+    let Ok(headers) = rdr.headers().cloned() else {
+        return Vec::new();
+    };
+    let c = Cols::of(&headers);
+    let (Some(i_station), Some(i_type)) = (c.at("station_cd"), c.at("type_cd")) else {
+        return Vec::new();
+    };
+
+    let mut out = Vec::with_capacity(45_000);
+    // SERIAL 相当。COPY の行順で 1 から採番される
+    let mut serial = 0i32;
+    for r in rdr.records().flatten() {
+        let (Some(station_cd), Some(type_cd)) =
+            (opt_i32(&r, Some(i_station)), opt_i32(&r, Some(i_type)))
+        else {
+            continue;
+        };
+        serial += 1;
+        out.push(SstRecord {
+            id: serial,
+            station_cd,
+            type_cd,
+            line_group_cd: opt_i32(&r, c.at("line_group_cd")),
+            pass: opt_i32(&r, c.at("pass")),
+        });
+    }
+    out
+}
+
+/// station_cd に紐づく station_station_types を sst.id 昇順で返す。
+/// 取り込み順がそのまま id 順なので、添字リストは並べ替え不要。
+pub fn sst_by_station(station_cd: i32) -> impl Iterator<Item = &'static SstRecord> {
+    let idx = SST_BY_STATION.get_or_init(|| {
+        let mut map: HashMap<i32, Vec<usize>> = HashMap::with_capacity(12_000);
+        for (i, s) in ssts().iter().enumerate() {
+            map.entry(s.station_cd).or_default().push(i);
+        }
+        map
+    });
+    idx.get(&station_cd)
+        .map(Vec::as_slice)
+        .unwrap_or(&[])
+        .iter()
+        .map(|&i| &ssts()[i])
+}
+
+/// 座標検索の has_train_types 用サブクエリ相当:
+/// `SELECT line_group_cd FROM station_station_types WHERE station_cd = ?
+///  AND line_group_cd IS NOT NULL ORDER BY id LIMIT 1`
+pub fn first_line_group_cd(station_cd: i32) -> Option<i32> {
+    sst_by_station(station_cd).find_map(|s| s.line_group_cd)
+}
+
+/// line_group_cd -> station_station_types の添字リスト (sst.id 昇順)
+static SST_BY_GROUP: OnceLock<HashMap<i32, Vec<usize>>> = OnceLock::new();
+
+pub fn sst_by_group(line_group_cd: i32) -> impl Iterator<Item = &'static SstRecord> {
+    let idx = SST_BY_GROUP.get_or_init(|| {
+        let mut map: HashMap<i32, Vec<usize>> = HashMap::with_capacity(4_000);
+        for (i, s) in ssts().iter().enumerate() {
+            if let Some(group) = s.line_group_cd {
+                map.entry(group).or_default().push(i);
+            }
+        }
+        map
+    });
+    idx.get(&line_group_cd)
+        .map(Vec::as_slice)
+        .unwrap_or(&[])
+        .iter()
+        .map(|&i| &ssts()[i])
+}
