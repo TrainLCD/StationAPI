@@ -1,7 +1,7 @@
 mod import;
 
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{Connection, PgConnection};
+use sqlx::{Connection, PgConnection, Row};
 use stationapi::config::fetch_database_url;
 use stationapi::infrastructure::company_repository::MyCompanyRepository;
 use stationapi::infrastructure::line_repository::MyLineRepository;
@@ -57,22 +57,27 @@ async fn main() -> std::result::Result<(), anyhow::Error> {
     run().await
 }
 
-#[derive(sqlx::FromRow)]
-struct SstExportRow {
-    id: i32,
-    station_cd: i32,
-    type_cd: i32,
-    line_group_cd: Option<i32>,
-    pass: Option<i32>,
-}
+/// Workers が読むテーブル。CSV の並びではなく DB の状態を書き出す。
+/// order は取り込み順序に意味がある列を明示するため。
+/// order はテーブルエイリアス t を使って元の列を指すこと。
+/// SELECT で `id::text AS id` としているため、`ORDER BY id` と書くと
+/// PostgreSQL は出力列 (text) を優先し、1,10,100... と辞書順になってしまう。
+const EXPORT_TABLES: &[(&str, &str)] = &[
+    ("companies", "ORDER BY t.company_cd"),
+    ("lines", "ORDER BY t.line_cd"),
+    ("stations", "ORDER BY t.station_cd"),
+    ("types", "ORDER BY t.id"),
+    // sst.id は停車順序そのものなので必ず id 昇順で出す
+    ("station_station_types", "ORDER BY t.id"),
+];
 
-/// スキーマ作成と CSV 取り込みを行い、その結果を Workers 用に書き出す。
+/// スキーマ作成と取り込みを行い、その結果を Workers 用に書き出す。
 ///
 /// `import_csv` は最後に `generate_virtual_local_rail_services` を実行し、
 /// 列車種別を持たない路線へ各駅停車の系統を DB 上で生成する。この行は
-/// data/*.csv には存在しないため、CSV を直接読むだけでは本番と挙動が変わる
-/// (2,268 駅が has_train_types = false になる)。ここで生成後の状態を
-/// 書き出すことで、Workers 側もサーバーと同じデータを持てる。
+/// data/*.csv には存在しないため、CSV を直接読むだけでは本番と挙動が変わる。
+/// GTFS を取り込んだ場合はバス停・バス路線も各テーブルへ統合されるため、
+/// いずれにせよ「取り込み後の DB」が唯一の正となる。
 async fn export_worker_data(out_dir: &str) -> std::result::Result<(), anyhow::Error> {
     info!("Exporting worker data into {out_dir}");
 
@@ -83,34 +88,75 @@ async fn export_worker_data(out_dir: &str) -> std::result::Result<(), anyhow::Er
         .await
         .map_err(|e| anyhow::anyhow!("Failed to import CSV: {}", e))?;
 
+    if !import::is_bus_feature_disabled() {
+        info!("Importing GTFS (bus) data...");
+        if let Err(e) = import::import_gtfs().await {
+            warn!("Failed to import GTFS data: {}. Continuing without bus data.", e);
+        } else if let Err(e) = import::integrate_gtfs_to_stations().await {
+            warn!("Failed to integrate GTFS data: {}. Continuing without bus data.", e);
+        }
+    } else {
+        info!("Bus feature is disabled; exporting rail data only.");
+    }
+
     let db_url = fetch_database_url();
     let mut conn = PgConnection::connect(&db_url).await?;
+    std::fs::create_dir_all(out_dir)?;
 
-    // sst.id は停車順序そのものなので、必ず id 昇順で書き出す
-    let rows: Vec<SstExportRow> = sqlx::query_as(
-        "SELECT id, station_cd, type_cd, line_group_cd, pass
-         FROM station_station_types ORDER BY id",
+    for (table, order) in EXPORT_TABLES {
+        let rows = export_table(&mut conn, table, order, out_dir).await?;
+        info!("Exported {rows} rows from {table}");
+    }
+
+    Ok(())
+}
+
+/// 1 テーブルを CSV へ書き出す。
+/// 列は information_schema から取り、すべて text へキャストして読む。
+/// こうすると型ごとの分岐が要らず、列が増えても追従できる。
+async fn export_table(
+    conn: &mut PgConnection,
+    table: &str,
+    order: &str,
+    out_dir: &str,
+) -> std::result::Result<usize, anyhow::Error> {
+    let columns: Vec<String> = sqlx::query_scalar(
+        "SELECT column_name FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = $1
+         ORDER BY ordinal_position",
     )
-    .fetch_all(&mut conn)
+    .bind(table)
+    .fetch_all(&mut *conn)
     .await?;
 
-    std::fs::create_dir_all(out_dir)?;
-    let path = std::path::Path::new(out_dir).join("station_station_types.csv");
+    if columns.is_empty() {
+        return Err(anyhow::anyhow!("table {table} has no columns"));
+    }
+
+    let select_list = columns
+        .iter()
+        .map(|c| format!("\"{c}\"::text"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let sql = format!("SELECT {select_list} FROM public.\"{table}\" AS t {order}");
+    let rows = sqlx::query(&sql).fetch_all(&mut *conn).await?;
+
+    let path = std::path::Path::new(out_dir).join(format!("{table}.csv"));
     let mut writer = csv::Writer::from_path(&path)?;
-    writer.write_record(["id", "station_cd", "type_cd", "line_group_cd", "pass"])?;
+    writer.write_record(&columns)?;
     for row in &rows {
-        writer.write_record([
-            row.id.to_string(),
-            row.station_cd.to_string(),
-            row.type_cd.to_string(),
-            row.line_group_cd.map(|v| v.to_string()).unwrap_or_default(),
-            row.pass.map(|v| v.to_string()).unwrap_or_default(),
-        ])?;
+        let values: Vec<String> = (0..columns.len())
+            .map(|i| {
+                row.try_get::<Option<String>, _>(i)
+                    .ok()
+                    .flatten()
+                    .unwrap_or_default()
+            })
+            .collect();
+        writer.write_record(&values)?;
     }
     writer.flush()?;
-
-    info!("Exported {} rows to {}", rows.len(), path.display());
-    Ok(())
+    Ok(rows.len())
 }
 
 async fn run() -> std::result::Result<(), anyhow::Error> {

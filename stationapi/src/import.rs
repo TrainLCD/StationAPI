@@ -2321,7 +2321,7 @@ async fn import_gtfs_feed_info(
     Ok(())
 }
 
-fn is_bus_feature_disabled() -> bool {
+pub fn is_bus_feature_disabled() -> bool {
     env_flag_enabled("DISABLE_BUS_FEATURE")
 }
 

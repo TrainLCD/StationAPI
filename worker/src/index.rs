@@ -10,9 +10,9 @@ use stationapi::proto::StopCondition;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-const STATIONS_CSV: &str = include_str!("../../data/3!stations.csv");
-const LINES_CSV: &str = include_str!("../../data/2!lines.csv");
-const COMPANIES_CSV: &str = include_str!("../../data/1!companies.csv");
+const STATIONS_CSV: &str = include_str!(concat!(env!("OUT_DIR"), "/stations.csv"));
+const LINES_CSV: &str = include_str!(concat!(env!("OUT_DIR"), "/lines.csv"));
+const COMPANIES_CSV: &str = include_str!(concat!(env!("OUT_DIR"), "/companies.csv"));
 
 // ---------------------------------------------------------------- CSV ヘルパー
 
@@ -468,7 +468,7 @@ pub fn search_by_name(query: &str, limit: usize) -> Vec<&'static StationRecord> 
 
 // ---------------------------------------------------------------- 列車種別
 
-const TYPES_CSV: &str = include_str!("../../data/4!types.csv");
+const TYPES_CSV: &str = include_str!(concat!(env!("OUT_DIR"), "/types.csv"));
 /// build.rs が生成した固定長バイナリ (1 行 = i32 x 4, リトルエンディアン)。
 /// CSV のままだと 41,250 行のパースがコールドスタートの大半を占めるため。
 const SST_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/sst.bin"));

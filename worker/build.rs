@@ -9,6 +9,26 @@ use std::{env, fs, path::Path, path::PathBuf};
 /// CSV に NULL 表現が無いため、欠損値を i32::MIN で表す
 const NULL_I32: i32 = i32::MIN;
 
+/// Workers が読む CSV を OUT_DIR へ集める。
+///
+/// generated/ があればそれを使う。無ければ data/*.csv にフォールバックする。
+/// generated は「取り込み後の DB」を書き出したもので、CSV には無い
+/// 各駅停車の生成系統や、GTFS 由来のバス停・バス路線を含む。
+fn stage_csv(out_dir: &Path, name: &str, fallback: &str) -> bool {
+    let generated = Path::new("generated").join(name);
+    println!("cargo:rerun-if-changed=generated/{name}");
+    println!("cargo:rerun-if-changed={fallback}");
+
+    let (src, from_generated) = if generated.is_file() {
+        (generated, true)
+    } else {
+        (PathBuf::from(fallback), false)
+    };
+    fs::copy(&src, out_dir.join(name))
+        .unwrap_or_else(|e| panic!("{} を配置できない: {e}", src.display()));
+    from_generated
+}
+
 fn main() {
     // 本番と同じデータを使うには、サーバー側の取り込み後の状態が要る。
     // `import_csv` は最後に generate_virtual_local_rail_services を実行し、
@@ -35,6 +55,20 @@ fn main() {
     println!("cargo:rerun-if-changed=generated/station_station_types.csv");
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
+
+    let staged = [
+        stage_csv(&out_dir, "stations.csv", "../data/3!stations.csv"),
+        stage_csv(&out_dir, "lines.csv", "../data/2!lines.csv"),
+        stage_csv(&out_dir, "companies.csv", "../data/1!companies.csv"),
+        stage_csv(&out_dir, "types.csv", "../data/4!types.csv"),
+    ];
+    if !staged.iter().all(|v| *v) {
+        println!(
+            "cargo:warning=worker/generated が揃っていないため data/*.csv を使用します。\
+             生成される各駅停車の系統や GTFS 由来のバスデータが含まれないため、\
+             本番と挙動が異なります"
+        );
+    }
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(true)
         .from_path(&csv_path)
