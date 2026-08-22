@@ -345,6 +345,7 @@ gRPC 削除にあわせて、PostgreSQL への取り込みで行っていたデ�
 | `find_by_line_group_id_and_line_id` が `pass <> 1` で絞り、駅の `e_status` を見ていない | `lines[].trainType.id` が別の駅の値になる |
 | `lines.average_distance` を `f32` の最短表記で書き出していた | 読み直すと別の値になり、応答が 31664.842 と 31664.841796875 でずれる |
 | バス路線の `nameChinese` / `nameKorean` / `nameRoman` が null | DB 側は既定値 `''` を持つため、本番は空文字を返していた |
+| `LineRepository::get_by_station_group_id_vec_no_types` が通過条件を見ていない | その駅を通過するだけの路線が `station.lines` に混ざる。`skip_types_join = true` で走る `station` / `stations` / `stationsNearby` / `stationsByName` / `lineListStations` などが該当し、generated データでは中央線(快速) の代々木・大久保・東中野など 5 路線 35 駅に出る |
 
 ### 残っている差分
 
@@ -359,10 +360,29 @@ gRPC 削除にあわせて、PostgreSQL への取り込みで行っていたデ�
 
 ### 未解決
 
-- `stationTrainTypes` の `lines[]` で、路線 11314 (総武本線) に別名 12 (総武快速線) を
-  適用するかどうかが 1 箇所だけ食い違う。こちらは系統内の先頭の駅 (東京、別名あり) を
-  採り、本番は別名を持たない駅を採っている。本番側の
-  `station_station_types` の世代差の可能性があり、切り分けには本番のデータが要る。
+- **`trainType.lines[]` の路線 11314 (総武本線) で、駅ごとの別名解決が同じ配列内で混ざる。**
+  `line_aliases.csv` は 11314 の駅を別名 12 (総武快速線 / `#0067C0`) 9 駅と
+  別名 7 (色だけ差し替える `#FFD400`) 21 駅に分けている。こちらは駅行ごとに
+  `apply_line_alias` を通すため、成田エクスプレス (系統 1095) の `lines[]` に
+  同じ 11314 が 3 通り並ぶ。本番は 4 件とも 総武本線 / `#0067C0` で揃える。
+
+  | | 本番 | こちら |
+  |---|---|---|
+  | `stationTrainTypes(stationId: 1130205)` の系統 1095、`lines[]` の 11314 (4 件) | 総武本線 / `#0067C0` ×4 | 総武快速線 / `#0067C0`、総武本線 / `#0067C0`、総武本線 / `#FFD400` ×2 |
+
+  `line(lineId: 11314)` 単体では両者一致するので、ネストしたときだけの問題。
+
+- **`routes` に `viaLineId` を渡すと、経由路線側に発着駅の行を持たない系統が落ちる。**
+  `get_route_stops` の via 絞り込みが停車駅単位で効くため、成田エクスプレスの新宿
+  (11312 / 11333 側の駅) が先に除かれ、`get_routes` の「発着駅の両方を含む経路だけ残す」
+  判定で系統ごと消える。同じ引数の `routeTypes` は 1095 を返すため、両者が食い違う。
+
+  | | 本番 | こちら |
+  |---|---|---|
+  | `routes(fromStationGroupId: 1130205, toStationGroupId: 1130208, viaLineId: 11302)` | `[363, 1095]` | `[363]` |
+  | 同じ引数の `routeTypes` | `[363, 1095]` | `[363, 1095]` |
+
+  `viaLineId` を指定しなければ両者とも 20 件で一致する。
 
 ---
 
