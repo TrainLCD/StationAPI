@@ -19,8 +19,6 @@ name: Build Cloudflare Worker
 
 env:
   SQLX_OFFLINE: true
-  # バスデータは ODPT トークンが必要なため、この時点では鉄道のみを対象にする
-  DISABLE_BUS_FEATURE: "true"
 
 jobs:
   build:
@@ -48,6 +46,10 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://stationapi:stationapi@127.0.0.1:5432/stationapi
+      # トークンが無ければトークン不要のフィード (都営バス) だけが取り込まれ、
+      # 他は警告を出してスキップされる。バスごと外したい場合は
+      # DISABLE_BUS_FEATURE=true を設定する。
+      ODPT_ACCESS_TOKEN: ${{ secrets.ODPT_ACCESS_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -77,8 +79,13 @@ jobs:
 
       - name: Verify exported data
         run: |
-          test -s worker/generated/station_station_types.csv
-          echo "exported rows: $(($(wc -l < worker/generated/station_station_types.csv) - 1))"
+          for t in companies lines stations types station_station_types; do
+            test -s "worker/generated/$t.csv" || { echo "::error::$t.csv が空"; exit 1; }
+            echo "$t: $(($(wc -l < "worker/generated/$t.csv") - 1)) rows"
+          done
+          # バスが取り込めたかを可視化する (取り込めなくてもビルドは続行する)
+          bus=$(awk -F, 'NR>1 && $NF == 1' worker/generated/stations.csv | wc -l)
+          echo "bus stops: $bus"
 
       - name: Install worker-build
         run: cargo install worker-build --locked

@@ -21,10 +21,6 @@ use stationapi::proto::StopCondition;
 
 use crate::index;
 
-fn todo_err(what: &'static str) -> DomainError {
-    DomainError::Unexpected(format!("{what}: PoC では未実装"))
-}
-
 /// 駅グループ ID 群に属する有効な駅を、路線を JOIN した Station として返す。
 fn stations_of_groups(group_ids: &[u32]) -> Vec<Station> {
     let mut out = Vec::new();
@@ -262,7 +258,8 @@ impl StationRepository for MemStationRepository {
                 }
             }
         }
-        candidates.sort_by(|a, b| b.0.cmp(&a.0));
+        // ORDER BY t.priority DESC
+        candidates.sort_by_key(|(priority, _)| std::cmp::Reverse(*priority));
 
         if let Some(&(_, target_group)) = candidates.first() {
             let mut typed: Vec<(i32, &index::StationRecord, &index::SstRecord)> = Vec::new();

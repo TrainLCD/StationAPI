@@ -91,9 +91,15 @@ async fn export_worker_data(out_dir: &str) -> std::result::Result<(), anyhow::Er
     if !import::is_bus_feature_disabled() {
         info!("Importing GTFS (bus) data...");
         if let Err(e) = import::import_gtfs().await {
-            warn!("Failed to import GTFS data: {}. Continuing without bus data.", e);
+            warn!(
+                "Failed to import GTFS data: {}. Continuing without bus data.",
+                e
+            );
         } else if let Err(e) = import::integrate_gtfs_to_stations().await {
-            warn!("Failed to integrate GTFS data: {}. Continuing without bus data.", e);
+            warn!(
+                "Failed to integrate GTFS data: {}. Continuing without bus data.",
+                e
+            );
         }
     } else {
         info!("Bus feature is disabled; exporting rail data only.");

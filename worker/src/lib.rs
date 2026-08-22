@@ -380,7 +380,7 @@ async fn handle_get_routes(mut req: Request) -> Result<Response> {
 
     // NOTE: ページングは未対応 (next_page_token は空)
     grpc_web::encode_response(&RouteResponse {
-        routes: routes.into_iter().map(Into::into).collect(),
+        routes,
         next_page_token: String::new(),
     })
 }
@@ -410,7 +410,7 @@ async fn handle_get_connected_routes(mut req: Request) -> Result<Response> {
         .map_err(use_case_err)?;
 
     grpc_web::encode_response(&RouteResponse {
-        routes: routes.into_iter().map(Into::into).collect(),
+        routes,
         next_page_token: String::new(),
     })
 }
