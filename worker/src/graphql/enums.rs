@@ -1,8 +1,8 @@
-//! GraphQL の enum。値の並びは BFF のスキーマに合わせてある。
+//! GraphQL の enum。値の並びは公開スキーマに合わせてある。
 //! proto 側は i32 で入ってくるので、範囲外はスキーマ既定値へ倒す。
 //!
 //! `OtherLineType` や `TransportTypeUnspecified` のように型名を含む値があるが、
-//! これは BFF のスキーマ (ひいては proto) の名前をそのまま出す必要があるため。
+//! これは公開スキーマ (ひいては proto) の名前をそのまま出す必要があるため。
 #![allow(clippy::enum_variant_names)]
 
 use async_graphql::Enum;

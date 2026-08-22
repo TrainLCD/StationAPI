@@ -21,7 +21,7 @@
 
 オンプレで動かしている gRPC-Web API を Cloudflare Workers へ移せるかを検証し、実装まで進めた。
 
-あわせて、クライアントは BFF (TrainLCD/BFF) が gRPC-Web を GraphQL へ変換したものを利用していたが、gRPC-Web である必然性が無いため、Worker 版は GraphQL を直接返すようにした。BFF を経由しない。
+あわせて、クライアントは BFF (TrainLCD/BFF) が gRPC-Web を GraphQL へ変換したものを利用していたが、gRPC-Web である必然性が無いため、Worker 版は GraphQL を直接返すようにした。BFF を経由しない (BFF は廃止予定)。
 
 **オンプレ版 (gRPC) はそのまま残している。** 今回の変更で gRPC を廃止したわけではない。
 
@@ -38,7 +38,7 @@
 | domain / use_case 層 (約17,000行) | **1行も変更していない** |
 | PostgreSQL | 不要 |
 | `pg_trgm` / `point() <-> point()` | 不要 |
-| GraphQL スキーマ | BFF の `schema.graphql` と完全一致 (18クエリ / 28型) |
+| GraphQL スキーマ | 公開スキーマと完全一致 (18クエリ / 28型) |
 | バス (GTFS) | 対応済み (都営・西武・京王・東急) |
 
 `sqlx` と `tonic` は wasm32 で動かないため、前者は埋め込みデータのインメモリ索引に置き換え、後者は GraphQL 化により不要になった。repository トレイトの実装を差し替えるだけで、経路探索を含む既存のビジネスロジックがそのまま動く。
@@ -87,7 +87,7 @@ worker/          # workspace から exclude (wasm32 専用)
     repository.rs # 4つの repository トレイトの実装
     graphql/     # GraphQL の型・リゾルバ
     lib.rs       # エンドポイント
-  schema/bff.graphql  # BFF スキーマの写し (CI が突き合わせる)
+  schema/public.graphql  # 公開スキーマの正 (CI が突き合わせる)
   scripts/compare_schema.py
 ```
 
@@ -113,7 +113,7 @@ worker/          # workspace から exclude (wasm32 専用)
 
 値は **domain エンティティ → proto → GraphQL 型** の順に変換する。IPA や TTS セグメントの計算が use_case の DTO 側にあるため、proto を経由するとそのロジックをそのまま使える。
 
-エンドポイントは BFF に合わせ、サブドメイン直下でクエリを受ける。
+エンドポイントはクライアント互換のため、サブドメイン直下でクエリを受ける。
 
 | パス | 内容 |
 |---|---|
@@ -125,11 +125,13 @@ worker/          # workspace から exclude (wasm32 専用)
 
 ### スキーマ一致の担保
 
-`async-graphql` はコードファーストなので、Rust の型を変えると SDL が変わる。クライアントが壊れる変更に気付けるよう、`worker/schema/bff.graphql` を正として `worker/scripts/compare_schema.py` が突き合わせ、CI で差分があれば失敗させる。型とフィールドは集合として、enum は順序込みで比較する。
+`async-graphql` はコードファーストなので、Rust の型を変えると SDL が変わる。クライアントが壊れる変更に気付けるよう、`worker/schema/public.graphql` を正として `worker/scripts/compare_schema.py` が突き合わせ、CI で差分があれば失敗させる。型とフィールドは集合として、enum は順序込みで比較する。
+
+このファイルはもともと BFF の `schema.graphql` を写したものだが、BFF が廃止された後はこれが公開スキーマの基準になる。意図的にスキーマを変えるときはこのファイルも更新する。その差分がクライアントへの影響範囲そのものになる。
 
 実装時に踏んだ差分:
 
-- `async-graphql` は enum 値を既定で SCREAMING_SNAKE_CASE にする。BFF は PascalCase なので `rename_items` で揃えた
+- `async-graphql` は enum 値を既定で SCREAMING_SNAKE_CASE にする。公開スキーマは PascalCase なので `rename_items` で揃えた
 - PascalCase 変換では `JR` が `Jr` になるため、この値だけ `name` を明示した
 - `Station` / `StationNested` のように同一構造で名前が違う型は、SDL を合わせるためマクロで両方定義した。Nested 型は互いを参照するので `Box` で間接化しないと無限サイズになる
 

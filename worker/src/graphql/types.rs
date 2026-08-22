@@ -1,6 +1,6 @@
 //! GraphQL のオブジェクト型。
 //!
-//! BFF のスキーマは循環参照を避けるため Station/StationNested のように
+//! 公開スキーマは循環参照を避けるため Station/StationNested のように
 //! 同一構造の型を 2 つ持つ。SDL を一致させる必要があるので、こちらも
 //! マクロで同じ定義から 2 つの型を作る。
 //!
@@ -105,7 +105,7 @@ impl From<proto::Company> for Company {
             url: v.url,
             r#type: Some(CompanyType::from(v.r#type)),
             status: Some(OperationStatus::from(v.status)),
-            // BFF は name に nameShort を入れている
+            // 公開スキーマは name に nameShort を入れている
             name: Some(v.name_short),
         }
     }

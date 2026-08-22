@@ -1,4 +1,4 @@
-//! Query リゾルバ。BFF が持っていた 18 個のクエリをそのまま提供する。
+//! Query リゾルバ。公開スキーマの 18 クエリを提供する。
 //!
 //! 各リゾルバは UseCase 層を呼び、返ってきた domain エンティティを
 //! proto へ変換してから GraphQL 型にする。proto を経由するのは、
@@ -155,7 +155,7 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         line_group_id: i32,
-        // NOTE: BFF のスキーマにはあるが UseCase 側に対応する引数が無い
+        // NOTE: 公開スキーマにはあるが UseCase 側に対応する引数が無い
         #[graphql(name = "directionId")] _direction_id: Option<i32>,
         transport_type: Option<GqlTransportType>,
     ) -> GqlResult<Vec<Station>> {
@@ -273,7 +273,7 @@ impl QueryRoot {
         from_station_group_id: i32,
         to_station_group_id: i32,
         via_line_id: Option<i32>,
-        // NOTE: ページングは未対応。BFF のスキーマに合わせて引数だけ受ける
+        // NOTE: ページングは未対応。公開スキーマに合わせて引数だけ受ける
         #[graphql(name = "pageSize")] _page_size: Option<i32>,
         #[graphql(name = "pageToken")] _page_token: Option<String>,
     ) -> GqlResult<RoutePage> {

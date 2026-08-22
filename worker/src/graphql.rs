@@ -1,4 +1,5 @@
 //! GraphQL スキーマ。BFF が担っていた変換を Worker 側で直接行う。
+//! 公開スキーマの正は worker/schema/public.graphql。
 
 pub mod enums;
 pub mod query;

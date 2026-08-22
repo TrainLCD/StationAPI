@@ -1,11 +1,11 @@
 //! StationAPI を Cloudflare Workers 上で動かす。
 //!
-//! オンプレ版は gRPC-Web を返し BFF で GraphQL へ変換しているが、
-//! こちらは GraphQL をそのまま返すので BFF を挟まない。
-//! スキーマは BFF のものと一致させてあり、CI で SDL を突き合わせている。
+//! オンプレ版は gRPC-Web を返し、BFF が GraphQL へ変換していた。
+//! こちらは GraphQL をそのまま返すので BFF を挟まない (BFF は廃止予定)。
 //!
-//! エンドポイントも BFF に合わせ、サブドメイン直下 (`/`) でクエリを受ける。
-//! `/__schema` などの内部向けは `__` を前置して区別している。
+//! 公開スキーマは worker/schema/public.graphql が正で、CI が SDL を
+//! 突き合わせる。エンドポイントはクライアント互換のためサブドメイン直下
+//! (`/`) でクエリを受ける。`/__schema` などの内部向けは `__` を前置して区別する。
 //!
 //! sqlx / tonic は wasm32 で動かないため、前者は埋め込みデータの
 //! インメモリ索引、後者は不要 (GraphQL 化により) となっている。
@@ -73,12 +73,12 @@ async fn route(req: Request) -> Result<Response> {
             index::companies().len()
         ));
     }
-    // スキーマを配る。CI はこれと BFF の schema.graphql を突き合わせる。
+    // スキーマを配る。CI はこれと worker/schema/public.graphql を突き合わせる。
     if method == Method::Get && path == "/__schema" {
         let schema = graphql::build_schema(interactor());
         return with_cors(Response::ok(schema.sdl())?);
     }
-    // BFF と同じく、サブドメイン直下で GraphQL を受ける
+    // クライアント互換のため、サブドメイン直下で GraphQL を受ける
     if method == Method::Get && path == "/" {
         return Response::from_html(GraphiQLSource::build().endpoint("/").finish());
     }

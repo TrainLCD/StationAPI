@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Worker が生成した SDL と BFF のスキーマを突き合わせる。
+"""Worker が生成した SDL を、公開スキーマ (worker/schema/public.graphql) と突き合わせる。
 
 async-graphql はコードファーストなので、Rust の型を変えると SDL が変わる。
 クライアントが壊れる変更に気付けるよう、CI でこの比較を行う。
@@ -38,7 +38,7 @@ def main():
             diffs.append(f"Worker にのみ存在する型: {name}")
             continue
         if name not in actual:
-            diffs.append(f"BFF にのみ存在する型: {name}")
+            diffs.append(f"公開スキーマにのみ存在する型: {name}")
             continue
         exp_kind, exp_fields = expected[name]
         act_kind, act_fields = actual[name]
@@ -47,14 +47,14 @@ def main():
         if exp_kind == "enum":
             # enum は値の順序も含めて一致させる
             if exp_fields != act_fields:
-                diffs.append(f"{name}: enum の値が違う / BFF={exp_fields} Worker={act_fields}")
+                diffs.append(f"{name}: enum の値が違う / 公開スキーマ={exp_fields} Worker={act_fields}")
         else:
             for f in exp_fields:
                 if f not in act_fields:
-                    diffs.append(f"{name}: BFF にあって Worker に無い -> {f}")
+                    diffs.append(f"{name}: 公開スキーマにあって Worker に無い -> {f}")
             for f in act_fields:
                 if f not in exp_fields:
-                    diffs.append(f"{name}: Worker にあって BFF に無い -> {f}")
+                    diffs.append(f"{name}: Worker にあって公開スキーマに無い -> {f}")
 
     if diffs:
         print(f"スキーマに {len(diffs)} 件の差分があります:")
