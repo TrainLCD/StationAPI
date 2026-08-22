@@ -535,78 +535,17 @@ impl StationRepository for MemStationRepository {
     /// 3. その系統に含まれない駅 (= 各駅停車として扱う駅) だけを残す
     ///
     /// 出発・到着の駅グループを引く段階では e_status を見ない。
+    /// 発着の双方に停車する系統の停車駅を、路線をまたいだまま sst.id 順で返す。
+    ///
+    /// 呼び出し側 (`get_routes` / `get_train_types`) は系統に属する停車駅しか使わない。
+    /// 系統に属さない駅は経路候補を構成しないので、ここでは集めない。
     async fn get_route_stops(
         &self,
         from_station_id: u32,
         to_station_id: u32,
         via_line_ids: &[u32],
     ) -> Result<Vec<Station>, DomainError> {
-        // common_lines (e_status = 0 が条件、via 指定があれば限定)
-        let from_lines: HashSet<i32> = index::stations_by_group(from_station_id as i32)
-            .filter(|s| s.e_status == 0)
-            .filter(|s| via_line_ids.is_empty() || via_line_ids.contains(&(s.line_cd as u32)))
-            .map(|s| s.line_cd)
-            .collect();
-        let to_lines: HashSet<i32> = index::stations_by_group(to_station_id as i32)
-            .filter(|s| s.e_status == 0)
-            .map(|s| s.line_cd)
-            .collect();
-        let common_lines: Vec<i32> = from_lines.intersection(&to_lines).copied().collect();
-        if common_lines.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        // sst_cte_c1 / sst_cte_c2 (from_cte / to_cte は e_status を見ない)
-        let groups_of = |group_id: u32| -> HashSet<i32> {
-            index::stations_by_group(group_id as i32)
-                .flat_map(|s| index::sst_by_station(s.station_cd))
-                .filter(|sst| sst.pass != Some(1))
-                .filter_map(|sst| sst.line_group_cd)
-                .collect()
-        };
-        let from_groups = groups_of(from_station_id);
-        let to_groups = groups_of(to_station_id);
-
-        // sst_cte に現れる station_cd = 除外対象 (sst.line_group_cd IS NULL の否定)
-        let mut excluded: HashSet<i32> = HashSet::new();
-        for group in from_groups.intersection(&to_groups) {
-            for sst in index::sst_by_group(*group) {
-                excluded.insert(sst.station_cd);
-            }
-        }
-
-        let mut records: Vec<&index::StationRecord> = Vec::new();
-        for line_cd in common_lines {
-            let Some(line) = index::line_by_cd(line_cd) else {
-                continue;
-            };
-            if line.e_status != 0 {
-                continue;
-            }
-            for record in index::stations_by_line(line_cd) {
-                if record.e_status != 0 || excluded.contains(&record.station_cd) {
-                    continue;
-                }
-                records.push(record);
-            }
-        }
-
-        // e_sort, station_cd の昇順
-        records.sort_by(|a, b| {
-            a.e_sort
-                .cmp(&b.e_sort)
-                .then_with(|| a.station_cd.cmp(&b.station_cd))
-        });
-
-        let mut out: Vec<Station> = records
-            .into_iter()
-            .map(|record| record.to_entity(index::line_by_cd(record.line_cd)))
-            .collect();
-
-        // 種別ありの停車駅を後ろに連ねる。
-        // 発着の双方に停車する系統の停車駅を、路線をまたいだまま sst.id 順で返す。
-        // ここを落とすと直通列車の経路が 1 本も出なくなる。
-        // 出発・到着の駅グループはこちらでは e_status を見る。
+        // 双方の駅に通過ではない停車を持つ系統
         let stopping_groups = |group_id: u32| -> HashSet<i32> {
             index::stations_by_group(group_id as i32)
                 .filter(|s| s.e_status == 0)
@@ -618,7 +557,7 @@ impl StationRepository for MemStationRepository {
         let from_stopping = stopping_groups(from_station_id);
         let to_stopping = stopping_groups(to_station_id);
 
-        let mut typed: Vec<(&index::SstRecord, &index::StationRecord, &index::TypeRecord)> =
+        let mut stops: Vec<(&index::SstRecord, &index::StationRecord, &index::TypeRecord)> =
             Vec::new();
         for group in from_stopping.intersection(&to_stopping) {
             for sst in index::sst_by_group(*group) {
@@ -641,24 +580,21 @@ impl StationRepository for MemStationRepository {
                 let Some(train_type) = index::type_by_cd(sst.type_cd) else {
                     continue;
                 };
-                typed.push((sst, record, train_type));
+                stops.push((sst, record, train_type));
             }
         }
-        typed.sort_by_key(|(sst, _, _)| sst.id);
+        stops.sort_by_key(|(sst, _, _)| sst.id);
 
-        out.extend(typed.into_iter().map(|(sst, record, train_type)| {
-            let mut station = record.to_entity(index::line_by_cd(record.line_cd));
-            apply_train_type(&mut station, sst, train_type);
-            station
-        }));
-
-        Ok(out)
+        Ok(stops
+            .into_iter()
+            .map(|(sst, record, train_type)| {
+                let mut station = record.to_entity(index::line_by_cd(record.line_cd));
+                apply_train_type(&mut station, sst, train_type);
+                station
+            })
+            .collect())
     }
-    /// 2 つの結果を連結して返す。
-    /// 1. 種別経路に含まれない駅。e_sort, station_cd の昇順
-    /// 2. 種別経路に含まれる駅。sst.id の昇順
-    ///
-    /// direction_id = 1 のときは両方の並び順を反転する。
+
     async fn get_route_stops_by_station_cd(
         &self,
         from_station_cd: u32,
@@ -677,7 +613,7 @@ impl StationRepository for MemStationRepository {
             return Ok(Vec::new());
         };
 
-        // sst_cte: 双方の駅に pass <> 1 で停車する line_group_cd
+        // 双方の駅に通過ではない停車を持つ系統
         let groups_of = |station_cd: i32| -> HashSet<i32> {
             index::sst_by_station(station_cd)
                 .filter(|sst| sst.pass != Some(1))
@@ -1038,6 +974,9 @@ fn sst_is_stop(sst: &index::SstRecord) -> bool {
 }
 
 /// priority の降順、次に sst.id の昇順で並べる。
+///
+/// priority は各駅停車を先頭に出すためのもの (普通・各駅停車・快速・
+/// アクセス特急だけが 1 以上)。種別を一覧として見せる場面で使う。
 fn sort_by_priority_then_id(items: &mut [(TrainType, i32)]) {
     items.sort_by(|a, b| {
         b.1.cmp(&a.1)
@@ -1081,7 +1020,7 @@ impl TrainTypeRepository for MemTrainTypeRepository {
     ) -> Result<Vec<TrainType>, DomainError> {
         let target_group = line_group_id.map(|v| v as i32);
 
-        let mut scored: Vec<(TrainType, i32)> = Vec::new();
+        let mut out: Vec<TrainType> = Vec::new();
         for &station_id in station_id_vec {
             for sst in index::sst_by_station(station_id as i32) {
                 if let Some(group) = target_group {
@@ -1095,15 +1034,13 @@ impl TrainTypeRepository for MemTrainTypeRepository {
                 let Some(ty) = index::type_by_cd(sst.type_cd) else {
                     continue;
                 };
-                scored.push((build_train_type(sst, ty), ty.priority));
+                out.push(build_train_type(sst, ty));
             }
         }
-        sort_by_priority_then_id(&mut scored);
-        Ok(scored.into_iter().map(|(t, _)| t).collect())
+        out.sort_by_key(|t| t.id.unwrap_or(0));
+        Ok(out)
     }
 
-    /// 並びは sst.id のみで priority を見ない
-    /// (`get_by_station_id_vec` 側は priority 降順なので分けている)。
     async fn get_by_station_id(&self, station_id: u32) -> Result<Vec<TrainType>, DomainError> {
         let mut out: Vec<TrainType> = index::sst_by_station(station_id as i32)
             .filter(|sst| sst_is_stop(sst))
@@ -1125,16 +1062,14 @@ impl TrainTypeRepository for MemTrainTypeRepository {
         line_group_id_vec: &[u32],
     ) -> Result<Vec<TrainType>, DomainError> {
         let targets: Vec<i32> = line_group_id_vec.iter().map(|&v| v as i32).collect();
-        let mut scored: Vec<(TrainType, i32)> = index::ssts()
+        let mut out: Vec<TrainType> = index::ssts()
             .iter()
             .filter(|sst| sst.line_group_cd.is_some_and(|g| targets.contains(&g)))
             .filter(|sst| sst_is_stop(sst))
-            .filter_map(|sst| {
-                index::type_by_cd(sst.type_cd).map(|ty| (build_train_type(sst, ty), ty.priority))
-            })
+            .filter_map(|sst| index::type_by_cd(sst.type_cd).map(|ty| build_train_type(sst, ty)))
             .collect();
-        sort_by_priority_then_id(&mut scored);
-        Ok(scored.into_iter().map(|(t, _)| t).collect())
+        out.sort_by_key(|t| t.id.unwrap_or(0));
+        Ok(out)
     }
 
     async fn get_line_group_ids_by_station_group_ids(

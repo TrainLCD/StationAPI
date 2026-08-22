@@ -716,8 +716,7 @@ pub fn sst_by_station(station_cd: i32) -> impl Iterator<Item = &'static SstRecor
         .map(|&i| &ssts()[i])
 }
 
-/// 座標検索の has_train_types 用サブクエリ相当:
-/// その駅が属する系統のうち、最も id の小さいものを返す。
+/// その駅が属する系統のうち、最も id の小さいものを返す。has_train_types に使う。
 pub fn first_line_group_cd(station_cd: i32) -> Option<i32> {
     sst_by_station(station_cd).find_map(|s| s.line_group_cd)
 }
