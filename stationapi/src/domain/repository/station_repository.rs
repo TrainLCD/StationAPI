@@ -105,7 +105,7 @@ pub trait StationRepository: Send + Sync + 'static {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proto::StopCondition;
+    use crate::model::StopCondition;
     use std::collections::HashMap;
 
     // モック実装

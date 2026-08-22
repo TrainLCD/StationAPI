@@ -1,6 +1,6 @@
-use crate::{domain::entity::company::Company, proto::Company as GrpcCompany};
+use crate::{domain::entity::company::Company, model::Company as ModelCompany};
 
-impl From<Company> for GrpcCompany {
+impl From<Company> for ModelCompany {
     fn from(company: Company) -> Self {
         Self {
             id: company.company_cd as u32,

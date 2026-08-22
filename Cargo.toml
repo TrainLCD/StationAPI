@@ -1,3 +1,51 @@
-# worker は wasm32 専用 crate のため workspace から除外する
-# (cargo check --workspace がネイティブターゲットで走ると壊れるため)
-workspace = { resolver = "2", members = ["stationapi", "data_validator"], exclude = ["worker"] }
+# StationAPI 本体。Cloudflare Workers 上で GraphQL を配信する wasm32 専用 crate。
+#
+# ネイティブ側の crate は workspace メンバーとして同居する:
+#   stationapi     ... ドメインとユースケース (この crate と preprocessor が共有)
+#   preprocessor   ... generated/*.csv を data/*.csv と GTFS から組み立てる
+#   data_validator ... data/*.csv の整合性検査
+#
+# この crate も wasm-bindgen 経由でネイティブターゲットのビルドは通るが、
+# 実行できるのは Workers 上だけ。`cargo check` などは対象を明示すること。
+[package]
+name = "stationapi-worker"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[workspace]
+resolver = "2"
+members = ["stationapi", "preprocessor", "data_validator"]
+
+[dependencies]
+stationapi = { path = "stationapi" }
+worker = "0.8"
+async-trait = "0.1"
+async-graphql = { version = "7", default-features = false, features = ["graphiql"] }
+serde_json = "1"
+csv = "1.3"
+console_error_panic_hook = "0.1"
+
+[build-dependencies]
+csv = "1.3"
+
+# 本番成果物である wasm 向けの設定。
+#
+# サイズは Workers の 10MiB 制限に対して gzip 3.5MiB (34%) と余裕があるので、
+# opt-level はサイズ優先 ("s") にせず速度優先のままにする ("s" にしても
+# gzip で 173KiB しか縮まらない)。
+# lto は gzip -193KiB / raw -1.35MB 効く。raw サイズは isolate がモジュールを
+# 読み込む時間に効くので有効にしておく。
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+# preprocessor は generated/*.csv を作るためだけのツール。実行は 7 秒ほどなのに
+# LTO を掛けるとビルドが 1 分半から 2 分半へ伸びて割に合わないため、こちらを使う。
+[profile.tool]
+inherits = "release"
+lto = false
+codegen-units = 16

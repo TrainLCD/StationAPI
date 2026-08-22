@@ -19,7 +19,7 @@
 //!   フィットした駅間速度で引き下げない。
 //! - バスには適用しない(道路交通の駅間時間は GTFS 由来の路線単位較正で扱う)。
 
-use crate::proto::TrainTypeKind;
+use crate::model::TrainTypeKind;
 
 /// `(line_cd, station_cd_小, station_cd_大, 実効最高速度 km/h)`。
 /// `(line_cd, station_cd_小, station_cd_大)` の昇順にソート済み(二分探索で引く)。

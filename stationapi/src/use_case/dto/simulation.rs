@@ -1,5 +1,5 @@
 use crate::domain::speed_table::line_speed_override_kmh;
-use crate::proto::{LineType, TrainTypeKind};
+use crate::model::{LineType, TrainTypeKind};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SpeedProfile {

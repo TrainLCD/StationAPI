@@ -1,3 +1,0 @@
-[submodule "proto"]
-	path = stationapi/proto
-	url = https://github.com/TrainLCD/gRPCProto.git
