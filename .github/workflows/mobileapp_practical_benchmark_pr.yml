@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Fetch MobileApp query definitions
         run: git clone --depth 1 --branch dev https://github.com/TrainLCD/MobileApp.git /tmp/MobileApp
-      - name: Run exact benchmark script from push workflow
+      - name: Run MobileApp-equivalent practical benchmark
         shell: python
         run: |
           from pathlib import Path
@@ -20,6 +20,43 @@ jobs:
           p = Path('.github/workflows/mobileapp_practical_benchmark.yml')
           text = p.read_text()
           marker = '        shell: python\n        run: |\n'
-          code = text.split(marker, 1)[1]
-          code = textwrap.dedent(code)
+          code = textwrap.dedent(text.split(marker, 1)[1])
+
+          helper = r'''
+          def dedupe_fragments(doc):
+              seen = set()
+              out = []
+              pos = 0
+              pat = re.compile(r'fragment\s+(\w+)\s+on\s+\w+\s*\{')
+              while True:
+                  m = pat.search(doc, pos)
+                  if not m:
+                      out.append(doc[pos:])
+                      break
+                  out.append(doc[pos:m.start()])
+                  name = m.group(1)
+                  brace = doc.find('{', m.start())
+                  depth = 0
+                  end = brace
+                  for i in range(brace, len(doc)):
+                      if doc[i] == '{':
+                          depth += 1
+                      elif doc[i] == '}':
+                          depth -= 1
+                          if depth == 0:
+                              end = i + 1
+                              break
+                  if name not in seen:
+                      out.append(doc[m.start():end])
+                      seen.add(name)
+                  pos = end
+              return ''.join(out)
+          '''
+          helper = textwrap.dedent(helper)
+          code = code.replace('def resolve(name, stack=()):', helper + '\ndef resolve(name, stack=()):', 1)
+          needle = "    return re.sub(r'\\$\\{(\\w+)\\}', lambda m: resolve(m.group(1), stack + (name,)), body)"
+          replacement = "    expanded = re.sub(r'\\$\\{(\\w+)\\}', lambda m: resolve(m.group(1), stack + (name,)), body)\n    return dedupe_fragments(expanded)"
+          if needle not in code:
+              raise RuntimeError('Could not patch resolver for graphql-tag fragment de-duplication')
+          code = code.replace(needle, replacement, 1)
           exec(compile(code, str(p), 'exec'))
