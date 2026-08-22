@@ -21,7 +21,14 @@ use stationapi::proto::StopCondition;
 
 use crate::index;
 
+/// 有効な (e_status = 0) 路線だけを返す。
+/// 多くの SQL が `l.e_status = 0` を条件に持つため、無効な路線を混ぜないようにする。
+fn active_line(line_cd: i32) -> Option<&'static Line> {
+    index::line_by_cd(line_cd).filter(|l| l.e_status == 0)
+}
+
 /// 駅グループ ID 群に属する有効な駅を、路線を JOIN した Station として返す。
+/// 対応する SQL は `JOIN lines l ... AND l.e_status = 0` なので無効な路線は除く。
 fn stations_of_groups(group_ids: &[u32]) -> Vec<Station> {
     let mut out = Vec::new();
     for &gid in group_ids {
@@ -33,6 +40,9 @@ fn stations_of_groups(group_ids: &[u32]) -> Vec<Station> {
             let Some(line) = index::line_by_cd(record.line_cd) else {
                 continue;
             };
+            if line.e_status != 0 {
+                continue;
+            }
             out.push(record.to_entity(Some(line)));
         }
     }
@@ -125,6 +135,8 @@ impl StationRepository for MemStationRepository {
         Ok(index::nearest(latitude, longitude, limit, want)
             .into_iter()
             .map(|(record, distance_km)| {
+                // NOTE: 座標検索の SQL は JOIN lines のみで l.e_status を見ないため、
+                // ここでは無効な路線も除外しない
                 let mut station = record.to_entity(index::line_by_cd(record.line_cd));
                 station.distance = Some(distance_km * 1000.0);
                 // 既存 SQL は has_train_types 用に line_group_cd をサブクエリで引く
@@ -166,6 +178,9 @@ impl StationRepository for MemStationRepository {
                 let Some(line) = index::line_by_cd(record.line_cd) else {
                     continue;
                 };
+                if line.e_status != 0 {
+                    continue;
+                }
 
                 // LEFT JOIN なので、種別を持つ駅は sst の数だけ行が出る
                 let mut matched = false;
@@ -211,7 +226,8 @@ impl StationRepository for MemStationRepository {
     async fn find_by_id(&self, id: u32) -> Result<Option<Station>, DomainError> {
         Ok(index::station_by_cd(id as i32)
             .filter(|r| r.e_status == 0)
-            .map(|r| r.to_entity(index::line_by_cd(r.line_cd))))
+            .filter(|r| active_line(r.line_cd).is_some())
+            .map(|r| r.to_entity(active_line(r.line_cd))))
     }
 
     async fn get_by_id_vec(&self, ids: &[u32]) -> Result<Vec<Station>, DomainError> {
@@ -219,7 +235,8 @@ impl StationRepository for MemStationRepository {
             .iter()
             .filter_map(|&id| index::station_by_cd(id as i32))
             .filter(|r| r.e_status == 0)
-            .map(|r| r.to_entity(index::line_by_cd(r.line_cd)))
+            .filter(|r| active_line(r.line_cd).is_some())
+            .map(|r| r.to_entity(active_line(r.line_cd)))
             .collect())
     }
 
@@ -324,7 +341,7 @@ impl StationRepository for MemStationRepository {
                 return Ok(typed
                     .into_iter()
                     .map(|(_, record, sst)| {
-                        let mut station = record.to_entity(index::line_by_cd(record.line_cd));
+                        let mut station = record.to_entity(active_line(record.line_cd));
                         if let Some(ty) = index::type_by_cd(sst.type_cd) {
                             apply_train_type(&mut station, sst, ty);
                         }
@@ -567,15 +584,12 @@ impl StationRepository for MemStationRepository {
             && to_record.e_status == 0
             && from_record.line_cd == to_record.line_cd
             && via_ok(from_record.line_cd)
+            && active_line(from_record.line_cd).is_some()
         {
-            if let Some(line) = index::line_by_cd(from_record.line_cd) {
-                if line.e_status == 0 {
-                    untyped.extend(
-                        index::stations_by_line(from_record.line_cd)
-                            .filter(|r| r.e_status == 0 && !excluded.contains(&r.station_cd)),
-                    );
-                }
-            }
+            untyped.extend(
+                index::stations_by_line(from_record.line_cd)
+                    .filter(|r| r.e_status == 0 && !excluded.contains(&r.station_cd)),
+            );
         }
         untyped.sort_by(|a, b| {
             a.e_sort
@@ -616,10 +630,10 @@ impl StationRepository for MemStationRepository {
         // untyped の後に typed を連結する (既存の rows.append と同じ順序)
         let mut out: Vec<Station> = untyped
             .into_iter()
-            .map(|record| record.to_entity(index::line_by_cd(record.line_cd)))
+            .map(|record| record.to_entity(active_line(record.line_cd)))
             .collect();
         for (_, record, sst) in typed {
-            let mut station = record.to_entity(index::line_by_cd(record.line_cd));
+            let mut station = record.to_entity(active_line(record.line_cd));
             if let Some(ty) = index::type_by_cd(sst.type_cd) {
                 apply_train_type(&mut station, sst, ty);
             }
@@ -646,6 +660,11 @@ fn lines_of_groups(group_ids: &[u32]) -> Vec<Line> {
             let Some(line) = index::line_by_cd(record.line_cd) else {
                 continue;
             };
+            // 既存 SQL は WHERE l.e_status = 0。無効化された路線は返さない
+            // (例: 成田エクスプレスは e_status = 3)
+            if line.e_status != 0 {
+                continue;
+            }
             let mut line = line.clone();
             line.station_cd = Some(record.station_cd);
             line.station_g_cd = Some(record.station_g_cd);
@@ -678,10 +697,13 @@ impl LineRepository for MemLineRepository {
         Ok(lines_of_groups(&[station_group_id]))
     }
 
+    /// 既存 SQL は WHERE l.e_status = 0
     async fn find_by_id(&self, id: u32) -> Result<Option<Line>, DomainError> {
-        Ok(index::line_by_cd(id as i32).cloned())
+        Ok(active_line(id as i32).cloned())
     }
 
+    /// NOTE: get_by_ids / find_by_station_id の SQL には l.e_status 条件が無いため、
+    /// 無効な路線も返す (呼び出し側が ID を指定しているため)
     async fn get_by_ids(&self, ids: &[u32]) -> Result<Vec<Line>, DomainError> {
         Ok(ids
             .iter()
