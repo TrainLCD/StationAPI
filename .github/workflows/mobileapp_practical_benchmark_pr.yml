@@ -59,4 +59,27 @@ jobs:
           if needle not in code:
               raise RuntimeError('Could not patch resolver for graphql-tag fragment de-duplication')
           code = code.replace(needle, replacement, 1)
+
+          # Fair route scenario: use the same physical line in both environments.
+          # Chuo Line (Rapid) lineId=11312 connects Tokyo and Shinjuku and exists in both datasets.
+          code = code.replace(
+              "            shinjuku = next((s for s in found if s.get('name') == '新宿'), found[0])",
+              "            shinjuku = next((s for s in found if s.get('name') == '新宿' and (s.get('line') or {}).get('id') == 11312), next((s for s in found if s.get('name') == '新宿'), found[0]))",
+              1,
+          )
+          code = code.replace(
+              "            via_line_id = (shinjuku.get('line') or {}).get('id')",
+              "            via_line_id = 11312",
+              1,
+          )
+          code = code.replace(
+              "            line_group_id = next((t.get('groupId') for t in train_types if t.get('groupId') is not None), None)",
+              "            matched_tt = next((t for t in train_types if (t.get('line') or {}).get('id') == via_line_id or any((l or {}).get('id') == via_line_id for l in (t.get('lines') or []))), None)\n            line_group_id = (matched_tt or {}).get('groupId') if matched_tt else next((t.get('groupId') for t in train_types if t.get('groupId') is not None), None)",
+              1,
+          )
+          code = code.replace(
+              "            ctx[env] = {",
+              "            current_line_ids = sorted(current_line_ids)\n\n            ctx[env] = {",
+              1,
+          )
           exec(compile(code, str(p), 'exec'))
