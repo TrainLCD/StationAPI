@@ -1,11 +1,36 @@
 {
-  "name": "stationapi-worker",
+  // 環境の使い分け (他の Worker と揃えて、既定を staging にしている):
+  //   staging : wrangler deploy --env=""            -> stationapi-stg
+  //   本番    : wrangler deploy --env production    -> stationapi
+  //
+  // env を完全に省略しても top-level (staging) が使われるが、
+  // wrangler 4 は「対象環境が未指定」と警告するため、staging を指すときは
+  // --env="" を明示する。本番へ出すときだけ --env production が要る。
+  //
+  // name / main / compatibility_date / routes は env に継承されるが、
+  // それ以外は継承されない可能性があるため各環境で明示している。
+  "name": "stationapi-stg",
   "main": "build/worker/shim.mjs",
   "compatibility_date": "2026-08-01",
+
+  // データは WASM に埋め込まれるため、ビルドが実質のデータ更新になる。
+  // worker/generated があればそれを使う (CI が書き出す本番相当データ)。
   "build": {
     "command": "worker-build --release"
   },
+
+  "workers_dev": true,
   "observability": {
     "enabled": true
+  },
+
+  "env": {
+    "production": {
+      "name": "stationapi",
+      "workers_dev": true,
+      "observability": {
+        "enabled": true
+      }
+    }
   }
 }
