@@ -151,26 +151,61 @@ impl StationRepository for MemStationRepository {
             .collect())
     }
 
+    /// 既存 SQL は `LEFT JOIN station_station_types sst` と `LEFT JOIN types t` を行い、
+    /// 駅に紐づく種別ごとに行を返す。種別を持たない駅は sst 側が NULL の 1 行になる。
     async fn get_by_station_group_id_vec(
         &self,
         station_group_id_vec: &[u32],
     ) -> Result<Vec<Station>, DomainError> {
-        Ok(stations_of_groups(station_group_id_vec))
+        let mut out = Vec::new();
+        for &group_id in station_group_id_vec {
+            for record in index::stations_by_group(group_id as i32) {
+                if record.e_status != 0 {
+                    continue;
+                }
+                let Some(line) = index::line_by_cd(record.line_cd) else {
+                    continue;
+                };
+
+                // LEFT JOIN なので、種別を持つ駅は sst の数だけ行が出る
+                let mut matched = false;
+                for sst in index::sst_by_station(record.station_cd) {
+                    let Some(ty) = index::type_by_cd(sst.type_cd) else {
+                        continue;
+                    };
+                    let mut station = record.to_entity(Some(line));
+                    apply_train_type(&mut station, sst, ty);
+                    out.push(station);
+                    matched = true;
+                }
+                if !matched {
+                    out.push(record.to_entity(Some(line)));
+                }
+            }
+        }
+        Ok(out)
     }
 
-    // 列車種別を未実装のため、types を JOIN する版としない版は同じ結果になる
+    /// 既存 SQL は types を JOIN しない代わりに、has_train_types 用の
+    /// `line_group_cd` をサブクエリで 1 件だけ引く。
+    /// ここを埋めないと lines[].station.hasTrainTypes が常に false になる。
     async fn get_by_station_group_id_vec_no_types(
         &self,
         station_group_id_vec: &[u32],
     ) -> Result<Vec<Station>, DomainError> {
-        Ok(stations_of_groups(station_group_id_vec))
+        let mut out = stations_of_groups(station_group_id_vec);
+        for station in out.iter_mut() {
+            station.line_group_cd = index::first_line_group_cd(station.station_cd);
+            station.has_train_types = station.line_group_cd.is_some();
+        }
+        Ok(out)
     }
 
     async fn get_by_station_group_id(
         &self,
         station_group_id: u32,
     ) -> Result<Vec<Station>, DomainError> {
-        Ok(stations_of_groups(&[station_group_id]))
+        self.get_by_station_group_id_vec(&[station_group_id]).await
     }
 
     async fn find_by_id(&self, id: u32) -> Result<Option<Station>, DomainError> {
