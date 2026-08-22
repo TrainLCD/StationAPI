@@ -112,3 +112,62 @@ jobs:
             build/
             generated/
           retention-days: 7
+
+  deploy:
+    name: Deploy worker
+    needs: build
+    runs-on: ubuntu-latest
+
+    # dev -> staging (stationapi-stg)、master -> production (stationapi)。
+    # それ以外のブランチと pull_request はビルドの検証までで止める。
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master')
+
+    # production 環境には承認レビューを設定してあるため、本番へ出すときだけ
+    # 人の承認を挟んで止まる。staging は無条件に進む。
+    environment: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
+
+    # 同じ環境へ同時に流れると、先に始まった古い版が後から上書きしうる。
+    concurrency:
+      group: deploy-${{ github.ref_name }}
+      cancel-in-progress: false
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # staging は wrangler.jsonc の top-level 設定なので、環境名は空にする。
+      # wrangler 4 は環境が複数あると --env の省略を警告するため、空でも明示する。
+      TARGET_ENV: ${{ github.ref == 'refs/heads/master' && 'production' || '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      # build ジョブと同じキーで読むだけにする。書き戻すのは build ジョブの役目。
+      - name: Restore cargo cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: worker-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
+      # build ジョブが検証したのと同じ generated/ を使う。ここで preprocessor を
+      # 動かし直すと GTFS の取得結果が変わりうるため、スキーマを検証していない
+      # データが本番へ出てしまう。
+      - uses: actions/download-artifact@v4
+        with:
+          name: worker-build
+
+      - name: Install worker-build
+        run: cargo install worker-build --locked --version "$WORKER_BUILD_VERSION"
+
+      # wrangler deploy は wrangler.jsonc の build.command (worker-build --release)
+      # を必ず実行し、これを飛ばすフラグは無い。generated/ を持ち込んであるので
+      # build ジョブと同じ入力から同じ wasm が組み上がる。
+      - name: Deploy
+        run: npx --yes "wrangler@$WRANGLER_VERSION" deploy --env="$TARGET_ENV"

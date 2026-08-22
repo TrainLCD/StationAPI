@@ -3,6 +3,11 @@
 
 .PHONY: help test check fmt clippy data build dev deploy deploy-production schema ipa-audit clean
 
+# CI (.github/workflows/build_worker.yml) と同じ版を使う。グローバルへ入れて
+# いなくても npx が取ってくるので、版ずれでビルド結果が変わらない。
+WRANGLER_VERSION := 4.125.0
+WRANGLER := npx --yes wrangler@$(WRANGLER_VERSION)
+
 help:
 	@echo "Available targets:"
 	@echo "  test             - Run all tests"
@@ -12,8 +17,8 @@ help:
 	@echo "  data             - Rebuild generated/*.csv from data/ and the GTFS feeds"
 	@echo "  build            - Build the Worker (wasm)"
 	@echo "  dev              - Run the Worker locally (wrangler dev)"
-	@echo "  deploy           - Deploy to staging"
-	@echo "  deploy-production- Deploy to production"
+	@echo "  deploy           - Deploy to staging (dev branch only)"
+	@echo "  deploy-production- Deploy to production (master branch only)"
 	@echo "  schema           - Diff the running Worker's SDL against schema/public.graphql"
 	@echo "  ipa-audit        - Print IPA coverage report for English/romanized CSV names"
 	@echo "  clean            - Clean build artifacts"
@@ -45,14 +50,20 @@ build:
 	worker-build --release
 
 dev:
-	wrangler dev
+	$(WRANGLER) dev
 
+# デプロイ先はブランチで決まる (dev -> staging, master -> production)。取り違えると
+# 別環境を上書きするため、対応しないブランチからは実行させない。
 # wrangler 4 は環境が複数あると --env の省略を警告するため、staging も明示する。
 deploy:
-	wrangler deploy --env=""
+	@branch=$$(git rev-parse --abbrev-ref HEAD); \
+	  [ "$$branch" = "dev" ] || { echo "error: staging へのデプロイは dev ブランチからのみ実行できます (現在: $$branch)" >&2; exit 1; }
+	$(WRANGLER) deploy --env=""
 
 deploy-production:
-	wrangler deploy --env production
+	@branch=$$(git rev-parse --abbrev-ref HEAD); \
+	  [ "$$branch" = "master" ] || { echo "error: production へのデプロイは master ブランチからのみ実行できます (現在: $$branch)" >&2; exit 1; }
+	$(WRANGLER) deploy --env production
 
 # 公開スキーマから外れるとクライアントが壊れる。ローカルの Worker から
 # SDL を取って突き合わせる (先に `make dev` を起動しておくこと)。
