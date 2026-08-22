@@ -64,8 +64,12 @@ runs:
       env:
         STRICT: ${{ inputs.fail-on-missing-bus-feeds }}
       run: |
-        if grep -q "の取得に失敗" /tmp/preprocessor.log; then
-          grep "の取得に失敗" /tmp/preprocessor.log
+        # preprocessor がフィードを 1 つ丸ごと飛ばすのは gtfs/mod.rs の
+        # 3 経路 (download 失敗 / 読み込み失敗 / 東急バス ODPT JSON) だけで、
+        # いずれもこの文言で終わる。個別のエラー文 (「の取得に失敗」など) で
+        # 拾うと、読み込み失敗と、外側の文言に含まれない東急バスを取りこぼす。
+        if grep -q "このフィードを飛ばす" /tmp/preprocessor.log; then
+          grep "このフィードを飛ばす" /tmp/preprocessor.log
           if [ "$STRICT" = "true" ]; then
             echo "::error::取り込めなかったバスフィードがある。ODPT_ACCESS_TOKEN を確認すること"
             exit 1
