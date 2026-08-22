@@ -1,0 +1,25 @@
+name: MobileApp practical GraphQL benchmark PR
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch MobileApp query definitions
+        run: git clone --depth 1 --branch dev https://github.com/TrainLCD/MobileApp.git /tmp/MobileApp
+      - name: Run exact benchmark script from push workflow
+        shell: python
+        run: |
+          from pathlib import Path
+          import textwrap
+          p = Path('.github/workflows/mobileapp_practical_benchmark.yml')
+          text = p.read_text()
+          marker = '        shell: python\n        run: |\n'
+          code = text.split(marker, 1)[1]
+          code = textwrap.dedent(code)
+          exec(compile(code, str(p), 'exec'))
