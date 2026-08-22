@@ -7,32 +7,46 @@
 
 ## benchmark_graphql.py
 
-本番 (`gql.trainlcd.app`) とステージング (`gql-stg.trainlcd.app`) の GraphQL
-エンドポイントを同一条件で叩き、応答時間を比べます。`schema/public.graphql` の
-`Query` 型にあるルートフィールドを全て 1 件ずつ計測します。
+デプロイ済みの GraphQL エンドポイントを 2 つ並べて計測し、応答の食い違いも検出します。
+`schema/public.graphql` の `Query` 型にあるルートフィールドを全て 1 件ずつ扱います。
+既定では本番 (`gql.trainlcd.app`) とステージング (`gql-stg.trainlcd.app`) を比べます。
 
-1 反復ごとに環境の順番を入れ替えて交互に投げるため、ネットワークの揺らぎが片方の環境
-だけに偏りません。接続は環境ごとに keep-alive で使い回すので、TLS ハンドシェイクの費用は
-warmup 分に吸われます。GraphQL を通さない `GET /__ping` も併せて測るので、
-サーバー側の処理時間とネットワークの下駄を切り分けられます。
+依存は Python 3.9 以降の標準ライブラリのみで、pip での用意は要りません。
 
 ### 使い方
 
 ```bash
-# 全クエリを 30 回ずつ計測して JSON も残す
-python3 scripts/benchmark_graphql.py --iterations 30 --warmup 3 --json-out bench.json
+# 速度を測ってレポート (Markdown) まで出す
+python3 scripts/benchmark_graphql.py --iterations 30 --report-out bench.md
 
-# 気になるクエリだけ
+# 応答が一致するかだけ調べる (各クエリ 1 回ずつ)
+python3 scripts/benchmark_graphql.py --parity
+
+# 気になるクエリだけ (--list で名前を確認できる)
 python3 scripts/benchmark_graphql.py --only routes connectedRoutes --iterations 10
-
-# 10 多重の並列プローブを追加する(直列の値が待ち行列由来か切り分ける)
-python3 scripts/benchmark_graphql.py --only station --iterations 10 --concurrency 10
 
 # ローカルの Worker (make dev) と本番を比べる
 python3 scripts/benchmark_graphql.py --staging http://127.0.0.1:8787/
+
+# 時間帯を変えて貯め、あとでまとめる
+python3 scripts/benchmark_graphql.py --iterations 30 --append-jsonl runs.jsonl
+python3 scripts/benchmark_graphql.py --summarize runs.jsonl
 ```
 
-依存は `requests` のみです。計測結果と読み取りは `docs/graphql-benchmark.md` にあります。
+`--report-out` を付けると、計測条件・結果 (p50/p95/p99)・応答の一致・
+外に出すときの注意までを 1 つの Markdown にまとめて書き出します。
+
+### 計測上の注意
+
+- **公表する数字は利用者のいる地域から測ってください。** GraphQL を通さない
+  `GET /__ping` を併せて測るので、エッジまでの往復とサーバー側の処理時間は
+  切り分けられますが、上流へ往復する構成が相手の場合は計測地から上流までの
+  距離がそのまま相手側の下駄になります。
+- **応答が一致しないクエリの速度差は、そのまま「同じ処理が N 倍速い」とは言えません。**
+  レポートは一致しないクエリに印を付けます。実装を変えた結果として出すなら、
+  新しい応答が正しいことを確かめてから、変わった点と併せて書いてください。
+- 接続は環境ごとに keep-alive で使い回し、1 反復ごとに環境の順番を入れ替えます。
+  TLS ハンドシェイクの費用は warmup 分に吸われ、ネットワークの揺らぎは片方に偏りません。
 
 ## compute_average_distance.py
 
