@@ -39,6 +39,12 @@ jobs:
     name: Build data and worker
     runs-on: ubuntu-latest
 
+    # ODPT_ACCESS_TOKEN は環境 Secret なので、environment を宣言しないと空のまま
+    # 走り、トークンが要るバスフィード (西武・京王・東急とそのコミュニティ路線) が
+    # すべて 403 で落ちる。preprocessor は警告を出して続行するため、欠損した
+    # データのままビルドが緑で通ってしまう。deploy と同じ規則で環境を選ぶ。
+    environment: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
+
     env:
       # トークンが無ければトークン不要のフィード (都営バス) だけが取り込まれ、
       # 他は警告を出してスキップされる。バスごと外したい場合は
@@ -46,7 +52,12 @@ jobs:
       ODPT_ACCESS_TOKEN: ${{ secrets.ODPT_ACCESS_TOKEN }}
 
     steps:
+      # checkout は既定で GITHUB_TOKEN を .git/config に残す。後続の
+      # cargo install / npx は取得したパッケージのコードを実行するため、
+      # 読み取られうる。どちらのジョブも checkout 後に git 認証を使わない。
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install wasm target
         run: rustup target add wasm32-unknown-unknown
@@ -143,7 +154,12 @@ jobs:
       TARGET_ENV: ${{ github.ref == 'refs/heads/master' && 'production' || '' }}
 
     steps:
+      # checkout は既定で GITHUB_TOKEN を .git/config に残す。後続の
+      # cargo install / npx は取得したパッケージのコードを実行するため、
+      # 読み取られうる。どちらのジョブも checkout 後に git 認証を使わない。
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install wasm target
         run: rustup target add wasm32-unknown-unknown
