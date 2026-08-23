@@ -950,8 +950,14 @@ where
             entity_type: "line group",
             entity_id: "unspecified".to_string(),
         })?;
+        // 系統の停車駅は付帯情報を付ける前に取り、要求された区間へ切り詰めてから
+        // 付帯情報を付ける。付帯情報の付与 (所属路線・事業者・種別・近傍バス路線)
+        // は駅ごとに独立しているため、切り詰めてから付けても各駅の内容は変わらない。
+        // 先に系統全体へ付けると、3 駅だけを要求されても 250 駅ぶんを組み立てる
+        // ことになり、区間の長さに関係なく同じ費用が掛かっていた。
         let stations = self
-            .get_stations_by_line_group_id(line_group_id, TransportTypeFilter::RailAndBus)
+            .station_repository
+            .get_by_line_group_id(line_group_id)
             .await?;
 
         let from_idx = stations
@@ -976,6 +982,14 @@ where
             v.reverse();
             v
         };
+        let sliced = self
+            .update_station_vec_with_attributes(
+                sliced,
+                Some(line_group_id),
+                TransportTypeFilter::RailAndBus,
+                false,
+            )
+            .await?;
 
         let mut segments: Vec<model::TrainRouteSegment> = Vec::with_capacity(sliced.len());
         // 経路スライス内で路線ごとに通過駅があるか。通過駅が無い路線では優等種別でも
@@ -1463,10 +1477,11 @@ where
         &self,
         coords: &[(u32, f64, f64)],
         limit_per_station: u32,
+        radius_meters: f64,
     ) -> Result<Vec<(u32, Station)>, UseCaseError> {
         let result = self
             .station_repository
-            .get_bus_stops_near_stations(coords, limit_per_station)
+            .get_bus_stops_near_stations(coords, limit_per_station, radius_meters)
             .await?;
 
         Ok(result)
@@ -1519,6 +1534,29 @@ where
             vec![]
         };
 
+        // 候補は駅グループごとに 1 つの代表座標で引くが、採否は駅ごとの座標で
+        // 決まる。代表座標と各駅の座標の隔たりぶんを半径に足しておかないと、
+        // 代表からは半径の外だが同じグループの別の駅からは内側、というバス停を
+        // 取りこぼす。
+        let bus_search_radius_meters = if should_include_bus_routes {
+            let anchors: HashMap<i32, (f64, f64)> = unique_bus_coords
+                .iter()
+                .map(|&(group_id, lat, lon)| (group_id as i32, (lat, lon)))
+                .collect();
+            let max_offset = stations
+                .iter()
+                .filter(|s| s.transport_type == TransportType::Rail)
+                .filter_map(|s| {
+                    anchors
+                        .get(&s.station_g_cd)
+                        .map(|&(lat, lon)| haversine_distance(lat, lon, s.lat, s.lon))
+                })
+                .fold(0.0_f64, f64::max);
+            NEARBY_BUS_STOP_RADIUS_METERS + max_offset
+        } else {
+            0.0
+        };
+
         // Phase 1: independent lookups in parallel.
         // When skip_types_join is true, skip the expensive train-type lookups
         // (used by the lineListStations query).
@@ -1528,14 +1566,22 @@ where
                 // Group stations already fetched by expanded primary query
                 let (lines, bus) = tokio::try_join!(
                     self.get_lines_by_station_group_id_vec_no_types(&station_group_ids),
-                    self.get_bus_stops_near_stations(&unique_bus_coords, 50),
+                    self.get_bus_stops_near_stations(
+                        &unique_bus_coords,
+                        50,
+                        bus_search_radius_meters
+                    ),
                 )?;
                 (prefetched, lines, bus)
             } else {
                 tokio::try_join!(
                     self.get_stations_by_group_id_vec_no_types(&station_group_ids),
                     self.get_lines_by_station_group_id_vec_no_types(&station_group_ids),
-                    self.get_bus_stops_near_stations(&unique_bus_coords, 50),
+                    self.get_bus_stops_near_stations(
+                        &unique_bus_coords,
+                        50,
+                        bus_search_radius_meters
+                    ),
                 )?
             }
         } else {
@@ -1544,7 +1590,7 @@ where
                 self.get_lines_by_station_group_id_vec(&station_group_ids),
             )?;
             let bus = self
-                .get_bus_stops_near_stations(&unique_bus_coords, 50)
+                .get_bus_stops_near_stations(&unique_bus_coords, 50, bus_search_radius_meters)
                 .await?;
             (s, l, bus)
         };
@@ -1559,10 +1605,25 @@ where
                 .push(station);
         }
 
-        // Collect all bus station group IDs for batch bus lines fetch
-        let mut all_bus_station_group_ids: Vec<u32> = bus_candidate_cache
-            .values()
-            .flat_map(|stops| stops.iter().map(|s| s.station_g_cd as u32))
+        // Collect all bus station group IDs for batch bus lines fetch.
+        // 候補は駅グループの代表座標で引いた最寄り N 件なので、実際に採用される
+        // のは各駅の座標から NEARBY_BUS_STOP_RADIUS_METERS 以内のものだけ。
+        // ここで先に絞らないと、採用されないバス停の駅グループぶんまで路線を
+        // 引くことになり、経路が長いほど無駄が (駅数 × N) で効く。
+        // 採否の判定は下の駅ごとのループと同じ式を使う。
+        let mut all_bus_station_group_ids: Vec<u32> = stations
+            .iter()
+            .filter(|s| s.transport_type == TransportType::Rail)
+            .filter_map(|s| bus_candidate_cache.get(&s.station_g_cd).map(|c| (s, c)))
+            .flat_map(|(station, candidates)| {
+                candidates
+                    .iter()
+                    .filter(move |bus_stop| {
+                        haversine_distance(station.lat, station.lon, bus_stop.lat, bus_stop.lon)
+                            <= NEARBY_BUS_STOP_RADIUS_METERS
+                    })
+                    .map(|bus_stop| bus_stop.station_g_cd as u32)
+            })
             .collect::<std::collections::HashSet<_>>()
             .into_iter()
             .collect();
@@ -2312,6 +2373,7 @@ mod tests {
                 &self,
                 _: &[(u32, f64, f64)],
                 _: u32,
+                _: f64,
             ) -> Result<Vec<(u32, Station)>, DomainError> {
                 Ok(vec![])
             }
@@ -3163,6 +3225,7 @@ mod tests {
                 &self,
                 _: &[(u32, f64, f64)],
                 _: u32,
+                _: f64,
             ) -> Result<Vec<(u32, Station)>, DomainError> {
                 Ok(vec![])
             }
@@ -3632,6 +3695,7 @@ mod tests {
                 &self,
                 coords: &[(u32, f64, f64)],
                 limit_per_station: u32,
+                _: f64,
             ) -> Result<Vec<(u32, Station)>, DomainError> {
                 let mut result = Vec::new();
                 for &(source_g_cd, lat, lon) in coords {
@@ -5090,6 +5154,7 @@ mod tests {
                 &self,
                 _: &[(u32, f64, f64)],
                 _: u32,
+                _: f64,
             ) -> Result<Vec<(u32, Station)>, DomainError> {
                 Ok(vec![])
             }
@@ -5385,6 +5450,436 @@ mod tests {
             let routes = interactor.get_routes(1, 3, None).await.unwrap();
 
             assert!(routes.is_empty());
+        }
+    }
+
+    /// `get_train_route` は要求された区間ぶんだけ付帯情報を組み立てる。
+    /// 系統全体へ付けてから切り出していた頃は、3 駅を要求しても系統の全駅を
+    /// 組み立てていた。区間の長さに費用が比例することをここで固定する。
+    mod get_train_route_tests {
+        use super::*;
+        use crate::domain::{
+            entity::company::Company,
+            error::DomainError,
+            repository::{
+                company_repository::CompanyRepository, line_repository::LineRepository,
+                station_repository::StationRepository, train_type_repository::TrainTypeRepository,
+            },
+        };
+        use std::sync::{Arc, Mutex};
+
+        /// 呼び出し内容の記録。テスト側と repository で共有する。
+        #[derive(Clone, Default)]
+        struct Calls {
+            enriched_group_ids: Arc<Mutex<Vec<Vec<u32>>>>,
+            bus_coord_counts: Arc<Mutex<Vec<usize>>>,
+            bus_radii: Arc<Mutex<Vec<f64>>>,
+        }
+
+        /// 系統の停車駅を返し、付帯情報の付与で要求された駅グループ ID を記録する
+        struct RecordingStationRepository {
+            line_group_stations: Vec<Station>,
+            calls: Calls,
+        }
+
+        #[async_trait::async_trait]
+        impl StationRepository for RecordingStationRepository {
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
+                Ok(self.line_group_stations.clone())
+            }
+            async fn get_by_station_group_id_vec(
+                &self,
+                ids: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                self.calls
+                    .enriched_group_ids
+                    .lock()
+                    .unwrap()
+                    .push(ids.to_vec());
+                Ok(self
+                    .line_group_stations
+                    .iter()
+                    .filter(|s| ids.contains(&(s.station_g_cd as u32)))
+                    .cloned()
+                    .collect())
+            }
+            async fn get_bus_stops_near_stations(
+                &self,
+                coords: &[(u32, f64, f64)],
+                _: u32,
+                radius_meters: f64,
+            ) -> Result<Vec<(u32, Station)>, DomainError> {
+                self.calls
+                    .bus_coord_counts
+                    .lock()
+                    .unwrap()
+                    .push(coords.len());
+                self.calls.bus_radii.lock().unwrap().push(radius_meters);
+                Ok(vec![])
+            }
+            async fn find_by_id(&self, _: u32) -> Result<Option<Station>, DomainError> {
+                Ok(None)
+            }
+            async fn get_by_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_id(
+                &self,
+                _: u32,
+                _: Option<u32>,
+                _: Option<u32>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_id_vec_with_group_stations(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec_no_types(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_coordinates(
+                &self,
+                _: f64,
+                _: f64,
+                _: Option<u32>,
+                _: Option<TransportType>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_name(
+                &self,
+                _: String,
+                _: Option<u32>,
+                _: Option<u32>,
+                _: Option<TransportType>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_route_stops(
+                &self,
+                _: u32,
+                _: u32,
+                _: &[u32],
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_route_stops_by_station_cd(
+                &self,
+                _: u32,
+                _: u32,
+                _: &[u32],
+                _: Option<u32>,
+            ) -> Result<Vec<Station>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        struct StubLineRepository;
+
+        #[async_trait::async_trait]
+        impl LineRepository for StubLineRepository {
+            async fn find_by_id(&self, _: u32) -> Result<Option<Line>, DomainError> {
+                Ok(None)
+            }
+            async fn find_by_station_id(&self, _: u32) -> Result<Option<Line>, DomainError> {
+                Ok(None)
+            }
+            async fn get_by_ids(&self, _: &[u32]) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id(&self, _: u32) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_group_id_vec_no_types(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id_vec(&self, _: &[u32]) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id_vec_for_routes(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_name(
+                &self,
+                _: String,
+                _: Option<u32>,
+            ) -> Result<Vec<Line>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        /// 区間内の駅に種別を付ける。優等種別 (kind = 3) を返す。
+        struct StubTrainTypeRepository;
+
+        #[async_trait::async_trait]
+        impl TrainTypeRepository for StubTrainTypeRepository {
+            async fn get_types_by_station_id_vec(
+                &self,
+                station_id_vec: &[u32],
+                _: Option<u32>,
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(station_id_vec
+                    .iter()
+                    .map(|&cd| TrainType {
+                        id: Some(cd as i32),
+                        station_cd: Some(cd as i32),
+                        type_cd: Some(1),
+                        line_group_cd: Some(1000),
+                        pass: None,
+                        type_name: "急行".to_string(),
+                        type_name_k: "キュウコウ".to_string(),
+                        type_name_r: None,
+                        type_name_zh: None,
+                        type_name_ko: None,
+                        color: "#FF0000".to_string(),
+                        direction: None,
+                        kind: Some(3),
+                        line: None,
+                        lines: vec![],
+                    })
+                    .collect())
+            }
+            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_id(&self, _: u32) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_station_id_vec(
+                &self,
+                _: &[u32],
+                _: Option<u32>,
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_by_line_group_id_vec(
+                &self,
+                _: &[u32],
+            ) -> Result<Vec<TrainType>, DomainError> {
+                Ok(vec![])
+            }
+            async fn get_line_group_ids_by_station_group_ids(
+                &self,
+                _: &[u32],
+            ) -> Result<std::collections::HashMap<u32, Vec<u32>>, DomainError> {
+                Ok(std::collections::HashMap::new())
+            }
+            async fn find_by_line_group_id_and_line_id(
+                &self,
+                _: u32,
+                _: u32,
+            ) -> Result<Option<TrainType>, DomainError> {
+                Ok(None)
+            }
+            async fn find_by_line_group_id_and_line_id_vec(
+                &self,
+                _: &[(u32, u32)],
+            ) -> Result<std::collections::HashMap<(u32, u32), TrainType>, DomainError> {
+                Ok(std::collections::HashMap::new())
+            }
+        }
+
+        struct StubCompanyRepository;
+
+        #[async_trait::async_trait]
+        impl CompanyRepository for StubCompanyRepository {
+            async fn find_by_id_vec(&self, _: &[u32]) -> Result<Vec<Company>, DomainError> {
+                Ok(vec![])
+            }
+        }
+
+        type TestInteractor = QueryInteractor<
+            RecordingStationRepository,
+            StubLineRepository,
+            StubTrainTypeRepository,
+            StubCompanyRepository,
+        >;
+
+        /// 20 駅の系統を作る。うち 1 駅おきに通過駅を混ぜる。
+        fn build_line_group(len: i32) -> Vec<Station> {
+            (0..len)
+                .map(|i| {
+                    let cd = 1000 + i;
+                    let mut station = create_test_station(cd, 2000 + i, 10, Some(1000));
+                    // 東京駅から北へ 1km 刻みに並べる
+                    station.lat = 35.6812 + f64::from(i) * 0.009;
+                    station.lon = 139.7671;
+                    if i % 2 == 1 {
+                        station.stop_condition = StopCondition::Not;
+                        station.pass = Some(1);
+                    }
+                    station
+                })
+                .collect()
+        }
+
+        fn build_interactor(stations: Vec<Station>) -> (TestInteractor, Calls) {
+            let calls = Calls::default();
+            let interactor = QueryInteractor {
+                station_repository: RecordingStationRepository {
+                    line_group_stations: stations,
+                    calls: calls.clone(),
+                },
+                line_repository: StubLineRepository,
+                train_type_repository: StubTrainTypeRepository,
+                company_repository: StubCompanyRepository,
+            };
+            (interactor, calls)
+        }
+
+        #[tokio::test]
+        async fn enriches_only_the_requested_range() {
+            let (interactor, calls) = build_interactor(build_line_group(20));
+
+            let segments = interactor
+                .get_train_route(1002, 1004, Some(1000))
+                .await
+                .unwrap();
+
+            assert_eq!(segments.len(), 3);
+            let enriched = calls.enriched_group_ids.lock().unwrap();
+            assert_eq!(enriched.len(), 1);
+            // 系統は 20 駅だが、付帯情報を求めたのは要求された 3 駅ぶんだけ
+            assert_eq!(enriched[0], vec![2002, 2003, 2004]);
+            // 近傍バス停の検索も同じ 3 駅ぶん
+            assert_eq!(*calls.bus_coord_counts.lock().unwrap(), vec![3]);
+        }
+
+        #[tokio::test]
+        async fn returns_the_range_reversed_when_going_backwards() {
+            let (interactor, calls) = build_interactor(build_line_group(20));
+
+            let segments = interactor
+                .get_train_route(1004, 1002, Some(1000))
+                .await
+                .unwrap();
+
+            let ids: Vec<u32> = segments
+                .iter()
+                .filter_map(|s| s.station.as_ref().map(|st| st.id))
+                .collect();
+            assert_eq!(ids, vec![1004, 1003, 1002]);
+            assert_eq!(
+                calls.enriched_group_ids.lock().unwrap()[0],
+                vec![2002, 2003, 2004]
+            );
+        }
+
+        /// 付帯情報 (列車種別) が区間の駅に載っていること。載っていないと
+        /// 速度プロファイルが各停へ落ちる。
+        #[tokio::test]
+        async fn keeps_train_type_driven_speed_profile() {
+            let (interactor, _) = build_interactor(build_line_group(20));
+
+            let segments = interactor
+                .get_train_route(1002, 1006, Some(1000))
+                .await
+                .unwrap();
+
+            assert_eq!(segments.len(), 5);
+            // 端点は必ず停車、内側の奇数番は通過
+            assert!(segments[0].stops);
+            assert!(!segments[1].stops);
+            assert!(segments[4].stops);
+            // 通過駅があるので優等種別の速度が使われる (各停より速い)
+            let local = segments
+                .iter()
+                .map(|s| s.max_speed)
+                .fold(f64::MIN, f64::max);
+            assert!(local > 0.0);
+            // 先頭は起点なので前駅からの距離は 0
+            assert_eq!(segments[0].distance_from_previous, 0.0);
+            assert!(segments[1].distance_from_previous > 0.0);
+        }
+
+        /// 近傍バス停の探索半径には、駅グループの代表座標と各駅の座標の隔たりを
+        /// 足す。足さないと、代表からは 300m を超えるが同じグループの別の駅からは
+        /// 300m 以内、というバス停を取りこぼす。
+        #[tokio::test]
+        async fn widens_the_bus_search_radius_by_the_station_group_offset() {
+            let mut stations = build_line_group(4);
+            // 3 駅目を 1 駅目と同じ駅グループにし、150m ほど離して置く
+            stations[2].station_g_cd = stations[0].station_g_cd;
+            stations[2].lat = stations[0].lat + 0.00135;
+            stations[2].lon = stations[0].lon;
+            let offset = haversine_distance(
+                stations[0].lat,
+                stations[0].lon,
+                stations[2].lat,
+                stations[2].lon,
+            );
+            assert!(offset > 100.0, "前提: 2 駅は 100m 以上離れている");
+            let (interactor, calls) = build_interactor(stations);
+
+            interactor
+                .get_train_route(1000, 1003, Some(1000))
+                .await
+                .unwrap();
+
+            let radii = calls.bus_radii.lock().unwrap();
+            assert_eq!(radii.len(), 1);
+            assert!(
+                (radii[0] - (NEARBY_BUS_STOP_RADIUS_METERS + offset)).abs() < 1e-6,
+                "探索半径 {} が 300m + 代表座標からの隔たり {offset} になっていない",
+                radii[0]
+            );
+        }
+
+        #[tokio::test]
+        async fn errors_when_the_station_is_not_on_the_route() {
+            let (interactor, _) = build_interactor(build_line_group(20));
+
+            let err = interactor
+                .get_train_route(1002, 9999, Some(1000))
+                .await
+                .unwrap_err();
+
+            assert!(matches!(err, UseCaseError::NotFound { .. }));
+        }
+
+        #[tokio::test]
+        async fn errors_when_the_line_group_is_unspecified() {
+            let (interactor, _) = build_interactor(build_line_group(20));
+
+            let err = interactor
+                .get_train_route(1002, 1004, None)
+                .await
+                .unwrap_err();
+
+            assert!(matches!(err, UseCaseError::NotFound { .. }));
         }
     }
 }

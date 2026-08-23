@@ -82,10 +82,15 @@ pub trait StationRepository: Send + Sync + 'static {
             })
             .collect())
     }
+    /// 各座標から `radius_meters` 以内のバス停を、近い順に最大
+    /// `limit_per_station` 件返す。半径の外は呼び出し側でも採用されないため、
+    /// ここで切っておく (全国の最寄り N 件を作ってから捨てると、駅数に比例して
+    /// 無駄が積み上がる)。
     async fn get_bus_stops_near_stations(
         &self,
         coords: &[(u32, f64, f64)], // (station_g_cd, lat, lon)
         limit_per_station: u32,
+        radius_meters: f64,
     ) -> Result<Vec<(u32, Station)>, DomainError>;
     async fn get_route_stops(
         &self,
@@ -265,6 +270,7 @@ mod tests {
             &self,
             coords: &[(u32, f64, f64)],
             limit_per_station: u32,
+            radius_meters: f64,
         ) -> Result<Vec<(u32, Station)>, DomainError> {
             let mut result = Vec::new();
             for &(source_g_cd, lat, lon) in coords {
@@ -272,6 +278,9 @@ mod tests {
                     .get_by_coordinates(lat, lon, Some(limit_per_station), Some(TransportType::Bus))
                     .await?;
                 for stop in stops {
+                    if stop.distance.is_some_and(|d| d > radius_meters) {
+                        continue;
+                    }
                     result.push((source_g_cd, stop));
                 }
             }

@@ -322,20 +322,24 @@ impl StationRepository for MemStationRepository {
             .collect())
     }
 
-    /// 各座標につきバス停の最寄り N 件を取り、そのあと有効な路線を持つものだけに絞る。
-    /// 先に路線で絞ると件数が変わるため、この順序を保つ。
+    /// 各座標につき半径以内のバス停を近い順に N 件取り、そのあと有効な路線を
+    /// 持つものだけに絞る。先に路線で絞ると件数が変わるため、この順序を保つ。
     /// 並びは指定された座標の順、その中では距離順。
     async fn get_bus_stops_near_stations(
         &self,
         coords: &[(u32, f64, f64)],
         limit_per_station: u32,
+        radius_meters: f64,
     ) -> Result<Vec<(u32, Station)>, DomainError> {
-        let want = Some(TransportType::Bus as i32);
+        let want = TransportType::Bus as i32;
         let limit = limit_per_station as usize;
+        let radius_km = radius_meters / 1000.0;
         let mut out = Vec::new();
 
         for &(source_g_cd, lat, lon) in coords {
-            for (record, _distance) in index::nearest_without_line_join(lat, lon, limit, want) {
+            let mut hits = index::within_radius(lat, lon, radius_km, want);
+            hits.truncate(limit);
+            for (record, _distance) in hits {
                 let Some(line) = index::line_by_cd(record.line_cd) else {
                     continue;
                 };
@@ -930,10 +934,14 @@ pub struct MemCompanyRepository;
 
 #[async_trait]
 impl CompanyRepository for MemCompanyRepository {
+    /// 事業者は 179 件と少ないが、駅ごとの付帯情報を組み立てるたびに呼ばれる。
+    /// `id_vec.contains` のままだと 1 回の呼び出しで (事業者数 × 要求 ID 数) の
+    /// 比較になるため、集合に入れてから引く。
     async fn find_by_id_vec(&self, id_vec: &[u32]) -> Result<Vec<Company>, DomainError> {
+        let wanted: HashSet<u32> = id_vec.iter().copied().collect();
         Ok(index::companies()
             .iter()
-            .filter(|c| id_vec.contains(&(c.company_cd as u32)))
+            .filter(|c| wanted.contains(&(c.company_cd as u32)))
             .cloned()
             .collect())
     }

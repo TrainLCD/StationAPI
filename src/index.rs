@@ -453,12 +453,14 @@ fn build_companies() -> Vec<Company> {
 
 // ---------------------------------------------------------------- 検索
 
+/// 地球半径 (km)。距離計算と探索範囲の見積もりで同じ値を使う。
+const EARTH_RADIUS_KM: f64 = 6371.0;
+
 /// 球面距離 (km)。
 ///
 /// 度単位のユークリッド距離だと緯度と経度を同じスケールで扱うことになり、
 /// 東西方向を過大評価する。ここでは実距離で並べる。
 pub fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
-    const EARTH_RADIUS_KM: f64 = 6371.0;
     let (p1, p2) = (lat1.to_radians(), lat2.to_radians());
     let dlat = (lat2 - lat1).to_radians();
     let dlon = (lon2 - lon1).to_radians();
@@ -466,7 +468,195 @@ pub fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
     2.0 * EARTH_RADIUS_KM * a.sqrt().clamp(-1.0, 1.0).asin()
 }
 
-/// 全件走査で最近傍 limit 件を返す。11,148 駅なので索引なしで十分速い。
+/// グリッド 1 マスの一辺 (度)。約 5.5km 四方。
+/// 細かくするとマスの数 (= 索引の大きさ) が増え、粗くすると 1 マスあたりの
+/// 走査件数が増える。近傍バス停の検索 (半径 300m) が 1 マスで収まる大きさ。
+const GRID_CELL_DEG: f64 = 0.05;
+/// 最初に見る半径 (km)。市街地ならこの範囲で近傍バス停 50 件がそろう。
+const INITIAL_SEARCH_RADIUS_KM: f64 = 1.0;
+/// 半径の内側で件数が足りなかったときに広げる倍率。
+const SEARCH_RADIUS_GROWTH: f64 = 4.0;
+
+fn cell_index(deg: f64) -> i32 {
+    (deg / GRID_CELL_DEG).floor() as i32
+}
+
+/// 駅を緯度経度のマスへ割り当てた索引。
+///
+/// 全件走査だと 1 回の近傍検索で駅の総数ぶん距離を計算することになる。
+/// `trainRoute` は経路上の駅ごとに近傍バス停を引くため、経路が長いほど
+/// (駅数 × 駅総数) で効いていた。マスに区切っておけば探索半径の内側だけで済む。
+///
+/// 添字は `stations()` のもの。CSR 形式で、`offsets[c]..offsets[c + 1]` が
+/// マス c に属する駅の `items` 上の範囲を表す。
+struct Grid {
+    min_i: i32,
+    min_j: i32,
+    rows: usize,
+    cols: usize,
+    offsets: Vec<u32>,
+    items: Vec<u32>,
+}
+
+impl Grid {
+    fn empty() -> Self {
+        Grid {
+            min_i: 0,
+            min_j: 0,
+            rows: 0,
+            cols: 0,
+            offsets: vec![0],
+            items: Vec::new(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    fn build(want: i32) -> Self {
+        let members: Vec<u32> = stations()
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.e_status == 0 && s.transport_type as i32 == want)
+            .map(|(i, _)| i as u32)
+            .collect();
+        if members.is_empty() {
+            return Grid::empty();
+        }
+
+        let (mut min_i, mut max_i) = (i32::MAX, i32::MIN);
+        let (mut min_j, mut max_j) = (i32::MAX, i32::MIN);
+        for &m in &members {
+            let s = &stations()[m as usize];
+            let (i, j) = (cell_index(s.lat), cell_index(s.lon));
+            min_i = min_i.min(i);
+            max_i = max_i.max(i);
+            min_j = min_j.min(j);
+            max_j = max_j.max(j);
+        }
+        let rows = (max_i - min_i + 1) as usize;
+        let cols = (max_j - min_j + 1) as usize;
+
+        // 度数分布 -> 累積和 -> 配置の 3 パスで CSR を組む
+        let mut offsets = vec![0u32; rows * cols + 1];
+        let cell_of = |s: &StationRecord| -> usize {
+            let i = (cell_index(s.lat) - min_i) as usize;
+            let j = (cell_index(s.lon) - min_j) as usize;
+            i * cols + j
+        };
+        for &m in &members {
+            offsets[cell_of(&stations()[m as usize]) + 1] += 1;
+        }
+        for c in 0..rows * cols {
+            offsets[c + 1] += offsets[c];
+        }
+        let mut cursor = offsets.clone();
+        let mut items = vec![0u32; members.len()];
+        for &m in &members {
+            let c = cell_of(&stations()[m as usize]);
+            items[cursor[c] as usize] = m;
+            cursor[c] += 1;
+        }
+
+        Grid {
+            min_i,
+            min_j,
+            rows,
+            cols,
+            offsets,
+            items,
+        }
+    }
+
+    /// 半径 radius_km の円を必ず覆うマスの範囲 (両端を含む) を返す。
+    ///
+    /// 緯度差だけの距離は `EARTH_RADIUS_KM * Δφ` なので、そこから緯度の幅を出す。
+    /// 経度差だけの距離は両端の緯度が高いほど短くなるため、探索帯のうち最も
+    /// 極に近い緯度で見積もって幅を広めに取る。
+    fn range(&self, lat: f64, lon: f64, radius_km: f64) -> (i32, i32, i32, i32) {
+        let dlat_deg = (radius_km / EARTH_RADIUS_KM).to_degrees();
+        let cos_phi = (lat.abs() + dlat_deg).min(90.0).to_radians().cos();
+        let sin_half = radius_km / (2.0 * EARTH_RADIUS_KM * cos_phi);
+        // cos_phi が 0 付近 (極) だと経度は絞れない。そのときは全周を見る。
+        let dlon_deg = if cos_phi <= 0.0 || !sin_half.is_finite() || sin_half >= 1.0 {
+            180.0
+        } else {
+            2.0 * sin_half.asin().to_degrees()
+        };
+        // 日付変更線をまたぐ範囲は 2 本の区間になる。分割して扱う価値がある
+        // データ (日本) ではないので、その場合は経度を絞らず全周を見る。
+        // 絞り込みを諦めるだけなので取りこぼしは起きない。
+        let (j0, j1) = if dlon_deg >= 180.0 || lon - dlon_deg < -180.0 || lon + dlon_deg > 180.0 {
+            (i32::MIN, i32::MAX)
+        } else {
+            (cell_index(lon - dlon_deg), cell_index(lon + dlon_deg))
+        };
+        (
+            cell_index(lat - dlat_deg),
+            cell_index(lat + dlat_deg),
+            j0,
+            j1,
+        )
+    }
+
+    /// この半径で索引の全域を覆うか。覆っていればこれ以上広げても増えない。
+    fn covers_all(&self, lat: f64, lon: f64, radius_km: f64) -> bool {
+        let (i0, i1, j0, j1) = self.range(lat, lon, radius_km);
+        i0 <= self.min_i
+            && i1 >= self.min_i + self.rows as i32 - 1
+            && j0 <= self.min_j
+            && j1 >= self.min_j + self.cols as i32 - 1
+    }
+
+    /// 半径 radius_km の円を覆うマスに属する駅を渡す。円の外の駅も混ざる。
+    fn for_each_near(
+        &self,
+        lat: f64,
+        lon: f64,
+        radius_km: f64,
+        mut f: impl FnMut(&'static StationRecord),
+    ) {
+        if self.is_empty() {
+            return;
+        }
+        let (i0, i1, j0, j1) = self.range(lat, lon, radius_km);
+        let i0 = i0.max(self.min_i);
+        let i1 = i1.min(self.min_i + self.rows as i32 - 1);
+        let j0 = j0.max(self.min_j);
+        let j1 = j1.min(self.min_j + self.cols as i32 - 1);
+        for i in i0..=i1 {
+            let row = (i - self.min_i) as usize * self.cols;
+            for j in j0..=j1 {
+                let c = row + (j - self.min_j) as usize;
+                for &m in &self.items[self.offsets[c] as usize..self.offsets[c + 1] as usize] {
+                    f(&stations()[m as usize]);
+                }
+            }
+        }
+    }
+}
+
+/// 種別ごとのグリッド。TransportType は 0 = 鉄道 / 1 = バスの 2 値。
+static GRIDS: OnceLock<[Grid; 2]> = OnceLock::new();
+
+fn grid_of(want: i32) -> &'static Grid {
+    let grids = GRIDS.get_or_init(|| {
+        [
+            Grid::build(TransportType::Rail as i32),
+            Grid::build(TransportType::Bus as i32),
+        ]
+    });
+    match want {
+        w if w == TransportType::Bus as i32 => &grids[1],
+        w if w == TransportType::Rail as i32 => &grids[0],
+        _ => EMPTY_GRID.get_or_init(Grid::empty),
+    }
+}
+
+static EMPTY_GRID: OnceLock<Grid> = OnceLock::new();
+
+/// 最近傍 limit 件を返す。路線を引けない駅は除く。
 ///
 /// `want` は種別の絞り込み。未指定 (RailAndBus) のときは
 /// 鉄道を先・バスを後に並べたうえで距離順になる。
@@ -476,57 +666,106 @@ pub fn nearest(
     limit: usize,
     want: Option<i32>,
 ) -> Vec<(&'static StationRecord, f64)> {
-    nearest_inner(lat, lon, limit, want, true)
-}
-
-/// 路線の存在を条件にしないまま最近傍を取る。
-///
-/// 近傍バス停の検索は先に件数を絞ってから路線の有無を見る。
-/// 先に路線で絞ると件数が変わるため、この順序を保つ用途で使う。
-pub fn nearest_without_line_join(
-    lat: f64,
-    lon: f64,
-    limit: usize,
-    want: Option<i32>,
-) -> Vec<(&'static StationRecord, f64)> {
-    nearest_inner(lat, lon, limit, want, false)
-}
-
-fn nearest_inner(
-    lat: f64,
-    lon: f64,
-    limit: usize,
-    want: Option<i32>,
-    require_line: bool,
-) -> Vec<(&'static StationRecord, f64)> {
-    let mut scored: Vec<(&StationRecord, f64)> = stations()
-        .iter()
-        .filter(|s| s.e_status == 0)
-        .filter(|s| !require_line || joins_line(s))
-        .filter(|s| want.is_none_or(|w| s.transport_type as i32 == w))
-        .map(|s| (s, haversine_km(lat, lon, s.lat, s.lon)))
-        .collect();
-
-    // 種別指定がある場合は第1キーが定数 0 になるので距離だけで並ぶ
-    let rank = move |s: &StationRecord| -> i32 {
-        if want.is_none() {
-            s.transport_type as i32
-        } else {
-            0
+    let Some(want) = want else {
+        // 種別未指定の並びは (transport_type 昇順, 距離昇順)。鉄道が全て
+        // バスより前に来るので、鉄道だけで limit 件そろえば以降は見なくてよい。
+        let mut out = nearest_of_type(lat, lon, limit, TransportType::Rail as i32);
+        if out.len() < limit {
+            let rest = limit - out.len();
+            out.extend(nearest_of_type(lat, lon, rest, TransportType::Bus as i32));
         }
+        return out;
     };
-    let cmp = move |a: &(&StationRecord, f64), b: &(&StationRecord, f64)| {
-        rank(a.0)
-            .cmp(&rank(b.0))
-            .then_with(|| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-    };
-    // 全体ソートを避け、上位 limit 件だけを確定させる
-    if limit < scored.len() {
-        scored.select_nth_unstable_by(limit, cmp);
-        scored.truncate(limit);
+    nearest_of_type(lat, lon, limit, want)
+}
+
+/// 距離の昇順、同着なら station_cd の昇順。
+///
+/// 同じ駅グループの駅は路線ごとに行が分かれるうえ座標を共有するため、距離だけで
+/// 並べると同着が多数出る。以前は不安定ソートに任せていたので、どの路線の行が
+/// 先に来るかがビルドごとに変わり得た。並びを決め切っておく。
+fn by_distance_then_station_cd(
+    a: &(&'static StationRecord, f64),
+    b: &(&'static StationRecord, f64),
+) -> std::cmp::Ordering {
+    a.1.partial_cmp(&b.1)
+        .unwrap_or(std::cmp::Ordering::Equal)
+        .then_with(|| a.0.station_cd.cmp(&b.0.station_cd))
+}
+
+/// 半径 radius_km 以内の駅を距離の昇順で返す。件数の上限は掛けない。
+///
+/// 「上位 N 件」ではなく半径で切る用途 (駅の近傍バス停) 向け。最寄り N 件を
+/// 作ってから半径で捨てると、採用されない駅の分まで組み立てることになる。
+/// `nearest` と違い、路線を引けるかどうかは見ない (呼び出し側が
+/// 件数を確定させてから路線で絞るため)。
+pub fn within_radius(
+    lat: f64,
+    lon: f64,
+    radius_km: f64,
+    want: i32,
+) -> Vec<(&'static StationRecord, f64)> {
+    let mut out: Vec<(&'static StationRecord, f64)> = Vec::new();
+    if radius_km < 0.0 {
+        return out;
     }
-    scored.sort_unstable_by(cmp);
-    scored
+    grid_of(want).for_each_near(lat, lon, radius_km, |record| {
+        let distance = haversine_km(lat, lon, record.lat, record.lon);
+        if distance <= radius_km {
+            out.push((record, distance));
+        }
+    });
+    out.sort_unstable_by(by_distance_then_station_cd);
+    out
+}
+
+/// 指定した種別の駅から最近傍 limit 件を距離昇順で返す。
+///
+/// 半径 r の範囲に limit 件そろえば、r より外に上位 limit 件は存在しない。
+/// そこでグリッド索引で半径 r の内側だけを見て、足りなければ r を広げる。
+/// 索引の外接矩形を覆っても足りなければ、その種別の全件がそろっている。
+fn nearest_of_type(
+    lat: f64,
+    lon: f64,
+    limit: usize,
+    want: i32,
+) -> Vec<(&'static StationRecord, f64)> {
+    if limit == 0 {
+        return Vec::new();
+    }
+    let grid = grid_of(want);
+    if grid.is_empty() {
+        return Vec::new();
+    }
+
+    let mut radius_km = INITIAL_SEARCH_RADIUS_KM;
+    loop {
+        let covers_all = grid.covers_all(lat, lon, radius_km);
+        let mut scored: Vec<(&'static StationRecord, f64)> = Vec::new();
+        let mut within = 0usize;
+        grid.for_each_near(lat, lon, radius_km, |record| {
+            if !joins_line(record) {
+                return;
+            }
+            let distance = haversine_km(lat, lon, record.lat, record.lon);
+            if distance <= radius_km {
+                within += 1;
+            }
+            scored.push((record, distance));
+        });
+
+        // 半径の内側で limit 件そろっていれば、外側を見る必要はない。
+        // 覆い切った場合はそれ以上広げても増えないので打ち切る。
+        if within >= limit || covers_all {
+            if limit < scored.len() {
+                scored.select_nth_unstable_by(limit, by_distance_then_station_cd);
+                scored.truncate(limit);
+            }
+            scored.sort_unstable_by(by_distance_then_station_cd);
+            return scored;
+        }
+        radius_km *= SEARCH_RADIUS_GROWTH;
+    }
 }
 
 /// 駅名・読み・ローマ字・中国語・韓国語のいずれかへの部分一致で引く。
@@ -906,4 +1145,131 @@ pub fn apply_line_alias(line: &mut Line, station_cd: i32) {
     line.line_name_zh = pick(alias.line_name_zh.as_ref(), line.line_name_zh.clone());
     line.line_name_ko = pick(alias.line_name_ko.as_ref(), line.line_name_ko.clone());
     line.line_color_c = pick(alias.line_color_c.as_ref(), line.line_color_c.clone());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// グリッド索引の正解となる全件走査。索引を入れる前の実装そのもの。
+    fn nearest_by_full_scan(
+        lat: f64,
+        lon: f64,
+        limit: usize,
+        want: Option<i32>,
+    ) -> Vec<(&'static StationRecord, f64)> {
+        let mut scored: Vec<(&StationRecord, f64)> = stations()
+            .iter()
+            .filter(|s| s.e_status == 0)
+            .filter(|s| joins_line(s))
+            .filter(|s| want.is_none_or(|w| s.transport_type as i32 == w))
+            .map(|s| (s, haversine_km(lat, lon, s.lat, s.lon)))
+            .collect();
+
+        let rank = move |s: &StationRecord| -> i32 {
+            if want.is_none() {
+                s.transport_type as i32
+            } else {
+                0
+            }
+        };
+        let cmp = move |a: &(&StationRecord, f64), b: &(&StationRecord, f64)| {
+            rank(a.0)
+                .cmp(&rank(b.0))
+                .then_with(|| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+        };
+        if limit < scored.len() {
+            scored.select_nth_unstable_by(limit, cmp);
+            scored.truncate(limit);
+        }
+        scored.sort_unstable_by(cmp);
+        scored
+    }
+
+    fn assert_same_as_full_scan(lat: f64, lon: f64, limit: usize, want: Option<i32>) {
+        let expected = nearest_by_full_scan(lat, lon, limit, want);
+        let actual = nearest(lat, lon, limit, want);
+        assert_eq!(
+            expected.len(),
+            actual.len(),
+            "件数が違う ({lat}, {lon}) want={want:?} limit={limit}"
+        );
+        for (i, (e, a)) in expected.iter().zip(actual.iter()).enumerate() {
+            // 距離が同着の駅は全件走査側の並びが決まらないので距離だけを見る
+            assert!(
+                (e.1 - a.1).abs() < 1e-9,
+                "{i} 件目が違う ({lat}, {lon}) want={want:?} limit={limit}: \
+                 期待 {} 実際 {}",
+                e.1,
+                a.1
+            );
+        }
+    }
+
+    /// グリッド索引は全件走査と同じ結果を返す。
+    /// 索引の絞り込みが範囲を取りこぼすと最近傍が欠けるため、実データで突き合わせる。
+    #[test]
+    fn grid_search_matches_full_scan() {
+        // 実在の駅の座標を、データの大きさによらず 40 点ほど抜き出す
+        let step = (stations().len() / 40).max(1);
+        let sampled = stations().iter().step_by(step).map(|s| (s.lat, s.lon));
+        // 駅から離れた座標 (海上・国外)、および索引の外側
+        let outside = [
+            (35.0, 145.0),
+            (43.5, 141.0),
+            (26.2, 127.7),
+            (0.0, 0.0),
+            (51.5, -0.1),
+            (-33.9, 151.2),
+        ];
+        for (lat, lon) in sampled.chain(outside) {
+            for want in [None, Some(0), Some(1)] {
+                for limit in [1usize, 50] {
+                    assert_same_as_full_scan(lat, lon, limit, want);
+                }
+            }
+        }
+    }
+
+    /// 極や日付変更線の付近でも打ち切れること。
+    /// 経度の絞り込みが日付変更線をまたぐ場合、範囲が索引を覆えず
+    /// 半径を広げ続ける (無限ループになる) 経路があった。
+    #[test]
+    fn grid_search_terminates_at_the_poles_and_the_antimeridian() {
+        for (lat, lon) in [
+            (89.9, 179.9),
+            (-89.9, -179.9),
+            (89.9, -179.9),
+            (-89.9, 179.9),
+            (35.0, 179.99),
+            (35.0, -179.99),
+            (90.0, 0.0),
+            (-90.0, 0.0),
+        ] {
+            for want in [None, Some(0), Some(1)] {
+                assert_same_as_full_scan(lat, lon, 5, want);
+            }
+        }
+    }
+
+    /// 半径 0 件要求と、存在しない種別を渡した場合。
+    #[test]
+    fn grid_search_handles_degenerate_requests() {
+        assert!(nearest(35.681382, 139.766084, 0, None).is_empty());
+        assert!(nearest(35.681382, 139.766084, 5, Some(99)).is_empty());
+    }
+
+    /// 索引が返す距離は haversine_km と一致し、距離の昇順に並ぶ。
+    #[test]
+    fn grid_search_returns_sorted_distances() {
+        let hits = nearest(35.681382, 139.766084, 20, Some(TransportType::Rail as i32));
+        assert!(!hits.is_empty());
+        for pair in hits.windows(2) {
+            assert!(pair[0].1 <= pair[1].1, "距離の昇順になっていない");
+        }
+        for (record, distance) in &hits {
+            let expected = haversine_km(35.681382, 139.766084, record.lat, record.lon);
+            assert!((expected - distance).abs() < 1e-9);
+        }
+    }
 }
