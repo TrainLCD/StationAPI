@@ -14,7 +14,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 | 項目 | 既定値 / 推論元 |
 | ---- | ---- |
 | `base` | リポジトリの既定ブランチ（`gh repo view --json defaultBranchRef -q .defaultBranchRef.name`、StationAPI では通常 `dev`） |
-| `head` | 作業コミット `@` に最も近いローカルブックマーク（`jj log -r 'heads(::@ & bookmarks())' --no-graph -T 'local_bookmarks.map(\|b\| b.name()).join("\n")'`）。該当が無ければ手順 1 で切り出す |
+| `head` | 作業コミット `@` に最も近いローカルブックマーク（`jj log -r 'heads(::@ & bookmarks())' --no-graph -T 'local_bookmarks.map(\|b\| b.name()).join("\n")'`）。該当が無ければ手順 1 で切り出す。**出力が 2 行以上のときは自動選択しない**（同一コミットに複数ブックマークがある、または `@` の上流に head が複数ある場合）。候補を列挙してユーザーに確認してから進める |
 | `title` | 下の「タイトル推論ルール」参照 |
 | `summary` | 空なら「概要」「変更内容」本文はテンプレのコメントのみ残す |
 | `related_issue` | **ユーザー入力を最優先**。指定が `#N`（数値のみ）なら `Closes #N`、`Closes #N` / `Fixes #N` / `Refs #N` 形式ならその接頭語を保って出力。`related_issue` が空のときに限り、コミット件名から `Closes #N` / `Fixes #N` / `Refs #N` を抽出（接頭語を維持。`#N` 単体表記なら `Closes` を補う）。両方とも見つからなければ節のコメントのみ |
@@ -38,6 +38,13 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 - **バージョン管理は jj で行う。** このリポジトリは colocated（`.jj/` と `.git/` が同居）なので `git` も動いてしまうが、書き込み系の git コマンド（`commit` / `switch` / `branch` / `push` など）は使わない。jj が次回起動時に Git の ref を再取り込みし、変更が破棄されるか divergent change として二重化する。詳細は `AGENTS.md` の **Version Control (Jujutsu)** を参照。
 - `gh` CLI が認証済み（PR 操作だけは従来どおり `gh`）。
 - `head` ブックマークが origin に push 済み。未 push の場合はユーザーに push の可否を確認する（勝手に push しない）。
+- **ref 名をシェルソースへ直接埋め込まない。** 本書の `<base>` / `<head>` は説明用のプレースホルダ。実際のコマンドでは値を `BASE_REF` / `HEAD_REF` に取り込み、以降は必ず `"$BASE_REF"` / `"$HEAD_REF"` で参照する。jj のブックマーク名は git の ref 名と同じ規則で、`'` / `$( )` / バッククォート / `;` を含められるため、リテラルを直接置換すると構文が壊れるか、意図しないコマンドが実行される。値はコマンド出力から取り込む（ユーザー指定がある場合のみ、その値を代入する）:
+
+  ```bash
+  BASE_REF="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)"
+  HEAD_REF="$(jj log -r 'heads(::@ & bookmarks())' --no-graph \
+    -T 'local_bookmarks.map(|b| b.name()).join("\n")')"
+  ```
 
 ## 手順
 
@@ -81,8 +88,16 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
 2. **状態確認とモード決定（新規作成 / 更新）**
    - `jj git fetch` を実行（remote bookmark をまとめて更新する）。
-   - `jj log -r '<base>@origin..<head>@origin' --no-graph -T 'commit_id.short() ++ " " ++ description.first_line() ++ "\n"'` で差分があることを確認。無ければ中断して報告。
-   - `gh pr list --base <base> --head <head> --state open --json number,url,body` で既存 open PR を確認。
+   - コミットとファイル差分の**両方**を確認する。`jj log` はコミットの有無しか見ないため、空コミットだけが載ったブックマークが通過してしまう。
+
+     ```bash
+     jj log -r "$BASE_REF@origin..$HEAD_REF@origin" --no-graph \
+       -T 'commit_id.short() ++ " " ++ description.first_line() ++ "\n"'
+     jj diff --name-only --from "$BASE_REF@origin" --to "$HEAD_REF@origin"
+     ```
+
+     コミット一覧が空、または `jj diff --name-only` の出力が空の場合は「PR 対象の差分が無い」と報告し、**既存 PR の検索へ進まずに中断する**。
+   - `gh pr list --base "$BASE_REF" --head "$HEAD_REF" --state open --json number,url,body` で既存 open PR を確認。
      - **存在しない場合**: 新規作成モード。以降、手順 5 で `gh pr create`。
      - **存在する場合**: 更新モード。既存本文を最新差分で再生成する。以降、手順 5 で `gh pr edit`。タイトルは既存を**原則尊重**（ユーザー推論より優先）。ただし手順 5 の整合性チェックで主題が大きくズレていると判断した場合のみ更新案を提示する。
 
@@ -90,8 +105,8 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
    `<base>@origin..<head>@origin` のコミット件名と変更ファイルを取得:
    ```bash
-   jj log -r '<base>@origin..<head>@origin' --no-graph -T 'description.first_line() ++ "\n"'
-   jj diff --name-only --from '<base>@origin' --to '<head>@origin'
+   jj log -r "$BASE_REF@origin..$HEAD_REF@origin" --no-graph -T 'description.first_line() ++ "\n"'
+   jj diff --name-only --from "$BASE_REF@origin" --to "$HEAD_REF@origin"
    ```
 
    **大原則: 判定はアプリ挙動／データに対する変更かどうかで決める**。下の「コード本体パス」が一切変わっていない場合、「バグ修正」「新機能」「リファクタリング」は OFF（コミット件名に `fix` / `feat` 等の語があっても）。スキル・設定・ドキュメントのメタ変更を「新機能」と誤分類しないための安全弁。「データの修正・追加」は `data/**` の変更を独立に判定する（後述「変更ファイルパスベース」「コミット件名ベース」を参照）。
@@ -190,7 +205,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
    ```bash
    # ref 名（ブックマーク名）をファイル名として安全な集合（A-Za-z0-9._-）にスラッグ化
-   REF_SLUG="$(printf '%s' '<head>' \
+   REF_SLUG="$(printf '%s' "$HEAD_REF" \
      | tr -d '\r\n' \
      | tr -c 'A-Za-z0-9._-' '_' \
      | sed -E 's/_+/_/g; s/^_+//; s/_+$//' \
@@ -200,8 +215,8 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    (
      trap 'rm -f "$BODY_FILE"' EXIT INT TERM
      gh pr create \
-       --base "<base>" \
-       --head "<head>" \
+       --base "$BASE_REF" \
+       --head "$HEAD_REF" \
        --title "<title>" \
        --assignee TinyKitten \
        [--label "<label1>" --label "<label2>" ...] \

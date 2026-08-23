@@ -79,7 +79,7 @@ The Worker is the workspace root package. `stationapi`, `preprocessor`, and `dat
 ## Version Control (Jujutsu)
 This repository is a **colocated jj/git checkout** — `.jj/` and `.git/` sit side by side. Agents run every version-control operation through `jj`. Do not run a `git` command that writes (`commit`, `switch`, `branch`, `push`, `rebase`, `stash`): jj re-imports the Git refs on its next invocation, so a Git-side change is either abandoned or resurfaces as a divergent change. `gh` remains the tool for pull requests, and GitHub Actions keeps consuming the Git side unchanged.
 
-- **`trunk()` resolves to `dev@origin`,** aliased in `.jj/repo/config.toml`. Prefer it to a hard-coded branch name.
+- **`trunk()` resolves to `dev@origin`,** a per-repository revset alias. Prefer it to a hard-coded branch name. jj 0.38.0 and later keep repository config outside the repository, so `.jj/repo/config.toml` is not the file to edit — run `jj config path --repo` to locate it, `jj config list 'revset-aliases."trunk()"'` to check it, and `jj config set --repo 'revset-aliases."trunk()"' dev@origin` to (re-)create it on a fresh clone.
 - **There is no staging area and no untracked file.** The working copy is itself a commit, and jj snapshots every file under the root on each command (`snapshot.auto-track = "all()"`), so a scratch file lands in the change unless `.gitignore` covers it. Nothing corresponds to `git add`, so read `jj status` before describing a change and remove what does not belong — `jj restore <path>` to drop it, `jj split` to move it into a commit of its own.
 - **Bookmarks are jj's branches, and they do not follow new commits.** After committing, move the bookmark yourself (`jj bookmark set <name> -r @-`); forgetting it makes the next push a no-op.
 - **Never rewrite a pushed commit without asking.** `jj describe`, `jj squash`, and `jj rebase` rewrite history in place, and the next `jj git push` moves the remote bookmark with force-with-lease semantics. Confirm with the user first, exactly as for a Git force push.
@@ -103,7 +103,7 @@ Equivalents for the operations this guide and `.claude/skills/create-pr` rely on
 | Repository root | `jj root` |
 | Working-copy state | `jj status` |
 | History | `jj log` (`jj log -r 'trunk()..@'` for the current change set) |
-| Bookmark closest to `@` | `jj log -r 'heads(::@ & bookmarks())' --no-graph -T 'local_bookmarks.map(\|b\| b.name()).join("\n")'` |
+| Bookmark closest to `@` | `jj log -r 'heads(::@ & bookmarks())' --no-graph -T 'local_bookmarks.map(\|b\| b.name()).join("\n")'` — may print more than one name (several bookmarks on one commit, or several heads above `@`). Count the lines first; on more than one, present the candidates and ask which to use instead of taking the first. |
 | Commit subjects on a bookmark | `jj log -r 'dev@origin..<bookmark>@origin' --no-graph -T 'description.first_line() ++ "\n"'` |
 | Files changed against a base | `jj diff --name-only --from 'dev@origin' --to '<bookmark>@origin'` |
 | Rebase onto the latest `dev` | `jj git fetch && jj rebase -d 'trunk()'` |
