@@ -1,23 +1,31 @@
 on:
   pull_request:
     paths:
+      - "src/**"
       - "stationapi/**"
+      - "preprocessor/**"
       - "data_validator/**"
+      - "build.rs"
       - "Cargo.lock"
       - "Cargo.toml"
       - "!*.csv"
   push:
     paths:
+      - "src/**"
       - "stationapi/**"
+      - "preprocessor/**"
       - "data_validator/**"
+      - "build.rs"
       - "Cargo.lock"
       - "Cargo.toml"
       - "!*.csv"
 
 name: Continuous integration
 
+# stationapi-worker は wasm32 専用の crate なので、ネイティブ側とは別に検査する。
+# ネイティブ向けのビルドも通るが、動かせるのは Workers 上だけ。
 env:
-  SQLX_OFFLINE: true
+  NATIVE_PACKAGES: "-p stationapi -p stationapi-preprocessor -p data_validator"
 
 jobs:
   check:
@@ -25,28 +33,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - run: rustup target add wasm32-unknown-unknown
+      - uses: actions/cache@v4
         with:
-          submodules: recursive
-      - run: sudo apt-get install protobuf-compiler
-      - run: cargo check
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: check-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo check $NATIVE_PACKAGES
+      - run: cargo check --target wasm32-unknown-unknown -p stationapi-worker
 
   test:
     name: Test Suite
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/cache@v4
         with:
-          submodules: recursive
-      - run: sudo apt-get install protobuf-compiler
-      - run: cargo test
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: test-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo test $NATIVE_PACKAGES
 
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - run: rustup component add rustfmt
       - run: cargo fmt --all -- --check
 
@@ -55,8 +71,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - run: sudo apt-get install protobuf-compiler
       - run: rustup component add clippy
-      - run: cargo clippy -- -D warnings
+      - run: rustup target add wasm32-unknown-unknown
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: clippy-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo clippy $NATIVE_PACKAGES --all-targets -- -D warnings
+      - run: cargo clippy --target wasm32-unknown-unknown -p stationapi-worker --all-targets -- -D warnings

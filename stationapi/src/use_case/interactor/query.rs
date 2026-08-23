@@ -65,7 +65,7 @@ use crate::{
         },
         segment_speed_table::{segment_override_applies_to_kind, segment_speed_override_kmh},
     },
-    proto::{self, Route},
+    model::{self, Route},
     use_case::{
         dto::simulation::resolve_speed_profile, error::UseCaseError, traits::query::QueryUseCase,
     },
@@ -241,7 +241,7 @@ where
             .await?;
 
         // Build input order map for sorting main stations by requested line_id order.
-        // Preserve first-occurrence order for duplicate line IDs (matching SQL CASE WHEN behavior).
+        // Preserve first-occurrence order for duplicate line IDs.
         let mut line_id_order: std::collections::HashMap<i32, usize> =
             std::collections::HashMap::new();
         for (i, &id) in line_ids.iter().enumerate() {
@@ -258,7 +258,7 @@ where
             .cloned()
             .collect();
 
-        // Sort by input line_id order, then by e_sort, station_cd (matching original query ORDER BY)
+        // Sort by input line_id order, then by e_sort, station_cd.
         stations.sort_by(|a, b| {
             let order_a = line_id_order.get(&a.line_cd).copied().unwrap_or(usize::MAX);
             let order_b = line_id_order.get(&b.line_cd).copied().unwrap_or(usize::MAX);
@@ -362,7 +362,7 @@ where
             .collect();
 
         // lines, companies, station_numbers等を付与（train_typeはNoneで空になる）
-        // train_typeは後続のget_by_line_group_id_vecで取得するためJOIN不要
+        // train_typeは後続のget_by_line_group_id_vecで取得するためここでは付けない
         let mut stations = self
             .update_station_vec_with_attributes(stations, None, transport_type, true)
             .await?;
@@ -660,16 +660,18 @@ where
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
 
-        // TODO: SQLで同等の処理を行う
-        // 発着駅を含まない経路候補はレスポンスに含まれないため、
-        // 路線の取得やproto変換を行う前にここで除外する
+        // 発着駅の両方を含まない経路候補はレスポンスに含まれないため、
+        // 路線の取得やモデル変換を行う前にここで除外する
         let route_groups: Vec<(&i32, &Vec<&Station>)> = route_row_tree_map
             .iter()
             .filter(|(_, stops)| {
-                stops.iter().any(|row| {
-                    row.station_g_cd as u32 == from_station_id
-                        || row.station_g_cd as u32 == to_station_id
-                })
+                let has_from = stops
+                    .iter()
+                    .any(|row| row.station_g_cd as u32 == from_station_id);
+                let has_to = stops
+                    .iter()
+                    .any(|row| row.station_g_cd as u32 == to_station_id);
+                has_from && has_to
             })
             .collect();
 
@@ -773,7 +775,7 @@ where
 
                     stop.into()
                 })
-                .collect::<Vec<proto::Station>>();
+                .collect::<Vec<model::Station>>();
 
             routes.push(Route {
                 id: *id as u32,
@@ -781,121 +783,6 @@ where
             });
         }
         Ok(routes)
-    }
-
-    async fn get_routes_minimal(
-        &self,
-        from_station_id: u32,
-        to_station_id: u32,
-        via_line_id: Option<u32>,
-    ) -> Result<proto::RouteMinimalResponse, UseCaseError> {
-        let via_ids: Vec<u32> = via_line_id.into_iter().collect();
-        let stops = self
-            .station_repository
-            .get_route_stops(from_station_id, to_station_id, &via_ids)
-            .await?;
-
-        let route_row_tree_map = self.build_route_tree_map(&stops);
-
-        let mut routes: Vec<proto::RouteMinimal> = Vec::new();
-        let mut all_lines: std::collections::HashMap<u32, proto::LineMinimal> =
-            std::collections::HashMap::new();
-
-        for (id, stops) in route_row_tree_map.iter() {
-            let stops_minimal = stops
-                .iter()
-                .map(|row| {
-                    let extracted_line = self.extract_line_from_station(row);
-
-                    // Add line to the lines collection
-                    let line_symbols = self
-                        .get_line_symbols(&extracted_line)
-                        .into_iter()
-                        .map(|ls| proto::LineSymbol {
-                            symbol: ls.symbol,
-                            color: ls.color,
-                            shape: ls.shape,
-                        })
-                        .collect();
-
-                    let line_minimal = proto::LineMinimal {
-                        id: extracted_line.line_cd as u32,
-                        name_short: extracted_line.line_name,
-                        color: extracted_line.line_color_c.unwrap_or_default(),
-                        line_type: extracted_line.line_type.unwrap_or(0),
-                        line_symbols,
-                    };
-
-                    // Update line: prefer entries with non-empty line_symbols
-                    all_lines
-                        .entry(line_minimal.id)
-                        .and_modify(|existing| {
-                            // Update if new line has symbols and existing doesn't
-                            if !line_minimal.line_symbols.is_empty()
-                                && existing.line_symbols.is_empty()
-                            {
-                                *existing = line_minimal.clone();
-                            }
-                        })
-                        .or_insert(line_minimal);
-
-                    // Create station minimal
-                    let station_numbers = self
-                        .get_station_numbers(row)
-                        .into_iter()
-                        .map(|sn| proto::StationNumber {
-                            line_symbol: sn.line_symbol,
-                            line_symbol_color: sn.line_symbol_color,
-                            line_symbol_shape: sn.line_symbol_shape,
-                            station_number: sn.station_number,
-                        })
-                        .collect();
-
-                    let ipa = crate::domain::ipa::compute_ipa_cached(
-                        &row.station_name_k,
-                        row.station_name_r.as_deref(),
-                    );
-                    let name_ipa = ipa.name_ipa.clone();
-                    let name_roman_ipa = ipa.name_roman_ipa.clone();
-                    let name_tts_segments =
-                        crate::use_case::dto::tts::to_proto_tts_segments(&ipa.tts_segments);
-                    proto::StationMinimal {
-                        id: row.station_cd as u32,
-                        group_id: row.station_g_cd as u32,
-                        name: row.station_name.clone(),
-                        name_katakana: row.station_name_k.clone(),
-                        name_roman: row.station_name_r.clone(),
-                        line_ids: vec![extracted_line.line_cd as u32],
-                        station_numbers,
-                        stop_condition: row.pass.unwrap_or(0),
-                        has_train_types: Some(row.type_id.is_some()),
-                        train_type_id: row.type_id.map(|id| id as u32),
-                        name_ipa,
-                        name_roman_ipa,
-                        name_tts_segments,
-                    }
-                })
-                .collect::<Vec<proto::StationMinimal>>();
-
-            // TODO: SQLで同等の処理を行う
-            let includes_requested_station = stops_minimal
-                .iter()
-                .any(|stop| stop.group_id == from_station_id || stop.group_id == to_station_id);
-            if !includes_requested_station {
-                continue;
-            }
-
-            routes.push(proto::RouteMinimal {
-                id: *id as u32,
-                stops: stops_minimal,
-            });
-        }
-
-        Ok(proto::RouteMinimalResponse {
-            routes,
-            lines: all_lines.into_values().collect(),
-            next_page_token: "".to_string(),
-        })
     }
 
     async fn get_train_types(
@@ -1058,7 +945,7 @@ where
         from_station_id: u32,
         to_station_id: u32,
         line_group_id: Option<u32>,
-    ) -> Result<Vec<proto::TrainRouteSegment>, UseCaseError> {
+    ) -> Result<Vec<model::TrainRouteSegment>, UseCaseError> {
         let line_group_id = line_group_id.ok_or_else(|| UseCaseError::NotFound {
             entity_type: "line group",
             entity_id: "unspecified".to_string(),
@@ -1090,7 +977,7 @@ where
             v
         };
 
-        let mut segments: Vec<proto::TrainRouteSegment> = Vec::with_capacity(sliced.len());
+        let mut segments: Vec<model::TrainRouteSegment> = Vec::with_capacity(sliced.len());
         // 経路スライス内で路線ごとに通過駅があるか。通過駅が無い路線では優等種別でも
         // 実質各駅停車として走る(東急田園都市線の急行が半蔵門線内で各駅停車になる
         // 直通など)ため、種別の速度を適用せず各停(Default)として扱う。
@@ -1102,13 +989,13 @@ where
         for (i, station) in sliced.iter().enumerate() {
             let is_endpoint = i == 0 || i + 1 == sliced_len;
             let passed = !is_endpoint
-                && (station.stop_condition == proto::StopCondition::Not || station.pass == Some(1));
+                && (station.stop_condition == model::StopCondition::Not || station.pass == Some(1));
             let entry = line_has_pass.entry(station.line_cd).or_insert(false);
             *entry = *entry || passed;
         }
         let mut prev_stop: Option<(f64, f64, i32)> = None;
         for station in sliced {
-            let stops = station.stop_condition != proto::StopCondition::Not;
+            let stops = station.stop_condition != model::StopCondition::Not;
 
             let distance_from_previous = match prev_stop {
                 Some((plat, plon, _)) => haversine_distance(plat, plon, station.lat, station.lon),
@@ -1141,9 +1028,9 @@ where
             }
             prev_stop = Some((station.lat, station.lon, station.station_cd));
 
-            let grpc_station: proto::Station = station.into();
-            segments.push(proto::TrainRouteSegment {
-                station: Some(grpc_station),
+            let model_station: model::Station = station.into();
+            segments.push(model::TrainRouteSegment {
+                station: Some(model_station),
                 stops,
                 distance_from_previous,
                 max_speed: profile.max_speed,
@@ -1446,7 +1333,7 @@ where
                         Some(Box::new(train_type)),
                     );
                     stop.line_group_cd = Some(virtual_line_group_id as i32);
-                    proto::Station::from(stop)
+                    model::Station::from(stop)
                 })
                 .collect();
             routes.push(Route {
@@ -1632,10 +1519,10 @@ where
             vec![]
         };
 
-        // Phase 1: independent queries in parallel
-        // When skip_types_join is true, skip the expensive JOINs to
-        // station_station_types and types tables (used by GetStationsByLineIdList)
-        // Also batch-fetch bus stop candidates in parallel
+        // Phase 1: independent lookups in parallel.
+        // When skip_types_join is true, skip the expensive train-type lookups
+        // (used by the lineListStations query).
+        // Also batch-fetch bus stop candidates in parallel.
         let (stations_by_group_ids, lines, bus_candidates_flat) = if skip_types_join {
             if let Some(prefetched) = prefetched_group_stations {
                 // Group stations already fetched by expanded primary query
@@ -1883,16 +1770,15 @@ where
         Ok(stations)
     }
 
+    /// 停車駅を系統ごとにまとめる。
+    ///
+    /// 経路の取得は系統に属さない駅も返す。それらは経路候補を構成しないので
+    /// ここで落とす。以前は `expect` していたため、そうした駅が 1 件でもあると
+    /// 応答を返せずに落ちていた。
     fn build_route_tree_map<'a>(&self, stops: &'a [Station]) -> BTreeMap<i32, Vec<&'a Station>> {
         stops
             .iter()
-            .map(|stop| {
-                (
-                    stop.line_group_cd
-                        .expect("route stop must belong to a train type group"),
-                    stop,
-                )
-            })
+            .filter_map(|stop| stop.line_group_cd.map(|group| (group, stop)))
             .fold(
                 BTreeMap::new(),
                 |mut acc: BTreeMap<i32, Vec<&'a Station>>, (line_group_cd, stop)| {
@@ -2003,7 +1889,7 @@ fn connected_route_virtual_id(signature: &[u8], used_ids: &mut HashSet<u32>) -> 
         hash = hash.wrapping_mul(FNV_PRIME);
     }
 
-    // Persisted line_group_cd is a signed PostgreSQL integer. Reserving the
+    // Persisted line_group_cd is a signed 32-bit integer. Reserving the
     // upper half of u32 therefore guarantees that virtual IDs cannot overlap it.
     let mut candidate = hash | 0x8000_0000;
     while !used_ids.insert(candidate) {
@@ -2055,7 +1941,7 @@ fn haversine_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 mod tests {
     use super::*;
     use crate::domain::entity::gtfs::TransportType;
-    use crate::proto::StopCondition;
+    use crate::model::StopCondition;
 
     /// Helper to create a minimal Station for testing
     fn create_test_station(
@@ -3113,14 +2999,14 @@ mod tests {
         /// 修正前は種別倍率(×1.15)が掛かり駅間別較正も外れて約15分に縮んでいた。
         #[tokio::test]
         async fn test_estimate_route_arrival_times_through_express_all_stops_matches_local() {
-            let default_kind = Some(proto::TrainTypeKind::Default as i32);
+            let default_kind = Some(model::TrainTypeKind::Default as i32);
             let local = build_interactor(hanzomon_stops(default_kind), vec![], vec![], vec![]);
             let local_est = local
                 .estimate_route_arrival_times(2800813, 2800807, &[], None)
                 .await
                 .unwrap();
 
-            let express_kind = Some(proto::TrainTypeKind::Express as i32);
+            let express_kind = Some(model::TrainTypeKind::Express as i32);
             let express = build_interactor(hanzomon_stops(express_kind), vec![], vec![], vec![]);
             let express_est = express
                 .estimate_route_arrival_times(2800813, 2800807, &[], None)
@@ -3452,12 +3338,19 @@ mod tests {
         }
 
         #[test]
-        #[should_panic(expected = "route stop must belong to a train type group")]
-        fn test_build_route_tree_map_requires_line_group() {
+        fn test_build_route_tree_map_skips_stops_without_line_group() {
             let interactor = create_interactor();
-            let stops = vec![create_test_station(1, 1, 100, None)];
+            let stops = vec![
+                create_test_station(1, 1, 100, None),
+                create_test_station(2, 2, 100, Some(1000)),
+            ];
 
-            interactor.build_route_tree_map(&stops);
+            let result = interactor.build_route_tree_map(&stops);
+
+            // 系統に属さない駅は経路候補にならないので落とす
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[&1000].len(), 1);
+            assert_eq!(result[&1000][0].station_cd, 2);
         }
 
         #[test]
@@ -5452,6 +5345,32 @@ mod tests {
                 let line_ids: Vec<u32> = tt.lines.iter().map(|l| l.id).collect();
                 assert_eq!(line_ids, vec![22]);
             }
+        }
+
+        #[tokio::test]
+        async fn test_get_routes_excludes_group_with_only_one_endpoint() {
+            let stops = vec![
+                // line_group 100: 発着駅(1, 3)の両方を含む → 採用
+                create_route_stop(1101, 1, 11, Some(100)),
+                create_route_stop(1103, 3, 11, Some(100)),
+                // line_group 400: 出発駅しか含まない → 除外
+                create_route_stop(4101, 1, 44, Some(400)),
+                create_route_stop(4104, 4, 44, Some(400)),
+                // line_group 500: 到着駅しか含まない → 除外
+                create_route_stop(5103, 3, 55, Some(500)),
+                create_route_stop(5105, 5, 55, Some(500)),
+            ];
+            let lines = vec![
+                create_route_line(11, 100),
+                create_route_line(44, 400),
+                create_route_line(55, 500),
+            ];
+            let interactor = build_interactor(stops, lines);
+
+            let routes = interactor.get_routes(1, 3, None).await.unwrap();
+
+            let route_ids: Vec<u32> = routes.iter().map(|r| r.id).collect();
+            assert_eq!(route_ids, vec![100]);
         }
 
         #[tokio::test]

@@ -46,7 +46,7 @@ use crate::domain::segment_speed_table::{
     segment_override_applies_to_kind, segment_speed_override_kmh,
 };
 use crate::domain::speed_table::line_speed_override_kmh;
-use crate::proto::{StopCondition, TrainTypeKind};
+use crate::model::{StopCondition, TrainTypeKind};
 
 /// 1 駅分の推定結果。
 #[derive(Clone, Debug, PartialEq)]

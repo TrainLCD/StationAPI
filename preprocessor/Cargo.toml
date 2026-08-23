@@ -1,0 +1,21 @@
+[package]
+name = "stationapi-preprocessor"
+version = "0.1.0"
+edition = "2021"
+
+# Worker が読む generated/*.csv を data/*.csv と GTFS フィードから組み立てる。
+# かつては PostgreSQL へ取り込んだ結果を書き出していたが、DB を介さず
+# 同じ変換を Rust 上で行う。
+[[bin]]
+name = "preprocessor"
+path = "src/main.rs"
+
+[dependencies]
+# haversine / ローマ字変換を domain 層と共有する。
+stationapi = { path = "../stationapi", default-features = false }
+anyhow = "1.0.71"
+csv = "1.3.1"
+serde = { version = "1.0.189", features = ["derive"] }
+serde_json = "1.0.107"
+reqwest = { version = "0.12.12", default-features = false, features = ["blocking", "rustls-tls", "gzip"] }
+zip = ">=2.3.0"

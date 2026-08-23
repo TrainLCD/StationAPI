@@ -1,373 +1,296 @@
 # StationAPI アーキテクチャドキュメント
 
-> 最終更新: 2026年5月
+> 最終更新: 2026年8月22日
 
 ## 目次
 
 - [概要](#概要)
+- [全体構成](#全体構成)
 - [レイヤー構造](#レイヤー構造)
-- [データベース設計](#データベース設計)
-- [gRPC/スキーマ設計](#grpcスキーマ設計)
+- [データパイプライン](#データパイプライン)
+- [インメモリ索引](#インメモリ索引)
+- [GraphQL とスキーマ一致の担保](#graphql-とスキーマ一致の担保)
 - [命名規則](#命名規則)
-- [キャッシュ戦略](#キャッシュ戦略)
 - [データフロー](#データフロー)
 - [ディレクトリ構造](#ディレクトリ構造)
+- [運用](#運用)
+- [関連ドキュメント](#関連ドキュメント)
 
 ---
 
 ## 概要
 
-StationAPI は日本の鉄道駅情報を提供する gRPC API です。**クリーンアーキテクチャ**に基づいた4層構造を採用し、ビジネスロジックと技術的関心事を明確に分離しています。
+日本の鉄道駅・バス停の情報を返す GraphQL API です。Cloudflare Workers 上で動き、
+データは WASM に埋め込んで配ります。**サーバープロセスもデータベースも持ちません。**
+
+以前は gRPC-Web を返すオンプレのサーバーで、PostgreSQL を読み、クライアントは
+BFF (TrainLCD/BFF) が GraphQL へ変換したものを使っていました。gRPC-Web である
+必然性が無かったため GraphQL を直接返す形にし、BFF ごと廃止しています。
 
 ### 技術スタック
 
-| 項目 | 技術 |
-|------|------|
-| 言語 | Rust (Edition 2021) |
-| ランタイム | tokio |
-| データベース | PostgreSQL 15+ |
-| ORM | sqlx (コンパイル時クエリ検証) |
-| API | gRPC (tonic) |
-| シリアライズ | Protocol Buffers |
+| 用途 | 採用しているもの |
+|---|---|
+| 実行環境 | Cloudflare Workers (wasm32-unknown-unknown) |
+| API | GraphQL ([async-graphql](https://github.com/async-graphql/async-graphql) 7) |
+| データ | ビルド時に WASM へ埋め込む CSV (`generated/*.csv`) |
+| データ生成 | `preprocessor` crate (純 Rust) |
+| デプロイ | wrangler |
+
+データベースを使わないため、`sqlx` も接続プールもありません。検索は
+起動時に組み立てたインメモリ索引に対する走査で行います。
+
+---
+
+## 全体構成
+
+```txt
+  data/*.csv          GTFS (ZIP)        ODPT (JSON)
+  鉄道の正データ        バス 5 フィード      東急バス
+      │                    │                 │
+      └────────────────────┴─────────────────┘
+                           │
+                 ┌─────────▼──────────┐
+                 │   preprocessor     │  純 Rust。各駅停車の系統生成と
+                 │   (ビルド時ツール)  │  GTFS 統合を行う
+                 └─────────┬──────────┘
+                           │
+                    generated/*.csv     7 テーブル
+                           │
+                 ┌─────────▼──────────┐
+                 │  build.rs          │  CSV を OUT_DIR へ配置し、
+                 │                    │  sst は固定長バイナリへ変換
+                 └─────────┬──────────┘
+                           │
+                 ┌─────────▼──────────┐
+                 │  worker-build      │
+                 └─────────┬──────────┘
+                           │
+                        WASM ────────► Cloudflare Workers
+                                          │
+                                     GraphQL (POST /)
+                                          │
+                                       TrainLCD
+```
+
+データは WASM に埋め込まれるため、**データ更新のたびに再デプロイが要ります。**
+起動時取り込みで自動反映される作りではありません。
 
 ---
 
 ## レイヤー構造
 
-StationAPI は4つの層で構成されています。各層は依存性の方向が内側（Domain）に向かうよう設計されています。
-
 ```txt
-┌─────────────────────────────────────────────────────────┐
-│                    Presentation 層                       │
-│            (gRPC Controller, エラーハンドリング)           │
-└─────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────┐
-│                      UseCase 層                          │
-│           (Interactor, DTO, ビジネスロジック)              │
-└─────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────┐
-│                   Infrastructure 層                      │
-│        (Repository実装, Row構造体, DB接続)                │
-└─────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────┐
-│                      Domain 層                           │
-│       (Entity, Repository Interface, ビジネスルール)       │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│ Presentation (src/graphql/)                   │  async-graphql のリゾルバと型
+│   Query / 型 / enum / スカラー                 │
+├──────────────────────────────────────────────┤
+│ Model (stationapi/src/model.rs)               │  API が返す値の表現
+├──────────────────────────────────────────────┤
+│ UseCase (stationapi/src/use_case/)            │  問い合わせの組み立て、
+│   QueryInteractor / DTO 変換                   │  IPA・TTS の生成
+├──────────────────────────────────────────────┤
+│ Domain (stationapi/src/domain/)               │  エンティティ、経路探索、
+│   entity / repository トレイト / 速度表        │  到達時間推定、正規化
+├──────────────────────────────────────────────┤
+│ Index (src/index.rs, src/repository.rs)       │  埋め込みデータの索引と
+│                                               │  repository トレイトの実装
+└──────────────────────────────────────────────┘
 ```
 
-### Domain 層 (`src/domain/`)
+`stationapi` crate は Domain / UseCase / Model だけを持つライブラリで、
+Worker と preprocessor の双方から参照されます。wasm32 でビルドできる必要が
+あるため、I/O を伴う依存は入れません。
 
-**責務**: コアビジネスロジックとデータモデルの定義
+### Domain 層 (`stationapi/src/domain/`)
 
-| ディレクトリ/ファイル | 内容 |
-|---------------------|------|
-| `entity/` | ドメインエンティティ（Station, Line, TrainType, Company など） |
-| `repository/` | リポジトリインターフェース（`async_trait` を使用） |
-| `normalize.rs` | テキスト正規化（ひらがな↔カタカナ、全角↔半角変換） |
-| `error.rs` | ドメインエラー型（NotFound, InfrastructureError, Unexpected） |
+エンティティ、リポジトリの抽象、および純粋な計算 (haversine、経路の探索、
+到達時間の推定、速度表、ローマ字・IPA 変換、検索用の正規化) を持ちます。
 
-**設計原則**:
-- 外部依存を持たない純粋な Rust コード
-- リポジトリは trait として定義し、実装を Infrastructure 層に委譲
-- 多言語対応（日本語、カタカナ、ローマ字、中国語、韓国語）
+### UseCase 層 (`stationapi/src/use_case/`)
 
-### UseCase 層 (`src/use_case/`)
+`QueryInteractor` が repository トレイト越しにデータを集め、駅へ路線・事業者・
+列車種別を付与します。N+1 を避けるため、関連データは常に一括で取ります。
 
-**責務**: アプリケーションビジネスロジックとデータ変換
+DTO (`use_case/dto/`) がドメインエンティティを Model へ変換します。IPA と
+TTS セグメントの生成はここにあります。
 
-| ディレクトリ/ファイル | 内容 |
-|---------------------|------|
-| `interactor/query.rs` | `QueryInteractor` - 主要なユースケース実装（約950行） |
-| `traits/query.rs` | `QueryUseCase` トレイト定義（20以上の非同期メソッド） |
-| `dto/` | データ変換オブジェクト（Entity ↔ gRPC メッセージ） |
-| `error.rs` | ユースケースエラー型 |
+### Model 層 (`stationapi/src/model.rs`)
 
-**重要なメソッド**:
+API が返す値の表現です。もとは `.proto` から prost が生成していた型で、
+gRPC をやめたあとも、上記の IPA・TTS 生成がここへの変換にぶら下がっているため
+ドメインエンティティと GraphQL 型の間に残してあります。
 
-```rust
-// update_station_vec_with_attributes (query.rs:169-265)
-// - 駅データにライン、会社、列車種別を付加
-// - N+1問題を回避するバッチクエリ設計
-async fn update_station_vec_with_attributes(
-    &self,
-    mut stations: Vec<Station>,
-    line_group_id: Option<u32>,
-) -> Result<Vec<Station>, UseCaseError>
-```
+### Presentation 層 (`src/graphql/`)
 
-### Infrastructure 層 (`src/infrastructure/`)
+`async-graphql` の Query リゾルバと型定義です。Model から GraphQL 型へ変換します。
 
-**責務**: データ永続化と外部システム連携
+### Index 層 (`src/index.rs`, `src/repository.rs`)
 
-| ファイル | 内容 |
-|---------|------|
-| `station_repository.rs` | `StationRow` + `MyStationRepository` 実装 |
-| `line_repository.rs` | `LineRow` + `MyLineRepository` 実装 |
-| `train_type_repository.rs` | `TrainTypeRow` + `MyTrainTypeRepository` 実装 |
-| `company_repository.rs` | `CompanyRow` + `MyCompanyRepository` 実装 |
-
-**設計パターン**:
-- 各 Repository は `Arc<Pool<Postgres>>` をラップ
-- `Internal*Repository` 構造体に実際の SQL 実行を委譲
-- `#[derive(sqlx::FromRow)]` による型安全な Row マッピング
-
-### Presentation 層 (`src/presentation/`)
-
-**責務**: 外部 API の公開とリクエスト/レスポンスハンドリング
-
-| ファイル | 内容 |
-|---------|------|
-| `controller/grpc.rs` | `MyApi` - 14の gRPC エンドポイント実装 |
-| `error.rs` | `PresentationalError` と `tonic::Status` への変換 |
+埋め込み CSV を isolate 起動時に一度だけパースし、`OnceLock` に保持します。
+`src/repository.rs` が 4 つの repository トレイトを実装し、UseCase 層からは
+データベース版と同じインターフェースで見えます。
 
 ---
 
-## データベース設計
+## データパイプライン
 
-### テーブル構成
+`data/*.csv` をそのまま Worker へ渡すと**本番と挙動が変わります。**
 
-すべてのテーブルは `UNLOGGED` として作成されパフォーマンスを優先しています。
+- 列車種別を持たない路線には各駅停車の系統を補う必要がある (約2,400行、
+  有効な駅の約21%が影響を受ける)。この行は `data/*.csv` に存在しない
+- バス停・バス路線・バス系統は GTFS と ODPT の JSON から起こす必要がある
 
-| テーブル | 主キー | 概要 |
-|---------|-------|------|
-| `companies` | company_cd | 鉄道会社情報 |
-| `lines` | line_cd | 路線情報 |
-| `stations` | station_cd | 駅情報 |
-| `types` | id | 列車種別 |
-| `station_station_types` | id | 駅と列車種別の関連 |
-| `line_aliases` | id | 路線エイリアス |
-| `connections` | - | 駅間接続 |
-| `aliases` | - | 検索用エイリアス |
+これを行うのが `preprocessor` crate です。
 
-### パフォーマンス最適化
-
-```sql
--- 使用している PostgreSQL 拡張
-CREATE EXTENSION IF NOT EXISTS pg_trgm;    -- トライグラム検索
-CREATE EXTENSION IF NOT EXISTS btree_gist; -- GiST インデックス
-
--- 主要インデックス
-CREATE INDEX idx_stations_station_g_cd ON stations(station_g_cd);
-CREATE INDEX idx_stations_line_cd ON stations(line_cd);
-CREATE INDEX idx_performance_station_name_trgm ON stations
-    USING gin(station_name gin_trgm_ops);  -- あいまい検索用
+```bash
+make data     # cargo run --profile tool -p stationapi-preprocessor
 ```
 
-### スキーマ更新時の注意点
+処理の流れ:
 
-1. **マイグレーション**: `data/create_table.sql` を更新
-2. **Row 構造体**: 対応する `*Row` 構造体を Infrastructure 層で更新
-3. **Entity**: 必要に応じて Domain 層の Entity を更新
-4. **変換ロジック**: `impl From<XxxRow> for Xxx` を更新
-5. **DTO**: gRPC メッセージへの変換を `use_case/dto/` で更新
+1. `data/*.csv` を読む (`#` 始まりの列は取り込まない)
+2. 各駅停車の系統を生成する (`generate_virtual_local_rail_services`)
+3. GTFS フィードを取得・展開して読む (都営・西武・京王・東急コミュニティ 3 区)
+4. 東急バスの ODPT JSON を読む (7 日間キャッシュ)
+5. バスを lines / stations / types / station_station_types へ統合する
+6. `generated/*.csv` を書き出す
 
-### バス (GTFS) データの統合
+`station_station_types.id` は停車順序そのものとして参照されるため、
+行の並びに意味があります。書き出しは必ず `id` 昇順で行います。
 
-`stations` / `lines` / `types` / `station_station_types` は鉄道とバスの両方を保持し、`stations.transport_type` / `lines.transport_type` (0: 鉄道, 1: バス) でフィルタリングします。バスデータの取り込みは `src/import.rs` の `integrate_gtfs_to_stations()` が起動時に実行し、ODPT 公開のデータを `gtfs_*` テーブルに展開してから既存テーブルへ統合します。都営バス・西武バス・京王バスを含む設定済みの全GTFSフィードを直接読み込みます。東急バスの一般路線は `BusroutePattern` / `BusstopPole` / `BusTimetable` JSONをGTFS相当の路線・停留所・便・停車時刻へ変換し、路線パターンIDを `shape_id` として扱います。ODPTのJSON APIは全事業者分の大きな配列を返すため、レスポンスをファイルへストリーミングし、1件ずつ東急バス分だけ抽出した7日間キャッシュを `data/TokyuBus-ODPT/` に保持します。大田区（たまちゃんバス）・品川区（しなバス）・目黒区（さんまバス）は公式GTFSを使用し、JSON側の同一路線を除外して重複を防ぎます。認証付きデータ（西武バス・京王バスのGTFSや東急バスのJSON）のダウンロードには `.env.local` の `ODPT_ACCESS_TOKEN` を使用します。なお、ODPT JSONで座標が欠落している一般路線停留所は名称・路線検索には含まれますが、座標検索には含められません。
+### バスのコード生成
 
-| 鉄道側の概念 | バス側の対応 |
+バス由来のレコードは、鉄道と衝突しない値域へ FNV-1a で決定的に割り当てます。
+実行のたびに同じ値になる必要があるため、`DefaultHasher` は使いません。
+
+| 対象 | 値域 | 入力 |
+|---|---|---|
+| `line_cd` | 100,000,000 + | `route_id` |
+| `station_cd` | 200,000,000 + | `(stop_id, route_id)` |
+| `station_g_cd` | 200,000,000 + | `stop_id` (まとめ後の代表) |
+| `type_cd` | 100,000,000 + | `(route_id, shape_id)` |
+| `line_group_cd` | 100,000,000 + | `(route_id, shape_id)` |
+
+### 環境変数
+
+| 変数 | 効果 |
 |---|---|
-| `companies` | データソースごとに会社を決定。Toei Bus は東京都交通局 (`company_cd=119`)、Seibu Bus は西武バス (`company_cd=253`)、Keio Bus は京王バス (`company_cd=254`)、東急バスのJSON変換データとコミュニティバス3フィードは東急バス (`company_cd=255`) |
-| `lines` | GTFS `routes` を 1:1 で `lines` に登録。`line_cd` はフィード接頭辞付き `route_id` の fnv1a ハッシュで 100,000,000+ 空間に決定的に生成 |
-| `stations` | GTFS `stops` (親停留所) を `(stop_id, route_id)` 単位で `stations` に登録。`station_cd` / `station_g_cd` もフィード接頭辞付き ID から 200,000,000+ 空間にハッシュ生成 |
-| `types` | GTFS の `(route_id, shape_id)` バリエーション (フルループ / 短ターン / 支線など) を `kind = TrainTypeKind::BusRoute (= 7)` の TrainType として登録。**停留所集合が完全に同じ shape ペア (上下方向違いのみ) は 1 つの TrainType に畳み、`direction = Both` を設定**。`type_name` は循環なら `<headsign> (循環)`、双方向ペアなら `<A> ⇔ <B>`、片方向なら `<始発停留所> → <headsign>` |
-| `station_station_types` | 各バリエーションの代表 trip の停留所を `stop_sequence` 順に挿入し、`SERIAL id` がそのまま停留所順序として機能 |
-
-バス系統の代表シェイプ (canonical_shape) は `COUNT(DISTINCT stop_id) DESC → MAX(shape_dist_traveled) → direction_id` の順で決定します。詳しくは `import.rs:build_stop_route_mapping` のコメント参照。
+| `ODPT_ACCESS_TOKEN` | 都営バス以外のフィードに必要。無い場合は警告のうえ読み飛ばす |
+| `DISABLE_BUS_FEATURE` | `true` でバスを取り込まない (鉄道のみ) |
 
 ---
 
-## gRPC/スキーマ設計
+## インメモリ索引
 
-### サービスエンドポイント
+PostgreSQL のクエリは以下のように置き換えています。
 
-`stationapi.proto` で17のエンドポイントを定義:
+| PostgreSQL | Worker |
+|---|---|
+| `point(lat,lon) <-> point()` | haversine の全件走査 (`select_nth_unstable_by` で上位のみ確定) |
+| `pg_trgm` の GIN インデックス | `contains()` |
+| `station_station_types` の JOIN | `HashMap` による索引 |
 
-| カテゴリ | メソッド |
-|---------|---------|
-| 駅検索 | `GetStationById`, `GetStationByIdList`, `GetStationsByGroupId`, `GetStationsByCoordinates`, `GetStationsByLineId`, `GetStationsByLineIdList`, `GetStationsByName`, `GetStationsByLineGroupId`, `GetStationsByLineGroupIdList` |
-| 路線検索 | `GetLineById`, `GetLinesByIdList`, `GetLinesByName` |
-| 経路検索 | `GetRoutes`, `GetRoutesMinimal`, `GetConnectedRoutes` |
-| 列車種別 | `GetTrainTypesByStationId`, `GetRouteTypes` |
+`pg_trgm` は `LIKE '%...%'` を高速化するインデックスであって類似度検索では
+ないため、`contains()` で論理的に等価な結果になります。正規化は domain 層の
+`normalize_for_search` をそのまま呼びます。
 
-### 接続経路探索
+39,204 件 (バス込み) の全件走査でも実測 10ms 台に収まります。
 
-`GetConnectedRoutes` は、始点の駅グループに停車する列車種別から幅優先で探索し、
-同じ駅グループに停車する別の列車種別へ接続します。Repository は探索階層ごとの
-駅グループをまとめて問い合わせ、該当する `line_group_cd` の駅列も一括取得するため、
-候補ごとの N+1 クエリを発生させません。
+`station_station_types.csv` は 65,281 行あり、起動時の CSV パースが
+コールドスタートの大半を占めていました。全列が整数なので、`build.rs` が
+1 行 = `i32` x 4 の固定長バイナリ (`sst.bin`) へ事前変換しています。
 
-探索中は通過駅を乗換地点にせず、利用済みの列車種別および訪問済みの駅グループを
-再訪しません。探索は最大 8 列車種別、4,096 展開状態、65,536 評価候補、
-32 返却候補に制限します。
-完成した経路は接続駅を一度だけ含む駅列へ連結し、各区間の `stop_condition` を保持します。
-返却時には経路の列車種別列と駅グループ列から決定的な仮想 `lineGroupId` を生成し、
-経路内の全 `station.train_type.group_id` に同じ値を設定します。仮想 ID は既存の
-PostgreSQL `INTEGER` ID と衝突しない `uint32` 上位半分を使用します。
+---
 
-各探索階層では未取得の駅グループを 1 回のクエリへまとめ、そこで判明した未取得の
-`line_group_cd` の駅列も 1 回で取得します。このため Repository 呼び出しは最大でも
-階層あたり 2 回で、候補経路ごとの N+1 クエリや同じ列車種別の再取得はありません。
-探索用の駅列は `line_group_cd`、`station_station_types.id`、`station_g_cd`、`pass` だけを取得し、経路状態にも
-この軽量な参照だけを保持します。駅名、住所、座標、路線属性、列車種別属性を含む完全な
-`Station` は探索中に生成・複製せず、返却候補が確定した後、その候補が実際に使用する
-`line_group_cd` に限定して一括取得します。これにより探索状態数と駅エンティティの大きさの
-積に比例していたメモリ使用量を避けます。
-取得後は駅グループと `line_group_cd` を `HashMap` に一度だけ分類し、状態と駅列を
-毎回総当たりする O(n×m) の処理を、入力件数に比例する O(n+m) の参照へ置き換えます。
-探索そのものの最悪計算量は各状態の始点候補数と駅列長の積にも依存するため、状態数とは
-独立した評価候補数の上限で `start_indices × pattern.len()` の走査も制御します。
+## GraphQL とスキーマ一致の担保
 
-SQL は `stations.station_g_cd`、`station_station_types.station_cd`、
-`station_station_types.line_group_cd` の既存 btree index を利用できます。列車種別の存在確認に
-必要な `types` との JOIN のみを行い、路線・会社など探索に不要なテーブルは JOIN しません。
+エンドポイントはクライアント互換のため、サブドメイン直下でクエリを受けます。
 
-### Proto 更新時の注意点
+| パス | 内容 |
+|---|---|
+| `POST /` | クエリ実行 |
+| `GET /` | GraphiQL |
+| `GET /__schema` | SDL (CI が取得して突き合わせる) |
+| `GET /__health` | 索引の件数 |
+| `GET /__ping` | データに触らない疎通確認 |
 
-1. **後方互換性**: 新フィールドには `optional` キーワードを使用
-2. **ビルド設定**: `build.rs` で `serde` トレイトを追加
-3. **DTO 更新**: `src/use_case/dto/*.rs` のマッピングを更新
-4. **テスト更新**: 新フィールドの統合テストを追加
+`async-graphql` はコードファーストなので、Rust の型を変えると SDL が変わります。
+クライアントが壊れる変更に気付けるよう、`schema/public.graphql` を正として
+`scripts/compare_schema.py` が突き合わせ、CI で差分があれば失敗させます。
+型とフィールドは集合として、enum は順序込みで比較します。
 
-```protobuf
-// 後方互換性のある追加例
-message Station {
-    // 既存フィールド...
-    optional string new_field = 25;  // optional で追加
-}
-```
+意図的にスキーマを変えるときはこのファイルも更新します。その差分が
+クライアントへの影響範囲そのものになります。
+
+実装上の注意:
+
+- `async-graphql` は enum 値を既定で SCREAMING_SNAKE_CASE にする。公開スキーマは
+  PascalCase なので `rename_items` で揃えている
+- PascalCase 変換では `JR` が `Jr` になるため、この値だけ `name` を明示している
+- `Station` / `StationNested` のように同一構造で名前が違う型は、SDL を合わせる
+  ためマクロで両方定義している。Nested 型は互いを参照するので `Box` で
+  間接化しないと無限サイズになる
 
 ---
 
 ## 命名規則
 
-### Row 構造体 vs Entity の区別
+同じ「駅」を指す型が層ごとに 3 つあります。
 
 | 種別 | 場所 | 目的 | 特徴 |
-|------|------|------|------|
-| **Row** | `infrastructure/*.rs` | DB行の直接マッピング | `#[derive(sqlx::FromRow)]`、DBカラム名と一致 |
-| **Entity** | `domain/entity/*.rs` | ドメインモデル | ビジネスロジック、ネスト構造、多言語対応 |
+|---|---|---|---|
+| **Record** | `src/index.rs` | 埋め込み CSV の 1 行 | 検索に要る列だけを持つ軽量な構造体 |
+| **Entity** | `stationapi/src/domain/entity/` | ドメインモデル | ネスト構造、多言語対応、約66フィールド |
+| **Model** | `stationapi/src/model.rs` | API が返す値 | 列挙型は `i32` のまま持つ |
 
-### Row 構造体
+### Record 構造体
 
 ```rust
-// infrastructure/station_repository.rs
-#[derive(sqlx::FromRow, Clone)]
-pub struct StationRow {
-    pub station_cd: i32,           // DBカラム名と一致
+// src/index.rs
+pub struct StationRecord {
+    pub station_cd: i32,
     pub station_g_cd: i32,
-    pub station_name: String,
-    pub line_cd: i32,
-    // ... 約19フィールド
+    pub name: String,
+    // 検索に使う列だけ。応答用の Station は必要になってから組み立てる
 }
 ```
 
-**特徴**:
-- フィールド名は PostgreSQL カラム名と**完全一致**（snake_case）
-- データベースネイティブ型を使用: `i32`, `i64`, `f64`, `Option<T>`, `String`
-- ロジックを持たない純粋なデータホルダー
+全件走査を毎リクエスト行うため、`Station` エンティティ (66 フィールド) を
+索引に持たせず、応答生成時にだけ組み立てます。ローマ字名の小文字版のように、
+比較のたびに計算すると高くつくものは索引時に持っておきます。
 
 ### Entity 構造体
 
 ```rust
-// domain/entity/station.rs
+// stationapi/src/domain/entity/station.rs
 pub struct Station {
-    pub station_cd: u32,           // ビジネス型（符号なし）
-    pub station_g_cd: u32,
-    pub station_name: String,
-    pub line: Option<Box<Line>>,   // ネスト構造
-    pub lines: Vec<Line>,          // コレクション
-    pub train_type: Option<Box<TrainType>>,
+    pub station_cd: u32,
+    pub line: Option<Box<Line>>,
+    pub lines: Vec<Line>,
     pub station_numbers: Vec<StationNumber>,
-    // ... 約66フィールド
+    // ...
 }
 ```
 
-**特徴**:
-- ビジネスセマンティクスを反映した型（例: `StopCondition` 列挙型）
-- ネスト構造を含む（`Option<Box<Line>>`, `Vec<Line>` など）
-- 多言語名をサポート: `station_name_r`（ローマ字）, `station_name_zh`（中国語）, `station_name_ko`（韓国語）
-- `Clone`, `Debug`, `Serialize`, `Deserialize`, `PartialEq` を実装
+- ビジネスセマンティクスを反映した型 (`StopCondition` 列挙型など)
+- 多言語名: `station_name_r` (ローマ字)、`station_name_zh`、`station_name_ko`
 
 ### 変換フロー
 
 ```txt
-Database (PostgreSQL)
-    ↓
-Row (sqlx::FromRow)      ← 直接マッピング: StationRow
-    ↓
-Entity (From<Row>)       ← 型変換、None初期化: Station
-    ↓
-Enriched Entity          ← UseCase層でネストデータ追加
-    ↓
-gRPC Message             ← Proto変換: proto::Station
-    ↓
-Network Response
+generated/*.csv
+    ↓  起動時に一度だけパース
+Record (StationRecord)
+    ↓  to_entity(): 路線の属性を埋める
+Entity (Station)
+    ↓  UseCase 層でネストデータを付与
+Enriched Entity
+    ↓  DTO 変換: IPA / TTS セグメントを生成
+Model (model::Station)
+    ↓  From 変換
+GraphQL 型
 ```
-
----
-
-## キャッシュ戦略
-
-### 現在の設計: 明示的キャッシュなし
-
-StationAPI は現時点で明示的なインメモリキャッシュを実装していません。その代わり、以下の最適化戦略を採用しています。
-
-### バッチクエリによる暗黙的キャッシュ
-
-`query.rs:169-265` の `update_station_vec_with_attributes` メソッドでは、N+1問題を回避するためにバッチクエリを使用しています。
-
-```rust
-// 1. すべての station_g_cd を抽出
-let station_group_ids = stations.iter()
-    .map(|s| s.station_g_cd as u32)
-    .collect::<Vec<u32>>();
-
-// 2. 一括クエリで関連データを取得（N+1回避）
-let stations_by_group_ids = self
-    .get_stations_by_group_id_vec(&station_group_ids).await?;
-let lines = self
-    .get_lines_by_station_group_id_vec(&station_group_ids).await?;
-let train_types = self
-    .get_train_types_by_station_id_vec(&station_ids, line_group_id).await?;
-
-// 3. メモリ上で関連付け（O(1)クエリ/エンリッチメント）
-```
-
-**結果**: エンリッチメント処理あたり**O(1)クエリ**（N駅に対してN回のクエリではない）
-
-### HashSet による重複排除
-
-`query.rs:223` 付近でインメモリ重複排除を実施:
-
-```rust
-let mut seen_line_cds = std::collections::HashSet::new();
-let lines: Vec<Line> = lines
-    .iter()
-    .filter(|&l| {
-        l.station_g_cd.unwrap_or(0) == station.station_g_cd
-            && seen_line_cds.insert(l.line_cd)  // HashSetで重複防止
-    })
-    .cloned()
-    .collect();
-```
-
-### キャッシュを実装しない理由
-
-1. **データ規模**: 日本の鉄道データは比較的小規模（約9,000駅）
-2. **更新頻度**: CSV インポートによるデータ更新が前提
-3. **ステートレス設計**: 各リクエストは独立して処理
-4. **PostgreSQL の最適化**: インデックスとクエリプランナーによる効率化
-
-### 将来の検討事項
-
-大規模化や高頻度アクセスが必要な場合:
-- `moka` や `lru` クレートによる有界インメモリキャッシュ
-- CSV インポート時のキャッシュ無効化
-- `station_g_cd` 単位のタグベース無効化
 
 ---
 
@@ -378,112 +301,139 @@ let lines: Vec<Line> = lines
 ```txt
 [Client]
     │
-    ▼ gRPC Request
+    ▼ POST / (GraphQL)
 ┌──────────────────────────────────────────────┐
-│ Presentation 層 (grpc.rs)                     │
-│  └─ MyApi::get_stations_by_id()              │
+│ Presentation (src/graphql/query.rs)           │
+│  └─ Query::station()                          │
 └──────────────────────────────────────────────┘
     │
     ▼ QueryUseCase メソッド呼び出し
 ┌──────────────────────────────────────────────┐
-│ UseCase 層 (query.rs)                         │
-│  ├─ QueryInteractor::get_station_by_id()     │
-│  └─ update_station_vec_with_attributes()     │
+│ UseCase (use_case/interactor/query.rs)        │
+│  ├─ QueryInteractor::get_station_by_id()      │
+│  └─ update_station_vec_with_attributes()      │
 │      ├─ 駅グループ一括取得                      │
-│      ├─ 路線一括取得                           │
-│      ├─ 会社一括取得                           │
+│      ├─ 路線一括取得                            │
+│      ├─ 事業者一括取得                          │
 │      └─ 列車種別一括取得                        │
 └──────────────────────────────────────────────┘
     │
-    ▼ Repository メソッド呼び出し
+    ▼ repository トレイト経由
 ┌──────────────────────────────────────────────┐
-│ Infrastructure 層 (station_repository.rs)     │
-│  └─ MyStationRepository::find_by_id()        │
-│      └─ SQL クエリ実行 (sqlx)                  │
+│ Index (src/repository.rs, src/index.rs)       │
+│  └─ MemStationRepository::find_by_id()        │
+│      └─ HashMap 参照 / 全件走査                │
 └──────────────────────────────────────────────┘
     │
-    ▼ Row → Entity 変換
-┌──────────────────────────────────────────────┐
-│ Domain 層 (entity/station.rs)                 │
-│  └─ impl From<StationRow> for Station        │
-└──────────────────────────────────────────────┘
-    │
-    ▼ Entity → gRPC Message 変換
-┌──────────────────────────────────────────────┐
-│ UseCase 層 (dto/station.rs)                   │
-│  └─ impl From<Station> for proto::Station    │
-└──────────────────────────────────────────────┘
-    │
-    ▼ gRPC Response
+    ▼ Record → Entity 変換
+    ▼ Entity → Model 変換 (use_case/dto/)
+    ▼ Model → GraphQL 型
 [Client]
 ```
 
-### エラー伝播チェーン
+一括取得は N+1 を避けるためのもので、データベース時代から変えていません。
+インメモリでも、駅ごとに索引を引き直すより一度に集めたほうが素直です。
+
+### エラー伝播
 
 ```txt
-DomainError (sqlx エラー等)
-    ↓ ?演算子
-UseCaseError (ユースケース層)
+DomainError
+    ↓ ? 演算子
+UseCaseError
     ↓ From トレイト
-PresentationalError (プレゼンテーション層)
-    ↓ Into トレイト
-tonic::Status (gRPC ワイヤーフォーマット)
+async_graphql::Error
+    ↓
+GraphQL の errors フィールド
 ```
+
+未実装の repository メソッドは `DomainError` を返す設計にしてあります。
+黙って空を返すと正常応答に見えて実装漏れに気付けないためです (移行時、
+実際にこの設計のおかげで 1 件の漏れが 500 応答として検出できました)。
 
 ---
 
 ## ディレクトリ構造
 
 ```txt
-stationapi/src/
-├── domain/                          # コアビジネスロジック
-│   ├── entity/                      # ドメインエンティティ
-│   │   ├── station.rs               # Station (66フィールド)
-│   │   ├── line.rs                  # Line (40フィールド)
-│   │   ├── train_type.rs            # TrainType
-│   │   ├── company.rs               # Company
-│   │   ├── line_symbol.rs           # LineSymbol
-│   │   └── station_number.rs        # StationNumber
-│   ├── repository/                  # 抽象インターフェース
-│   │   ├── station_repository.rs
-│   │   ├── line_repository.rs
-│   │   ├── train_type_repository.rs
-│   │   └── company_repository.rs
-│   ├── normalize.rs                 # テキスト正規化
-│   └── error.rs                     # DomainError
+.
+├── Cargo.toml            # stationapi-worker (wasm32 専用) + workspace
+├── wrangler.jsonc        # staging / production の設定
+├── build.rs              # CSV を OUT_DIR へ配置、sst.bin を生成
+├── src/                  # Worker 本体
+│   ├── lib.rs            # エンドポイント
+│   ├── index.rs          # 埋め込みデータのパースと索引
+│   ├── repository.rs     # repository トレイトの実装
+│   └── graphql/          # GraphQL の型・リゾルバ
+│       ├── query.rs      # 18 クエリ
+│       ├── types.rs      # オブジェクト型
+│       ├── enums.rs      # 列挙型
+│       └── scalar.rs     # UInt32 スカラー
 │
-├── use_case/                        # アプリケーションロジック
-│   ├── interactor/
-│   │   └── query.rs                 # QueryInteractor (約950行)
-│   ├── traits/
-│   │   └── query.rs                 # QueryUseCase トレイト
-│   ├── dto/                         # データ変換
-│   │   ├── station.rs
-│   │   ├── line.rs
-│   │   ├── train_type.rs
-│   │   └── company.rs
-│   └── error.rs                     # UseCaseError
+├── schema/
+│   └── public.graphql    # 公開スキーマの正 (CI が突き合わせる)
 │
-├── infrastructure/                  # データ永続化
-│   ├── station_repository.rs        # StationRow + MyStationRepository
-│   ├── line_repository.rs           # LineRow + MyLineRepository
-│   ├── train_type_repository.rs     # TrainTypeRow + MyTrainTypeRepository
-│   ├── company_repository.rs        # CompanyRow + MyCompanyRepository
-│   └── error.rs                     # InfrastructureError
+├── stationapi/           # ドメインとユースケース (Worker と preprocessor が共有)
+│   └── src/
+│       ├── domain/
+│       │   ├── entity/           # Station / Line / TrainType / Company ...
+│       │   ├── repository/       # 抽象インターフェース
+│       │   ├── arrival_estimation.rs
+│       │   ├── segment_speed_table.rs
+│       │   ├── speed_table.rs
+│       │   ├── ipa.rs
+│       │   ├── romaji.rs
+│       │   └── normalize.rs
+│       ├── use_case/
+│       │   ├── interactor/query.rs   # QueryInteractor
+│       │   ├── traits/query.rs       # QueryUseCase トレイト
+│       │   └── dto/                  # Entity → Model 変換
+│       └── model.rs                  # API が返す値の表現
 │
-├── presentation/                    # 外部API
-│   ├── controller/
-│   │   └── grpc.rs                  # MyApi (14エンドポイント)
-│   └── error.rs                     # PresentationalError
+├── preprocessor/         # generated/*.csv を作るビルド時ツール
+│   └── src/
+│       ├── rail.rs       # data/*.csv の読み込みと各駅停車の系統生成
+│       ├── gtfs/         # GTFS / ODPT の取得・解釈・統合
+│       ├── codes.rs      # バス用コードの生成
+│       ├── table.rs      # 出力テーブルの表現
+│       └── emit.rs       # CSV 書き出し
 │
-├── lib.rs                           # モジュール宣言
-└── main.rs                          # エントリーポイント
+├── data_validator/       # data/*.csv の整合性検査
+├── data/                 # 鉄道の正データ (CSV) と GTFS の展開先
+├── generated/            # preprocessor の出力 (git 管理外)
+├── scripts/              # データ整備・スキーマ比較のスクリプト
+└── tools/                # IPA カバレッジ監査
 ```
+
+---
+
+## 運用
+
+### 環境の使い分け
+
+他の Worker と揃えて、env 省略時を staging にしてあります。
+
+```bash
+make deploy             # wrangler deploy --env=""         -> stationapi-stg
+make deploy-production  # wrangler deploy --env production -> stationapi
+```
+
+wrangler 4 は複数環境がある状態で `--env` を省略すると警告するため、
+staging を指す場合も `--env=""` を明示します。
+
+### 注意点
+
+- **データ更新のたびに再デプロイが要る。** WASM に埋め込むため
+- **custom domain は二重に登録できない。** ドメインを移す際は、先に元の
+  Worker から外してデプロイする必要がある
+- **`generated/` は git 管理外。** クローン直後には無いので、`make data` で
+  作る。無いまま `worker-build` すると `data/*.csv` にフォールバックし、
+  各駅停車の系統とバスが欠けた状態でビルドされる (警告は出る)
 
 ---
 
 ## 関連ドキュメント
 
+- [Cloudflare Workers 移行の記録](./cloudflare-workers-migration.md)
 - [技術負債分析レポート](./technical_debt.md)
-- [リポジトリテストガイド](./repository_testing.md)
+- [近傍バス停検索機能](./nearby-bus-stops.md)
 - [データ貢献ガイドライン](../data/README.md)

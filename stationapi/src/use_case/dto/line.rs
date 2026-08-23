@@ -3,16 +3,16 @@ use crate::{
         entity::{gtfs::TransportType, line::Line},
         ipa::compute_line_ipa_cached,
     },
-    proto::{Line as GrpcLine, TransportType as GrpcTransportType},
-    use_case::dto::tts::to_proto_tts_segments,
+    model::{Line as ModelLine, TransportType as ModelTransportType},
+    use_case::dto::tts::to_tts_segments,
 };
 
-impl From<Line> for GrpcLine {
+impl From<Line> for ModelLine {
     fn from(line: Line) -> Self {
         let ipa = compute_line_ipa_cached(&line.line_name_k, line.line_name_r.as_deref());
         let name_ipa = ipa.name_ipa.clone();
         let name_roman_ipa = ipa.name_roman_ipa.clone();
-        let name_tts_segments = to_proto_tts_segments(&ipa.tts_segments);
+        let name_tts_segments = to_tts_segments(&ipa.tts_segments);
         // バス路線の場合は line_type を OtherLineType (0) に強制
         // (鉄道用の line_type が誤って設定されている可能性があるため)
         let line_type = if line.transport_type == TransportType::Bus {
@@ -49,15 +49,15 @@ impl From<Line> for GrpcLine {
 
 fn convert_transport_type(t: TransportType) -> i32 {
     match t {
-        TransportType::Rail => GrpcTransportType::Rail as i32,
-        TransportType::Bus => GrpcTransportType::Bus as i32,
+        TransportType::Rail => ModelTransportType::Rail as i32,
+        TransportType::Bus => ModelTransportType::Bus as i32,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proto::LineType as GrpcLineType;
+    use crate::model::LineType as ModelLineType;
 
     fn create_test_line(transport_type: TransportType, line_type: Option<i32>) -> Line {
         Line {
@@ -105,67 +105,72 @@ mod tests {
     #[test]
     fn test_bus_line_with_subway_line_type_returns_other() {
         // バス路線にSubway(3)が設定されていても、OtherLineType(0)が返される
-        let bus_line = create_test_line(TransportType::Bus, Some(GrpcLineType::Subway as i32));
-        let grpc_line: GrpcLine = bus_line.into();
+        let bus_line = create_test_line(TransportType::Bus, Some(ModelLineType::Subway as i32));
+        let model_line: ModelLine = bus_line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::OtherLineType as i32);
-        assert_eq!(grpc_line.transport_type, GrpcTransportType::Bus as i32);
+        assert_eq!(model_line.line_type, ModelLineType::OtherLineType as i32);
+        assert_eq!(model_line.transport_type, ModelTransportType::Bus as i32);
     }
 
     #[test]
     fn test_bus_line_with_bullet_train_line_type_returns_other() {
         // バス路線にBulletTrain(1)が設定されていても、OtherLineType(0)が返される
-        let bus_line = create_test_line(TransportType::Bus, Some(GrpcLineType::BulletTrain as i32));
-        let grpc_line: GrpcLine = bus_line.into();
+        let bus_line =
+            create_test_line(TransportType::Bus, Some(ModelLineType::BulletTrain as i32));
+        let model_line: ModelLine = bus_line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::OtherLineType as i32);
+        assert_eq!(model_line.line_type, ModelLineType::OtherLineType as i32);
     }
 
     #[test]
     fn test_bus_line_with_normal_line_type_returns_other() {
         // バス路線にNormal(2)が設定されていても、OtherLineType(0)が返される
-        let bus_line = create_test_line(TransportType::Bus, Some(GrpcLineType::Normal as i32));
-        let grpc_line: GrpcLine = bus_line.into();
+        let bus_line = create_test_line(TransportType::Bus, Some(ModelLineType::Normal as i32));
+        let model_line: ModelLine = bus_line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::OtherLineType as i32);
+        assert_eq!(model_line.line_type, ModelLineType::OtherLineType as i32);
     }
 
     #[test]
     fn test_bus_line_with_tram_line_type_returns_other() {
         // バス路線にTram(4)が設定されていても、OtherLineType(0)が返される
-        let bus_line = create_test_line(TransportType::Bus, Some(GrpcLineType::Tram as i32));
-        let grpc_line: GrpcLine = bus_line.into();
+        let bus_line = create_test_line(TransportType::Bus, Some(ModelLineType::Tram as i32));
+        let model_line: ModelLine = bus_line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::OtherLineType as i32);
+        assert_eq!(model_line.line_type, ModelLineType::OtherLineType as i32);
     }
 
     #[test]
     fn test_bus_line_with_monorail_line_type_returns_other() {
         // バス路線にMonorailOrAGT(5)が設定されていても、OtherLineType(0)が返される
-        let bus_line =
-            create_test_line(TransportType::Bus, Some(GrpcLineType::MonorailOrAgt as i32));
-        let grpc_line: GrpcLine = bus_line.into();
+        let bus_line = create_test_line(
+            TransportType::Bus,
+            Some(ModelLineType::MonorailOrAgt as i32),
+        );
+        let model_line: ModelLine = bus_line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::OtherLineType as i32);
+        assert_eq!(model_line.line_type, ModelLineType::OtherLineType as i32);
     }
 
     #[test]
     fn test_bus_line_with_none_line_type_returns_other() {
         // バス路線でline_typeがNoneでも、OtherLineType(0)が返される
         let bus_line = create_test_line(TransportType::Bus, None);
-        let grpc_line: GrpcLine = bus_line.into();
+        let model_line: ModelLine = bus_line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::OtherLineType as i32);
+        assert_eq!(model_line.line_type, ModelLineType::OtherLineType as i32);
     }
 
     #[test]
     fn test_bus_line_with_other_line_type_returns_other() {
         // バス路線でOtherLineType(0)が設定されていれば、そのままOtherLineType(0)が返される
-        let bus_line =
-            create_test_line(TransportType::Bus, Some(GrpcLineType::OtherLineType as i32));
-        let grpc_line: GrpcLine = bus_line.into();
+        let bus_line = create_test_line(
+            TransportType::Bus,
+            Some(ModelLineType::OtherLineType as i32),
+        );
+        let model_line: ModelLine = bus_line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::OtherLineType as i32);
+        assert_eq!(model_line.line_type, ModelLineType::OtherLineType as i32);
     }
 
     // ============================================
@@ -175,39 +180,39 @@ mod tests {
     #[test]
     fn test_rail_line_with_subway_line_type_preserved() {
         // 鉄道路線ではSubway(3)がそのまま返される
-        let rail_line = create_test_line(TransportType::Rail, Some(GrpcLineType::Subway as i32));
-        let grpc_line: GrpcLine = rail_line.into();
+        let rail_line = create_test_line(TransportType::Rail, Some(ModelLineType::Subway as i32));
+        let model_line: ModelLine = rail_line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::Subway as i32);
-        assert_eq!(grpc_line.transport_type, GrpcTransportType::Rail as i32);
+        assert_eq!(model_line.line_type, ModelLineType::Subway as i32);
+        assert_eq!(model_line.transport_type, ModelTransportType::Rail as i32);
     }
 
     #[test]
     fn test_rail_line_with_bullet_train_line_type_preserved() {
         // 鉄道路線ではBulletTrain(1)がそのまま返される
         let rail_line =
-            create_test_line(TransportType::Rail, Some(GrpcLineType::BulletTrain as i32));
-        let grpc_line: GrpcLine = rail_line.into();
+            create_test_line(TransportType::Rail, Some(ModelLineType::BulletTrain as i32));
+        let model_line: ModelLine = rail_line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::BulletTrain as i32);
+        assert_eq!(model_line.line_type, ModelLineType::BulletTrain as i32);
     }
 
     #[test]
     fn test_rail_line_with_normal_line_type_preserved() {
         // 鉄道路線ではNormal(2)がそのまま返される
-        let rail_line = create_test_line(TransportType::Rail, Some(GrpcLineType::Normal as i32));
-        let grpc_line: GrpcLine = rail_line.into();
+        let rail_line = create_test_line(TransportType::Rail, Some(ModelLineType::Normal as i32));
+        let model_line: ModelLine = rail_line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::Normal as i32);
+        assert_eq!(model_line.line_type, ModelLineType::Normal as i32);
     }
 
     #[test]
     fn test_rail_line_with_tram_line_type_preserved() {
         // 鉄道路線ではTram(4)がそのまま返される
-        let rail_line = create_test_line(TransportType::Rail, Some(GrpcLineType::Tram as i32));
-        let grpc_line: GrpcLine = rail_line.into();
+        let rail_line = create_test_line(TransportType::Rail, Some(ModelLineType::Tram as i32));
+        let model_line: ModelLine = rail_line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::Tram as i32);
+        assert_eq!(model_line.line_type, ModelLineType::Tram as i32);
     }
 
     #[test]
@@ -215,20 +220,20 @@ mod tests {
         // 鉄道路線ではMonorailOrAGT(5)がそのまま返される
         let rail_line = create_test_line(
             TransportType::Rail,
-            Some(GrpcLineType::MonorailOrAgt as i32),
+            Some(ModelLineType::MonorailOrAgt as i32),
         );
-        let grpc_line: GrpcLine = rail_line.into();
+        let model_line: ModelLine = rail_line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::MonorailOrAgt as i32);
+        assert_eq!(model_line.line_type, ModelLineType::MonorailOrAgt as i32);
     }
 
     #[test]
     fn test_rail_line_with_none_line_type_defaults_to_other() {
         // 鉄道路線でline_typeがNoneの場合、OtherLineType(0)がデフォルトで返される
         let rail_line = create_test_line(TransportType::Rail, None);
-        let grpc_line: GrpcLine = rail_line.into();
+        let model_line: ModelLine = rail_line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::OtherLineType as i32);
+        assert_eq!(model_line.line_type, ModelLineType::OtherLineType as i32);
     }
 
     // ============================================
@@ -238,38 +243,38 @@ mod tests {
     #[test]
     fn test_convert_transport_type_rail() {
         let result = convert_transport_type(TransportType::Rail);
-        assert_eq!(result, GrpcTransportType::Rail as i32);
+        assert_eq!(result, ModelTransportType::Rail as i32);
     }
 
     #[test]
     fn test_convert_transport_type_bus() {
         let result = convert_transport_type(TransportType::Bus);
-        assert_eq!(result, GrpcTransportType::Bus as i32);
+        assert_eq!(result, ModelTransportType::Bus as i32);
     }
 
     // ============================================
-    // Line から GrpcLine への変換テスト (その他フィールド)
+    // Line から ModelLine への変換テスト (その他フィールド)
     // ============================================
 
     #[test]
-    fn test_line_to_grpc_line_basic_fields() {
-        let line = create_test_line(TransportType::Rail, Some(GrpcLineType::Normal as i32));
-        let grpc_line: GrpcLine = line.into();
+    fn test_line_to_model_line_basic_fields() {
+        let line = create_test_line(TransportType::Rail, Some(ModelLineType::Normal as i32));
+        let model_line: ModelLine = line.into();
 
-        assert_eq!(grpc_line.id, 1);
-        assert_eq!(grpc_line.name_short, "テスト路線");
-        assert_eq!(grpc_line.name_katakana, "テストロセン");
-        assert_eq!(grpc_line.name_full, "てすとろせん");
-        assert_eq!(grpc_line.name_roman, Some("Test Line".to_string()));
-        assert_eq!(grpc_line.name_chinese, Some("测试线路".to_string()));
-        assert_eq!(grpc_line.name_korean, Some("테스트노선".to_string()));
-        assert_eq!(grpc_line.color, "#FF0000");
-        assert_eq!(grpc_line.status, 0);
-        assert!((grpc_line.average_distance - 1.5).abs() < f64::EPSILON);
+        assert_eq!(model_line.id, 1);
+        assert_eq!(model_line.name_short, "テスト路線");
+        assert_eq!(model_line.name_katakana, "テストロセン");
+        assert_eq!(model_line.name_full, "てすとろせん");
+        assert_eq!(model_line.name_roman, Some("Test Line".to_string()));
+        assert_eq!(model_line.name_chinese, Some("测试线路".to_string()));
+        assert_eq!(model_line.name_korean, Some("테스트노선".to_string()));
+        assert_eq!(model_line.color, "#FF0000");
+        assert_eq!(model_line.status, 0);
+        assert!((model_line.average_distance - 1.5).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn test_line_to_grpc_line_with_none_optional_fields() {
+    fn test_line_to_model_line_with_none_optional_fields() {
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_r = None;
         line.line_name_zh = None;
@@ -277,48 +282,48 @@ mod tests {
         line.line_color_c = None;
         line.average_distance = None;
 
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
         // name_romanはNoneでもSome("")になる
-        assert_eq!(grpc_line.name_roman, Some("".to_string()));
-        assert_eq!(grpc_line.name_chinese, None);
-        assert_eq!(grpc_line.name_korean, None);
+        assert_eq!(model_line.name_roman, Some("".to_string()));
+        assert_eq!(model_line.name_chinese, None);
+        assert_eq!(model_line.name_korean, None);
         // colorはNoneでも""になる
-        assert_eq!(grpc_line.color, "");
+        assert_eq!(model_line.color, "");
         // average_distanceはNoneでも0.0になる
-        assert!((grpc_line.average_distance - 0.0).abs() < f64::EPSILON);
+        assert!((model_line.average_distance - 0.0).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn test_line_to_grpc_line_empty_line_symbols() {
+    fn test_line_to_model_line_empty_line_symbols() {
         let line = create_test_line(TransportType::Rail, None);
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
-        assert!(grpc_line.line_symbols.is_empty());
+        assert!(model_line.line_symbols.is_empty());
     }
 
     #[test]
-    fn test_line_to_grpc_line_without_station() {
+    fn test_line_to_model_line_without_station() {
         let line = create_test_line(TransportType::Rail, None);
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
-        assert!(grpc_line.station.is_none());
+        assert!(model_line.station.is_none());
     }
 
     #[test]
-    fn test_line_to_grpc_line_without_company() {
+    fn test_line_to_model_line_without_company() {
         let line = create_test_line(TransportType::Rail, None);
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
-        assert!(grpc_line.company.is_none());
+        assert!(model_line.company.is_none());
     }
 
     #[test]
-    fn test_line_to_grpc_line_without_train_type() {
+    fn test_line_to_model_line_without_train_type() {
         let line = create_test_line(TransportType::Rail, None);
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
-        assert!(grpc_line.train_type.is_none());
+        assert!(model_line.train_type.is_none());
     }
 
     // ============================================
@@ -329,19 +334,19 @@ mod tests {
     fn test_line_type_boundary_values() {
         // line_typeの境界値テスト
         let test_cases = vec![
-            (0, GrpcLineType::OtherLineType as i32),
-            (1, GrpcLineType::BulletTrain as i32),
-            (2, GrpcLineType::Normal as i32),
-            (3, GrpcLineType::Subway as i32),
-            (4, GrpcLineType::Tram as i32),
-            (5, GrpcLineType::MonorailOrAgt as i32),
+            (0, ModelLineType::OtherLineType as i32),
+            (1, ModelLineType::BulletTrain as i32),
+            (2, ModelLineType::Normal as i32),
+            (3, ModelLineType::Subway as i32),
+            (4, ModelLineType::Tram as i32),
+            (5, ModelLineType::MonorailOrAgt as i32),
         ];
 
         for (input, expected) in test_cases {
             let line = create_test_line(TransportType::Rail, Some(input));
-            let grpc_line: GrpcLine = line.into();
+            let model_line: ModelLine = line.into();
             assert_eq!(
-                grpc_line.line_type, expected,
+                model_line.line_type, expected,
                 "Failed for line_type: {input}"
             );
         }
@@ -351,18 +356,18 @@ mod tests {
     fn test_line_type_unknown_value_preserved_for_rail() {
         // 鉄道路線で未知のline_type値は保持される
         let line = create_test_line(TransportType::Rail, Some(99));
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
-        assert_eq!(grpc_line.line_type, 99);
+        assert_eq!(model_line.line_type, 99);
     }
 
     #[test]
     fn test_bus_line_unknown_line_type_returns_other() {
         // バス路線では未知のline_type値もOtherLineTypeになる
         let line = create_test_line(TransportType::Bus, Some(99));
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
-        assert_eq!(grpc_line.line_type, GrpcLineType::OtherLineType as i32);
+        assert_eq!(model_line.line_type, ModelLineType::OtherLineType as i32);
     }
 
     #[test]
@@ -370,9 +375,9 @@ mod tests {
         // line_cdがu32に正しく変換されることを確認
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_cd = 12345;
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
-        assert_eq!(grpc_line.id, 12345);
+        assert_eq!(model_line.id, 12345);
     }
 
     // ============================================
@@ -384,10 +389,10 @@ mod tests {
         // name_ipa はカタカナ由来
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "セイブイケブクロセン".to_string();
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
         assert_eq!(
-            grpc_line.name_ipa,
+            model_line.name_ipa,
             Some("se.ibɯ.ikebɯkɯɾo laɪn".to_string())
         );
     }
@@ -396,10 +401,10 @@ mod tests {
     fn test_name_ipa_honsen_suffix_replaced_with_main_line() {
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "トウカイドウホンセン".to_string();
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
         assert_eq!(
-            grpc_line.name_ipa,
+            model_line.name_ipa,
             Some("to.ɯka.ido.ɯ meɪn laɪn".to_string())
         );
     }
@@ -408,9 +413,9 @@ mod tests {
     fn test_name_ipa_shinkansen_preserved() {
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "トウホクシンカンセン".to_string();
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("to.ɯhokɯɕiŋkanseɴ".to_string()));
+        assert_eq!(model_line.name_ipa, Some("to.ɯhokɯɕiŋkanseɴ".to_string()));
     }
 
     #[test]
@@ -418,11 +423,11 @@ mod tests {
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "ケイセイホンセン".to_string();
         line.line_name_r = Some("Keisei Main Line".to_string());
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, Some("ke.ise.i meɪn laɪn".to_string()));
+        assert_eq!(model_line.name_ipa, Some("ke.ise.i meɪn laɪn".to_string()));
         assert_eq!(
-            grpc_line.name_roman_ipa,
+            model_line.name_roman_ipa,
             Some("keːseː meɪn laɪn".to_string())
         );
     }
@@ -433,15 +438,15 @@ mod tests {
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "チュウオウ・ソウブセン".to_string();
         line.line_name_r = None;
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
         // 「・」が空白へ正規化され（連続空白も残さず）、「線」→ " laɪn" 置換も維持される。
-        let ipa = grpc_line.name_ipa.expect("name_ipa should be present");
+        let ipa = model_line.name_ipa.expect("name_ipa should be present");
         assert!(!ipa.is_empty());
         assert!(ipa.contains(" laɪn"));
         assert!(!ipa.contains("  "));
         assert!(!ipa.contains('・'));
-        assert!(!grpc_line.name_tts_segments.is_empty());
+        assert!(!model_line.name_tts_segments.is_empty());
     }
 
     #[test]
@@ -450,11 +455,11 @@ mod tests {
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "トウキョウサクラトラム（トデンアラカワセン）".to_string();
         line.line_name_r = None;
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
-        assert!(grpc_line.name_ipa.is_some());
-        assert!(!grpc_line.name_ipa.as_deref().unwrap().is_empty());
-        assert!(!grpc_line.name_tts_segments.is_empty());
+        assert!(model_line.name_ipa.is_some());
+        assert!(!model_line.name_ipa.as_deref().unwrap().is_empty());
+        assert!(!model_line.name_tts_segments.is_empty());
     }
 
     #[test]
@@ -462,9 +467,9 @@ mod tests {
         let mut line = create_test_line(TransportType::Rail, None);
         line.line_name_k = "".to_string();
         line.line_name_r = None;
-        let grpc_line: GrpcLine = line.into();
+        let model_line: ModelLine = line.into();
 
-        assert_eq!(grpc_line.name_ipa, None);
-        assert_eq!(grpc_line.name_roman_ipa, None);
+        assert_eq!(model_line.name_ipa, None);
+        assert_eq!(model_line.name_roman_ipa, None);
     }
 }

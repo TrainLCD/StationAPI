@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::proto::StopCondition;
+use crate::model::StopCondition;
 
 use super::{
     gtfs::TransportType, line::Line, station_number::StationNumber,
@@ -38,7 +38,7 @@ pub struct Station {
     pub distance: Option<f64>,
     pub has_train_types: bool,
     pub train_type: Option<Box<TrainTypeEntity>>,
-    // linesからJOIN
+    // 路線から引く値
     pub company_cd: Option<i32>,
     pub line_name: Option<String>,
     pub line_name_k: Option<String>,
@@ -61,13 +61,13 @@ pub struct Station {
     pub line_symbol3_shape: Option<String>,
     pub line_symbol4_shape: Option<String>,
     pub average_distance: Option<f64>,
-    // station_station_typesからJOIN
+    // 系統 (station_station_types) から引く値
     pub type_id: Option<i32>,
     pub sst_id: Option<i32>,
     pub type_cd: Option<i32>,
     pub line_group_cd: Option<i32>,
     pub pass: Option<i32>,
-    // typesからJOIN
+    // 列車種別 (types) から引く値
     pub type_name: Option<String>,
     pub type_name_k: Option<String>,
     pub type_name_r: Option<String>,
@@ -221,7 +221,7 @@ impl Station {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proto::StopCondition;
+    use crate::model::StopCondition;
 
     fn create_test_station_number() -> StationNumber {
         StationNumber::new(

@@ -1,10 +1,10 @@
 use crate::{
     domain::{entity::train_type::TrainType, ipa::compute_ipa_cached},
-    proto::TrainType as GrpcTrainType,
-    use_case::dto::tts::to_proto_tts_segments,
+    model::TrainType as ModelTrainType,
+    use_case::dto::tts::to_tts_segments,
 };
 
-impl From<TrainType> for GrpcTrainType {
+impl From<TrainType> for ModelTrainType {
     fn from(train_type: TrainType) -> Self {
         let TrainType {
             id,
@@ -26,7 +26,7 @@ impl From<TrainType> for GrpcTrainType {
         let ipa = compute_ipa_cached(&type_name_k, type_name_r.as_deref());
         let name_ipa = ipa.name_ipa.clone();
         let name_roman_ipa = ipa.name_roman_ipa.clone();
-        let name_tts_segments = to_proto_tts_segments(&ipa.tts_segments);
+        let name_tts_segments = to_tts_segments(&ipa.tts_segments);
         Self {
             id: id.map(|id| id as u32).unwrap_or(0),
             type_id: type_cd.map(|id| id as u32).unwrap_or(0),
@@ -72,9 +72,9 @@ mod tests {
 
     #[test]
     fn test_train_type_sets_katakana_and_roman_ipa() {
-        let grpc_train_type: GrpcTrainType = create_test_train_type().into();
+        let model_train_type: ModelTrainType = create_test_train_type().into();
 
-        assert_eq!(grpc_train_type.name_ipa, Some("ka.isokɯ".to_string()));
-        assert_eq!(grpc_train_type.name_roman_ipa, Some("ɹæpɪd".to_string()));
+        assert_eq!(model_train_type.name_ipa, Some("ka.isokɯ".to_string()));
+        assert_eq!(model_train_type.name_roman_ipa, Some("ɹæpɪd".to_string()));
     }
 }

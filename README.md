@@ -8,7 +8,7 @@
 
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
-A gRPC-Web API that provides nearby Japanese train stations.
+A GraphQL API that provides nearby Japanese train stations and bus stops, running on Cloudflare Workers.
 
 ## Documentation
 
@@ -16,6 +16,8 @@ A gRPC-Web API that provides nearby Japanese train stations.
 - For contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 - For system architecture and design decisions, see [docs/architecture.md](docs/architecture.md).
 - For technical debt analysis and architectural concerns, see [docs/technical_debt.md](docs/technical_debt.md).
+- For the record of the Cloudflare Workers migration, see [docs/cloudflare-workers-migration.md](docs/cloudflare-workers-migration.md).
+- For the published GraphQL schema, see [schema/public.graphql](schema/public.graphql).
 
 ## Data Contribution
 
@@ -53,66 +55,40 @@ Do you like this project? Join our Discord community!
 
 ## Development
 
-### Running Tests
-
-This project includes comprehensive tests for the repository layer:
-
-#### Unit Tests (No database required)
+No database is required. The data is generated into `generated/*.csv` and embedded
+into the WASM binary at build time.
 
 ```bash
-# Using Cargo directly
-cargo test --lib --package stationapi
+rustup target add wasm32-unknown-unknown
+cargo install worker-build --locked
 
-# Or using Make
-make test-unit
+make data     # build generated/*.csv from data/ and the GTFS feeds
+make build    # build the Worker (wasm)
+make dev      # run it locally on http://127.0.0.1:8787
 ```
 
-#### Integration Tests (Requires PostgreSQL)
+`make help` lists every target.
+
+### Testing
 
 ```bash
-# Set up environment and run integration tests
-source .env.test
-cargo test --lib --package stationapi --features integration-tests
-
-# Or using Make
-make test-integration
+make test     # unit tests for every native crate
+make check    # type-check, including the wasm32 target
+make clippy   # lint, including the wasm32 target
+make fmt      # formatting check
 ```
 
-#### All Tests
+Tests need no external services. `stationapi` (domain / use case) and
+`preprocessor` (data pipeline) are covered by unit tests; the published GraphQL
+schema is verified in CI by diffing the Worker's SDL against
+[`schema/public.graphql`](schema/public.graphql).
+
+### Deploying
 
 ```bash
-# Run unit tests followed by integration tests
-make test-all
+make deploy             # staging   -> stationapi-stg
+make deploy-production  # production -> stationapi
 ```
 
-For detailed testing information, see [docs/repository_testing.md](docs/repository_testing.md).
-
-### Test Coverage
-
-Repository layer tests cover:
-
-- ✅ Data conversion logic (`Row` → `Entity`)
-- ✅ Database query operations
-- ✅ Error handling and edge cases
-- ✅ Filtering conditions (`e_status`, `pass` fields)
-- ✅ Alias handling (line names)
-- ✅ Type conversions (`u32` ↔ `i32`, `u32` ↔ `i64`)
-
-### Testing Philosophy
-
-We follow Rust best practices for testing:
-
-- **Unit tests** run without external dependencies (fast, always available)
-- **Integration tests** controlled by feature flags (opt-in when database is available)
-- **Cargo-native** test execution using standard `cargo test` commands
-- **Makefile shortcuts** for common testing workflows
-
-## Data Sources
-
-- Bus-related data provided by [Tokyo Metropolitan Bureau of Transportation (Toei)](https://www.kotsu.metro.tokyo.jp/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
-- Bus-related data provided by [Seibu Bus Co., Ltd. (西武バス)](https://www.seibubus.co.jp/) via the [Public Transportation Open Data Center](https://ckan.odpt.org/), licensed under the [Public Transportation Open Data Basic License](https://developer.odpt.org/terms)
-- Bus-related data provided by [Keio Dentetsu Bus Co., Ltd. (京王電鉄バス)](https://www.keio-bus.com/) via the [Public Transportation Open Data Center](https://ckan.odpt.org/), licensed under the [Public Transportation Open Data Basic License](https://developer.odpt.org/terms)
-- Bus data provided by [Tokyu Bus Corporation (東急バス)](https://www.tokyubus.co.jp/) via the [Public Transportation Open Data Center](https://ckan.odpt.org/), licensed under the [Public Transportation Open Data Basic License](https://developer.odpt.org/terms)
-- Station data provided by [駅データ.jp](https://www.ekidata.jp/)
-- Speed calibration data (`speed_table.rs`) derived from GTFS timetables provided by Kyoto City Transportation Bureau (京都市交通局), Yokohama City Transportation Bureau (横浜市交通局), Tokyo Metro (東京メトロ), Metropolitan Intercity Railway (首都圏新都市鉄道), Tokyo Tama Intercity Monorail (多摩都市モノレール), and Tokyo Waterfront Area Rapid Transit (東京臨海高速鉄道) via the [Public Transportation Open Data Center](https://ckan.odpt.org/), licensed under the [Public Transportation Open Data Basic License](https://developer.odpt.org/terms); by [Tokyo Metropolitan Bureau of Transportation (Toei)](https://www.kotsu.metro.tokyo.jp/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); and by Hakodate City Enterprise Bureau Transportation Department (函館市企業局交通部), licensed under [GTFS-RUL (ODPT)](https://gtfs-jp.org/GTFS-RUL(ODPT).pdf)
-- Average inter-station distances (`average_distance`) computed from railway track geometry © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), licensed under [ODbL](https://opendatacommons.org/licenses/odbl/)
+The data lives inside the WASM binary, so **a data change needs a rebuild and a
+redeploy**; it is not picked up at runtime.

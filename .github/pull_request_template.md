@@ -22,9 +22,9 @@
 
 <!-- どのようにテストしたかを記述してください -->
 
-- [ ] `cargo fmt --all -- --check` が通ること
-- [ ] `cargo clippy -- -D warnings` が通ること
-- [ ] `cargo test`（`SQLX_OFFLINE=true`）が通ること
+- [ ] `make fmt` が通ること
+- [ ] `make clippy` が通ること（wasm32 ターゲットを含む）
+- [ ] `make test` が通ること
 
 ## 関連Issue
 

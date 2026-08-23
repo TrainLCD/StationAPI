@@ -6,13 +6,15 @@ ci/cd:
 rust:
   - changed-files:
       - any-glob-to-any-file:
-          - "src/*"
-          - "src/**/*"
-protobuf:
+          - "src/**"
+          - "stationapi/**"
+          - "preprocessor/**"
+          - "data_validator/**"
+          - "build.rs"
+graphql:
   - changed-files:
       - any-glob-to-any-file:
-          - "proto/*"
-          - "proto/**/*"
+          - "schema/**"
 documentation:
   - changed-files:
       - any-glob-to-any-file:

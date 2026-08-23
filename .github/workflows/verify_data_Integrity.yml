@@ -22,7 +22,7 @@ jobs:
       - name: Run data validator
         id: validate
         run: |
-          if cargo run --bin data_validator; then
+          if cargo run -p data_validator; then
             echo "result=success" >> "$GITHUB_OUTPUT"
           else
             echo "result=failure" >> "$GITHUB_OUTPUT"

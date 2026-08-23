@@ -289,7 +289,7 @@
 データ入力で不明な点がある場合は、以下を確認してください：
 
 1. 既存のデータ例を参照
-2. `create_table.sql`でテーブル構造を確認
+2. 列の定義は `preprocessor/src/rail.rs` の `*_COLUMNS` を確認
 3. 公式な鉄道会社の情報を参照
 4. 不明な場合は Issue で質問、または [Discord サーバ](https://discord.gg/tsemdME9Nz)で相談
 

@@ -1,9 +1,9 @@
 use crate::{
     domain::ipa::{TtsAlphabetKind, TtsNameSegment},
-    proto::{TtsAlphabet, TtsSegment},
+    model::{TtsAlphabet, TtsSegment},
 };
 
-pub fn to_proto_tts_segments(segments: &[TtsNameSegment]) -> Vec<TtsSegment> {
+pub fn to_tts_segments(segments: &[TtsNameSegment]) -> Vec<TtsSegment> {
     segments
         .iter()
         .map(|segment| TtsSegment {

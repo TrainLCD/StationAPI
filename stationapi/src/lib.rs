@@ -1,12 +1,9 @@
-pub mod config;
+//! StationAPI のドメインとユースケース。
+//!
+//! 配信 (GraphQL) は Cloudflare Workers 上で動くルートの crate が、
+//! Worker が読むデータの生成は preprocessor crate が担う。この crate は
+//! どちらからも参照されるため、wasm32 でビルドできる範囲に留めている。
+
 pub mod domain;
-pub mod infrastructure;
-pub mod presentation;
+pub mod model;
 pub mod use_case;
-
-pub mod proto {
-    tonic::include_proto!("app.trainlcd.grpc");
-
-    pub const FILE_DESCRIPTOR_SET: &[u8] =
-        tonic::include_file_descriptor_set!("stationapi_descriptor");
-}

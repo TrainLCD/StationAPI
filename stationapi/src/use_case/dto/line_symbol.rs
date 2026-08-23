@@ -1,6 +1,6 @@
-use crate::{domain::entity::line_symbol::LineSymbol, proto::LineSymbol as GrpcLineSymbol};
+use crate::{domain::entity::line_symbol::LineSymbol, model::LineSymbol as ModelLineSymbol};
 
-impl From<LineSymbol> for GrpcLineSymbol {
+impl From<LineSymbol> for ModelLineSymbol {
     fn from(symbol: LineSymbol) -> Self {
         Self {
             symbol: symbol.symbol,
