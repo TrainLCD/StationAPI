@@ -119,7 +119,8 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
 2. **状態確認とモード決定（新規作成 / 更新）**
    - `jj git fetch` を実行（remote bookmark をまとめて更新する）。**fetch は remote bookmark を動かすため、前提条件で解決した `BASE_REV` / `HEAD_REV` は fetch 後に必ず解決し直す**（古い commit ID のまま進むと差分の検出範囲がずれる）。
-   - **`BASE_REV` / `HEAD_REV` は origin 側の位置なので、ローカルの `HEAD_REF` がそれより先行していないかを機械的に確かめる。** 一致しなければ未 push のコミットがあり、そのまま進むとその分を含まない範囲で PR が組み上がる。検出したら push の可否をユーザーに確認して中断する（勝手に push しない）。ブックマークは自動追従しないので、`jj commit` 後に `jj bookmark set` を忘れた場合もここに現れる。
+   - **`BASE_REV` / `HEAD_REV` は origin 側の位置なので、ローカルの `HEAD_REF` がそれと一致することを機械的に確かめる。** 一致しなければ未 push のコミットがあり、そのまま進むとその分を含まない範囲で PR が組み上がる。検出したら push の可否をユーザーに確認して中断する（勝手に push しない）。ブックマークは自動追従しないので、`jj commit` 後に `jj bookmark set` を忘れた場合もここに現れる。
+   - **ローカルに `HEAD_REF` が無い場合も中断する。** 空は「未 push が無い」証拠ではなく、単に検証できていない状態（ローカルで削除済み、あるいは origin にしか無いブックマークを `head` に指定した、など）。`jj bookmark track "<名前>@origin"` でローカルへ取り込んでからやり直す。
    - コミットとファイル差分の**両方**を確認する。`jj log` はコミットの有無しか見ないため、空コミットだけが載ったブックマークが通過してしまう。
 
      ```bash
@@ -127,11 +128,17 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
      BASE_REV="$(resolve_remote_rev "$BASE_REF")" || exit 1   # 前提条件で定義したヘルパ
      HEAD_REV="$(resolve_remote_rev "$HEAD_REF")" || exit 1
 
-     # ローカルの HEAD_REF が origin より先行していないか（未 push の変更が無いか）確認する。
-     # HEAD_REF は resolve_remote_rev の case で検証済み。ローカルに無ければ空が返る
+     # ローカルの HEAD_REF を解決し、origin の先端と一致することを確認する。
+     # HEAD_REF は resolve_remote_rev の case で検証済み
      HEAD_LOCAL_REV="$(jj log -r "bookmarks(exact:\"$HEAD_REF\")" --no-graph \
        -T 'commit_id ++ "\n"')"
-     if [ -n "$HEAD_LOCAL_REV" ] && [ "$HEAD_LOCAL_REV" != "$HEAD_REV" ]; then
+     # 該当が無くても終了コードは 0 なので、|| ではなく中身で判定する
+     if [ -z "$HEAD_LOCAL_REV" ]; then
+       printf 'ローカルに %s が無い。origin だけを見て組むと一致を検証できない。\n' "$HEAD_REF" >&2
+       printf 'jj bookmark track "%s@origin" でトラックしてからやり直す。\n' "$HEAD_REF" >&2
+       exit 1
+     fi
+     if [ "$HEAD_LOCAL_REV" != "$HEAD_REV" ]; then
        printf 'ローカル %s が origin と一致しない:\n  local  = %s\n  origin = %s\n' \
          "$HEAD_REF" "$HEAD_LOCAL_REV" "$HEAD_REV" >&2
        exit 1   # 未 push の変更がある。push の可否をユーザーに確認してから進む
