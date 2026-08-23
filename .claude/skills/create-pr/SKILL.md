@@ -118,13 +118,18 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    以降の手順では推論後の head を使う。
 
 2. **状態確認とモード決定（新規作成 / 更新）**
-   - `jj git fetch` を実行（remote bookmark をまとめて更新する）。**fetch は remote bookmark を動かすため、前提条件で解決した `BASE_REV` / `HEAD_REV` は fetch 後に必ず解決し直す**（古い commit ID のまま進むと差分の検出範囲がずれる）。
+   - `jj git fetch` を実行（remote bookmark を更新する）。**fetch は remote bookmark を動かすため、前提条件で解決した `BASE_REV` / `HEAD_REV` は fetch 後に必ず解決し直す**（古い commit ID のまま進むと差分の検出範囲がずれる）。
+   - **fetch 対象は `--remote` と `--branch` で明示する。** 引数無しの `jj git fetch` は remote を `git.fetch`、ブックマークを `remotes.<name>.fetch-bookmarks` の設定から決める。これらはユーザーグローバル設定なので、別マシンでは `origin` や対象ブックマークが更新されないことがあり、その場合 `@origin` を読む後続の解決と一致検査が古い値のまま通ってしまう。`--branch` のパターンは既定が glob なので `exact:` を付ける。
    - **`BASE_REV` / `HEAD_REV` は origin 側の位置なので、ローカルの `HEAD_REF` がそれと一致することを機械的に確かめる。** 一致しなければ未 push のコミットがあり、そのまま進むとその分を含まない範囲で PR が組み上がる。検出したら push の可否をユーザーに確認して中断する（勝手に push しない）。ブックマークは自動追従しないので、`jj commit` 後に `jj bookmark set` を忘れた場合もここに現れる。
    - **ローカルに `HEAD_REF` が無い場合も中断する。** 空は「未 push が無い」証拠ではなく、単に検証できていない状態（ローカルで削除済み、あるいは origin にしか無いブックマークを `head` に指定した、など）。`jj bookmark track "<名前>@origin"` でローカルへ取り込んでからやり直す。
    - コミットとファイル差分の**両方**を確認する。`jj log` はコミットの有無しか見ないため、空コミットだけが載ったブックマークが通過してしまう。
 
      ```bash
-     jj git fetch
+     # 設定（git.fetch / remotes.<name>.fetch-bookmarks）に左右されないよう
+     # remote と対象ブックマークを明示する
+     jj git fetch --remote origin \
+       --branch "exact:$BASE_REF" \
+       --branch "exact:$HEAD_REF"
      BASE_REV="$(resolve_remote_rev "$BASE_REF")" || exit 1   # 前提条件で定義したヘルパ
      HEAD_REV="$(resolve_remote_rev "$HEAD_REF")" || exit 1
 
