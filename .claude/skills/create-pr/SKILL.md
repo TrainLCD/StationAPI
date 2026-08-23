@@ -53,13 +53,22 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
   fi
   HEAD_REF="$HEAD_CANDIDATES"
 
-  # ref 名を検証し、origin 上のブックマークを commit ID へ解決する。
-  # BASE_REF / HEAD_REF に同じ規則を適用する（理由は下の 3 項目）
-  resolve_remote_rev() {
+  # ref 名の文字種を検証する。gh --head・ファイル名 slug・revset の
+  # 文字列リテラルのすべてで安全に使える集合か（理由は下の 3 項目）。
+  # BASE_REF / HEAD_REF に同じ規則を適用する
+  validate_ref() {
     case "$1" in
       '' | *[!A-Za-z0-9._/-]*)
         printf 'ref 名に想定外の文字が含まれる: %s\n' "$1" >&2; return 1 ;;
     esac
+  }
+  validate_ref "$BASE_REF" || exit 1
+  validate_ref "$HEAD_REF" || exit 1
+
+  # origin 上のブックマークを commit ID へ解決する。
+  # 実際の解決は fetch 後（手順 2）に一度だけ行うので、ここでは定義のみ
+  resolve_remote_rev() {
+    validate_ref "$1" || return 1
     rev="$(jj log -r "remote_bookmarks(exact:\"$1\", exact:\"origin\")" \
       --no-graph -T 'commit_id ++ "\n"')"
     if [ "$(printf '%s\n' "$rev" | grep -c .)" -ne 1 ]; then
@@ -67,9 +76,6 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
     fi
     printf '%s\n' "$rev"
   }
-
-  BASE_REV="$(resolve_remote_rev "$BASE_REF")" || exit 1
-  HEAD_REV="$(resolve_remote_rev "$HEAD_REF")" || exit 1
   ```
 
 - **ブックマーク名を jj の revset へ直接連結しない。** `&` と `|` は git の ref 名には使えるが jj では revset の演算子で、`"$BASE_REF@origin..$HEAD_REF@origin"` のような連結は `Error: Revision ... doesn't exist` で落ちる。`jj bookmark create` 自身がこの種の名前を拒否するため発生源は Git 側で作られた／fetch されたブランチに限られるが、上のように **`BASE_REV` / `HEAD_REV`（commit ID）へ一度解決し、以降の revset は commit ID だけで組み立てる**。`gh` に渡すのは GitHub 上のブランチ名なので `$BASE_REF` / `$HEAD_REF` のままでよい。
@@ -118,7 +124,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    以降の手順では推論後の head を使う。
 
 2. **状態確認とモード決定（新規作成 / 更新）**
-   - `jj git fetch` を実行（remote bookmark を更新する）。**fetch は remote bookmark を動かすため、前提条件で解決した `BASE_REV` / `HEAD_REV` は fetch 後に必ず解決し直す**（古い commit ID のまま進むと差分の検出範囲がずれる）。
+   - `jj git fetch` を実行（remote bookmark を更新する）。**`BASE_REV` / `HEAD_REV` の解決は必ず fetch の後に行う。** fetch は remote bookmark を動かすので、先に解決すると古い commit ID で差分を測ることになる。加えて `remote_bookmarks()` が読むのは jj が記録している remote の状態なので、まだ fetch していないブックマークは解決できない。前提条件で済ませておくのは ref 名の文字種検証までにとどめる。
    - **fetch 対象は `--remote` と `--branch` で明示する。** 引数無しの `jj git fetch` は remote を `git.fetch`、ブックマークを `remotes.<name>.fetch-bookmarks` の設定から決める。これらはユーザーグローバル設定なので、別マシンでは `origin` や対象ブックマークが更新されないことがあり、その場合 `@origin` を読む後続の解決と一致検査が古い値のまま通ってしまう。`--branch` のパターンは既定が glob なので `exact:` を付ける。
    - **`BASE_REV` / `HEAD_REV` は origin 側の位置なので、ローカルの `HEAD_REF` がそれと一致することを機械的に確かめる。** 一致しなければ未 push のコミットがあり、そのまま進むとその分を含まない範囲で PR が組み上がる。検出したら push の可否をユーザーに確認して中断する（勝手に push しない）。ブックマークは自動追従しないので、`jj commit` 後に `jj bookmark set` を忘れた場合もここに現れる。
    - **ローカルに `HEAD_REF` が無い場合も中断する。** 空は「未 push が無い」証拠ではなく、単に検証できていない状態（ローカルで削除済み、あるいは origin にしか無いブックマークを `head` に指定した、など）。`jj bookmark track "<名前>@origin"` でローカルへ取り込んでからやり直す。
@@ -130,7 +136,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
      jj git fetch --remote origin \
        --branch "exact:$BASE_REF" \
        --branch "exact:$HEAD_REF"
-     BASE_REV="$(resolve_remote_rev "$BASE_REF")" || exit 1   # 前提条件で定義したヘルパ
+     BASE_REV="$(resolve_remote_rev "$BASE_REF")" || exit 1   # 前提条件で定義したヘルパ。解決はここが最初
      HEAD_REV="$(resolve_remote_rev "$HEAD_REF")" || exit 1
 
      # ローカルの HEAD_REF を解決し、origin の先端と一致することを確認する。
