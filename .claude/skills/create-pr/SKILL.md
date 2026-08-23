@@ -14,7 +14,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 | 項目 | 既定値 / 推論元 |
 | ---- | ---- |
 | `base` | リポジトリの既定ブランチ（`gh repo view --json defaultBranchRef -q .defaultBranchRef.name`、StationAPI では通常 `dev`） |
-| `head` | カレントブランチ（`git rev-parse --abbrev-ref HEAD`） |
+| `head` | 作業コミット `@` に最も近いローカルブックマーク（`jj log -r 'heads(::@ & bookmarks())' --no-graph -T 'local_bookmarks.map(\|b\| b.name()).join("\n")'`）。該当が無ければ手順 1 で切り出す |
 | `title` | 下の「タイトル推論ルール」参照 |
 | `summary` | 空なら「概要」「変更内容」本文はテンプレのコメントのみ残す |
 | `related_issue` | **ユーザー入力を最優先**。指定が `#N`（数値のみ）なら `Closes #N`、`Closes #N` / `Fixes #N` / `Refs #N` 形式ならその接頭語を保って出力。`related_issue` が空のときに限り、コミット件名から `Closes #N` / `Fixes #N` / `Refs #N` を抽出（接頭語を維持。`#N` 単体表記なら `Closes` を補う）。両方とも見つからなければ節のコメントのみ |
@@ -23,7 +23,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
 ### タイトル推論ルール
 
-`origin/<base>..origin/<head>` のコミット件名を対象に、以下を順に試す:
+`<base>@origin..<head>@origin`（jj revset）のコミット件名を対象に、以下を順に試す:
 
 1. **コミット 1 件のみ**: その件名をそのまま使う。
 2. **コミット複数・共通テーマあり**: 最新コミットの件名、もしくは件名群を要約した日本語の単文を使う。
@@ -34,20 +34,21 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
 ## 前提条件
 
-- カレントディレクトリが `git rev-parse --show-toplevel` で解決できるリポジトリ内。
-- `gh` CLI が認証済み。
-- `head` ブランチが origin に push 済み。未 push の場合はユーザーに push の可否を確認する（勝手に push しない）。
+- カレントディレクトリが `jj root` で解決できるリポジトリ内。
+- **バージョン管理は jj で行う。** このリポジトリは colocated（`.jj/` と `.git/` が同居）なので `git` も動いてしまうが、書き込み系の git コマンド（`commit` / `switch` / `branch` / `push` など）は使わない。jj が次回起動時に Git の ref を再取り込みし、変更が破棄されるか divergent change として二重化する。詳細は `AGENTS.md` の **Version Control (Jujutsu)** を参照。
+- `gh` CLI が認証済み（PR 操作だけは従来どおり `gh`）。
+- `head` ブックマークが origin に push 済み。未 push の場合はユーザーに push の可否を確認する（勝手に push しない）。
 
 ## 手順
 
-1. **head / base の整合性チェックと自動ブランチ切り出し**
+1. **head / base の整合性チェックと自動ブックマーク切り出し**
 
-   `base == head` になるケース（例: `dev` に居てデフォルト base も `dev`）は、そのまま進めると PR が作れない。以下のいずれかで救済する:
+   `head` が `base` と同じブックマーク（例: `dev` の上で作業していて base も `dev`）や、そもそもブックマークが無い状態は、そのまま進めると PR が作れない。`jj status` で `@` の内容を確認し、以下のいずれかで救済する:
 
-   - 作業中の変更（staged / unstaged / 直近の未 push コミット）がある場合、**新しいブランチを切ってそこに退避**してから続行する。
-   - 何の変更も無い場合は「PR 対象の差分が無い」と報告して中断する。
+   - `@` に変更がある、または未 push のコミットがある場合、**新しいブックマークを作ってそこに載せる**。
+   - 何の変更も無い（`@` が empty で `trunk()` と同じ）場合は「PR 対象の差分が無い」と報告して中断する。
 
-   **ブランチ名の推論**（`CONTRIBUTING.md` の命名規則に従う）:
+   **ブックマーク名の推論**（`CONTRIBUTING.md` の命名規則に従う。git のブランチ名とそのまま対応する）:
 
    | プレフィックス | 採用条件 |
    | ---- | ---- |
@@ -61,36 +62,36 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
    切り出し手順:
    ```bash
-   git switch -c <inferred-branch>
-   # 未コミットなら:
-   git add -u                       # 追跡済みの staged/unstaged をまとめてステージ
-   # 未追跡ファイルも退避対象なら明示的にパス指定で追加（`git add -A` / `.` は使わない）:
-   #   git add path/to/untracked-file ...
-   git commit                       # コミットメッセージは日本語単文
-   git push -u origin <inferred-branch>
+   jj status                                          # @ に何が入っているか必ず先に確認
+   jj commit -m "<日本語単文>"                          # @ に説明を付けて確定し、新しい空の @ を作る
+   jj bookmark create <inferred-bookmark> -r @-        # 直前に確定したコミットにブックマークを置く
+   jj git push -b <inferred-bookmark>
    ```
+   - **jj にステージング領域は無く、未追跡ファイルという概念も無い**（`snapshot.auto-track = "all()"`）。`.gitignore` に載っていない一時ファイルは黙って `@` に入るので、`jj status` の出力を読んでから確定する。関係ないファイルは `jj restore <path>` で戻すか、`jj split` で別コミットに分ける。`git add` に相当する「一部だけ含める」操作は無い。
+   - 変更が既に `@` ではなく確定済みコミット側にある場合は `jj commit` を飛ばし、`jj bookmark create <inferred-bookmark> -r <rev>` で直接そのコミットに置く。
+   - ブックマークは自動で追従しないので、追加コミット後は `jj bookmark set <inferred-bookmark> -r @-` で必ず動かす。忘れると push が空振りする。
    - コミット前に下記の品質チェックを通す（`CONTRIBUTING.md` ルール、手順 3 で定義する「コード本体パス」に変更が無ければ省略可）:
      - `cargo fmt --all -- --check`
      - `make clippy`
      - `make test`
    - データのみの変更（`data/*.csv` 等）を含む場合は `cargo run -p data_validator` も流す。
-   - push は新規ブランチなので安全だが、実行前にユーザーへ要約（ブランチ名・含めるファイル・コミットメッセージ案）を提示して承認を取る。
+   - push は新規ブックマークなので安全だが、実行前にユーザーへ要約（ブックマーク名・含めるファイル・コミットメッセージ案）を提示して承認を取る。未トラックのブックマークは `-b` 指定で自動的にトラックされる。
 
    以降の手順では推論後の head を使う。
 
 2. **状態確認とモード決定（新規作成 / 更新）**
-   - `git fetch origin <base> <head>` を実行。
-   - `git log --oneline origin/<base>..origin/<head>` で差分があることを確認。無ければ中断して報告。
+   - `jj git fetch` を実行（remote bookmark をまとめて更新する）。
+   - `jj log -r '<base>@origin..<head>@origin' --no-graph -T 'commit_id.short() ++ " " ++ description.first_line() ++ "\n"'` で差分があることを確認。無ければ中断して報告。
    - `gh pr list --base <base> --head <head> --state open --json number,url,body` で既存 open PR を確認。
      - **存在しない場合**: 新規作成モード。以降、手順 5 で `gh pr create`。
      - **存在する場合**: 更新モード。既存本文を最新差分で再生成する。以降、手順 5 で `gh pr edit`。タイトルは既存を**原則尊重**（ユーザー推論より優先）。ただし手順 5 の整合性チェックで主題が大きくズレていると判断した場合のみ更新案を提示する。
 
 3. **変更の種類を判定**
 
-   `origin/<base>..origin/<head>` のコミット件名と変更ファイルを取得:
+   `<base>@origin..<head>@origin` のコミット件名と変更ファイルを取得:
    ```bash
-   git log --pretty=%s origin/<base>..origin/<head>
-   git diff --name-only origin/<base>..origin/<head>
+   jj log -r '<base>@origin..<head>@origin' --no-graph -T 'description.first_line() ++ "\n"'
+   jj diff --name-only --from '<base>@origin' --to '<head>@origin'
    ```
 
    **大原則: 判定はアプリ挙動／データに対する変更かどうかで決める**。下の「コード本体パス」が一切変わっていない場合、「バグ修正」「新機能」「リファクタリング」は OFF（コミット件名に `fix` / `feat` 等の語があっても）。スキル・設定・ドキュメントのメタ変更を「新機能」と誤分類しないための安全弁。「データの修正・追加」は `data/**` の変更を独立に判定する（後述「変更ファイルパスベース」「コミット件名ベース」を参照）。
@@ -181,14 +182,14 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
       - 連続した `_` は 1 つに畳み、先頭・末尾の `_` は除去
       - 必要なら長さを 100〜200 文字程度に切り詰める
 
-      生のブランチ名を直結するとサブディレクトリ解釈や制御文字混入で Write／削除が失敗する。バッククォートは **素のまま** 書く。escape しない。
+      生のブックマーク名を直結するとサブディレクトリ解釈や制御文字混入で Write／削除が失敗する。バッククォートは **素のまま** 書く。escape しない。
    2. 下の `gh` コマンドをサブシェル内で `trap` と一緒に実行する。`gh` の成功・失敗に関わらず `EXIT` / `INT` / `TERM` のどれでも一時ファイルを確実に削除されるようにする（`&&` で `rm` を繋ぐだけだと失敗時に `/tmp` にゴミが残る）。
    3. `gh` 呼び出しと `rm`（を含む `trap`）は Bash tool の 1 呼び出し内で完結させる。別呼び出しで後片付けすると、前段の呼び出しがエラー／中断で終わった場合にクリーンアップが実行されない。
 
    **新規作成モード**
 
    ```bash
-   # ref 名をファイル名として安全な集合（A-Za-z0-9._-）にスラッグ化
+   # ref 名（ブックマーク名）をファイル名として安全な集合（A-Za-z0-9._-）にスラッグ化
    REF_SLUG="$(printf '%s' '<head>' \
      | tr -d '\r\n' \
      | tr -c 'A-Za-z0-9._-' '_' \
@@ -231,8 +232,10 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 ## 注意事項
 
 - テンプレの節構成は改変しない。追加・削除はメンテナ承認が必要。
-- `git push --no-verify` や force push はしない。push が必要ならユーザーに確認。
+- バージョン管理の操作は `jj` で行い、書き込み系の `git` コマンドは使わない（colocated リポジトリなので動いてしまうが、jj 側と食い違う）。
+- **push 済みのコミットを勝手に書き換えない。** `jj describe` / `jj squash` / `jj rebase` は履歴をその場で書き換え、次の `jj git push` が force-with-lease 相当でリモートのブックマークを巻き戻す。git の force push と同じ扱いで、必ずユーザーに確認する。
+- 操作をやり直したいときは手作業で戻さず `jj undo`（直前の操作を取り消す）／`jj op log`（操作履歴）を使う。
 - 既存 open PR を上書きしない（重複作成禁止）。
-- ブランチプレフィックスは `feature/` / `fix/` / `data/` / `chore/` / `release/` のみ使用（`pr-labeler.yml` のラベル自動付与に直結する）。
+- ブックマークのプレフィックスは `feature/` / `fix/` / `data/` / `chore/` / `release/` のみ使用（`pr-labeler.yml` のラベル自動付与に直結する）。
 - 本文は `gh pr create --body` / `gh pr edit --body` のようにインラインで渡さない。必ず `--body-file` で一時ファイル経由で渡す（バッククォートなど特殊文字の escape 事故を構造的に防ぐため）。
 - データ変更を伴う PR では `cargo run -p data_validator` の実行結果を「テスト」または「変更内容」節に追記すると `AGENTS.md` のガイドライン（変更内容と検証コマンドの記録）に沿う。
