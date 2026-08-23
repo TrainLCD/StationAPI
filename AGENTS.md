@@ -76,8 +76,42 @@ The Worker is the workspace root package. `stationapi`, `preprocessor`, and `dat
 - **Connected routes** – `GetConnectedRoutes` performs a bounded breadth-first search across train-type line groups. Transfers join at a shared station group, route order and per-stop pass metadata are preserved, and each returned candidate receives a deterministic virtual line-group ID in the upper half of the `uint32` range. Revisiting station groups and already-used train types is rejected to prevent cycles. Exploration loads only line-group ID, station-station-type ID, station-group ID, and pass metadata; full station rows are fetched after the result set is fixed. The search is additionally capped at eight train types, 4,096 expanded states, 65,536 evaluated candidates, and 32 results to bound computation and result size.
 - Changes to the published contract require coordinated updates to `schema/public.graphql`, the async-graphql types in `src/graphql/`, and, when the shape of a value changes, `stationapi/src/model.rs` and the DTO conversions.
 
+## Version Control (Jujutsu)
+This repository is a **colocated jj/git checkout** — `.jj/` and `.git/` sit side by side. Agents run every version-control operation through `jj`. Do not run a `git` command that writes (`commit`, `switch`, `branch`, `push`, `rebase`, `stash`): jj re-imports the Git refs on its next invocation, so a Git-side change is either abandoned or resurfaces as a divergent change. `gh` remains the tool for pull requests, and GitHub Actions keeps consuming the Git side unchanged.
+
+- **`trunk()` resolves to `dev@origin`,** a per-repository revset alias. Prefer it to a hard-coded branch name. jj 0.38.0 and later keep repository config outside the repository, so `.jj/repo/config.toml` is not the file to edit — run `jj config path --repo` to locate it, `jj config list 'revset-aliases."trunk()"'` to check it, and `jj config set --repo 'revset-aliases."trunk()"' dev@origin` to (re-)create it on a fresh clone.
+- **There is no staging area and no untracked file.** The working copy is itself a commit, and jj snapshots every file under the root on each command (`snapshot.auto-track = "all()"`), so a scratch file lands in the change unless `.gitignore` covers it. Nothing corresponds to `git add`, so read `jj status` before describing a change and remove what does not belong — `jj restore <path>` to drop it, `jj split` to move it into a commit of its own.
+- **Bookmarks are jj's branches, and they do not follow new commits.** After committing, move the bookmark yourself (`jj bookmark set <name> -r @-`); forgetting it makes the next push a no-op.
+- **Never rewrite a pushed commit without asking.** `jj describe`, `jj squash`, and `jj rebase` rewrite history in place, and the next `jj git push` moves the remote bookmark with force-with-lease semantics. Confirm with the user first, exactly as for a Git force push.
+- **`jj undo` reverses the last operation** and `jj op log` lists them; prefer both to reconstructing state by hand.
+
+A typical change:
+```bash
+jj git fetch                        # refresh dev@origin and the other remote bookmarks
+jj new 'trunk()'                    # start a new change on top of dev@origin
+# ... edit files; jj snapshots them automatically ...
+jj status                           # confirm exactly what the change contains
+jj commit -m "日本語の単文"          # describe @ and open a fresh empty working copy on top
+jj bookmark create feature/<description> -r @-
+jj git push -b feature/<description>
+```
+
+Equivalents for the operations this guide and `.claude/skills/create-pr` rely on:
+
+| Purpose | Command |
+| --- | --- |
+| Repository root | `jj root` |
+| Working-copy state | `jj status` |
+| History | `jj log` (`jj log -r 'trunk()..@'` for the current change set) |
+| Bookmark closest to `@` | `jj log -r 'heads(::@ & bookmarks())' --no-graph -T 'local_bookmarks.map(\|b\| b.name()).join("\n") ++ "\n"'` — the trailing `++ "\n"` is what separates one revision's output from the next; without it several heads print as one run-on line. May print more than one name (several bookmarks on one commit, or several heads above `@`). Count the lines first; on more than one, present the candidates and ask which to use instead of taking the first. |
+| Commit subjects on a bookmark | `jj log -r 'dev@origin..<bookmark>@origin' --no-graph -T 'description.first_line() ++ "\n"'` |
+| Files changed against a base | `jj diff --name-only --from 'dev@origin' --to '<bookmark>@origin'` |
+| Rebase onto the latest `dev` | `jj git fetch && jj rebase -d 'trunk()'` |
+
+`CONTRIBUTING.md` still documents the Git workflow, because outside contributors are not required to install jj. Keep the two aligned in intent — base branch, naming convention, and pull-request rules are identical; only the commands differ.
+
 ## Contribution Guidelines
-- **Git-flow** – Follow Git-flow with `dev` serving as this repository's `develop` branch. Create ordinary work branches from the latest `origin/dev`, use the `feature/<description>` naming convention, and target their pull requests to `dev`. Do not create or target a branch named `develop`.
+- **Git-flow** – Follow Git-flow with `dev` serving as this repository's `develop` branch. Create ordinary work bookmarks from the latest `trunk()` (`dev@origin`) with `jj new 'trunk()'`, use the `feature/<description>` naming convention, and target their pull requests to `dev`. Do not create or target a bookmark named `develop`. **Version Control (Jujutsu)** above has the full command sequence.
 - **Pull requests** – Assign every pull request to `@TinyKitten` when creating it, open it as ready for review rather than as a draft, and use `.github/pull_request_template.md` without omitting or replacing its sections or checklists.
 - **Prioritize quality and performance over implementation speed** – Always favor code quality and runtime performance over velocity. Be mindful of algorithmic complexity and look for opportunities to replace O(n×m) linear scans with O(n+m) indexed lookups (e.g., HashMaps). The indexes are rebuilt on every isolate start and every request scans them, so prefer indexed lookups over repeated full scans. When a change affects performance, document the before/after complexity and query plan impact in the pull request.
 - Document the commands you executed (for example, ``make fmt && make clippy && make test``) and their outcomes in every pull request.
