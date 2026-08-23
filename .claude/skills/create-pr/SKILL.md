@@ -42,8 +42,16 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
   ```bash
   BASE_REF="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)"
-  HEAD_REF="$(jj log -r 'heads(::@ & bookmarks())' --no-graph \
+
+  # 候補は一度 HEAD_CANDIDATES に受ける。0 件／2 件以上をそのまま代入すると、
+  # 内部改行を含んだ値が gh --head や slug 処理へそのまま流れる
+  HEAD_CANDIDATES="$(jj log -r 'heads(::@ & bookmarks())' --no-graph \
     -T 'local_bookmarks.map(|b| b.name()).join("\n") ++ "\n"')"
+  if [ "$(printf '%s\n' "$HEAD_CANDIDATES" | grep -c .)" -ne 1 ]; then
+    printf '%s\n' "$HEAD_CANDIDATES"   # 候補を列挙してユーザーに確認する（自動選択しない）
+    exit 1
+  fi
+  HEAD_REF="$HEAD_CANDIDATES"
 
   # revset は commit ID に解決してから組み立てる（理由は下の項目）
   BASE_REV="$(jj log -r "$BASE_REF@origin" --no-graph -T 'commit_id ++ "\n"')"
@@ -94,10 +102,14 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    以降の手順では推論後の head を使う。
 
 2. **状態確認とモード決定（新規作成 / 更新）**
-   - `jj git fetch` を実行（remote bookmark をまとめて更新する）。
+   - `jj git fetch` を実行（remote bookmark をまとめて更新する）。**fetch は remote bookmark を動かすため、前提条件で解決した `BASE_REV` / `HEAD_REV` は fetch 後に必ず解決し直す**（古い commit ID のまま進むと差分の検出範囲がずれる）。
    - コミットとファイル差分の**両方**を確認する。`jj log` はコミットの有無しか見ないため、空コミットだけが載ったブックマークが通過してしまう。
 
      ```bash
+     jj git fetch
+     BASE_REV="$(jj log -r "$BASE_REF@origin" --no-graph -T 'commit_id ++ "\n"')"
+     HEAD_REV="$(jj log -r "$HEAD_REF@origin" --no-graph -T 'commit_id ++ "\n"')"
+
      jj log -r "$BASE_REV..$HEAD_REV" --no-graph \
        -T 'commit_id.short() ++ " " ++ description.first_line() ++ "\n"'
      jj diff --name-only --from "$BASE_REV" --to "$HEAD_REV"
