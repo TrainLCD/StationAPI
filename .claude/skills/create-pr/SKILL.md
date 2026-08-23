@@ -37,7 +37,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 - カレントディレクトリが `jj root` で解決できるリポジトリ内。
 - **バージョン管理は jj で行う。** このリポジトリは colocated（`.jj/` と `.git/` が同居）なので `git` も動いてしまうが、書き込み系の git コマンド（`commit` / `switch` / `branch` / `push` など）は使わない。jj が次回起動時に Git の ref を再取り込みし、変更が破棄されるか divergent change として二重化する。詳細は `AGENTS.md` の **Version Control (Jujutsu)** を参照。
 - `gh` CLI が認証済み（PR 操作だけは従来どおり `gh`）。
-- `head` ブックマークが origin に push 済み。未 push の場合はユーザーに push の可否を確認する（勝手に push しない）。
+- `head` ブックマークが origin に push 済み。未 push の場合はユーザーに push の可否を確認する（勝手に push しない）。散文の前提で終わらせず、手順 2 でローカルと origin の commit ID を突き合わせて機械的に検出する。
 - **ref 名をシェルソースへ直接埋め込まない。** 本書の `<base>` / `<head>` は説明用のプレースホルダ。実際のコマンドでは値を `BASE_REF` / `HEAD_REF` に取り込み、以降は必ず `"$BASE_REF"` / `"$HEAD_REF"` で参照する。jj のブックマーク名は git の ref 名と同じ規則で、`'` / `$( )` / バッククォート / `;` を含められるため、リテラルを直接置換すると構文が壊れるか、意図しないコマンドが実行される。値はコマンド出力から取り込む（ユーザー指定がある場合のみ、その値を代入する）:
 
   ```bash
@@ -119,12 +119,23 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
 2. **状態確認とモード決定（新規作成 / 更新）**
    - `jj git fetch` を実行（remote bookmark をまとめて更新する）。**fetch は remote bookmark を動かすため、前提条件で解決した `BASE_REV` / `HEAD_REV` は fetch 後に必ず解決し直す**（古い commit ID のまま進むと差分の検出範囲がずれる）。
+   - **`BASE_REV` / `HEAD_REV` は origin 側の位置なので、ローカルの `HEAD_REF` がそれより先行していないかを機械的に確かめる。** 一致しなければ未 push のコミットがあり、そのまま進むとその分を含まない範囲で PR が組み上がる。検出したら push の可否をユーザーに確認して中断する（勝手に push しない）。ブックマークは自動追従しないので、`jj commit` 後に `jj bookmark set` を忘れた場合もここに現れる。
    - コミットとファイル差分の**両方**を確認する。`jj log` はコミットの有無しか見ないため、空コミットだけが載ったブックマークが通過してしまう。
 
      ```bash
      jj git fetch
      BASE_REV="$(resolve_remote_rev "$BASE_REF")" || exit 1   # 前提条件で定義したヘルパ
      HEAD_REV="$(resolve_remote_rev "$HEAD_REF")" || exit 1
+
+     # ローカルの HEAD_REF が origin より先行していないか（未 push の変更が無いか）確認する。
+     # HEAD_REF は resolve_remote_rev の case で検証済み。ローカルに無ければ空が返る
+     HEAD_LOCAL_REV="$(jj log -r "bookmarks(exact:\"$HEAD_REF\")" --no-graph \
+       -T 'commit_id ++ "\n"')"
+     if [ -n "$HEAD_LOCAL_REV" ] && [ "$HEAD_LOCAL_REV" != "$HEAD_REV" ]; then
+       printf 'ローカル %s が origin と一致しない:\n  local  = %s\n  origin = %s\n' \
+         "$HEAD_REF" "$HEAD_LOCAL_REV" "$HEAD_REV" >&2
+       exit 1   # 未 push の変更がある。push の可否をユーザーに確認してから進む
+     fi
 
      jj log -r "$BASE_REV..$HEAD_REV" --no-graph \
        -T 'commit_id.short() ++ " " ++ description.first_line() ++ "\n"'
