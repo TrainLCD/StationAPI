@@ -14,7 +14,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 | 項目 | 既定値 / 推論元 |
 | ---- | ---- |
 | `base` | リポジトリの既定ブランチ（`gh repo view --json defaultBranchRef -q .defaultBranchRef.name`、StationAPI では通常 `dev`） |
-| `head` | 作業コミット `@` に最も近いローカルブックマーク（`jj log -r 'heads(::@ & bookmarks())' --no-graph -T 'local_bookmarks.map(\|b\| b.name()).join("\n")'`）。該当が無ければ手順 1 で切り出す。**出力が 2 行以上のときは自動選択しない**（同一コミットに複数ブックマークがある、または `@` の上流に head が複数ある場合）。候補を列挙してユーザーに確認してから進める |
+| `head` | 作業コミット `@` に最も近いローカルブックマーク（`jj log -r 'heads(::@ & bookmarks())' --no-graph -T 'local_bookmarks.map(\|b\| b.name()).join("\n") ++ "\n"'`）。該当が無ければ手順 1 で切り出す。**出力が 2 行以上のときは自動選択しない**（同一コミットに複数ブックマークがある、または `@` の上流に head が複数ある場合）。候補を列挙してユーザーに確認してから進める |
 | `title` | 下の「タイトル推論ルール」参照 |
 | `summary` | 空なら「概要」「変更内容」本文はテンプレのコメントのみ残す |
 | `related_issue` | **ユーザー入力を最優先**。指定が `#N`（数値のみ）なら `Closes #N`、`Closes #N` / `Fixes #N` / `Refs #N` 形式ならその接頭語を保って出力。`related_issue` が空のときに限り、コミット件名から `Closes #N` / `Fixes #N` / `Refs #N` を抽出（接頭語を維持。`#N` 単体表記なら `Closes` を補う）。両方とも見つからなければ節のコメントのみ |
@@ -43,8 +43,15 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
   ```bash
   BASE_REF="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)"
   HEAD_REF="$(jj log -r 'heads(::@ & bookmarks())' --no-graph \
-    -T 'local_bookmarks.map(|b| b.name()).join("\n")')"
+    -T 'local_bookmarks.map(|b| b.name()).join("\n") ++ "\n"')"
+
+  # revset は commit ID に解決してから組み立てる（理由は下の項目）
+  BASE_REV="$(jj log -r "$BASE_REF@origin" --no-graph -T 'commit_id ++ "\n"')"
+  HEAD_REV="$(jj log -r "$HEAD_REF@origin" --no-graph -T 'commit_id ++ "\n"')"
   ```
+
+- **ブックマーク名を jj の revset へ直接連結しない。** `&` と `|` は git の ref 名には使えるが jj では revset の演算子で、`"$BASE_REF@origin..$HEAD_REF@origin"` のような連結は `Error: Revision ... doesn't exist` で落ちる。`jj bookmark create` 自身がこの種の名前を拒否するため発生源は Git 側で作られた／fetch されたブランチに限られるが、上のように **`BASE_REV` / `HEAD_REV`（commit ID）へ一度解決し、以降の revset は commit ID だけで組み立てる**。`gh` に渡すのは GitHub 上のブランチ名なので `$BASE_REF` / `$HEAD_REF` のままでよい。
+- **`HEAD_REF` が `^[A-Za-z0-9._/-]+$` に一致しない場合は自動で進めない。** `local_bookmarks.map(|b| b.name())` は要引用の名前を revset 用の引用付き（`"feature/x&dev"`、内部の `"` は `\"`）で返す。この表記は revset では正しいが `gh --head` やファイル名 slug には使えないため、一致しない値が返ったらユーザーに正しいブランチ名を確認する。
 
 ## 手順
 
@@ -91,9 +98,9 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    - コミットとファイル差分の**両方**を確認する。`jj log` はコミットの有無しか見ないため、空コミットだけが載ったブックマークが通過してしまう。
 
      ```bash
-     jj log -r "$BASE_REF@origin..$HEAD_REF@origin" --no-graph \
+     jj log -r "$BASE_REV..$HEAD_REV" --no-graph \
        -T 'commit_id.short() ++ " " ++ description.first_line() ++ "\n"'
-     jj diff --name-only --from "$BASE_REF@origin" --to "$HEAD_REF@origin"
+     jj diff --name-only --from "$BASE_REV" --to "$HEAD_REV"
      ```
 
      コミット一覧が空、または `jj diff --name-only` の出力が空の場合は「PR 対象の差分が無い」と報告し、**既存 PR の検索へ進まずに中断する**。
@@ -105,8 +112,8 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
    `<base>@origin..<head>@origin` のコミット件名と変更ファイルを取得:
    ```bash
-   jj log -r "$BASE_REF@origin..$HEAD_REF@origin" --no-graph -T 'description.first_line() ++ "\n"'
-   jj diff --name-only --from "$BASE_REF@origin" --to "$HEAD_REF@origin"
+   jj log -r "$BASE_REV..$HEAD_REV" --no-graph -T 'description.first_line() ++ "\n"'
+   jj diff --name-only --from "$BASE_REV" --to "$HEAD_REV"
    ```
 
    **大原則: 判定はアプリ挙動／データに対する変更かどうかで決める**。下の「コード本体パス」が一切変わっていない場合、「バグ修正」「新機能」「リファクタリング」は OFF（コミット件名に `fix` / `feat` 等の語があっても）。スキル・設定・ドキュメントのメタ変更を「新機能」と誤分類しないための安全弁。「データの修正・追加」は `data/**` の変更を独立に判定する（後述「変更ファイルパスベース」「コミット件名ベース」を参照）。

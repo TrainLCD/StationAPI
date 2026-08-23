@@ -103,7 +103,7 @@ Equivalents for the operations this guide and `.claude/skills/create-pr` rely on
 | Repository root | `jj root` |
 | Working-copy state | `jj status` |
 | History | `jj log` (`jj log -r 'trunk()..@'` for the current change set) |
-| Bookmark closest to `@` | `jj log -r 'heads(::@ & bookmarks())' --no-graph -T 'local_bookmarks.map(\|b\| b.name()).join("\n")'` — may print more than one name (several bookmarks on one commit, or several heads above `@`). Count the lines first; on more than one, present the candidates and ask which to use instead of taking the first. |
+| Bookmark closest to `@` | `jj log -r 'heads(::@ & bookmarks())' --no-graph -T 'local_bookmarks.map(\|b\| b.name()).join("\n") ++ "\n"'` — the trailing `++ "\n"` is what separates one revision's output from the next; without it several heads print as one run-on line. May print more than one name (several bookmarks on one commit, or several heads above `@`). Count the lines first; on more than one, present the candidates and ask which to use instead of taking the first. |
 | Commit subjects on a bookmark | `jj log -r 'dev@origin..<bookmark>@origin' --no-graph -T 'description.first_line() ++ "\n"'` |
 | Files changed against a base | `jj diff --name-only --from 'dev@origin' --to '<bookmark>@origin'` |
 | Rebase onto the latest `dev` | `jj git fetch && jj rebase -d 'trunk()'` |
