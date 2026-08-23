@@ -53,13 +53,29 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
   fi
   HEAD_REF="$HEAD_CANDIDATES"
 
-  # revset は commit ID に解決してから組み立てる（理由は下の項目）
-  BASE_REV="$(jj log -r "$BASE_REF@origin" --no-graph -T 'commit_id ++ "\n"')"
-  HEAD_REV="$(jj log -r "$HEAD_REF@origin" --no-graph -T 'commit_id ++ "\n"')"
+  # ref 名を検証し、origin 上のブックマークを commit ID へ解決する。
+  # BASE_REF / HEAD_REF に同じ規則を適用する（理由は下の 3 項目）
+  resolve_remote_rev() {
+    case "$1" in
+      '' | *[!A-Za-z0-9._/-]*)
+        printf 'ref 名に想定外の文字が含まれる: %s\n' "$1" >&2; return 1 ;;
+    esac
+    rev="$(jj log -r "remote_bookmarks(exact:\"$1\", exact:\"origin\")" \
+      --no-graph -T 'commit_id ++ "\n"')"
+    if [ "$(printf '%s\n' "$rev" | grep -c .)" -ne 1 ]; then
+      printf 'origin 上で commit ID 1 件に解決できない: %s\n' "$1" >&2; return 1
+    fi
+    printf '%s\n' "$rev"
+  }
+
+  BASE_REV="$(resolve_remote_rev "$BASE_REF")" || exit 1
+  HEAD_REV="$(resolve_remote_rev "$HEAD_REF")" || exit 1
   ```
 
 - **ブックマーク名を jj の revset へ直接連結しない。** `&` と `|` は git の ref 名には使えるが jj では revset の演算子で、`"$BASE_REF@origin..$HEAD_REF@origin"` のような連結は `Error: Revision ... doesn't exist` で落ちる。`jj bookmark create` 自身がこの種の名前を拒否するため発生源は Git 側で作られた／fetch されたブランチに限られるが、上のように **`BASE_REV` / `HEAD_REV`（commit ID）へ一度解決し、以降の revset は commit ID だけで組み立てる**。`gh` に渡すのは GitHub 上のブランチ名なので `$BASE_REF` / `$HEAD_REF` のままでよい。
-- **`HEAD_REF` が `^[A-Za-z0-9._/-]+$` に一致しない場合は自動で進めない。** `local_bookmarks.map(|b| b.name())` は要引用の名前を revset 用の引用付き（`"feature/x&dev"`、内部の `"` は `\"`）で返す。この表記は revset では正しいが `gh --head` やファイル名 slug には使えないため、一致しない値が返ったらユーザーに正しいブランチ名を確認する。
+- **`<名前>@origin` 形式ではなく `remote_bookmarks(exact:"<名前>", exact:"origin")` で解決する。** 裸のシンボルは revset の構文解析にかかるため、末尾が `-` の名前は `-`（親）演算子と誤読され `Failed to parse revset: Syntax error` になる（jj 0.44.0 で確認。`dev-@origin` が失敗する一方、名前の途中の `-` は `feature/jj-workflow-docs@origin` のように問題なく解決する）。`exact:` は文字列リテラルなので、この解析差に依存しない。
+- **`remote_bookmarks()` は該当が無くてもエラーにならない。** `<名前>@origin` が `Error: Revision ... doesn't exist` で落ちるのに対し、`remote_bookmarks(exact:...)` は終了コード 0 のまま空を返す。切り替えるなら **解決結果が commit ID ちょうど 1 行であることの検証が必須**（上の `resolve_remote_rev`）。省くと、未 push のブックマークが空の `BASE_REV` / `HEAD_REV` として無言で通過する。
+- **`BASE_REF` / `HEAD_REF` が `^[A-Za-z0-9._/-]+$` に一致しない場合は自動で進めない。** `local_bookmarks.map(|b| b.name())` は要引用の名前を revset 用の引用付き（`"feature/x&dev"`、内部の `"` は `\"`）で返す。この表記は revset では正しいが `gh --head` やファイル名 slug には使えず、`exact:"…"` の文字列リテラルへ埋め込むと引用が壊れる。`gh repo view` 由来の `BASE_REF` にも同じ検査を適用し（`resolve_remote_rev` の `case` がこれを担う）、一致しない値が返ったらユーザーに正しいブランチ名を確認する。
 
 ## 手順
 
@@ -107,8 +123,8 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
      ```bash
      jj git fetch
-     BASE_REV="$(jj log -r "$BASE_REF@origin" --no-graph -T 'commit_id ++ "\n"')"
-     HEAD_REV="$(jj log -r "$HEAD_REF@origin" --no-graph -T 'commit_id ++ "\n"')"
+     BASE_REV="$(resolve_remote_rev "$BASE_REF")" || exit 1   # 前提条件で定義したヘルパ
+     HEAD_REV="$(resolve_remote_rev "$HEAD_REF")" || exit 1
 
      jj log -r "$BASE_REV..$HEAD_REV" --no-graph \
        -T 'commit_id.short() ++ " " ++ description.first_line() ++ "\n"'
