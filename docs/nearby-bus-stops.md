@@ -29,8 +29,6 @@ enum TransportType {
 | **Bus** | バス停のみを返す |
 | **RailAndBus** | 鉄道駅とバス停の両方を返す。`lines`配列にも近傍バス路線を含める |
 
-**注**: `stationsNearby` の並びは常に近い順です。`transportType` を指定しない場合も鉄道とバスを分けず、距離だけで並べます。
-
 ## 対象API
 
 | クエリ | 近傍バス停対応 | 備考 |
