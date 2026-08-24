@@ -96,6 +96,12 @@ def root_query_fields(document: str) -> set[str]:
                 i += 2 if document[i] == "\\" else 1
             i += 1
             continue
+        if ch == "#":                       # 行コメント。
+            # 深さ 1 の外でも捨てる。コメントの散文に括弧が 1 つ混じるだけで
+            # 深さの追跡がずれ、フィールドの集合ごと壊れるため。
+            newline = document.find("\n", i + 1)
+            i = n if newline == -1 else newline + 1
+            continue
         if ch == "(":
             paren += 1
         elif ch == ")":
@@ -109,6 +115,10 @@ def root_query_fields(document: str) -> set[str]:
             if depth <= 0:
                 break                       # オペレーション本文の終わり
         elif depth == 1:
+            if ch == "@":                   # ディレクティブ名はフィールドではない
+                directive = _NAME.match(document, i + 1)
+                i = directive.end() if directive else i + 1
+                continue
             if document.startswith("...", i):
                 i += 3                      # フラグメントスプレッドは Query フィールドではない
                 continue
