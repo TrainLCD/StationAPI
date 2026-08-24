@@ -1,7 +1,74 @@
 # scripts/
 
-データメンテナンス用のスクリプト置き場です。CI で実行されるスクリプト
-（`.github/scripts/`）とは別物で、メンテナが手元で実行してデータを更新するために使います。
+データメンテナンスと計測用のスクリプト置き場です。CI で実行されるスクリプト
+（`.github/scripts/`）とは別物で、メンテナが手元で実行してデータを更新したり、
+デプロイ済みのエンドポイントを計測したりするために使います。
+
+## benchmark_graphql.py
+
+本番 (`https://gql.trainlcd.app`) とステージング (`https://gql-stg.trainlcd.app`) の
+GraphQL エンドポイントを、`schema/public.graphql` の Query ルートフィールド 18 種
+すべてについて計測して比較します。
+
+### 計測方法
+
+- 1 クエリごとに両エンドポイントへ**交互に**リクエストします。反復ごとに順番を入れ替える
+  ので、時間帯によるネットワーク状況の変動が片側だけに乗ることがありません。
+- 接続確立 (DNS / TCP / TLS) は計測区間の外で済ませ、keep-alive で使い回します。
+  サンプルに含まれるのは「リクエスト送信〜本文の読み切り」だけです。
+- TTFB と全体時間を別々に記録するので、サーバー処理時間と転送時間を切り分けられます。
+- 応答 `data` を正規化した SHA-256 を両環境で突き合わせ、データセットのずれを検出します
+  （レイテンシ差がデプロイ内容の差なのかを判断するため）。
+- HTTP 200 以外・GraphQL `errors` 付き・`data` が null の応答は失敗として集計から外し、
+  レポートの「失敗したリクエスト」に理由を出します。
+
+### 使い方
+
+```bash
+# 既定 (本番 vs ステージング、全 18 クエリ + 重い派生 3 ケース、各 20 回)
+python3 scripts/benchmark_graphql.py --markdown bench.md --json bench.json
+
+# 手早く傾向だけ見る
+python3 scripts/benchmark_graphql.py -n 5
+
+# 重いクエリだけ、選択セットを最小にして比較する
+python3 scripts/benchmark_graphql.py --only lineGroupStations,trainRoute --profile light
+
+# ローカルの wrangler dev を基準に加える
+python3 scripts/benchmark_graphql.py \
+  --endpoint local=http://127.0.0.1:8787 \
+  --endpoint production=https://gql.trainlcd.app
+
+# スループットを見る (並列 8。本番へ流す前に負荷量を確認すること)
+python3 scripts/benchmark_graphql.py -n 200 -c 8 --only stationsNearby
+```
+
+主なオプション:
+
+| オプション | 既定 | 説明 |
+| --- | --- | --- |
+| `-n, --iterations` | 20 | 1 クエリ・1 エンドポイントあたりの計測回数 |
+| `-w, --warmup` | 3 | 集計に含めないウォームアップ回数 |
+| `-c, --concurrency` | 1 | 2 以上で並列実行し、実効 RPS を計測する |
+| `--profile` | `full` | `full` はアプリ相当の広い選択セット、`light` は id と名前だけ |
+| `--only` | - | クエリ ID をカンマ区切りで絞り込む（完全一致優先、無ければ前方一致） |
+| `--cases` | - | ケース定義 JSON で組み込み定義を差し替える |
+| `--endpoint NAME=URL` | - | 計測先を明示指定する（複数可） |
+| `--compression` | `gzip` | `identity` にすると非圧縮の転送量を測れる |
+| `--markdown` / `--json` | 標準出力 | レポートの出力先 |
+| `--list` / `--print-query ID` | - | ケース一覧・組み立て済みクエリ本文の確認 |
+
+失敗が 1 件でもあると終了コードは 1 になります。
+
+### ケースの選び方
+
+パラメータは `data/*.csv` に実在する ID を使っています。応答が小さいクエリ（`station`,
+`line`）から最大級のもの（`lineGroupStations:heavy` は東海道本線系統の 250 駅、
+`trainRoute:long` は同系統の端から端まで）までを含め、計算量の大きい
+`connectedRoutes`（幅優先探索）と座標索引を使う `stationsNearby` も個別のケースにして
+あります。データを増やしたときにどのクエリが先に重くなるかを追えるようにするためです。
+
+対象を変えたいときは `--list` で ID を確認し、`--cases` に同じ形の JSON を渡してください。
 
 ## compute_average_distance.py
 
