@@ -1,0 +1,207 @@
+{
+  "$comment": [
+    "ベンチマーク対象のクエリ定義。schema/public.graphql の Query フィールドを全件カバーする。",
+    "fragments はクエリが uses で参照した分だけ本文に連結される。",
+    "変数は data/*.csv 由来の実在 ID を固定値で持つ。過去の実行結果と比較できるよう、",
+    "既存ケースの variables は変えないこと。条件を変えたいときは新しい name のケースを足す。"
+  ],
+
+  "fragments": {
+    "StationCore": "fragment StationCore on Station { id groupId name nameKatakana nameRoman threeLetterCode prefectureId latitude longitude status stopCondition hasTrainTypes distance transportType stationNumbers { lineSymbol lineSymbolColor lineSymbolShape stationNumber } line { ...LineCore } lines { ...LineCore } trainType { ...TrainTypeCore } }",
+    "StationNestedCore": "fragment StationNestedCore on StationNested { id groupId name nameKatakana nameRoman threeLetterCode prefectureId latitude longitude status stopCondition hasTrainTypes distance transportType stationNumbers { lineSymbol lineSymbolColor lineSymbolShape stationNumber } line { ...LineCore } lines { ...LineCore } trainType { ...TrainTypeCore } }",
+    "LineCore": "fragment LineCore on LineNested { id nameShort nameKatakana nameFull nameRoman color lineType status averageDistance transportType lineSymbols { symbol color shape } company { id nameShort nameFull type status } }",
+    "LineTop": "fragment LineTop on Line { id nameShort nameKatakana nameFull nameRoman color lineType status averageDistance transportType lineSymbols { symbol color shape } company { id nameShort nameFull type status } station { id groupId name nameRoman } }",
+    "TrainTypeCore": "fragment TrainTypeCore on TrainTypeNested { id typeId groupId name nameKatakana nameRoman color direction kind }",
+    "TrainTypeTop": "fragment TrainTypeTop on TrainType { id typeId groupId name nameKatakana nameRoman color direction kind lines { ...LineCore } line { ...LineCore } }"
+  },
+
+  "cases": [
+    {
+      "name": "ping",
+      "kind": "http",
+      "method": "GET",
+      "path": "/__ping",
+      "weight": "baseline",
+      "note": "データに触らない疎通のみ。ネットワーク往復と Worker 起動の下限を測る基準線"
+    },
+    {
+      "name": "health",
+      "kind": "http",
+      "method": "GET",
+      "path": "/__health",
+      "weight": "baseline",
+      "note": "索引サイズを返すだけ。索引初期化が済んでいるかの確認も兼ねる"
+    },
+
+    {
+      "name": "station",
+      "weight": "light",
+      "uses": ["StationCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_station($id: Int!) { station(id: $id) { ...StationCore } }",
+      "variables": { "id": 1130205 },
+      "note": "渋谷 (山手線)。単駅取得 + 路線/会社/駅ナンバリング/近隣バス路線の付加"
+    },
+    {
+      "name": "stations",
+      "weight": "medium",
+      "uses": ["StationCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_stations($ids: [Int!]!) { stations(ids: $ids) { ...StationCore } }",
+      "variables": { "ids": [1130101, 1130102, 1130103, 1130201, 1130202, 1130203, 1130205, 1130208, 1130212, 1130224, 1130228, 1130229, 1130230, 1141101, 1160214, 1130105, 2800201, 9930101, 2400601, 2600101] },
+      "note": "主要 20 駅の一括取得"
+    },
+    {
+      "name": "stationsNearby",
+      "weight": "medium",
+      "uses": ["StationCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_stationsNearby($lat: Float!, $lon: Float!, $limit: Int) { stationsNearby(latitude: $lat, longitude: $lon, limit: $limit) { ...StationCore } }",
+      "variables": { "lat": 35.658034, "lon": 139.701636, "limit": 10 },
+      "note": "渋谷駅前。transportType 無指定。#1649 以降は鉄道駅を距離順に上限まで詰め、残った枠にだけバス停が入る"
+    },
+    {
+      "name": "stationsNearby_limit100",
+      "weight": "heavy",
+      "uses": ["StationCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_stationsNearbyWide($lat: Float!, $lon: Float!, $limit: Int) { stationsNearby(latitude: $lat, longitude: $lon, limit: $limit) { ...StationCore } }",
+      "variables": { "lat": 35.658034, "lon": 139.701636, "limit": 100 },
+      "note": "渋谷駅前で 100 件。鉄道駅だけでは枠が埋まらないのでバス停の検索まで走る。グリッド索引の半径拡張と付加処理がどこまで線形に伸びるかを見る"
+    },
+    {
+      "name": "stationsNearby_rail",
+      "weight": "light",
+      "uses": ["StationCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_stationsNearbyRail($lat: Float!, $lon: Float!, $limit: Int) { stationsNearby(latitude: $lat, longitude: $lon, limit: $limit, transportType: Rail) { ...StationCore } }",
+      "variables": { "lat": 35.658034, "lon": 139.701636, "limit": 10 },
+      "note": "鉄道のみを明示。既定ケースとの差が、バス停側の検索を回すかどうかのコスト"
+    },
+    {
+      "name": "stationsByName",
+      "weight": "medium",
+      "uses": ["StationCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_stationsByName($name: String!, $limit: Int) { stationsByName(name: $name, limit: $limit) { ...StationCore } }",
+      "variables": { "name": "新宿", "limit": 20 },
+      "note": "正規化つき全文検索。ヒット数が多い駅名を選んでいる"
+    },
+    {
+      "name": "stationGroupStations",
+      "weight": "heavy",
+      "uses": ["StationCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_stationGroupStations($groupId: Int!) { stationGroupStations(groupId: $groupId) { ...StationCore } }",
+      "variables": { "groupId": 1130208 },
+      "note": "新宿駅グループ。同一駅の全路線分レコード"
+    },
+    {
+      "name": "lineGroupStations",
+      "weight": "heavy",
+      "uses": ["StationCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_lineGroupStations($lineGroupId: Int!) { lineGroupStations(lineGroupId: $lineGroupId) { ...StationCore } }",
+      "variables": { "lineGroupId": 203 },
+      "note": "サンライズ出雲 (250 駅)。データ中で最大の列車種別グループ"
+    },
+    {
+      "name": "lineStations",
+      "weight": "medium",
+      "uses": ["StationCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_lineStations($lineId: Int!) { lineStations(lineId: $lineId) { ...StationCore } }",
+      "variables": { "lineId": 11302 },
+      "note": "山手線 (30 駅)"
+    },
+    {
+      "name": "lineListStations",
+      "weight": "heavy",
+      "uses": ["StationCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_lineListStations($lineIds: [Int!]!) { lineListStations(lineIds: $lineIds) { ...StationCore } }",
+      "variables": { "lineIds": [11302, 11311, 11332, 28002, 99301, 11301, 11312, 11313] },
+      "note": "山手/中央/京浜東北/丸ノ内/大江戸 ほか 8 路線分の全駅"
+    },
+    {
+      "name": "lineGroupListStations",
+      "weight": "heavy",
+      "uses": ["StationCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_lineGroupListStations($lineGroupIds: [Int!]!) { lineGroupListStations(lineGroupIds: $lineGroupIds) { ...StationCore } }",
+      "variables": { "lineGroupIds": [203, 202, 363] },
+      "note": "大型グループ 2 本 + 山手線普通の同時取得"
+    },
+
+    {
+      "name": "line",
+      "weight": "light",
+      "uses": ["LineTop"],
+      "query": "query Bench_line($lineId: Int!) { line(lineId: $lineId) { ...LineTop } }",
+      "variables": { "lineId": 11302 },
+      "note": "山手線の単体取得"
+    },
+    {
+      "name": "lines",
+      "weight": "medium",
+      "uses": ["LineTop"],
+      "query": "query Bench_lines($lineIds: [Int!]!) { lines(lineIds: $lineIds) { ...LineTop } }",
+      "variables": { "lineIds": [1002, 1004, 1005, 1009, 11301, 11302, 11307, 11308, 11311, 11312, 11313, 11321, 24001, 11332, 11333, 11411, 11502, 11508, 11602, 11603, 11623, 11629, 11641, 21001, 22001, 24006, 26001, 28002, 99301, 99509] },
+      "note": "主要 30 路線"
+    },
+    {
+      "name": "linesByName",
+      "weight": "light",
+      "uses": ["LineTop"],
+      "query": "query Bench_linesByName($name: String!, $limit: Int) { linesByName(name: $name, limit: $limit) { ...LineTop } }",
+      "variables": { "name": "本線", "limit": 20 },
+      "note": "ヒット数の多い部分一致"
+    },
+
+    {
+      "name": "stationTrainTypes",
+      "weight": "medium",
+      "uses": ["TrainTypeTop", "LineCore"],
+      "query": "query Bench_stationTrainTypes($stationId: Int!) { stationTrainTypes(stationId: $stationId) { ...TrainTypeTop } }",
+      "variables": { "stationId": 1130101 },
+      "note": "東京駅 (東海道本線)。種別が多く、種別ごとに路線を引き直す"
+    },
+    {
+      "name": "routeTypes",
+      "weight": "medium",
+      "uses": ["TrainTypeTop", "LineCore"],
+      "query": "query Bench_routeTypes($from: Int!, $to: Int!) { routeTypes(fromStationGroupId: $from, toStationGroupId: $to) { trainTypes { ...TrainTypeTop } nextPageToken } }",
+      "variables": { "from": 1130101, "to": 1130103 },
+      "note": "東京 → 品川。両駅を通る種別の列挙"
+    },
+
+    {
+      "name": "routes",
+      "weight": "heavy",
+      "uses": ["StationNestedCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_routes($from: Int!, $to: Int!) { routes(fromStationGroupId: $from, toStationGroupId: $to) { routes { id stops { ...StationNestedCore } } nextPageToken } }",
+      "variables": { "from": 1130101, "to": 1130103 },
+      "note": "東京 → 品川。直通経路の全停車駅を付加つきで返す"
+    },
+    {
+      "name": "connectedRoutes",
+      "weight": "heavy",
+      "uses": ["StationNestedCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_connectedRoutes($from: Int!, $to: Int!) { connectedRoutes(fromStationGroupId: $from, toStationGroupId: $to) { id stops { ...StationNestedCore } } }",
+      "variables": { "from": 1130205, "to": 1130212 },
+      "note": "渋谷 → 池袋。乗り換えを含む有界 BFS"
+    },
+    {
+      "name": "estimateArrivalTimes",
+      "weight": "medium",
+      "query": "query Bench_estimateArrivalTimes($from: Int!, $to: Int!) { estimateArrivalTimes(fromStationId: $from, toStationId: $to) { routes { id stops { stationId stationGroupId cumulativeMinutes stopsHere departureCumulativeMinutes } } } }",
+      "variables": { "from": 1130205, "to": 1130208 },
+      "note": "渋谷 → 新宿 (山手線)。運動学モデルによる到着時刻推定"
+    },
+    {
+      "name": "trainRoute_short",
+      "weight": "light",
+      "uses": ["StationNestedCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_trainRouteShort($from: Int!, $to: Int!, $lineGroupId: Int) { trainRoute(fromStationId: $from, toStationId: $to, lineGroupId: $lineGroupId) { segments { stops distanceFromPrevious maxSpeed maxAcceleration maxDeceleration station { ...StationNestedCore } } } }",
+      "variables": { "from": 1130101, "to": 1130103, "lineGroupId": 203 },
+      "note": "250 駅グループの先頭 3 駅だけを要求する。コストが要求区間に比例しているかの判定材料 (#1647)"
+    },
+    {
+      "name": "trainRoute_long",
+      "weight": "heavy",
+      "uses": ["StationNestedCore", "LineCore", "TrainTypeCore"],
+      "query": "query Bench_trainRouteLong($from: Int!, $to: Int!, $lineGroupId: Int) { trainRoute(fromStationId: $from, toStationId: $to, lineGroupId: $lineGroupId) { segments { stops distanceFromPrevious maxSpeed maxAcceleration maxDeceleration station { ...StationNestedCore } } } }",
+      "variables": { "from": 1130101, "to": 1170113, "lineGroupId": 203 },
+      "note": "同グループの東京 → 出雲市 (全 250 駅)。short との比が区間比例性を示す"
+    }
+  ]
+}
