@@ -688,12 +688,13 @@ fn grid_of(want: i32) -> &'static Grid {
 
 static EMPTY_GRID: OnceLock<Grid> = OnceLock::new();
 
-/// 最近傍 limit 件を距離の昇順で返す。路線を引けない駅は除く。
+/// 最近傍 limit 件を返す。路線を引けない駅は除く。
 ///
-/// `want` は種別の絞り込み。未指定 (RailAndBus) でも並びは距離順で、
-/// 鉄道とバスを区別しない。移行前の SQL は `transport_type` を第 1 キーに
-/// していたため、10m 先のバス停より 5km 先の鉄道駅が先に来ていた。
-/// `stationsNearby` は近い順が仕様なので、種別で先に分けない。
+/// `want` は種別の絞り込み。指定した場合は距離の昇順。未指定 (RailAndBus) の
+/// 場合は鉄道駅を先に、バス停を後に並べ、それぞれの中を距離の昇順にする
+/// (`stationsNearby` の仕様)。件数の上限は混ぜた後の並びに掛かるので、鉄道駅が
+/// limit 件そろえばバス停は返らない。移行前の SQL が `transport_type` を第 1 キー、
+/// 距離を第 2 キーにしていたのと同じ並び。
 pub fn nearest(
     lat: f64,
     lon: f64,
@@ -707,16 +708,11 @@ pub fn nearest(
         return Vec::new();
     }
     let Some(want) = want else {
-        // 全体の上位 limit 件は種別ごとの上位 limit 件の和集合に必ず含まれる
-        // (ある駅より近い駅が limit 件未満なら、同じ種別の中でも limit 件未満)。
-        // 種別ごとに引いてから距離で混ぜ直す。
+        // 鉄道駅が先に並ぶので、上限に届くまでの残り枠だけがバス停に回る。
+        // 残り枠より遠いバス停は採用されないため、引くのも残り枠ぶんでよい。
         let mut out = nearest_of_type(lat, lon, limit, TransportType::Rail as i32);
-        out.extend(nearest_of_type(lat, lon, limit, TransportType::Bus as i32));
-        if limit < out.len() {
-            out.select_nth_unstable_by(limit, by_distance_then_station_cd);
-            out.truncate(limit);
-        }
-        out.sort_unstable_by(by_distance_then_station_cd);
+        let rest = limit.saturating_sub(out.len());
+        out.extend(nearest_of_type(lat, lon, rest, TransportType::Bus as i32));
         return out;
     };
     nearest_of_type(lat, lon, limit, want)
@@ -1210,12 +1206,19 @@ mod tests {
             .map(|s| (s, haversine_km(lat, lon, s.lat, s.lon)))
             .collect();
 
-        // 種別を指定してもしなくても並びは距離順 (`stationsNearby` の仕様)
+        // 種別を指定しない場合は鉄道が先、バスが後。その中では距離順
+        // (`stationsNearby` の仕様)。種別を指定した場合は第 1 キーが定数に
+        // なるので、同じ比較関数で距離順になる。
+        let cmp = |a: &(&'static StationRecord, f64), b: &(&'static StationRecord, f64)| {
+            (a.0.transport_type as i32)
+                .cmp(&(b.0.transport_type as i32))
+                .then_with(|| by_distance_then_station_cd(a, b))
+        };
         if limit < scored.len() {
-            scored.select_nth_unstable_by(limit, by_distance_then_station_cd);
+            scored.select_nth_unstable_by(limit, cmp);
             scored.truncate(limit);
         }
-        scored.sort_unstable_by(by_distance_then_station_cd);
+        scored.sort_unstable_by(cmp);
         scored
     }
 
@@ -1228,12 +1231,14 @@ mod tests {
             "件数が違う ({lat}, {lon}) want={want:?} limit={limit}"
         );
         for (i, (e, a)) in expected.iter().zip(actual.iter()).enumerate() {
-            // 距離が同着の駅は全件走査側の並びが決まらないので距離だけを見る
+            // 距離が同着の駅は全件走査側の並びが決まらないので、種別と距離を見る
             assert!(
-                (e.1 - a.1).abs() < 1e-9,
+                e.0.transport_type == a.0.transport_type && (e.1 - a.1).abs() < 1e-9,
                 "{i} 件目が違う ({lat}, {lon}) want={want:?} limit={limit}: \
-                 期待 {} 実際 {}",
+                 期待 {:?} {} 実際 {:?} {}",
+                e.0.transport_type,
                 e.1,
+                a.0.transport_type,
                 a.1
             );
         }
@@ -1421,28 +1426,57 @@ mod tests {
         }
     }
 
-    /// `stationsNearby` は近い順が仕様。種別を指定しない場合も、鉄道とバスを
-    /// 分けずに距離だけで並べる。移行前の SQL は `transport_type` を第 1 キーに
-    /// していたため、近いバス停より遠い鉄道駅が先に来ていた。
+    /// `stationsNearby` の並びは鉄道駅が先、バス停が後。種別を指定しない場合も
+    /// 種別で分かれ、距離の昇順はそれぞれの中だけで成り立つ。
     #[test]
-    fn nearest_orders_by_distance_regardless_of_transport_type() {
+    fn nearest_puts_rail_before_bus() {
         let step = (stations().len() / 40).max(1);
         for record in stations().iter().step_by(step) {
             for limit in [5usize, 50] {
                 let hits = nearest(record.lat, record.lon, limit, None);
                 for pair in hits.windows(2) {
+                    let (former, latter) = (pair[0].0.transport_type, pair[1].0.transport_type);
                     assert!(
-                        pair[0].1 <= pair[1].1,
-                        "({}, {}) limit={limit}: 距離の昇順になっていない ({} -> {}, 種別 {:?} -> {:?})",
+                        (former as i32) <= (latter as i32),
+                        "({}, {}) limit={limit}: バス停が鉄道駅より先に来ている \
+                         ({former:?} -> {latter:?})",
                         record.lat,
                         record.lon,
-                        pair[0].1,
-                        pair[1].1,
-                        pair[0].0.transport_type,
-                        pair[1].0.transport_type
                     );
+                    if former as i32 == latter as i32 {
+                        assert!(
+                            pair[0].1 <= pair[1].1,
+                            "({}, {}) limit={limit}: 種別 {former:?} の中が距離の昇順に \
+                             なっていない ({} -> {})",
+                            record.lat,
+                            record.lon,
+                            pair[0].1,
+                            pair[1].1
+                        );
+                    }
                 }
             }
         }
+    }
+
+    /// 鉄道駅だけで上限に届く地点では、どれだけ近くてもバス停は返らない。
+    /// 上限は種別ごとではなく、混ぜた後の並びに掛かる。
+    #[test]
+    fn nearest_fills_the_limit_with_rail_before_bus() {
+        // 東京駅前。周囲にはバス停も鉄道駅も多数ある
+        let (lat, lon) = (35.681382, 139.766084);
+        let rail = nearest(lat, lon, 5, Some(TransportType::Rail as i32));
+        assert_eq!(rail.len(), 5, "鉄道駅が 5 件そろう地点で測る");
+        // DISABLE_BUS_FEATURE で組んだ鉄道のみのデータでは確かめようがない
+        if nearest(lat, lon, 5, Some(TransportType::Bus as i32)).is_empty() {
+            return;
+        }
+
+        let hits = nearest(lat, lon, 5, None);
+        assert!(
+            hits.iter()
+                .all(|(record, _)| record.transport_type == TransportType::Rail),
+            "鉄道駅で上限が埋まる地点にバス停が混ざっている"
+        );
     }
 }
