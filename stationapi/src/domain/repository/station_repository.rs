@@ -40,6 +40,10 @@ pub trait StationRepository: Send + Sync + 'static {
         &self,
         station_group_id_vec: &[u32],
     ) -> Result<Vec<Station>, DomainError>;
+    /// 座標の近傍から最大 `limit` 件返す。`transport_type` を指定した場合は
+    /// 距離の昇順。指定しない場合は鉄道駅を先、バス停を後に並べ、それぞれの中を
+    /// 距離の昇順にする (`stationsNearby` の仕様)。件数の上限は並べた後に掛かる
+    /// ので、鉄道駅だけで `limit` 件そろえばバス停は返らない。
     async fn get_by_coordinates(
         &self,
         latitude: f64,
@@ -259,8 +263,18 @@ mod tests {
                 })
                 .collect();
 
-            // 距離でソート
-            result.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
+            // trait の契約どおり、鉄道を先・バスを後にしてから距離でソートする。
+            // 種別を指定した場合は第 1 キーが定数になるので距離順になる。
+            result.sort_by(|a, b| {
+                (a.transport_type as i32)
+                    .cmp(&(b.transport_type as i32))
+                    .then_with(|| {
+                        a.distance
+                            .partial_cmp(&b.distance)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .then_with(|| a.station_cd.cmp(&b.station_cd))
+            });
 
             // 制限があれば適用
             if let Some(limit) = limit {
@@ -520,6 +534,19 @@ mod tests {
         MockStationRepository { stations }
     }
 
+    /// 指定した座標に種別つきの駅を置いたモック。並び順の検証に使う。
+    /// 経度は東京駅に固定し、緯度だけを動かす。
+    fn mixed_repository(stations_spec: &[(i32, TransportType, f64)]) -> MockStationRepository {
+        let mut stations = HashMap::new();
+        for &(station_cd, transport_type, lat) in stations_spec {
+            let mut station =
+                create_test_station(station_cd, &format!("駅{station_cd}"), 500, lat, 139.767125);
+            station.transport_type = transport_type;
+            stations.insert(station_cd as u32, station);
+        }
+        MockStationRepository { stations }
+    }
+
     /// 東京駅から北へおよそ meters メートルの緯度。
     fn lat_north_of_tokyo(meters: f64) -> f64 {
         35.681236 + meters / 111_195.0
@@ -700,6 +727,46 @@ mod tests {
             .unwrap();
         assert!(result.len() <= 2);
         assert!(result[0].distance.is_some());
+    }
+
+    /// 種別を指定しない座標検索は鉄道駅が先、バス停が後。10m 先のバス停より
+    /// 500m 先の鉄道駅が先に来る (`stationsNearby` の仕様)。
+    #[tokio::test]
+    async fn test_get_by_coordinates_puts_rail_before_bus() {
+        let repo = mixed_repository(&[
+            (901, TransportType::Bus, lat_north_of_tokyo(10.0)),
+            (902, TransportType::Bus, lat_north_of_tokyo(20.0)),
+            (101, TransportType::Rail, lat_north_of_tokyo(500.0)),
+            (102, TransportType::Rail, lat_north_of_tokyo(400.0)),
+        ]);
+
+        let result = repo
+            .get_by_coordinates(35.681236, 139.767125, None, None)
+            .await
+            .unwrap();
+
+        // 鉄道 2 件が先、その中では近い順。バス停はその後
+        let ids: Vec<i32> = result.iter().map(|s| s.station_cd).collect();
+        assert_eq!(ids, vec![102, 101, 901, 902]);
+    }
+
+    /// 件数の上限は種別ごとではなく、並べた後の全体に掛かる。鉄道駅だけで
+    /// 埋まる地点ではバス停は返らない。
+    #[tokio::test]
+    async fn test_get_by_coordinates_fills_the_limit_with_rail_first() {
+        let repo = mixed_repository(&[
+            (901, TransportType::Bus, lat_north_of_tokyo(10.0)),
+            (101, TransportType::Rail, lat_north_of_tokyo(500.0)),
+            (102, TransportType::Rail, lat_north_of_tokyo(400.0)),
+        ]);
+
+        let result = repo
+            .get_by_coordinates(35.681236, 139.767125, Some(2), None)
+            .await
+            .unwrap();
+
+        let ids: Vec<i32> = result.iter().map(|s| s.station_cd).collect();
+        assert_eq!(ids, vec![102, 101]);
     }
 
     #[tokio::test]
