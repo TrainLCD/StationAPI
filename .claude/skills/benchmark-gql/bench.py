@@ -415,12 +415,20 @@ def measure(cases: list[dict], repeat: int, warmup: int, timeout: float,
     meta: dict = {"cpu_time_available": False, "tail_note": None}
 
     if use_cpu:
-        for t in TARGETS:
-            tails[t["key"]] = Tail(t["script"], run_id, log_dir)
-        for tail in tails.values():
-            tail.start()
-        print("wrangler tail の接続を待っています ...", file=sys.stderr)
-        if wait_for_tail(tails, clients, timeout=90):
+        try:
+            for t in TARGETS:
+                tails[t["key"]] = Tail(t["script"], run_id, log_dir)
+            for tail in tails.values():
+                tail.start()
+            print("wrangler tail の接続を待っています ...", file=sys.stderr)
+            connected = wait_for_tail(tails, clients, timeout=90)
+        except BaseException:
+            # 2 個目の start() が失敗しても、90 秒の接続待ち中に Ctrl-C が来ても、
+            # 起動済みの wrangler tail を残さない。未起動の Tail への stop() は無害。
+            for tail in tails.values():
+                tail.stop()
+            raise
+        if connected:
             meta["cpu_time_available"] = True
             print("  tail 接続完了。CPU Time を収集します。", file=sys.stderr)
         else:
