@@ -16,3 +16,6 @@ data/KeioBus-GTFS/
 scripts/.osm_cache/
 scripts/.gtfs_cache/
 __pycache__/
+
+# ベンチマークの wrangler tail 生ログ (デバッグ用の一時ファイル)
+benchmarks/.logs/
