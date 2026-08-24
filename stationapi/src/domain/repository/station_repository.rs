@@ -499,6 +499,111 @@ mod tests {
         )
     }
 
+    /// 指定した座標にバス停を置いたモック。半径の扱いを検証するために使う。
+    fn bus_stop_repository(stops: &[(i32, f64, f64)]) -> MockStationRepository {
+        let mut stations = HashMap::new();
+        for &(station_cd, lat, lon) in stops {
+            let mut stop =
+                create_test_station(station_cd, &format!("バス停{station_cd}"), 500, lat, lon);
+            stop.transport_type = TransportType::Bus;
+            stations.insert(station_cd as u32, stop);
+        }
+        MockStationRepository { stations }
+    }
+
+    /// 東京駅から北へおよそ meters メートルの緯度。
+    fn lat_north_of_tokyo(meters: f64) -> f64 {
+        35.681236 + meters / 111_195.0
+    }
+
+    #[tokio::test]
+    async fn test_get_bus_stops_near_stations_excludes_stops_outside_the_radius() {
+        let repo = bus_stop_repository(&[
+            (901, lat_north_of_tokyo(100.0), 139.767125),
+            (902, lat_north_of_tokyo(250.0), 139.767125),
+            (903, lat_north_of_tokyo(500.0), 139.767125),
+        ]);
+
+        let result = repo
+            .get_bus_stops_near_stations(&[(1, 35.681236, 139.767125)], 50, 300.0)
+            .await
+            .unwrap();
+
+        // 300m を超える 903 は含まれず、近い順に並ぶ
+        let ids: Vec<i32> = result.iter().map(|(_, s)| s.station_cd).collect();
+        assert_eq!(ids, vec![901, 902]);
+        // 距離はメートルで入る
+        let distances: Vec<f64> = result.iter().map(|(_, s)| s.distance.unwrap()).collect();
+        assert!((distances[0] - 100.0).abs() < 5.0, "{distances:?}");
+        assert!((distances[1] - 250.0).abs() < 5.0, "{distances:?}");
+        // 呼び出し元の座標に紐づく
+        assert!(result.iter().all(|(source_g_cd, _)| *source_g_cd == 1));
+    }
+
+    /// 件数の上限は半径で絞ったあとに掛ける。先に切ると、半径の外の駅が枠を
+    /// 埋めた分だけ返る件数が本来より少なくなる。
+    #[tokio::test]
+    async fn test_get_bus_stops_near_stations_applies_the_limit_after_the_radius() {
+        let repo = bus_stop_repository(&[
+            (901, lat_north_of_tokyo(1000.0), 139.767125),
+            (902, lat_north_of_tokyo(2000.0), 139.767125),
+            (903, lat_north_of_tokyo(100.0), 139.767125),
+            (904, lat_north_of_tokyo(200.0), 139.767125),
+        ]);
+
+        let result = repo
+            .get_bus_stops_near_stations(&[(1, 35.681236, 139.767125)], 2, 300.0)
+            .await
+            .unwrap();
+
+        // 半径の外にある 901 / 902 が枠を消費しない
+        let ids: Vec<i32> = result.iter().map(|(_, s)| s.station_cd).collect();
+        assert_eq!(ids, vec![903, 904]);
+    }
+
+    /// 同距離の並びは station_cd の昇順。元の並びは HashMap の反復順なので、
+    /// 決め切っていないと件数を切ったときの結果が実行ごとに変わる。
+    #[tokio::test]
+    async fn test_get_bus_stops_near_stations_breaks_ties_by_station_cd() {
+        let lat = lat_north_of_tokyo(100.0);
+        let repo = bus_stop_repository(&[(903, lat, 139.767125), (901, lat, 139.767125)]);
+
+        let result = repo
+            .get_bus_stops_near_stations(&[(1, 35.681236, 139.767125)], 1, 300.0)
+            .await
+            .unwrap();
+
+        let ids: Vec<i32> = result.iter().map(|(_, s)| s.station_cd).collect();
+        assert_eq!(ids, vec![901]);
+    }
+
+    /// 座標ごとにまとまり、その中では距離順。
+    #[tokio::test]
+    async fn test_get_bus_stops_near_stations_groups_by_source_coordinate() {
+        let repo = bus_stop_repository(&[
+            (901, lat_north_of_tokyo(100.0), 139.767125),
+            (902, lat_north_of_tokyo(200.0), 139.767125),
+        ]);
+
+        let result = repo
+            .get_bus_stops_near_stations(
+                &[
+                    (1, 35.681236, 139.767125),
+                    (2, lat_north_of_tokyo(200.0), 139.767125),
+                ],
+                50,
+                300.0,
+            )
+            .await
+            .unwrap();
+
+        let pairs: Vec<(u32, i32)> = result
+            .iter()
+            .map(|(source_g_cd, s)| (*source_g_cd, s.station_cd))
+            .collect();
+        assert_eq!(pairs, vec![(1, 901), (1, 902), (2, 902), (2, 901)]);
+    }
+
     #[tokio::test]
     async fn test_find_by_id_existing() {
         let repo = MockStationRepository::new();
