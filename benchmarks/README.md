@@ -1,0 +1,40 @@
+# benchmarks/
+
+本番 (`https://gql.trainlcd.app`) とステージング (`https://gql-stg.trainlcd.app`) の
+GraphQL クエリ性能を比べた結果を貯めておく場所です。
+
+両環境は同じデータを積んでいる (`/__health` の駅数・路線数・会社数が一致する) ので、
+差が出ればそれは実装差です。ステージングは `dev`、本番は `master` から出ているため、
+ここに並ぶ差分は「次のリリースで本番がどう変わるか」を先に見たものになります。
+
+## 生成する
+
+```bash
+python3 .claude/skills/benchmark-gql/bench.py
+```
+
+Claude Code からは `/benchmark-gql` でも呼べます。詳しい手順とオプションは
+[`.claude/skills/benchmark-gql/SKILL.md`](../.claude/skills/benchmark-gql/SKILL.md) に書いてあります。
+
+## 生成されるもの
+
+`bench.py` は 1 実行につき以下を書き出す。初回実行までは、このディレクトリにはこの
+README しか無い。
+
+| パス | 内容 |
+| --- | --- |
+| `index.md` | 実行履歴。1 実行 1 行で要約が追記される |
+| `YYYYMMDD-HHMMSS.md` | 実行ごとのレポート本体 |
+| `raw/YYYYMMDD-HHMMSS.json` | 全リクエストの生データ。`python3 .claude/skills/benchmark-gql/bench.py --rerender benchmarks/raw/<実行 ID>.json` でレポートを作り直せる (リクエストは送らない。手書きの「所見」は残る) |
+| `.logs/` | `wrangler tail` の生ログ。デバッグ用の一時ファイルで Git 管理外 |
+
+## 読むときに気をつけること
+
+- **判定は CPU Time で行う。** 応答時間には計測ホストからエッジまでの回線が乗るので、
+  実装の良し悪しを直接は表しません。レポートには `ping` の p50 を引いた補正列もあります。
+- **CPU Time はミリ秒の整数で届く。** 1〜2 ms のクエリでは丸めが効くため、
+  1 標本の値ではなく反復ぶんの平均を見ます。反復数を増やすほど分解能が上がります。
+- **コールドスタートは別枠。** WASM の実体化と索引構築で 250 ms 以上かかるので、
+  定常性能の統計からは外し、レポートの「コールドスタート」節で件数だけ数えています。
+- **クエリの変数は固定。** 過去の実行と比較できるよう、既存ケースの変数は変えません。
+  条件を変えたいときは新しいケースを足します。

@@ -1,7 +1,7 @@
 # StationAPI Makefile
 # よく使うタスクの定義
 
-.PHONY: help test check fmt clippy data build dev deploy deploy-production schema ipa-audit clean
+.PHONY: help test check fmt clippy data build dev deploy deploy-production schema ipa-audit bench clean
 
 # CI (.github/workflows/build_worker.yml) と同じ版を使う。グローバルへ入れて
 # いなくても npx が取ってくるので、版ずれでビルド結果が変わらない。
@@ -21,15 +21,18 @@ help:
 	@echo "  deploy-production- Deploy to production (master branch only)"
 	@echo "  schema           - Diff the running Worker's SDL against schema/public.graphql"
 	@echo "  ipa-audit        - Print IPA coverage report for English/romanized CSV names"
+	@echo "  bench            - Compare production vs staging GraphQL performance (sends live traffic to both)"
 	@echo "  clean            - Clean build artifacts"
 	@echo ""
 	@echo "Environment variables:"
 	@echo "  ODPT_ACCESS_TOKEN   - Required by all bus feeds except Toei"
 	@echo "  DISABLE_BUS_FEATURE - Set to true to build rail-only data"
 
-# worker は wasm32 用の crate なので、ネイティブのテストからは外す。
+# worker は Workers 上でしか動かないが、索引 (src/index.rs) はネイティブでも
+# 動く純粋なデータ構造なので、そのユニットテストはここで走らせる。
 test:
 	cargo test -p stationapi -p stationapi-preprocessor -p data_validator
+	cargo test -p stationapi-worker
 
 check:
 	cargo check -p stationapi -p stationapi-preprocessor -p data_validator
@@ -75,6 +78,15 @@ ipa-audit:
 	@echo "Printing IPA coverage report..."
 	rustc tools/ipa_audit.rs -o /tmp/stationapi-ipa-audit
 	/tmp/stationapi-ipa-audit
+
+# 本番とステージングの GraphQL 性能を比べ、benchmarks/ にレポートを貯める。
+# 実在のエンドポイントへ数百リクエスト投げるので、気軽に回すものではない。
+# CPU Time の収集には wrangler の workers_tail (read) 権限が要る。
+# 追加の引数は BENCH_ARGS で渡す (例: make bench BENCH_ARGS="--repeat 30")。
+bench:
+	@echo "警告: 本番 (gql.trainlcd.app) とステージングへ実リクエストを送ります。" >&2
+	@echo "      既定で 1 環境あたり 400 件超、うち数十件は Worker の CPU を 500ms 以上使います。" >&2
+	python3 .claude/skills/benchmark-gql/bench.py $(BENCH_ARGS)
 
 clean:
 	cargo clean

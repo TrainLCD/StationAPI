@@ -40,6 +40,10 @@ pub trait StationRepository: Send + Sync + 'static {
         &self,
         station_group_id_vec: &[u32],
     ) -> Result<Vec<Station>, DomainError>;
+    /// 座標の近傍から最大 `limit` 件返す。`transport_type` を指定した場合は
+    /// 距離の昇順。指定しない場合は鉄道駅を先、バス停を後に並べ、それぞれの中を
+    /// 距離の昇順にする (`stationsNearby` の仕様)。件数の上限は並べた後に掛かる
+    /// ので、鉄道駅だけで `limit` 件そろえばバス停は返らない。
     async fn get_by_coordinates(
         &self,
         latitude: f64,
@@ -82,10 +86,19 @@ pub trait StationRepository: Send + Sync + 'static {
             })
             .collect())
     }
+    /// 各座標から `radius_meters` 以内のバス停を、近い順に最大
+    /// `limit_per_station` 件返す。半径の外は呼び出し側でも採用されないため、
+    /// ここで切っておく (全国の最寄り N 件を作ってから捨てると、駅数に比例して
+    /// 無駄が積み上がる)。
+    ///
+    /// 半径が有限でない (`NaN` / 無限大) 場合と負の場合は空を返す。無限大を
+    /// 距離の比較にそのまま使うと全件が半径内と判定されるため、実装ごとに
+    /// 結果が食い違わないようここで決めておく。
     async fn get_bus_stops_near_stations(
         &self,
         coords: &[(u32, f64, f64)], // (station_g_cd, lat, lon)
         limit_per_station: u32,
+        radius_meters: f64,
     ) -> Result<Vec<(u32, Station)>, DomainError>;
     async fn get_route_stops(
         &self,
@@ -250,8 +263,18 @@ mod tests {
                 })
                 .collect();
 
-            // 距離でソート
-            result.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
+            // trait の契約どおり、鉄道を先・バスを後にしてから距離でソートする。
+            // 種別を指定した場合は第 1 キーが定数になるので距離順になる。
+            result.sort_by(|a, b| {
+                (a.transport_type as i32)
+                    .cmp(&(b.transport_type as i32))
+                    .then_with(|| {
+                        a.distance
+                            .partial_cmp(&b.distance)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .then_with(|| a.station_cd.cmp(&b.station_cd))
+            });
 
             // 制限があれば適用
             if let Some(limit) = limit {
@@ -261,19 +284,63 @@ mod tests {
             Ok(result)
         }
 
+        /// trait の契約どおり、半径で絞ってから件数を切る。
+        ///
+        /// `get_by_coordinates` が `distance` に入れるのは緯度経度の度で測った
+        /// ユークリッド距離なので、メートルの半径とは比較できない。ここでは
+        /// 距離を測り直す。件数を先に切ると、半径の外の駅が枠を埋めた分だけ
+        /// 返る件数が本来より少なくなる。
         async fn get_bus_stops_near_stations(
             &self,
             coords: &[(u32, f64, f64)],
             limit_per_station: u32,
+            radius_meters: f64,
         ) -> Result<Vec<(u32, Station)>, DomainError> {
+            // 無限大をそのまま比較に使うと全件が半径内になる
+            if !radius_meters.is_finite() || radius_meters < 0.0 {
+                return Ok(Vec::new());
+            }
+
+            /// 球面距離 (m)。
+            fn haversine_meters(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+                const EARTH_RADIUS_M: f64 = 6_371_000.0;
+                let (p1, p2) = (lat1.to_radians(), lat2.to_radians());
+                let dlat = (lat2 - lat1).to_radians();
+                let dlon = (lon2 - lon1).to_radians();
+                let a =
+                    (dlat / 2.0).sin().powi(2) + p1.cos() * p2.cos() * (dlon / 2.0).sin().powi(2);
+                2.0 * EARTH_RADIUS_M * a.sqrt().clamp(-1.0, 1.0).asin()
+            }
+
             let mut result = Vec::new();
             for &(source_g_cd, lat, lon) in coords {
                 let stops = self
-                    .get_by_coordinates(lat, lon, Some(limit_per_station), Some(TransportType::Bus))
+                    .get_by_coordinates(lat, lon, None, Some(TransportType::Bus))
                     .await?;
-                for stop in stops {
-                    result.push((source_g_cd, stop));
-                }
+                // get_by_coordinates の並びは度で測ったユークリッド距離順で、
+                // 緯度の高い地点では球面距離順と一致しない。件数を切る前に
+                // 測り直した距離で並べ直す。
+                let mut within: Vec<Station> = stops
+                    .into_iter()
+                    .filter_map(|mut stop| {
+                        let meters = haversine_meters(lat, lon, stop.lat, stop.lon);
+                        (meters <= radius_meters).then(|| {
+                            stop.distance = Some(meters);
+                            stop
+                        })
+                    })
+                    .collect();
+                // 元の並びは HashMap の反復順なので、同距離の順序を距離だけに
+                // 任せると件数を切ったときにどのバス停が残るか実行ごとに変わる。
+                // 索引側 (by_distance_then_station_cd) と同じく station_cd で決める。
+                within.sort_by(|a, b| {
+                    a.distance
+                        .partial_cmp(&b.distance)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.station_cd.cmp(&b.station_cd))
+                });
+                within.truncate(limit_per_station as usize);
+                result.extend(within.into_iter().map(|stop| (source_g_cd, stop)));
             }
             Ok(result)
         }
@@ -455,6 +522,150 @@ mod tests {
         )
     }
 
+    /// 指定した座標にバス停を置いたモック。半径の扱いを検証するために使う。
+    fn bus_stop_repository(stops: &[(i32, f64, f64)]) -> MockStationRepository {
+        let mut stations = HashMap::new();
+        for &(station_cd, lat, lon) in stops {
+            let mut stop =
+                create_test_station(station_cd, &format!("バス停{station_cd}"), 500, lat, lon);
+            stop.transport_type = TransportType::Bus;
+            stations.insert(station_cd as u32, stop);
+        }
+        MockStationRepository { stations }
+    }
+
+    /// 指定した座標に種別つきの駅を置いたモック。並び順の検証に使う。
+    /// 経度は東京駅に固定し、緯度だけを動かす。
+    fn mixed_repository(stations_spec: &[(i32, TransportType, f64)]) -> MockStationRepository {
+        let mut stations = HashMap::new();
+        for &(station_cd, transport_type, lat) in stations_spec {
+            let mut station =
+                create_test_station(station_cd, &format!("駅{station_cd}"), 500, lat, 139.767125);
+            station.transport_type = transport_type;
+            stations.insert(station_cd as u32, station);
+        }
+        MockStationRepository { stations }
+    }
+
+    /// 東京駅から北へおよそ meters メートルの緯度。
+    fn lat_north_of_tokyo(meters: f64) -> f64 {
+        35.681236 + meters / 111_195.0
+    }
+
+    #[tokio::test]
+    async fn test_get_bus_stops_near_stations_excludes_stops_outside_the_radius() {
+        let repo = bus_stop_repository(&[
+            (901, lat_north_of_tokyo(100.0), 139.767125),
+            (902, lat_north_of_tokyo(250.0), 139.767125),
+            (903, lat_north_of_tokyo(500.0), 139.767125),
+        ]);
+
+        let result = repo
+            .get_bus_stops_near_stations(&[(1, 35.681236, 139.767125)], 50, 300.0)
+            .await
+            .unwrap();
+
+        // 300m を超える 903 は含まれず、近い順に並ぶ
+        let ids: Vec<i32> = result.iter().map(|(_, s)| s.station_cd).collect();
+        assert_eq!(ids, vec![901, 902]);
+        // 距離はメートルで入る
+        let distances: Vec<f64> = result.iter().map(|(_, s)| s.distance.unwrap()).collect();
+        assert!((distances[0] - 100.0).abs() < 5.0, "{distances:?}");
+        assert!((distances[1] - 250.0).abs() < 5.0, "{distances:?}");
+        // 呼び出し元の座標に紐づく
+        assert!(result.iter().all(|(source_g_cd, _)| *source_g_cd == 1));
+    }
+
+    /// 件数の上限は半径で絞ったあとに掛ける。先に切ると、半径の外の駅が枠を
+    /// 埋めた分だけ返る件数が本来より少なくなる。
+    #[tokio::test]
+    async fn test_get_bus_stops_near_stations_applies_the_limit_after_the_radius() {
+        let repo = bus_stop_repository(&[
+            (901, lat_north_of_tokyo(1000.0), 139.767125),
+            (902, lat_north_of_tokyo(2000.0), 139.767125),
+            (903, lat_north_of_tokyo(100.0), 139.767125),
+            (904, lat_north_of_tokyo(200.0), 139.767125),
+        ]);
+
+        let result = repo
+            .get_bus_stops_near_stations(&[(1, 35.681236, 139.767125)], 2, 300.0)
+            .await
+            .unwrap();
+
+        // 半径の外にある 901 / 902 が枠を消費しない
+        let ids: Vec<i32> = result.iter().map(|(_, s)| s.station_cd).collect();
+        assert_eq!(ids, vec![903, 904]);
+    }
+
+    /// 同距離の並びは station_cd の昇順。元の並びは HashMap の反復順なので、
+    /// 決め切っていないと件数を切ったときの結果が実行ごとに変わる。
+    #[tokio::test]
+    async fn test_get_bus_stops_near_stations_breaks_ties_by_station_cd() {
+        let lat = lat_north_of_tokyo(100.0);
+        let repo = bus_stop_repository(&[(903, lat, 139.767125), (901, lat, 139.767125)]);
+
+        let result = repo
+            .get_bus_stops_near_stations(&[(1, 35.681236, 139.767125)], 1, 300.0)
+            .await
+            .unwrap();
+
+        let ids: Vec<i32> = result.iter().map(|(_, s)| s.station_cd).collect();
+        assert_eq!(ids, vec![901]);
+    }
+
+    /// 座標ごとにまとまり、その中では距離順。
+    #[tokio::test]
+    async fn test_get_bus_stops_near_stations_groups_by_source_coordinate() {
+        let repo = bus_stop_repository(&[
+            (901, lat_north_of_tokyo(100.0), 139.767125),
+            (902, lat_north_of_tokyo(200.0), 139.767125),
+        ]);
+
+        let result = repo
+            .get_bus_stops_near_stations(
+                &[
+                    (1, 35.681236, 139.767125),
+                    (2, lat_north_of_tokyo(200.0), 139.767125),
+                ],
+                50,
+                300.0,
+            )
+            .await
+            .unwrap();
+
+        let pairs: Vec<(u32, i32)> = result
+            .iter()
+            .map(|(source_g_cd, s)| (*source_g_cd, s.station_cd))
+            .collect();
+        assert_eq!(pairs, vec![(1, 901), (1, 902), (2, 902), (2, 901)]);
+    }
+
+    /// 半径が有限でない場合と負の場合は空を返す。無限大をそのまま比較に使うと
+    /// 全件が半径内と判定され、本番実装 (index::within_radius) と食い違う。
+    #[tokio::test]
+    async fn test_get_bus_stops_near_stations_rejects_an_invalid_radius() {
+        let repo = bus_stop_repository(&[
+            (901, lat_north_of_tokyo(100.0), 139.767125),
+            (902, lat_north_of_tokyo(5000.0), 139.767125),
+        ]);
+        let coords = [(1u32, 35.681236, 139.767125)];
+
+        for radius in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN, -1.0] {
+            let result = repo
+                .get_bus_stops_near_stations(&coords, 50, radius)
+                .await
+                .unwrap();
+            assert!(result.is_empty(), "半径 {radius} で空にならない");
+        }
+
+        // 有限の半径では従来どおり返る
+        let result = repo
+            .get_bus_stops_near_stations(&coords, 50, 300.0)
+            .await
+            .unwrap();
+        assert_eq!(result.len(), 1);
+    }
+
     #[tokio::test]
     async fn test_find_by_id_existing() {
         let repo = MockStationRepository::new();
@@ -516,6 +727,46 @@ mod tests {
             .unwrap();
         assert!(result.len() <= 2);
         assert!(result[0].distance.is_some());
+    }
+
+    /// 種別を指定しない座標検索は鉄道駅が先、バス停が後。10m 先のバス停より
+    /// 500m 先の鉄道駅が先に来る (`stationsNearby` の仕様)。
+    #[tokio::test]
+    async fn test_get_by_coordinates_puts_rail_before_bus() {
+        let repo = mixed_repository(&[
+            (901, TransportType::Bus, lat_north_of_tokyo(10.0)),
+            (902, TransportType::Bus, lat_north_of_tokyo(20.0)),
+            (101, TransportType::Rail, lat_north_of_tokyo(500.0)),
+            (102, TransportType::Rail, lat_north_of_tokyo(400.0)),
+        ]);
+
+        let result = repo
+            .get_by_coordinates(35.681236, 139.767125, None, None)
+            .await
+            .unwrap();
+
+        // 鉄道 2 件が先、その中では近い順。バス停はその後
+        let ids: Vec<i32> = result.iter().map(|s| s.station_cd).collect();
+        assert_eq!(ids, vec![102, 101, 901, 902]);
+    }
+
+    /// 件数の上限は種別ごとではなく、並べた後の全体に掛かる。鉄道駅だけで
+    /// 埋まる地点ではバス停は返らない。
+    #[tokio::test]
+    async fn test_get_by_coordinates_fills_the_limit_with_rail_first() {
+        let repo = mixed_repository(&[
+            (901, TransportType::Bus, lat_north_of_tokyo(10.0)),
+            (101, TransportType::Rail, lat_north_of_tokyo(500.0)),
+            (102, TransportType::Rail, lat_north_of_tokyo(400.0)),
+        ]);
+
+        let result = repo
+            .get_by_coordinates(35.681236, 139.767125, Some(2), None)
+            .await
+            .unwrap();
+
+        let ids: Vec<i32> = result.iter().map(|s| s.station_cd).collect();
+        assert_eq!(ids, vec![102, 101]);
     }
 
     #[tokio::test]
