@@ -307,10 +307,14 @@ mod tests {
                         })
                     })
                     .collect();
+                // 元の並びは HashMap の反復順なので、同距離の順序を距離だけに
+                // 任せると件数を切ったときにどのバス停が残るか実行ごとに変わる。
+                // 索引側 (by_distance_then_station_cd) と同じく station_cd で決める。
                 within.sort_by(|a, b| {
                     a.distance
                         .partial_cmp(&b.distance)
                         .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.station_cd.cmp(&b.station_cd))
                 });
                 within.truncate(limit_per_station as usize);
                 result.extend(within.into_iter().map(|stop| (source_g_cd, stop)));
