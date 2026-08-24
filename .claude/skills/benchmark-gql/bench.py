@@ -258,6 +258,21 @@ class Client:
         raise RuntimeError("unreachable")
 
 
+def check_response(case: dict, target: dict, res: dict, payload: dict | None) -> None:
+    """失敗した応答を標本に混ぜない。
+
+    エラー応答は速くて小さいので、混ざると失敗した側が「速い」という逆の結論になる。
+    ウォームアップと本計測の両方でこれを通す。
+    """
+    if res["status"] != 200:
+        sys.exit(f"{case['name']} / {target['key']}: HTTP {res['status']}")
+    if payload is not None:
+        errs = graphql_errors(res["body"])
+        if errs:
+            sys.exit(f"{case['name']} / {target['key']}: GraphQL エラー "
+                     f"{json.dumps(errs, ensure_ascii=False)[:400]}")
+
+
 def graphql_errors(raw: bytes) -> list | None:
     try:
         doc = json.loads(raw)
@@ -409,7 +424,7 @@ def measure(cases: list[dict], repeat: int, warmup: int, timeout: float,
             meta["cpu_time_available"] = True
             print("  tail 接続完了。CPU Time を収集します。", file=sys.stderr)
         else:
-            meta["tail_note"] = "wrangler tail に接続できなかったため CPU Time は欠測です。`npx wrangler whoami` で workers_tail (read) を確認してください。"
+            meta["tail_note"] = "wrangler tail に接続できなかったため CPU Time は欠測です。wrangler の権限に workers_tail (read) があるか確認してください。"
             print(f"  ! {meta['tail_note']}", file=sys.stderr)
             for tail in tails.values():
                 tail.stop()
@@ -436,13 +451,7 @@ def measure(cases: list[dict], repeat: int, warmup: int, timeout: float,
                         res = clients[target["key"]].request(method, path, payload)
                     except Exception as exc:
                         sys.exit(f"{case['name']} / {target['key']}: リクエスト失敗 {exc}")
-                    if res["status"] != 200:
-                        sys.exit(f"{case['name']} / {target['key']}: HTTP {res['status']}")
-                    if payload is not None:
-                        errs = graphql_errors(res["body"])
-                        if errs:
-                            sys.exit(f"{case['name']} / {target['key']}: GraphQL エラー "
-                                     f"{json.dumps(errs, ensure_ascii=False)[:400]}")
+                    check_response(case, target, res, payload)
 
         # ---- 本計測
         # 外側が反復、内側がケース。1 ケースを続けて 15 回叩くのではなく、
@@ -465,6 +474,7 @@ def measure(cases: list[dict], repeat: int, warmup: int, timeout: float,
                 order = TARGETS if (i + j) % 2 == 0 else list(reversed(TARGETS))
                 for target in order:
                     res = clients[target["key"]].request(method, path, payload)
+                    check_response(case, target, res, payload)
                     samples.append({
                         "case": case["name"],
                         "target": target["key"],
@@ -488,15 +498,20 @@ def measure(cases: list[dict], repeat: int, warmup: int, timeout: float,
             client.close()
 
     if tails:
-        # tail は数秒遅れて届く。最後のリクエスト分を取りこぼさないよう待つ。
-        print("tail の残りを待っています ...", file=sys.stderr)
-        time.sleep(12)
         events: dict[str, dict] = {}
-        for key, tail in tails.items():
-            tail.stop()
-            for ray, ev in tail.events().items():
-                ev["target"] = key
-                events[ray] = ev
+        try:
+            # tail は数秒遅れて届く。最後のリクエスト分を取りこぼさないよう待つ。
+            print("tail の残りを待っています ...", file=sys.stderr)
+            time.sleep(12)
+            for key, tail in tails.items():
+                tail.stop()
+                for ray, ev in tail.events().items():
+                    ev["target"] = key
+                    events[ray] = ev
+        finally:
+            # この待機中の Ctrl-C でも wrangler tail を残さない。stop() は冪等。
+            for tail in tails.values():
+                tail.stop()
         matched = 0
         versions: dict[str, set] = {t["key"]: set() for t in TARGETS}
         for s in samples:

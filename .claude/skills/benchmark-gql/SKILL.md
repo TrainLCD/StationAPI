@@ -28,8 +28,15 @@ CPU Time はリクエストと `cf-ray` で突き合わせる。`wrangler tail` 
 
 ## 前提条件
 
-- `npx wrangler whoami` が通り、権限に **`workers_tail (read)`** があること。
+- wrangler の認証が済んでいて、権限に **`workers_tail (read)`** があること。
   無いと CPU Time が欠測になる (応答時間の計測だけは続行する)。
+  版は `Makefile` の `WRANGLER_VERSION` に合わせる。版を指定しない `npx wrangler` は
+  その時点の最新を取ってくるので、Cloudflare の認証情報を持つ環境で走らせるものとしては
+  固定しておく。`bench.py` も同じ値を読んで `wrangler tail` を起動する。
+
+  ```bash
+  npx --yes wrangler@"$(sed -n 's/^WRANGLER_VERSION := //p' Makefile)" whoami
+  ```
 - Python 3。依存は標準ライブラリのみ。
 - リポジトリルートで実行すること (`wrangler tail` の cwd に使う)。
 

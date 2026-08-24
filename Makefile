@@ -84,6 +84,8 @@ ipa-audit:
 # CPU Time の収集には wrangler の workers_tail (read) 権限が要る。
 # 追加の引数は BENCH_ARGS で渡す (例: make bench BENCH_ARGS="--repeat 30")。
 bench:
+	@echo "警告: 本番 (gql.trainlcd.app) とステージングへ実リクエストを送ります。" >&2
+	@echo "      既定で 1 環境あたり 400 件超、うち数十件は Worker の CPU を 500ms 以上使います。" >&2
 	python3 .claude/skills/benchmark-gql/bench.py $(BENCH_ARGS)
 
 clean:
