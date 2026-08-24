@@ -90,6 +90,19 @@ def root_query_fields(document: str) -> set[str]:
     i, n = 0, len(document)
     while i < n:
         ch = document[i]
+        if document.startswith('"""', i):   # ブロック文字列。
+            # 単純に " 単位で食うと、中に " が 1 つあるだけで境界がずれ、
+            # 続く # や括弧が本文として解釈されてしまう。丸ごと 1 トークンで飛ばす。
+            j = i + 3
+            while j < n:
+                if document[j] == "\\":
+                    j += 2                  # \""" は終端ではない
+                    continue
+                if document.startswith('"""', j):
+                    break
+                j += 1
+            i = n if j >= n else j + 3
+            continue
         if ch == '"':                       # 引数の文字列。中の括弧を数えない
             i += 1
             while i < n and document[i] != '"':
@@ -885,6 +898,98 @@ def update_index(index_path: Path, run_id: str, started, rows, meta, args) -> No
     index_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+# --------------------------------------------------------------------------- 自己診断
+
+# root_query_fields は「ケースの足し忘れ」を知らせるためだけの補助だが、壊れても
+# 黙って警告が出なくなるだけなので気付けない。過去に見つかった取りこぼしを
+# ここに固定しておく。`make test` は Rust 専用なので、Python 側はこれで代える。
+_LEXER_CASES = [
+    ("ルートフィールド",
+     'query Q { station(id: 1) { name } }', {"station"}),
+    ("ルート複数",
+     'query Q { station(id: 1) { name } lines(lineIds: [1]) { id } }', {"station", "lines"}),
+    ("ネストは拾わない",
+     'query Q { trainRoute(fromStationId: 1, toStationId: 2) { segments { station { id } } } }',
+     {"trainRoute"}),
+    ("ネストが引数付きでも拾わない",
+     'query Q { trainRoute(fromStationId: 1, toStationId: 2) { segments { station { lines(transportType: Rail) { id } } } } }',
+     {"trainRoute"}),
+    ("フラグメントスプレッドは無視",
+     'query Q { station(id: 1) { ...StationCore } }', {"station"}),
+    ("エイリアスは実フィールド名を採る",
+     'query Q { a: stationsByName(name: "x", limit: 2) { id } }', {"stationsByName"}),
+    ("引数の文字列にある括弧を数えない",
+     'query Q { stationsByName(name: "新宿(西口)", limit: 2) { id } lines(lineIds: [1]) { id } }',
+     {"stationsByName", "lines"}),
+    ("引数の文字列にある # はコメントではない",
+     'query Q { stationsByName(name: "#1 番線", limit: 2) { id } }', {"stationsByName"}),
+    ("コメントの語を拾わない",
+     'query Q {\n  # lines\n  station(id: 1) { name }\n}', {"station"}),
+    ("コメント内の閉じ波括弧で深さを崩さない",
+     'query Q {\n  station(id: 1) {\n    # closing } here\n    name\n  }\n  lines(lineIds: [1]) { id }\n}',
+     {"station", "lines"}),
+    ("コメント内の開き波括弧で深さを崩さない",
+     'query Q {\n  # open { here\n  station(id: 1) { name }\n  lines(lineIds: [1]) { id }\n}',
+     {"station", "lines"}),
+    ("コメント内の閉じ括弧で深さを崩さない",
+     'query Q {\n  station(id: 1) { name }  # a paren ) here\n  lines(lineIds: [1]) { id }\n}',
+     {"station", "lines"}),
+    ("ディレクティブ名はフィールドではない",
+     'query Q { station(id: 1) @lines { name } }', {"station"}),
+    ("引数付きディレクティブ",
+     'query Q { station(id: 1) @include(if: $x) { name } lines(lineIds: [1]) { id } }',
+     {"station", "lines"}),
+    ("ブロック文字列を丸ごと飛ばす",
+     'query Q { field(arg: """text # { }""") other }', {"field", "other"}),
+    ("ブロック文字列の中に \" があっても崩れない",
+     'query Q { field(arg: """text " # { }""") other }', {"field", "other"}),
+    ("ブロック文字列の中の波括弧",
+     'query Q { field(arg: """text " { }""") other }', {"field", "other"}),
+]
+
+
+def self_test(queries_path: Path) -> int:
+    """レキサとカバレッジ判定の自己診断。`--self-test` で走る。"""
+    failures = 0
+    for label, document, expected in _LEXER_CASES:
+        got = root_query_fields(document)
+        ok = got == expected
+        failures += not ok
+        print(f"  {'ok  ' if ok else 'FAIL'}  {label}"
+              + ("" if ok else f"\n        期待 {sorted(expected)} / 実際 {sorted(got)}"),
+              file=sys.stderr)
+
+    # カタログ側。全 Query フィールドを覆えているか、覆えなくなったら気付けるか。
+    # スキーマが読めないと uncovered_query_fields は無条件に空を返すので、
+    # 先に存在を確かめる。これが無いと以下 2 件が空振りで ok になる。
+    schema = REPO_ROOT / "schema" / "public.graphql"
+    if not schema.exists():
+        print(f"  FAIL  {schema} が見つからない (カバレッジ判定を検証できない)", file=sys.stderr)
+        print(f"全 {len(_LEXER_CASES) + 2} 件中 {len(_LEXER_CASES) - failures} 件 ok", file=sys.stderr)
+        return 1
+
+    cases = json.loads(queries_path.read_text(encoding="utf-8"))["cases"]
+    uncovered = uncovered_query_fields(cases)
+    ok = not uncovered
+    failures += not ok
+    print(f"  {'ok  ' if ok else 'FAIL'}  {queries_path.name} が Query を全て覆う"
+          + ("" if ok else f" (未カバー: {uncovered})"), file=sys.stderr)
+
+    named = next((c["name"] for c in cases if c.get("query")), None)
+    if named:
+        target = next(iter(root_query_fields(
+            next(c["query"] for c in cases if c["name"] == named))), None)
+        remaining = [c for c in cases if c["name"] != named]
+        ok = target is not None and target in uncovered_query_fields(remaining)
+        failures += not ok
+        print(f"  {'ok  ' if ok else 'FAIL'}  ケースを外すと未カバーとして検出する"
+              f" ({named} / {target})", file=sys.stderr)
+
+    total = len(_LEXER_CASES) + 2
+    print(f"全 {total} 件中 {total - failures} 件 ok", file=sys.stderr)
+    return 1 if failures else 0
+
+
 # --------------------------------------------------------------------------- main
 
 
@@ -951,10 +1056,15 @@ def main() -> int:
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR, help="結果の出力先")
     parser.add_argument("--queries", type=Path, default=SKILL_DIR / "queries.json")
     parser.add_argument("--dry-run", action="store_true", help="ファイルを書かずに標準出力へ出す")
+    parser.add_argument("--self-test", action="store_true",
+                        help="レキサとカバレッジ判定の自己診断だけ走らせる (リクエストは送らない)")
     parser.add_argument("--rerender", type=Path, default=None,
                         help="benchmarks/raw/*.json からレポートを作り直す (リクエストは送らない)")
     parser.add_argument("--note", default="", help="レポート冒頭に添える一言")
     args = parser.parse_args()
+
+    if args.self_test:
+        return self_test(args.queries)
 
     if args.rerender:
         return rerender(args)
