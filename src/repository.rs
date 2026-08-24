@@ -322,8 +322,9 @@ impl StationRepository for MemStationRepository {
             .collect())
     }
 
-    /// 各座標につき半径以内のバス停を近い順に N 件取り、そのあと有効な路線を
-    /// 持つものだけに絞る。先に路線で絞ると件数が変わるため、この順序を保つ。
+    /// 各座標につき半径以内のバス停を近い順に見て、有効な路線を持つものだけを
+    /// N 件まで採る。上限を先に掛けると、路線を引けないバス停や廃止路線の
+    /// バス停が枠を埋めたぶんだけ件数が減るため、絞り込みを先に行う。
     /// 並びは指定された座標の順、その中では距離順。
     async fn get_bus_stops_near_stations(
         &self,
@@ -337,20 +338,17 @@ impl StationRepository for MemStationRepository {
         let mut out = Vec::new();
 
         for &(source_g_cd, lat, lon) in coords {
-            let mut hits = index::within_radius(lat, lon, radius_km, want);
-            hits.truncate(limit);
-            for (record, _distance) in hits {
-                let Some(line) = index::line_by_cd(record.line_cd) else {
-                    continue;
-                };
-                if line.e_status != 0 {
-                    continue;
-                }
-                let mut station = record.to_entity(Some(line));
-                station.line_group_cd = index::first_line_group_cd(record.station_cd);
-                station.has_train_types = station.line_group_cd.is_some();
-                out.push((source_g_cd, station));
-            }
+            let hits = index::within_radius(lat, lon, radius_km, want)
+                .into_iter()
+                .filter_map(|(record, _distance)| {
+                    let line = index::line_by_cd(record.line_cd).filter(|l| l.e_status == 0)?;
+                    let mut station = record.to_entity(Some(line));
+                    station.line_group_cd = index::first_line_group_cd(record.station_cd);
+                    station.has_train_types = station.line_group_cd.is_some();
+                    Some((source_g_cd, station))
+                })
+                .take(limit);
+            out.extend(hits);
         }
         Ok(out)
     }

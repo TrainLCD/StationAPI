@@ -125,5 +125,5 @@ async fn get_nearby_bus_lines(&self, ref_lat: f64, ref_lon: f64) -> Result<Vec<L
 
 ## 注意事項
 
-- バス路線検索は最大50件のバス停候補を取得し、その中から300m以内のものをフィルタリング
+- バス路線検索は300m以内のバス停を近い順に見て、有効な路線を持つものを最大50件採用
 - 鉄道駅の `lines` 配列に近傍バス路線が追加されるのは、未指定または `transportType: RailAndBus` の場合
