@@ -74,6 +74,59 @@ def wrangler_argv() -> list[str]:
     return ["npx", "--yes", pkg]
 
 
+_NAME = re.compile(r"[A-Za-z_]\w*")
+
+
+def root_query_fields(document: str) -> set[str]:
+    """オペレーション本文の深さ 1 — つまり Query の直下で選ぶフィールド名を返す。
+
+    本文全体を正規表現で舐めると、ネストした同名フィールドまで拾ってしまう。
+    たとえば `Station.lines(transportType: Rail)` が Query の `lines` を
+    覆ったことになり、`lines` のケースを足し忘れても警告が出なくなる。
+    深さで切れば取り違えは起きない。
+    """
+    fields: set[str] = set()
+    depth = paren = 0
+    i, n = 0, len(document)
+    while i < n:
+        ch = document[i]
+        if ch == '"':                       # 引数の文字列。中の括弧を数えない
+            i += 1
+            while i < n and document[i] != '"':
+                i += 2 if document[i] == "\\" else 1
+            i += 1
+            continue
+        if ch == "(":
+            paren += 1
+        elif ch == ")":
+            paren = max(paren - 1, 0)
+        elif paren:
+            pass                            # 引数の中はフィールドではない
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth <= 0:
+                break                       # オペレーション本文の終わり
+        elif depth == 1:
+            if document.startswith("...", i):
+                i += 3                      # フラグメントスプレッドは Query フィールドではない
+                continue
+            m = _NAME.match(document, i)
+            if m:
+                j = m.end()
+                while j < n and document[j] in " \t\r\n":
+                    j += 1
+                if j < n and document[j] == ":":
+                    i = j + 1               # エイリアス。実フィールド名は次のトークン
+                    continue
+                fields.add(m.group(0))
+                i = m.end()
+                continue
+        i += 1
+    return fields
+
+
 def uncovered_query_fields(cases: list[dict]) -> list[str]:
     """schema/public.graphql の Query フィールドのうち、どのケースも叩かないものを返す。
 
@@ -87,8 +140,10 @@ def uncovered_query_fields(cases: list[dict]) -> list[str]:
     if not body:
         return []
     fields = [m.group(1) for m in re.finditer(r"^\s*(\w+)\s*[(:]", body.group(1), re.M)]
-    documents = " ".join(c.get("query", "") for c in cases)
-    return [f for f in fields if not re.search(r"[{\s]" + re.escape(f) + r"\s*[(:]", documents)]
+    covered: set[str] = set()
+    for case in cases:
+        covered |= root_query_fields(case.get("query", ""))
+    return [f for f in fields if f not in covered]
 
 
 def load_cases(path: Path, only: list[str] | None, skip_baseline: bool) -> tuple[list[dict], list[str]]:
@@ -96,11 +151,14 @@ def load_cases(path: Path, only: list[str] | None, skip_baseline: bool) -> tuple
     fragments = doc["fragments"]
     cases = doc["cases"]
     uncovered = uncovered_query_fields(cases)
+    # 未知判定は絞り込み前の名前で行う。--skip-baseline で落ちたケースは
+    # 「存在しない」のではなく「今回対象外」なので、--only に書かれても未知ではない。
+    known = {c["name"] for c in cases}
     if skip_baseline:
         cases = [c for c in cases if c.get("weight") != "baseline"]
     if only:
         wanted = set(only)
-        unknown = wanted - {c["name"] for c in cases}
+        unknown = wanted - known
         if unknown:
             sys.exit(f"未知のケース: {', '.join(sorted(unknown))}")
         cases = [c for c in cases if c["name"] in wanted]
@@ -826,6 +884,12 @@ def rerender(args) -> int:
     集計や表の書き方を直したときに、本番へ投げ直さずにレポートを更新できる。
     生データには全リクエストの結果が入っているので、再計測する理由は無い。
     """
+    # 出力先は入力パスから逆算するので、想定の配置でなければ止める。
+    # 黙って parent.parent を取ると、raw/ 以外を渡されたとき無関係な場所へ書き出す。
+    if args.rerender.parent.name != "raw":
+        sys.exit(f"--rerender には <出力先>/raw/<実行 ID>.json を渡してください: {args.rerender}")
+    out_dir = args.rerender.parent.parent
+
     raw = json.loads(args.rerender.read_text(encoding="utf-8"))
     run_id = raw["run_id"]
     started = datetime.fromisoformat(raw["started_at"])
@@ -847,7 +911,7 @@ def rerender(args) -> int:
     if note:
         markdown = markdown.replace("## 実行条件", f"> {note}\n\n## 実行条件", 1)
 
-    report = args.rerender.parent.parent / f"{run_id}.md"
+    report = out_dir / f"{run_id}.md"
     previous = report.read_text(encoding="utf-8") if report.exists() else ""
     # 手で書いた「所見」は上書きしない。集計を直しても書いた考察は残す。
     marker = "## 所見\n"

@@ -25,7 +25,7 @@ README しか無い。
 | --- | --- |
 | `index.md` | 実行履歴。1 実行 1 行で要約が追記される |
 | `YYYYMMDD-HHMMSS.md` | 実行ごとのレポート本体 |
-| `raw/YYYYMMDD-HHMMSS.json` | 全リクエストの生データ。`bench.py --rerender raw/<実行 ID>.json` でレポートを作り直せる (リクエストは送らない。手書きの「所見」は残る) |
+| `raw/YYYYMMDD-HHMMSS.json` | 全リクエストの生データ。`python3 .claude/skills/benchmark-gql/bench.py --rerender benchmarks/raw/<実行 ID>.json` でレポートを作り直せる (リクエストは送らない。手書きの「所見」は残る) |
 | `.logs/` | `wrangler tail` の生ログ。デバッグ用の一時ファイルで Git 管理外 |
 
 ## 読むときに気をつけること
