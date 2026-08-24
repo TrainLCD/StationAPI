@@ -5641,7 +5641,8 @@ mod tests {
             }
         }
 
-        /// 区間内の駅に種別を付ける。優等種別 (kind = 3) を返す。
+        /// 区間内の駅に種別を付ける。速度プロファイルを各停から引き上げるのは
+        /// LimitedExpress (4) と HighSpeedRapid (5) だけなので、特急を返す。
         struct StubTrainTypeRepository;
 
         #[async_trait::async_trait]
@@ -5659,14 +5660,14 @@ mod tests {
                         type_cd: Some(1),
                         line_group_cd: Some(1000),
                         pass: None,
-                        type_name: "急行".to_string(),
-                        type_name_k: "キュウコウ".to_string(),
+                        type_name: "特急".to_string(),
+                        type_name_k: "トッキュウ".to_string(),
                         type_name_r: None,
                         type_name_zh: None,
                         type_name_ko: None,
                         color: "#FF0000".to_string(),
                         direction: None,
-                        kind: Some(3),
+                        kind: Some(4),
                         line: None,
                         lines: vec![],
                     })
@@ -5734,6 +5735,9 @@ mod tests {
                 .map(|i| {
                     let cd = 1000 + i;
                     let mut station = create_test_station(cd, 2000 + i, 10, Some(1000));
+                    // 在来線 (LineType::Normal)。新幹線だと路線側の上限が種別の
+                    // 下限を上回るため、種別の有無で速度が変わらない
+                    station.line_type = Some(2);
                     // 東京駅から北へ 1km 刻みに並べる
                     station.lat = 35.6812 + f64::from(i) * 0.009;
                     station.lon = 139.7671;
@@ -5814,15 +5818,36 @@ mod tests {
             assert!(segments[0].stops);
             assert!(!segments[1].stops);
             assert!(segments[4].stops);
-            // 通過駅があるので優等種別の速度が使われる (各停より速い)
-            let local = segments
-                .iter()
-                .map(|s| s.max_speed)
-                .fold(f64::MIN, f64::max);
-            assert!(local > 0.0);
             // 先頭は起点なので前駅からの距離は 0
             assert_eq!(segments[0].distance_from_previous, 0.0);
             assert!(segments[1].distance_from_previous > 0.0);
+
+            // 通過駅の無い同じ区間と比べる。通過駅が無ければ優等種別でも各停
+            // 扱いになるので、速度に差が出るはず。単に max_speed が正である
+            // ことだけを見ると、種別が付与されなくてもテストが通ってしまう。
+            let mut all_stops = build_line_group(20);
+            for station in all_stops.iter_mut() {
+                station.stop_condition = StopCondition::All;
+                station.pass = None;
+            }
+            let (local_interactor, _) = build_interactor(all_stops);
+            let local_segments = local_interactor
+                .get_train_route(1002, 1006, Some(1000))
+                .await
+                .unwrap();
+
+            let top = |segments: &[model::TrainRouteSegment]| {
+                segments
+                    .iter()
+                    .map(|s| s.max_speed)
+                    .fold(f64::MIN, f64::max)
+            };
+            assert!(
+                top(&segments) > top(&local_segments),
+                "優等種別の速度が使われていない (優等 {} / 各停 {})",
+                top(&segments),
+                top(&local_segments)
+            );
         }
 
         /// 近傍バス停の探索半径には、駅グループの代表座標と各駅の座標の隔たりを

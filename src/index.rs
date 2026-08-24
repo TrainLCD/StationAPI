@@ -472,13 +472,24 @@ pub fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 /// 細かくするとマスの数 (= 索引の大きさ) が増え、粗くすると 1 マスあたりの
 /// 走査件数が増える。近傍バス停の検索 (半径 300m) が 1 マスで収まる大きさ。
 const GRID_CELL_DEG: f64 = 0.05;
+/// マス数の上限。`offsets` は外接矩形に比例して確保するため、外れ値の座標が
+/// 1 件混ざるだけで確保量が跳ね上がる。GTFS 由来のデータは外部入力なので、
+/// 上限を超える場合はマスを粗くして収める (索引の役目は候補を絞ることなので、
+/// 粗くしても返す結果は変わらない)。
+const GRID_MAX_CELLS: usize = 1 << 22;
 /// 最初に見る半径 (km)。市街地ならこの範囲で近傍バス停 50 件がそろう。
 const INITIAL_SEARCH_RADIUS_KM: f64 = 1.0;
 /// 半径の内側で件数が足りなかったときに広げる倍率。
 const SEARCH_RADIUS_GROWTH: f64 = 4.0;
 
-fn cell_index(deg: f64) -> i32 {
-    (deg / GRID_CELL_DEG).floor() as i32
+/// 索引に載せられる座標か。NaN・無限大や WGS84 の範囲外は、距離計算に使えない
+/// うえに外接矩形だけを広げるので載せない。
+fn indexable_coords(lat: f64, lon: f64) -> bool {
+    lat.is_finite() && lon.is_finite() && lat.abs() <= 90.0 && lon.abs() <= 180.0
+}
+
+fn cell_index(deg: f64, cell_deg: f64) -> i32 {
+    (deg / cell_deg).floor() as i32
 }
 
 /// 駅を緯度経度のマスへ割り当てた索引。
@@ -490,6 +501,7 @@ fn cell_index(deg: f64) -> i32 {
 /// 添字は `stations()` のもの。CSR 形式で、`offsets[c]..offsets[c + 1]` が
 /// マス c に属する駅の `items` 上の範囲を表す。
 struct Grid {
+    cell_deg: f64,
     min_i: i32,
     min_j: i32,
     rows: usize,
@@ -501,6 +513,7 @@ struct Grid {
 impl Grid {
     fn empty() -> Self {
         Grid {
+            cell_deg: GRID_CELL_DEG,
             min_i: 0,
             min_j: 0,
             rows: 0,
@@ -519,30 +532,45 @@ impl Grid {
             .iter()
             .enumerate()
             .filter(|(_, s)| s.e_status == 0 && s.transport_type as i32 == want)
+            .filter(|(_, s)| indexable_coords(s.lat, s.lon))
             .map(|(i, _)| i as u32)
             .collect();
         if members.is_empty() {
             return Grid::empty();
         }
 
-        let (mut min_i, mut max_i) = (i32::MAX, i32::MIN);
-        let (mut min_j, mut max_j) = (i32::MAX, i32::MIN);
-        for &m in &members {
-            let s = &stations()[m as usize];
-            let (i, j) = (cell_index(s.lat), cell_index(s.lon));
-            min_i = min_i.min(i);
-            max_i = max_i.max(i);
-            min_j = min_j.min(j);
-            max_j = max_j.max(j);
+        // 外接矩形がマス数の上限に収まるまでマスを粗くする。座標は WGS84 の
+        // 範囲に収まっているので、この繰り返しは必ず終わる。
+        let bounds = |cell_deg: f64| -> (i32, i32, usize, usize) {
+            let (mut lo_i, mut hi_i) = (i32::MAX, i32::MIN);
+            let (mut lo_j, mut hi_j) = (i32::MAX, i32::MIN);
+            for &m in &members {
+                let s = &stations()[m as usize];
+                let (i, j) = (cell_index(s.lat, cell_deg), cell_index(s.lon, cell_deg));
+                lo_i = lo_i.min(i);
+                hi_i = hi_i.max(i);
+                lo_j = lo_j.min(j);
+                hi_j = hi_j.max(j);
+            }
+            (
+                lo_i,
+                lo_j,
+                (hi_i - lo_i + 1) as usize,
+                (hi_j - lo_j + 1) as usize,
+            )
+        };
+        let mut cell_deg = GRID_CELL_DEG;
+        let (mut min_i, mut min_j, mut rows, mut cols) = bounds(cell_deg);
+        while rows.saturating_mul(cols) > GRID_MAX_CELLS {
+            cell_deg *= 2.0;
+            (min_i, min_j, rows, cols) = bounds(cell_deg);
         }
-        let rows = (max_i - min_i + 1) as usize;
-        let cols = (max_j - min_j + 1) as usize;
 
         // 度数分布 -> 累積和 -> 配置の 3 パスで CSR を組む
         let mut offsets = vec![0u32; rows * cols + 1];
         let cell_of = |s: &StationRecord| -> usize {
-            let i = (cell_index(s.lat) - min_i) as usize;
-            let j = (cell_index(s.lon) - min_j) as usize;
+            let i = (cell_index(s.lat, cell_deg) - min_i) as usize;
+            let j = (cell_index(s.lon, cell_deg) - min_j) as usize;
             i * cols + j
         };
         for &m in &members {
@@ -560,6 +588,7 @@ impl Grid {
         }
 
         Grid {
+            cell_deg,
             min_i,
             min_j,
             rows,
@@ -590,11 +619,14 @@ impl Grid {
         let (j0, j1) = if dlon_deg >= 180.0 || lon - dlon_deg < -180.0 || lon + dlon_deg > 180.0 {
             (i32::MIN, i32::MAX)
         } else {
-            (cell_index(lon - dlon_deg), cell_index(lon + dlon_deg))
+            (
+                cell_index(lon - dlon_deg, self.cell_deg),
+                cell_index(lon + dlon_deg, self.cell_deg),
+            )
         };
         (
-            cell_index(lat - dlat_deg),
-            cell_index(lat + dlat_deg),
+            cell_index(lat - dlat_deg, self.cell_deg),
+            cell_index(lat + dlat_deg, self.cell_deg),
             j0,
             j1,
         )
@@ -1251,6 +1283,97 @@ mod tests {
     fn grid_search_handles_degenerate_requests() {
         assert!(nearest(35.681382, 139.766084, 0, None).is_empty());
         assert!(nearest(35.681382, 139.766084, 5, Some(99)).is_empty());
+    }
+
+    /// `within_radius` は半径以内の駅を距離の昇順で漏れなく返す。
+    /// 近傍バス停の採否をそのまま決めるので、全件走査と突き合わせる。
+    #[test]
+    fn within_radius_matches_full_scan() {
+        let rail = TransportType::Rail as i32;
+        let step = (stations().len() / 30).max(1);
+        for record in stations().iter().step_by(step) {
+            for radius_km in [0.0, 0.3, 2.0, 25.0] {
+                let mut expected: Vec<(i32, f64)> = stations()
+                    .iter()
+                    .filter(|s| s.e_status == 0 && s.transport_type as i32 == rail)
+                    .map(|s| {
+                        (
+                            s.station_cd,
+                            haversine_km(record.lat, record.lon, s.lat, s.lon),
+                        )
+                    })
+                    .filter(|(_, d)| *d <= radius_km)
+                    .collect();
+                expected.sort_by(|a, b| {
+                    a.1.partial_cmp(&b.1)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.0.cmp(&b.0))
+                });
+                let actual: Vec<(i32, f64)> =
+                    within_radius(record.lat, record.lon, radius_km, rail)
+                        .into_iter()
+                        .map(|(s, d)| (s.station_cd, d))
+                        .collect();
+                assert_eq!(
+                    expected, actual,
+                    "({}, {}) radius={radius_km}km",
+                    record.lat, record.lon
+                );
+            }
+        }
+    }
+
+    /// 半径ちょうどの駅を含み、負の半径は空を返す。
+    #[test]
+    fn within_radius_handles_the_boundary_and_negative_radius() {
+        let rail = TransportType::Rail as i32;
+        let origin = &stations()[0];
+        // 自分自身は距離 0 なので、半径 0 でも含まれる
+        let at_zero = within_radius(origin.lat, origin.lon, 0.0, rail);
+        assert!(
+            at_zero
+                .iter()
+                .any(|(s, _)| s.station_cd == origin.station_cd),
+            "半径 0 で距離 0 の駅が落ちている"
+        );
+        assert!(at_zero.iter().all(|(_, d)| *d == 0.0));
+
+        // 2 番目に近い駅の距離を半径にすると、その駅は含まれる (境界を含む)
+        let near = within_radius(origin.lat, origin.lon, 50.0, rail);
+        if let Some((boundary, distance)) = near.last().map(|(s, d)| (s.station_cd, *d)) {
+            let exact = within_radius(origin.lat, origin.lon, distance, rail);
+            assert!(
+                exact.iter().any(|(s, _)| s.station_cd == boundary),
+                "半径ちょうどの駅が落ちている"
+            );
+        }
+
+        assert!(within_radius(origin.lat, origin.lon, -1.0, rail).is_empty());
+    }
+
+    /// 索引に載せられない座標を弾く。NaN や範囲外が混ざると外接矩形だけが
+    /// 広がり、マスの確保量が跳ね上がる。
+    #[test]
+    fn indexable_coords_rejects_invalid_values() {
+        assert!(indexable_coords(35.681382, 139.766084));
+        assert!(indexable_coords(-90.0, 180.0));
+        assert!(!indexable_coords(f64::NAN, 139.0));
+        assert!(!indexable_coords(35.0, f64::INFINITY));
+        assert!(!indexable_coords(90.1, 139.0));
+        assert!(!indexable_coords(35.0, 180.1));
+    }
+
+    /// 実データのグリッドがマス数の上限に収まっている。
+    #[test]
+    fn grid_stays_within_the_cell_cap() {
+        for want in [TransportType::Rail as i32, TransportType::Bus as i32] {
+            let grid = grid_of(want);
+            assert!(
+                grid.rows * grid.cols <= GRID_MAX_CELLS,
+                "種別 {want} のマス数 {} が上限を超えている",
+                grid.rows * grid.cols
+            );
+        }
     }
 
     /// 索引が返す距離は haversine_km と一致し、距離の昇順に並ぶ。

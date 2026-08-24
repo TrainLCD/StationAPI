@@ -266,21 +266,45 @@ mod tests {
             Ok(result)
         }
 
+        /// trait の契約どおり、半径で絞ってから件数を切る。
+        ///
+        /// `get_by_coordinates` が `distance` に入れるのは緯度経度の度で測った
+        /// ユークリッド距離なので、メートルの半径とは比較できない。ここでは
+        /// 距離を測り直す。件数を先に切ると、半径の外の駅が枠を埋めた分だけ
+        /// 返る件数が本来より少なくなる。
         async fn get_bus_stops_near_stations(
             &self,
             coords: &[(u32, f64, f64)],
             limit_per_station: u32,
             radius_meters: f64,
         ) -> Result<Vec<(u32, Station)>, DomainError> {
+            /// 球面距離 (m)。
+            fn haversine_meters(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+                const EARTH_RADIUS_M: f64 = 6_371_000.0;
+                let (p1, p2) = (lat1.to_radians(), lat2.to_radians());
+                let dlat = (lat2 - lat1).to_radians();
+                let dlon = (lon2 - lon1).to_radians();
+                let a =
+                    (dlat / 2.0).sin().powi(2) + p1.cos() * p2.cos() * (dlon / 2.0).sin().powi(2);
+                2.0 * EARTH_RADIUS_M * a.sqrt().clamp(-1.0, 1.0).asin()
+            }
+
             let mut result = Vec::new();
             for &(source_g_cd, lat, lon) in coords {
                 let stops = self
-                    .get_by_coordinates(lat, lon, Some(limit_per_station), Some(TransportType::Bus))
+                    .get_by_coordinates(lat, lon, None, Some(TransportType::Bus))
                     .await?;
-                for stop in stops {
-                    if stop.distance.is_some_and(|d| d > radius_meters) {
+                let mut taken = 0u32;
+                for mut stop in stops {
+                    if taken >= limit_per_station {
+                        break;
+                    }
+                    let meters = haversine_meters(lat, lon, stop.lat, stop.lon);
+                    if meters > radius_meters {
                         continue;
                     }
+                    stop.distance = Some(meters);
+                    taken += 1;
                     result.push((source_g_cd, stop));
                 }
             }
