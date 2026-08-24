@@ -1231,13 +1231,17 @@ mod tests {
             "件数が違う ({lat}, {lon}) want={want:?} limit={limit}"
         );
         for (i, (e, a)) in expected.iter().zip(actual.iter()).enumerate() {
-            // 距離が同着の駅は全件走査側の並びが決まらないので、種別と距離を見る
+            // 種別・距離・station_cd の 3 キーで並びが決まり切るので、駅まで一致する
             assert!(
-                e.0.transport_type == a.0.transport_type && (e.1 - a.1).abs() < 1e-9,
+                e.0.station_cd == a.0.station_cd
+                    && e.0.transport_type == a.0.transport_type
+                    && (e.1 - a.1).abs() < 1e-9,
                 "{i} 件目が違う ({lat}, {lon}) want={want:?} limit={limit}: \
-                 期待 {:?} {} 実際 {:?} {}",
+                 期待 {} {:?} {} 実際 {} {:?} {}",
+                e.0.station_cd,
                 e.0.transport_type,
                 e.1,
+                a.0.station_cd,
                 a.0.transport_type,
                 a.1
             );
