@@ -1477,6 +1477,8 @@ mod tests {
         }
 
         let hits = nearest(lat, lon, 5, None);
+        // all() は空でも通るので、上限まで埋まっていることを先に確かめる
+        assert_eq!(hits.len(), 5, "鉄道駅で上限が埋まる地点で 5 件返らない");
         assert!(
             hits.iter()
                 .all(|(record, _)| record.transport_type == TransportType::Rail),
