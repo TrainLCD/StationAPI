@@ -294,19 +294,26 @@ mod tests {
                 let stops = self
                     .get_by_coordinates(lat, lon, None, Some(TransportType::Bus))
                     .await?;
-                let mut taken = 0u32;
-                for mut stop in stops {
-                    if taken >= limit_per_station {
-                        break;
-                    }
-                    let meters = haversine_meters(lat, lon, stop.lat, stop.lon);
-                    if meters > radius_meters {
-                        continue;
-                    }
-                    stop.distance = Some(meters);
-                    taken += 1;
-                    result.push((source_g_cd, stop));
-                }
+                // get_by_coordinates の並びは度で測ったユークリッド距離順で、
+                // 緯度の高い地点では球面距離順と一致しない。件数を切る前に
+                // 測り直した距離で並べ直す。
+                let mut within: Vec<Station> = stops
+                    .into_iter()
+                    .filter_map(|mut stop| {
+                        let meters = haversine_meters(lat, lon, stop.lat, stop.lon);
+                        (meters <= radius_meters).then(|| {
+                            stop.distance = Some(meters);
+                            stop
+                        })
+                    })
+                    .collect();
+                within.sort_by(|a, b| {
+                    a.distance
+                        .partial_cmp(&b.distance)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+                within.truncate(limit_per_station as usize);
+                result.extend(within.into_iter().map(|stop| (source_g_cd, stop)));
             }
             Ok(result)
         }

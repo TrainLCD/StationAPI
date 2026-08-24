@@ -700,6 +700,12 @@ pub fn nearest(
     limit: usize,
     want: Option<i32>,
 ) -> Vec<(&'static StationRecord, f64)> {
+    // 索引に載せられない座標では探索を打ち切れない。lat が NaN だと
+    // covers_all が永久に false のままで、半径を無限大まで広げ続けても
+    // 抜けられない (リクエストが返らなくなる)。入口で弾く。
+    if !indexable_coords(lat, lon) {
+        return Vec::new();
+    }
     let Some(want) = want else {
         // 全体の上位 limit 件は種別ごとの上位 limit 件の和集合に必ず含まれる
         // (ある駅より近い駅が limit 件未満なら、同じ種別の中でも limit 件未満)。
@@ -743,7 +749,8 @@ pub fn within_radius(
     want: i32,
 ) -> Vec<(&'static StationRecord, f64)> {
     let mut out: Vec<(&'static StationRecord, f64)> = Vec::new();
-    if radius_km < 0.0 {
+    // `nearest` と同じ理由で、索引に載せられない座標は入口で弾く
+    if !radius_km.is_finite() || radius_km < 0.0 || !indexable_coords(lat, lon) {
         return out;
     }
     grid_of(want).for_each_near(lat, lon, radius_km, |record| {
@@ -1349,6 +1356,30 @@ mod tests {
         }
 
         assert!(within_radius(origin.lat, origin.lon, -1.0, rail).is_empty());
+    }
+
+    /// 索引に載せられない座標を渡しても打ち切れること。
+    ///
+    /// lat が NaN だと covers_all が永久に false のままで、半径を無限大まで
+    /// 広げ続けても抜けられない。入口で弾いていないとこのテストは終わらない。
+    #[test]
+    fn nearest_rejects_coordinates_it_cannot_index() {
+        for (lat, lon) in [
+            (f64::NAN, 139.766084),
+            (35.681382, f64::NAN),
+            (f64::INFINITY, 139.766084),
+            (35.681382, f64::NEG_INFINITY),
+            (90.1, 139.766084),
+            (35.681382, 180.1),
+        ] {
+            for want in [None, Some(TransportType::Rail as i32)] {
+                assert!(
+                    nearest(lat, lon, 5, want).is_empty(),
+                    "({lat}, {lon}) want={want:?} が空でない"
+                );
+            }
+            assert!(within_radius(lat, lon, 1.0, TransportType::Rail as i32).is_empty());
+        }
     }
 
     /// 索引に載せられない座標を弾く。NaN や範囲外が混ざると外接矩形だけが
