@@ -86,6 +86,10 @@ pub trait StationRepository: Send + Sync + 'static {
     /// `limit_per_station` 件返す。半径の外は呼び出し側でも採用されないため、
     /// ここで切っておく (全国の最寄り N 件を作ってから捨てると、駅数に比例して
     /// 無駄が積み上がる)。
+    ///
+    /// 半径が有限でない (`NaN` / 無限大) 場合と負の場合は空を返す。無限大を
+    /// 距離の比較にそのまま使うと全件が半径内と判定されるため、実装ごとに
+    /// 結果が食い違わないようここで決めておく。
     async fn get_bus_stops_near_stations(
         &self,
         coords: &[(u32, f64, f64)], // (station_g_cd, lat, lon)
@@ -278,6 +282,11 @@ mod tests {
             limit_per_station: u32,
             radius_meters: f64,
         ) -> Result<Vec<(u32, Station)>, DomainError> {
+            // 無限大をそのまま比較に使うと全件が半径内になる
+            if !radius_meters.is_finite() || radius_meters < 0.0 {
+                return Ok(Vec::new());
+            }
+
             /// 球面距離 (m)。
             fn haversine_meters(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
                 const EARTH_RADIUS_M: f64 = 6_371_000.0;
@@ -602,6 +611,32 @@ mod tests {
             .map(|(source_g_cd, s)| (*source_g_cd, s.station_cd))
             .collect();
         assert_eq!(pairs, vec![(1, 901), (1, 902), (2, 902), (2, 901)]);
+    }
+
+    /// 半径が有限でない場合と負の場合は空を返す。無限大をそのまま比較に使うと
+    /// 全件が半径内と判定され、本番実装 (index::within_radius) と食い違う。
+    #[tokio::test]
+    async fn test_get_bus_stops_near_stations_rejects_an_invalid_radius() {
+        let repo = bus_stop_repository(&[
+            (901, lat_north_of_tokyo(100.0), 139.767125),
+            (902, lat_north_of_tokyo(5000.0), 139.767125),
+        ]);
+        let coords = [(1u32, 35.681236, 139.767125)];
+
+        for radius in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN, -1.0] {
+            let result = repo
+                .get_bus_stops_near_stations(&coords, 50, radius)
+                .await
+                .unwrap();
+            assert!(result.is_empty(), "半径 {radius} で空にならない");
+        }
+
+        // 有限の半径では従来どおり返る
+        let result = repo
+            .get_bus_stops_near_stations(&coords, 50, 300.0)
+            .await
+            .unwrap();
+        assert_eq!(result.len(), 1);
     }
 
     #[tokio::test]
