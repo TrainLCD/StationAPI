@@ -322,31 +322,33 @@ impl StationRepository for MemStationRepository {
             .collect())
     }
 
-    /// 各座標につきバス停の最寄り N 件を取り、そのあと有効な路線を持つものだけに絞る。
-    /// 先に路線で絞ると件数が変わるため、この順序を保つ。
+    /// 各座標につき半径以内のバス停を近い順に見て、有効な路線を持つものだけを
+    /// N 件まで採る。上限を先に掛けると、路線を引けないバス停や廃止路線の
+    /// バス停が枠を埋めたぶんだけ件数が減るため、絞り込みを先に行う。
     /// 並びは指定された座標の順、その中では距離順。
     async fn get_bus_stops_near_stations(
         &self,
         coords: &[(u32, f64, f64)],
         limit_per_station: u32,
+        radius_meters: f64,
     ) -> Result<Vec<(u32, Station)>, DomainError> {
-        let want = Some(TransportType::Bus as i32);
+        let want = TransportType::Bus as i32;
         let limit = limit_per_station as usize;
+        let radius_km = radius_meters / 1000.0;
         let mut out = Vec::new();
 
         for &(source_g_cd, lat, lon) in coords {
-            for (record, _distance) in index::nearest_without_line_join(lat, lon, limit, want) {
-                let Some(line) = index::line_by_cd(record.line_cd) else {
-                    continue;
-                };
-                if line.e_status != 0 {
-                    continue;
-                }
-                let mut station = record.to_entity(Some(line));
-                station.line_group_cd = index::first_line_group_cd(record.station_cd);
-                station.has_train_types = station.line_group_cd.is_some();
-                out.push((source_g_cd, station));
-            }
+            let hits = index::within_radius(lat, lon, radius_km, want)
+                .into_iter()
+                .filter_map(|(record, _distance)| {
+                    let line = index::line_by_cd(record.line_cd).filter(|l| l.e_status == 0)?;
+                    let mut station = record.to_entity(Some(line));
+                    station.line_group_cd = index::first_line_group_cd(record.station_cd);
+                    station.has_train_types = station.line_group_cd.is_some();
+                    Some((source_g_cd, station))
+                })
+                .take(limit);
+            out.extend(hits);
         }
         Ok(out)
     }
@@ -930,10 +932,14 @@ pub struct MemCompanyRepository;
 
 #[async_trait]
 impl CompanyRepository for MemCompanyRepository {
+    /// 事業者は 179 件と少ないが、駅ごとの付帯情報を組み立てるたびに呼ばれる。
+    /// `id_vec.contains` のままだと 1 回の呼び出しで (事業者数 × 要求 ID 数) の
+    /// 比較になるため、集合に入れてから引く。
     async fn find_by_id_vec(&self, id_vec: &[u32]) -> Result<Vec<Company>, DomainError> {
+        let wanted: HashSet<u32> = id_vec.iter().copied().collect();
         Ok(index::companies()
             .iter()
-            .filter(|c| id_vec.contains(&(c.company_cd as u32)))
+            .filter(|c| wanted.contains(&(c.company_cd as u32)))
             .cloned()
             .collect())
     }

@@ -27,9 +27,11 @@ help:
 	@echo "  ODPT_ACCESS_TOKEN   - Required by all bus feeds except Toei"
 	@echo "  DISABLE_BUS_FEATURE - Set to true to build rail-only data"
 
-# worker は wasm32 用の crate なので、ネイティブのテストからは外す。
+# worker は Workers 上でしか動かないが、索引 (src/index.rs) はネイティブでも
+# 動く純粋なデータ構造なので、そのユニットテストはここで走らせる。
 test:
 	cargo test -p stationapi -p stationapi-preprocessor -p data_validator
+	cargo test -p stationapi-worker
 
 check:
 	cargo check -p stationapi -p stationapi-preprocessor -p data_validator

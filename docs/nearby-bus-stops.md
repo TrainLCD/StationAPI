@@ -29,6 +29,8 @@ enum TransportType {
 | **Bus** | バス停のみを返す |
 | **RailAndBus** | 鉄道駅とバス停の両方を返す。`lines`配列にも近傍バス路線を含める |
 
+**注**: `stationsNearby` の並びは常に近い順です。`transportType` を指定しない場合も鉄道とバスを分けず、距離だけで並べます。
+
 ## 対象API
 
 | クエリ | 近傍バス停対応 | 備考 |
@@ -123,5 +125,5 @@ async fn get_nearby_bus_lines(&self, ref_lat: f64, ref_lon: f64) -> Result<Vec<L
 
 ## 注意事項
 
-- バス路線検索は最大50件のバス停候補を取得し、その中から300m以内のものをフィルタリング
+- バス路線検索は300m以内のバス停を近い順に見て、有効な路線を持つものを最大50件採用
 - 鉄道駅の `lines` 配列に近傍バス路線が追加されるのは、未指定または `transportType: RailAndBus` の場合
