@@ -275,6 +275,7 @@ DEFAULT,382,急行,キュウコウ,Express,特快,급행,#008000,0,3,0,京王・
 DEFAULT,383,区間急行,クカンキュウコウ,Semi Express,区域特快,구간급행,#009A41,0,3,0,京阪用,PARTIAL
 DEFAULT,384,準急,ジュンキュウ,Sub Express,准急,준급,#0000FF,0,3,0,京阪用,PARTIAL
 DEFAULT,385,準急,ジュンキュウ,Semi Express,准急,준급,#0000FF,0,3,0,南海用,PARTIAL
+DEFAULT,386,洛楽,ラクラク,Rakuraku,洛乐,라쿠라쿠,#DC143C,0,4,0,京阪用 快速特急,COMPLETE
 DEFAULT,400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,2,0,,COMPLETE
 DEFAULT,401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,2,0,,COMPLETE
 DEFAULT,402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,2,0,,COMPLETE
