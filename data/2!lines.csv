@@ -319,7 +319,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 30019,20,犬山モノレール,イヌヤマモノレール,名鉄モンキーパークモノレール線,Inuyama Monorail,Inuyama Monorail,犬山单轨电车,이누야마 모노레일,#808080,5,,,,,,,,,,,,,2,30019,617.56367
 30020,20,名鉄竹鼻線,メイテツタケハナセン,名鉄竹鼻線,Takehana Line,Takehana Line,竹鼻线,다케하나 선,#D7A629,2,TH,NH,,,#D7A629,#D12027,,,HALF_SQUARE,HALF_SQUARE,,,0,30020,1248.15533
 30021,20,名鉄羽島線,メイテツハシマセン,名鉄羽島線,Hashima Line,Hashima Line,羽岛线,하시마 선,#D7A629,2,TH,NH,,,#D7A629,#D12027,,,HALF_SQUARE,HALF_SQUARE,,,0,30021,1280.75978
-31001,21,近鉄難波線,キンテツナンバセン,近鉄難波線,Kintetsu Namba Line,Kintetsu Namba Line,近铁难波线,긴테쓰 난바선,#008000,2,A,,,,#D21644,,,,KINTETSU,,,,0,31001,1058.17493
+31001,21,近鉄難波線,キンテツナンバセン,近鉄難波線,Kintetsu Namba Line,Kintetsu Namba Line,近铁难波线,긴테쓰 난바선,#B33249,2,A,,,,#D21644,,,,KINTETSU,,,,0,31001,1058.17493
 31002,21,近鉄橿原線,キンテツカシハラセン,近鉄橿原線,Kintetsu Kashihara Line,Kintetsu Kashihara Line,近铁橿原线,긴테쓰 가시하라선,#DEA83F,2,B,,,,#FAB202,,,,KINTETSU,,,,0,31002,1477.6481
 31003,21,近鉄南大阪線,キンテツミナミオオサカセン,近鉄南大阪線,Kintetsu Minami-Osaka Line,Kintetsu Minami-Osaka Line,近铁南大阪线,긴테쓰 미나미오사카선,#FF1493,2,F,,,,#028E46,,,,KINTETSU,,,,0,31003,1440.61933
 31004,21,近鉄養老線,キンテツヨウロウセン,近鉄養老線,Kintetsu Yoro Line,Kintetsu Yoro Line,近铁养老线,긴테쓰 요로선,#228B22,2,,,,,,,,,,,,,2,31004,2398.89369
