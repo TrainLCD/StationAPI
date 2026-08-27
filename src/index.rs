@@ -964,8 +964,12 @@ fn build_ssts() -> Vec<SstRecord> {
     };
     let nullable = |v: i32| (v != NULL_I32).then_some(v);
 
+    // 定数長なので as_chunks で固定長配列として取る (clippy::chunks_exact_to_as_chunks)。
+    // 端数は .1 に落ちるが、build.rs が ROW の倍数で書き出すので常に空。
     SST_BIN
-        .chunks_exact(ROW)
+        .as_chunks::<ROW>()
+        .0
+        .iter()
         .enumerate()
         .map(|(i, chunk)| SstRecord {
             // SERIAL 相当。build.rs が CSV の行順を保っているのでここで採番できる
