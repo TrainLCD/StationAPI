@@ -214,7 +214,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 11910,6,若松線,ワカマツセン,筑豊本線,Wakamatsu Line,Wakamatsu Line,若松线,와카마쓰선,#0095D9,2,JE,,,,#0095D9,,,,HALF_SQUARE,,,,0,11910,2099.50323
 11911,6,福北ゆたか線,フクホクユタカセン,筑豊本線,Fukuhoku Yutaka Line,Fukuhoku Yutaka Line,福北丰线,후쿠호쿠유타카선,#FAAF18,2,JC,,,,#FAAF18,,,,HALF_SQUARE_DARK_TEXT,,,,0,11911,2280.68241
 11912,6,原田線,ハルダセン,筑豊本線,Haruda Line,Haruda Line,原田线,하루다선,#36B558,2,JG,,,,#36B558,,,,HALF_SQUARE,,,,0,11912,5133.01193
-11913,6,ゆふ高原線,ユフコウゲンセン,久大本線,Kyūdai Main Line,Kyūdai Main Line,久大本线,규다이 본선,#36B558,2,,,,,,,,,,,,,0,11913,3843.50595
+11913,6,ゆふ高原線,ユフコウゲンセン,久大本線,Kyūdai Main Line,Kyudai Main Line,久大本线,규다이 본선,#36B558,2,,,,,,,,,,,,,0,11913,3843.50595
 11914,6,日田彦山線,ヒタヒコサンセン,日田彦山線,Hitahikosan Line,Hitahikosan Line,日田彦山线,히타히코산선,#B96F30,2,JI,,,,#B96F30,,,,HALF_SQUARE,,,,0,11914,2853.35332
 11915,6,後藤寺線,ゴトウジセン,後藤寺線,Gotoji Line,Gotoji Line,后藤寺线,고토지선,#8F3E97,2,JJ,,,,#8F3E97,,,,HALF_SQUARE,,,,0,11915,2547.05013
 11916,6,海の中道線,ウミノナカミチセン,香椎線,Kashii Line,Kashii Line,香椎线,가시선,#3A268F,2,,,,,,,,,,,,,0,11916,2435.9513
@@ -399,7 +399,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99210,111,鳥海山ろく線,チョウカイサンロクセン,由利高原鉄道鳥海山ろく線,Chokai Sanroku Line,Chokai Sanroku Line,鸟海山麓线,조카이산로쿠선,#B5E61D,2,,,,,,,,,,,,,0,99210,2051.2472
 99211,112,フラワー長井線,ヤマガタテツドウフラワーナガイセン,山形鉄道フラワー長井線,Flower Nagai Line,Flower Nagai Line,花长井线,플라워 나가이선,#F892F4,2,,,,,,,,,,,,,0,99211,1882.55335
 99212,113,くりはら田園鉄道線,クリハラデンエンテツドウセン,くりはら田園鉄道線,Kurihara Den'en Railway Line,Kurihara Den'en Railway Line,栗原田园铁道线,구리하라 덴엔 철도선,#8E2229,2,,,,,,,,,,,,,2,99212,1907.17502
-99213,114,阿武隈急行線,アブクマキュウコウセン,阿武隈急行線,Abukuma Kyūkō Line,Abukuma Kyūkō Line,阿武隈急行线,아부쿠마 급행선,#37CB7F,2,,,,,,,,,,,,,0,99213,2369.63173
+99213,114,阿武隈急行線,アブクマキュウコウセン,阿武隈急行線,Abukuma Kyūkō Line,Abukuma Kyuko Line,阿武隈急行线,아부쿠마 급행선,#37CB7F,2,,,,,,,,,,,,,0,99213,2369.63173
 99214,115,仙台市営地下鉄南北線,センダイシエイチカテツナンボクセン,仙台市営地下鉄南北線,Sendai Subway Namboku Line,Sendai Subway Namboku Line,仙台市营地铁南北线,센다이 시영 지하철 난보쿠선,#339966,3,N,,,,#339966,,,,ROUND,,,,0,99214,891.24713
 99218,115,仙台市営地下鉄東西線,センダイシエイチカテツトウザイセン,仙台市営地下鉄東西線,Sendai Subway Tozai Line,Sendai Subway Tozai Line,仙台市营地铁东西线,센다이 시영 지하철 도자이선,#00B1DD,3,T,,,,#00B1DD,,,,ROUND,,,,0,99214,1129.33276
 99215,116,福島交通飯坂線,フクシマシエイコウツウイイザカセン,福島交通飯坂線,Fukushima Kotsu Iizaka Line,Fukushima Kotsu Iizaka Line,福岛交通饭坂线,후쿠시마 교통 이이자카선,#BFBFFF,2,,,,,,,,,,,,,0,99215,855.93195
@@ -477,7 +477,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99419,167,えちぜん鉄道勝山永平寺線,エチゼンテツドウカツヤマエイヘイジセン,えちぜん鉄道勝山永平寺線,Echizen Railway Katsuyama Eiheiji Line,Echizen Railway Katsuyama Eiheiji Line,越前铁道胜山永平寺线,에치젠 철도 가쓰야마에이헤이지선,#FD6802,2,E,,,,#FD6802,,,,ROUND,,,,0,99419,1227.41572
 99420,167,えちぜん鉄道三国芦原線,エチゼンテツドウミクニアワラセン,えちぜん鉄道三国芦原線,Echizen Railway Mikuni Ashihara Line,Echizen Railway Mikuni Ashihara Line,越前铁道三国芦原线,에치젠 철도 미쿠니아와라선,#0069FF,2,E,,,,#0069FF,,,,ROUND,,,,0,99420,1148.51023
 99421,168,福井鉄道福武線,フクイテツドウフクブセン,福井鉄道福武線,Fukui Railway Fukutake Line,Fukui Railway Fukutake Line,福井铁道福武线,후쿠이 철도 후쿠타케선,#197A3D,4,F,,,,#197A3D,,,,ROUND,,,,0,99421,1071.15936
-99428,251,ハピラインふくい線,ハピラインフクイセン,ハピラインふくい線,Hapi-line Fukui,Hapi-line Fukui线,Hapi线福井线,하피라인 후쿠이선,#EC1C9C,2,,,,,,,,,,,,,0,99426,4390.58048
+99428,251,ハピラインふくい線,ハピラインフクイセン,ハピラインふくい線,Hapi-line Fukui,Hapi-line Fukui,Hapi线福井线,하피라인 후쿠이선,#EC1C9C,2,,,,,,,,,,,,,0,99426,4390.58048
 99501,169,伊豆急行線,イズキュウコウセン,伊豆急行線,Izu Kyuko Line,Izu Kyuko Line,伊豆急行线,이즈 급행선,#0085CD,2,IZ,,,,#000000,,,,SQUARE,,,,0,99501,3006.10916
 99502,128,伊豆箱根鉄道駿豆線,イズハコネテツドウスンズセン,伊豆箱根鉄道駿豆線,Izuhakone Railway Sunzu Line,Izuhakone Railway Sunzu Line,伊豆箱根铁道骏豆线,이즈하코네 철도 순즈선,#4086E5,2,IS,,,,#4086E5,,,,IZUHAKONE,,,,0,99502,1608.83117
 99503,170,岳南鉄道線,ガクナンテツドウセン,岳南鉄道線,Gakunan Railway Line,Gakunan Railway Line,岳南铁道线,가쿠난 철도선,#6B0102,2,GD,,,,#6B0102,,,,MONOCHROME_ROUND,,,,0,99503,991.96997
