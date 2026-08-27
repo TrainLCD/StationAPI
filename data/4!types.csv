@@ -23,14 +23,10 @@ DEFAULT,101,各駅停車,カクエキテイシャ,Local,每站停车,각역정�
 DEFAULT,102,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,,PARTIAL
 DEFAULT,103,特別快速,トクベツカイソク,Special Rapid,特别快车,특별쾌속,#DC143C,0,2,0,,COMPLETE
 DEFAULT,104,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#581882,0,6,0,,COMPLETE
-DEFAULT,105,快速(赤),カイソク(アカ),Rapid(Red),快车,쾌속,#FF0000,0,2,0,,NOT
-DEFAULT,106,快速(緑),カイソク(ミドリ),Rapid(Green),快车,쾌속,#00FF00,0,2,0,,NOT
-DEFAULT,107,ホームライナー,ホームライナー,Home Liner,家用班轮,홈 라이너,#DC143C,0,2,0,,NOT
 DEFAULT,108,区間快速,クカンカイソク,Regional Rapid,区域快车,구간쾌속,#DC143C,0,2,0,,PARTIAL
 DEFAULT,109,快速みえ,カイソクミエ,Rapid Mie,快速三重,쾌속미에,#DC143C,0,2,0,,COMPLETE
 DEFAULT,110,新快速,シンカイソク,Special Rapid,新快速,새쾌속,#0071BE,0,5,0,JR西日本用,COMPLETE
 DEFAULT,111,直通快速,チョクツウカイソク,Direct Rapid,直接快速,직통쾌속,#F5A200,0,2,0,,COMPLETE
-DEFAULT,112,B快速,Bカイソク,B Rapid,B快速,B쾌속,#0071BE,0,2,0,,COMPLETE
 DEFAULT,113,おくたま号,オクタマゴウ,Okutama,奧多摩号,오쿠타마호,#F15A22,0,2,0,,COMPLETE
 DEFAULT,114,大和路快速,ヤマトジカイソク,Yamatoji Rapid,大和路快速,야마토지 쾌속,#02AD73,0,2,0,,COMPLETE
 DEFAULT,115,丹波路快速,タンバジカイソク,Tambaji Rapid,坦巴路快速,단바로 쾌속,#FEC210,0,2,0,,COMPLETE
@@ -49,7 +45,6 @@ DEFAULT,127,安芸路ライナー,アキジライナー,Akiji Liner,安藝路Lin
 DEFAULT,128,みよしライナー,ミヨシライナー,Miyoshi Liner,三吉Liner,미요시 라이너,#DC143C,0,2,0,,NOT
 DEFAULT,129,とっとりライナー,トットリライナー,Tottori Liner,鳥取Liner,돗토리 라이너,#DC143C,0,2,0,,NOT
 DEFAULT,130,アクアライナー,アクアライナー,Aqua Liner,Aqua Liner,아쿠아 라이너,#DC143C,0,2,0,,NOT
-DEFAULT,131,快速(青),カイソク（アオ）,Rapid(Blue),快车,쾌속,#0000FF,0,2,0,,NOT
 DEFAULT,132,各駅停車(南武支線),カクエキテイシャ,Local(Nambu Branch Line),每站停车(南埠支线),각역정차(난부 지선),#FFD400,0,1,0,,COMPLETE
 DEFAULT,133,普通(成田空港方面),フツウ,Local(for Narita Airport),慢车(成田机场),보통(나리타 공항),#00B261,0,1,0,,COMPLETE
 DEFAULT,134,区間快速(加茂方面),クカンカイソク,Regional Rapid(for Kamo),区间快速,구간쾌속,#02AD73,0,2,0,,COMPLETE
@@ -70,12 +65,7 @@ DEFAULT,148,ニセコライナー,ニセコライナー,Niseko Liner,二世谷�
 DEFAULT,149,普通(美濃赤坂線),フツウ,Local(Mino-Akasaka Line),慢车(美浓赤坂线),보통(미노아카사카 지선),#F68B1E,0,1,0,,COMPLETE
 DEFAULT,150,普通(本山支線),フツウ,Local(Motoyama Branch Line),慢车(本山支线),보통(모토야마 지선),#695FAA,0,1,0,小野田線,COMPLETE
 DEFAULT,151,あきがわ号,アキガワゴウ,Akigawa,秋川号,아키가와호,#F15A22,0,2,0,,COMPLETE
-DEFAULT,152,普通,フツウ,Local,慢车,보통,#1F63C6,1,0,0,上り系統,PARTIAL
-DEFAULT,153,普通,フツウ,Local,慢车,보통,#1F63C6,2,0,0,下り系統,PARTIAL
 DEFAULT,154,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,1,自動選択用,COMPLETE
-DEFAULT,155,区間快速エアポート,クカンカイソクエアポート,Semi Rapid Airport,区域快车机场号,구간쾌속에어포트,#33ff33,0,5,0,,COMPLETE
-DEFAULT,156,快速エアポート,カイソクエアポート,Rapid Airport,快车机场号,쾌속에어포트,#FF6600,0,5,0,,COMPLETE
-DEFAULT,157,特別快速エアポート,トクベツカイソクエアポート,Special Rapid Airport,特别快车机场号,특별쾌속에어포트,#FF3300,0,5,0,,COMPLETE
 DEFAULT,158,快速サンポート,カイソクサンポート,Rapid Sunport,快车太陽港号,쾌속선포트,#F39800,0,2,0,,PARTIAL
 DEFAULT,159,普通(桜島方面),フツウ,Local(For Sakurajima),慢车,보통,#1F63C6,0,1,0,,COMPLETE
 DEFAULT,160,快速きたみ,カイソクキタミ,Rapid Kitami,快车北见,쾌속니시기타미,#FF6600,0,2,0,,COMPLETE
@@ -141,7 +131,6 @@ DEFAULT,244,いしづち,イシヅチ,Ishizuchi,石鎚,석진,#1CADCA,0,4,0,,COM
 DEFAULT,245,おおぞら,オオゾラ,Ōzora,大空,큰 하늘,#2CB431,0,4,0,,COMPLETE
 DEFAULT,246,とかち,トカチ,Tokachi,十勝,도카치,#2CB431,0,4,0,,COMPLETE
 DEFAULT,247,きのさき,キノサキ,Kinosaki,城崎,시로사키,#800080,0,4,0,,COMPLETE
-DEFAULT,248,はしだて,ハシダテ,Hashidate,橋立,하시다테,#ff0000,0,4,0,,COMPLETE
 DEFAULT,249,まいづる,マイヅル,Maizuru,舞鶴,마이즈루,#ff8c00,0,4,0,,COMPLETE
 DEFAULT,250,しらさぎ,シラサギ,Shirasagi,白鷺,백로,#f0e68c,0,4,0,,COMPLETE
 DEFAULT,251,くろしお,クロシオ,Kuroshio,黑潮,구로시오,#40e0d0,0,4,0,,COMPLETE
@@ -162,11 +151,9 @@ DEFAULT,265,きりしま,キリシマ,Kirishima,霧島,기리시마,#006400,0,4,
 DEFAULT,266,かいおう,カイオウ,Kaiō,魁皇,카이오,#8b0000,0,4,0,,COMPLETE
 DEFAULT,267,ゆふ,ユフ,Yufu,由布,유후,#ffff00,0,4,0,,COMPLETE
 DEFAULT,268,ゆふいんの森,ユフインノモリ,Yufuin no Mori,由布院之森,유후인노모리,#228b22,0,4,0,,COMPLETE
-DEFAULT,269,有明,アリアケ,Ariake,有明,아리아케,#daa520,0,4,0,,COMPLETE
 DEFAULT,270,九州横断特急,キュウシュウオウダントッキュウ,Trans-Kyushu Limited Express,九州橫斷特急,규슈 횡단 특급,#dc143c,0,4,0,,COMPLETE
 DEFAULT,271,南紀,ナンキ,Nanki,南紀,난키,#00bfff,0,4,0,,COMPLETE
 DEFAULT,272,伊那路,イナジ,Inaji,伊那路,이나로,#228b22,0,4,0,,COMPLETE
-DEFAULT,273,東海,トウカイ,Tōkai,東海,도카이,#ff8c00,0,4,0,,COMPLETE
 DEFAULT,274,ふじかわ,フジカワ,Fujikawa,富士川,후지카와,#90ee90,0,4,0,,COMPLETE
 DEFAULT,275,わかしお,ワカシオ,Wakashio,若潮,와카시오,#ff0000,0,4,0,,COMPLETE
 DEFAULT,276,新宿わかしお,シンジュクワカシオ,Shinjuku Wakashio,新宿若潮,신주쿠와카시오의,#ff0000,0,4,0,,COMPLETE
@@ -176,9 +163,7 @@ DEFAULT,279,しおさい,シオサイ,Shiosai,潮骚,시오사이,#ffff00,0,4,0,
 DEFAULT,280,あやめ,アヤメ,Ayame,菖蒲,아야메,#ffd700,0,4,0,,COMPLETE
 DEFAULT,281,つがる,ツガル,Tsugaru,津輕,쓰가루,#ff0000,0,4,0,,COMPLETE
 DEFAULT,282,いなほ,イナホ,Inaho,稻穗,이나호,#ffa500,0,4,0,,COMPLETE
-DEFAULT,283,北越,ホクエツ,Hokuetsu,北越,호쿠코시,#00ffff,0,4,0,,COMPLETE
 DEFAULT,284,しらゆき,シラユキ,Shirayuki,白雪,백설,#800080,0,4,0,,COMPLETE
-DEFAULT,285,ダイナスター,ダイナスター,Dinostar,恐龍星,다이노스타,#191970,0,4,0,,COMPLETE
 DEFAULT,286,能登かがり火,ノトカガリビ,Noto Kagaribi,能登篝火,노토 카오리 불,#dc143c,0,4,0,,COMPLETE
 DEFAULT,287,サフィール踊り子,サフィールオドリコ,Saphir Odoriko,蓝宝石踊子,사필 무희,#035D67,0,4,0,,COMPLETE
 DEFAULT,288,はまかぜ,ハマカゼ,Hamakaze,濱風,하마카제,#b22222,0,4,0,,COMPLETE
@@ -193,7 +178,6 @@ DEFAULT,296,鎌倉,カマクラ,Kamakura,镰仓,가마쿠라,#00008b,0,4,0,,COMP
 DEFAULT,297,いにしへ,イニシヘ,Inishihe,在过去,어서,#8b0000,0,4,0,,COMPLETE
 DEFAULT,300,普通,フツウ,Local,慢车,보통,#1F63C6,0,0,0,優先度0,PARTIAL
 DEFAULT,301,各駅停車,カクエキテイシャ,Local,每站停车,각역정차,#1F63C6,0,0,0,優先度0,PARTIAL
-DEFAULT,302,快速,カイソク,Rapid,快车,쾌속,#DC143C,0,2,0,廃止済み 102に移行,NOT
 DEFAULT,303,区間急行,クカンキュウコウ,Semi Express,区域特快,구간급행,#D8CA00,0,3,0,,PARTIAL
 DEFAULT,304,急行,キュウコウ,Express,特快,급행,#DC143C,0,3,0,,PARTIAL
 DEFAULT,306,特急,トッキュウ,Limited Express,特快,특급,#DC143C,0,4,0,,COMPLETE
@@ -225,7 +209,6 @@ DEFAULT,332,アクセス特急,アクセストッキュウ,Access Express,访问
 DEFAULT,333,準急,ジュンキュウ,Semi-Express,准急,준급,#2A9B50,0,3,0,堺筋準急,PARTIAL
 DEFAULT,334,直通特急,チョクツウトッキュウ,Limited Express,直通特急,직통특급,#DD2E1E,0,4,0,山陽電車,COMPLETE
 DEFAULT,335,区間快速,クカンカイソク,Semi Rapid,区间快速,구간쾌속,#000084,0,5,0,TX用,COMPLETE
-DEFAULT,336,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,통근쾌속,#FFA500,0,6,0,廃止済み 104に移行,NOT
 DEFAULT,337,準特急,ジュントッキュウ,Semi-Limited Express,准特急,준특급,#FF6E00,0,4,0,,COMPLETE
 DEFAULT,338,区間急行,クカンキュウコウ,Sub Express,区间快速,구간급행,#009A41,0,3,0,南海電車用,COMPLETE
 DEFAULT,339,S-TRAIN(土休日運行),エストレイン,S-TRAIN(Holiday),S-TRAIN,S-TRAIN,#8EC21F,0,2,0,,COMPLETE
@@ -275,6 +258,7 @@ DEFAULT,382,急行,キュウコウ,Express,特快,급행,#008000,0,3,0,京王・
 DEFAULT,383,区間急行,クカンキュウコウ,Semi Express,区域特快,구간급행,#009A41,0,3,0,京阪用,PARTIAL
 DEFAULT,384,準急,ジュンキュウ,Sub Express,准急,준급,#0000FF,0,3,0,京阪用,PARTIAL
 DEFAULT,385,準急,ジュンキュウ,Semi Express,准急,준급,#0000FF,0,3,0,南海用,PARTIAL
+DEFAULT,386,洛楽,ラクラク,Rakuraku,洛乐,라쿠라쿠,#DC143C,0,4,0,京阪用 快速特急,COMPLETE
 DEFAULT,400,京王ライナー(京王八王子方面),ケイオウライナー,Keio Liner(for Keiō-hachiōji),京王Liner,게이오 라이너,#DD0077,0,2,0,,COMPLETE
 DEFAULT,401,京王ライナー(橋本方面),ケイオウライナー,Keio Liner(for Hashimoto),京王Liner,게이오 라이너,#DD0078,0,2,0,,COMPLETE
 DEFAULT,402,モーニングウィング号,モーニングウィングゴウ,"Morning Wing(Miurakaigan to Shinagawa, Sengakuji)",Morning Wing,모닝윙호,#379412,1,2,0,,COMPLETE
