@@ -107,7 +107,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    git push -u origin <inferred-branch>
    ```
    - **`git add -A` / `git add .` は使わない。** `.gitignore` に載っていない一時ファイルまで巻き込む。`git status` の出力を読んでから、追跡済みは `git add -u`、未追跡は明示パスで追加する。関係ないファイルが入ったら `git restore --staged <path>` で外す。
-   - 変更が既にコミット済みでブランチだけが無い（`dev` の上に直接コミットした等）場合は、`git switch -c <inferred-branch>` だけでそのコミットを新ブランチへ引き継げる。`dev` 側を元に戻す必要があれば、**`git status --short` が空であることを確認してから** `git switch dev && git reset --hard origin/dev` の可否をユーザーに確認して実行する。出力があるなら hard reset は追跡済みファイルの staged／unstaged 変更を問答無用で捨てるので、先に WIP コミット（推奨）か名前付き stash（`git stash push -u -m "<tag>"`。stash スタックは全 worktree 共有なので `git stash pop` ではなく `git stash apply <sha>` で戻す）へ退避する。
+   - 変更が既にコミット済みでブランチだけが無い（`dev` の上に直接コミットした等）場合は、`git switch -c <inferred-branch>` だけでそのコミットを新ブランチへ引き継げる。`dev` 側を元に戻す必要があれば、**作業ツリーに触れない `git branch -f dev origin/dev`** を使う（実行の可否はユーザーに確認する）。`dev` が別の worktree で checkout 済みなら git 自身がこのコマンドを拒否するので、取り違えも起きない。`git switch dev && git reset --hard origin/dev` は避ける: 追跡済みファイルの staged／unstaged 変更を問答無用で捨てるうえ、`dev` を別の worktree が持っていると `git switch` 自体が失敗する。どうしても checkout して戻すなら、`git worktree list` で `dev` の所在を確認し、その worktree で `git status --short` が空であることを確かめてから実行する（変更があれば先に WIP コミット（推奨）か名前付き stash（`git stash push -u -m "<tag>"`。stash スタックは全 worktree 共有なので `git stash pop` ではなく `git stash apply <sha>` で戻す）へ退避する）。
    - コミット前に下記の品質チェックを通す（`CONTRIBUTING.md` ルール、手順 3 で定義する「コード本体パス」に変更が無ければ省略可）:
      - `cargo fmt --all -- --check`
      - `make clippy`
