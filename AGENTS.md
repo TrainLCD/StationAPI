@@ -85,15 +85,16 @@ Version control is plain Git. `gh` is the tool for pull requests, and GitHub Act
 - **`origin/dev` is the base for ordinary work.** Fetch it before branching so a feature branch does not start from a stale `dev`; `master` is release-only.
 - **Stage deliberately.** `git add -u` picks up edits to tracked files; add an untracked file by explicit path rather than `git add -A` / `git add .`, so scratch files do not ride along. Read `git status` before committing.
 - **Never rewrite a pushed commit without asking.** `git commit --amend`, `git rebase`, and anything that needs `git push --force-with-lease` rewrite published history. Confirm with the user first.
+- **Update a remote-tracking ref with an explicit refspec.** `git fetch origin dev` leaves `refs/remotes/origin/dev` to whatever `remote.origin.fetch` happens to be; a narrowed refspec on one machine silently leaves `origin/dev` stale, and every branch, rebase, and diff taken from it is then measured against an old commit.
 - **The stash stack is shared with every worktree of this repository.** Prefer a temporary WIP commit to set work aside; if you must stash, use `git stash push -u -m "<tag>"` and restore with `git stash apply <sha>` rather than a bare `git stash pop`.
 
 A typical change:
 ```bash
-git fetch origin dev                          # refresh origin/dev
+git fetch origin "+refs/heads/dev:refs/remotes/origin/dev"  # explicit refspec, so origin/dev cannot be stale
 git switch -c feature/<description> origin/dev
 # ... edit files ...
-git status                                    # confirm exactly what the change contains
-git add -u                                    # plus explicit paths for new files
+git status  # confirm exactly what the change contains
+git add -u  # plus explicit paths for new files
 git commit -m "日本語の単文"
 git push -u origin feature/<description>
 ```
@@ -107,7 +108,7 @@ Commands this guide and `.claude/skills/create-pr` rely on:
 | Current branch | `git rev-parse --abbrev-ref HEAD` |
 | Commit subjects on a branch | `git log --pretty=%s origin/dev..origin/<branch>` |
 | Files changed against a base | `git diff --name-only origin/dev..origin/<branch>` |
-| Rebase onto the latest `dev` | `git fetch origin dev && git rebase origin/dev` |
+| Rebase onto the latest `dev` | `git fetch origin "+refs/heads/dev:refs/remotes/origin/dev" && git rebase origin/dev` |
 
 `CONTRIBUTING.md` documents the same workflow for outside contributors. Keep the two aligned — base branch, naming convention, and pull-request rules are identical.
 

@@ -107,7 +107,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    git push -u origin <inferred-branch>
    ```
    - **`git add -A` / `git add .` は使わない。** `.gitignore` に載っていない一時ファイルまで巻き込む。`git status` の出力を読んでから、追跡済みは `git add -u`、未追跡は明示パスで追加する。関係ないファイルが入ったら `git restore --staged <path>` で外す。
-   - 変更が既にコミット済みでブランチだけが無い（`dev` の上に直接コミットした等）場合は、`git switch -c <inferred-branch>` だけでそのコミットを新ブランチへ引き継げる。`dev` 側を元に戻す必要があれば、`git switch dev && git reset --hard origin/dev` の可否をユーザーに確認してから実行する。
+   - 変更が既にコミット済みでブランチだけが無い（`dev` の上に直接コミットした等）場合は、`git switch -c <inferred-branch>` だけでそのコミットを新ブランチへ引き継げる。`dev` 側を元に戻す必要があれば、**`git status --short` が空であることを確認してから** `git switch dev && git reset --hard origin/dev` の可否をユーザーに確認して実行する。出力があるなら hard reset は追跡済みファイルの staged／unstaged 変更を問答無用で捨てるので、先に WIP コミット（推奨）か名前付き stash（`git stash push -u -m "<tag>"`。stash スタックは全 worktree 共有なので `git stash pop` ではなく `git stash apply <sha>` で戻す）へ退避する。
    - コミット前に下記の品質チェックを通す（`CONTRIBUTING.md` ルール、手順 3 で定義する「コード本体パス」に変更が無ければ省略可）:
      - `cargo fmt --all -- --check`
      - `make clippy`
