@@ -63,7 +63,7 @@ CPU Time はリクエストと `cf-ray` で突き合わせる。`wrangler tail` 
 
 3. **レポートの「所見」節を埋める。** ここだけは自動生成しない。差が出たクエリについて、
    `src/graphql/query.rs` や `stationapi/src/use_case/interactor/query.rs` の実装、
-   および `jj diff --from 'master@origin' --to 'dev@origin'` を見て、
+   および `git diff origin/master..origin/dev` を見て、
    **どの変更が効いているか**を書く。差が出なかったこと自体が結論なら、それも明記する。
 
    仮説を確かめたいときは、一時的なケース定義を作って `--queries` と `--out-dir` を
