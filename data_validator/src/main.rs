@@ -5,6 +5,10 @@ use std::path::Path;
 use csv::{ReaderBuilder, StringRecord};
 
 /// `3!stations.csv` の列インデックス。
+/// `2!lines.csv` の列インデックス。
+const LINES_COL_LINE_CD: usize = 0;
+
+/// `3!stations.csv` の列インデックス。
 const STATIONS_COL_STATION_CD: usize = 0;
 const STATIONS_COL_LINE_CD: usize = 13;
 const STATIONS_COL_E_STATUS: usize = 21;
@@ -29,6 +33,7 @@ const EXPECTED_CONSECUTIVE_STATION_ORDERS: &[(u32, &[u32])] = &[
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut invalid_station_ids: Vec<String> = Vec::new();
     let mut invalid_type_ids: Vec<String> = Vec::new();
+    let mut invalid_line_ids: Vec<String> = Vec::new();
 
     let data_path: &Path = Path::new("data");
     let mut rdr = ReaderBuilder::new().from_path(data_path.join("3!stations.csv"))?;
@@ -37,6 +42,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .iter()
         .map(|row| {
             row.get(STATIONS_COL_STATION_CD)
+                .unwrap()
+                .parse::<u32>()
+                .unwrap()
+        })
+        .collect();
+
+    let mut rdr = ReaderBuilder::new().from_path(data_path.join("2!lines.csv"))?;
+    let line_records: Vec<StringRecord> = rdr.records().collect::<Result<Vec<_>, _>>()?;
+    let line_ids: HashSet<u32> = line_records
+        .iter()
+        .map(|row| {
+            row.get(LINES_COL_LINE_CD)
                 .unwrap()
                 .parse::<u32>()
                 .unwrap()
@@ -83,6 +100,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // `3!stations.csv` の各行について、紐づく `line_cd` が
+    // `2!lines.csv` に存在することを検証する (#1030)。
+    for record in &station_records {
+        let line = || record.iter().collect::<Vec<&str>>().join(",");
+
+        let line_cd: u32 = match record
+            .get(STATIONS_COL_LINE_CD)
+            .and_then(|v| v.parse().ok())
+        {
+            Some(id) => id,
+            None => {
+                println!("[INVALID] Failed to parse line_cd from row: {}", line());
+                invalid_line_ids.push(line());
+                continue;
+            }
+        };
+
+        if !line_ids.contains(&line_cd) {
+            println!("[INVALID] Unrecognized Line ID {:?} Found!", line_cd);
+            invalid_line_ids.push(line());
+        }
+    }
+
     let invalid_station_orders = validate_station_orders(&station_records);
     for message in &invalid_station_orders {
         println!("[INVALID] {message}");
@@ -90,12 +130,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let has_err = !invalid_station_ids.is_empty()
         || !invalid_type_ids.is_empty()
+        || !invalid_line_ids.is_empty()
         || !invalid_station_orders.is_empty();
 
     if has_err {
         let report = build_markdown_report(
             &invalid_station_ids,
             &invalid_type_ids,
+            &invalid_line_ids,
             &invalid_station_orders,
         );
         let report_path =
@@ -160,6 +202,7 @@ fn validate_station_orders(station_records: &[StringRecord]) -> Vec<String> {
 fn build_markdown_report(
     invalid_station_ids: &[String],
     invalid_type_ids: &[String],
+    invalid_line_ids: &[String],
     invalid_station_orders: &[String],
 ) -> String {
     let mut md = String::new();
@@ -170,6 +213,12 @@ fn build_markdown_report(
     if !invalid_station_ids.is_empty() || !invalid_type_ids.is_empty() {
         md.push_str(
             "`5!station_station_types.csv` に存在しない外部キーへの参照が含まれています。\n\n",
+        );
+    }
+
+    if !invalid_line_ids.is_empty() {
+        md.push_str(
+            "`3!stations.csv` に `2!lines.csv` へ存在しない外部キーへの参照が含まれています。\n\n",
         );
     }
 
@@ -196,6 +245,20 @@ fn build_markdown_report(
         md.push_str("<details>\n<summary>該当レコード一覧</summary>\n\n");
         md.push_str("| 行データ |\n|---|\n");
         for line in invalid_type_ids {
+            md.push_str(&format!("| `{}` |\n", escape_markdown_cell(line)));
+        }
+        md.push_str("\n</details>\n\n");
+    }
+
+    if !invalid_line_ids.is_empty() {
+        md.push_str(&format!(
+            "### 不正な Line ID ({} 件)\n\n",
+            invalid_line_ids.len()
+        ));
+        md.push_str("`2!lines.csv` に存在しない `line_cd` が参照されています。\n\n");
+        md.push_str("<details>\n<summary>該当レコード一覧</summary>\n\n");
+        md.push_str("| 行データ |\n|---|\n");
+        for line in invalid_line_ids {
             md.push_str(&format!("| `{}` |\n", escape_markdown_cell(line)));
         }
         md.push_str("\n</details>\n\n");
