@@ -218,7 +218,7 @@ fn build_markdown_report(
 
     if !invalid_line_ids.is_empty() {
         md.push_str(
-            "`3!stations.csv` に `2!lines.csv` へ存在しない外部キーへの参照が含まれています。\n\n",
+            "`3!stations.csv` に `2!lines.csv` に存在しない外部キーへの参照が含まれています。\n\n",
         );
     }
 
