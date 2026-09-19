@@ -33,11 +33,11 @@ impl From<Line> for ModelLine {
             line_type,
             line_symbols: line.line_symbols.into_iter().map(|s| s.into()).collect(),
             status: line.e_status,
-            station: line.station.map(|s| Box::new(s.into())),
+            station: line.station.map(|s| Box::new((*s).into())),
             company: line.company.map(|c| c.into()),
             train_type: line
                 .train_type
-                .map(|train_type| Box::new(train_type.into())),
+                .map(|train_type| Box::new((*train_type).into())),
             average_distance: line.average_distance.unwrap_or(0.0),
             transport_type: convert_transport_type(line.transport_type),
             name_ipa,

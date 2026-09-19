@@ -616,7 +616,7 @@ where
                     line.line_symbols = self.get_line_symbols(line);
                     line.train_type = tt_by_pair
                         .get(&(line_group_cd as u32, line.line_cd as u32))
-                        .cloned();
+                        .map(|tt| Box::new((*tt).clone()));
                 }
 
                 line.company = company_map.get(&line.company_cd).copied().cloned();
@@ -923,7 +923,8 @@ where
                     station: None,
                     train_type: line
                         .type_cd
-                        .and_then(|cd| train_type_by_type_cd.get(&cd).cloned()),
+                        .and_then(|cd| train_type_by_type_cd.get(&cd))
+                        .map(|tt| Box::new((*tt).clone())),
                     line_group_cd: line.line_group_cd,
                     station_cd: line.station_cd,
                     station_g_cd: line.station_g_cd,
@@ -1717,7 +1718,7 @@ where
                 station.train_type = Some(tt);
             }
 
-            line.station = Some(station.clone());
+            line.station = Some(Box::new(station.clone()));
             station.line = Some(Box::new(line));
 
             let mut seen_line_cds = std::collections::HashSet::new();
@@ -1792,7 +1793,7 @@ where
                                 let mut station_copy = bus_stop.clone();
                                 station_copy.station_numbers =
                                     self.get_station_numbers(&station_copy);
-                                bus_line.station = Some(station_copy);
+                                bus_line.station = Some(Box::new(station_copy));
                             }
                         }
 
@@ -1822,7 +1823,7 @@ where
                     {
                         station_copy.train_type = Some(tt);
                     };
-                    line.station = Some(station_copy);
+                    line.station = Some(Box::new(station_copy));
                 }
             }
             station.lines = station_lines;

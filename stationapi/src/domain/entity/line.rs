@@ -34,8 +34,8 @@ pub struct Line {
     pub e_status: i32,
     pub e_sort: i32,
     pub average_distance: Option<f64>,
-    pub station: Option<Station>,
-    pub train_type: Option<TrainType>,
+    pub station: Option<Box<Station>>,
+    pub train_type: Option<Box<TrainType>>,
     pub line_group_cd: Option<i32>,
     pub station_cd: Option<i32>,
     pub station_g_cd: Option<i32>,
@@ -108,8 +108,8 @@ impl Line {
             line_symbol4_shape,
             e_status,
             e_sort,
-            station,
-            train_type,
+            station: station.map(Box::new),
+            train_type: train_type.map(Box::new),
             line_group_cd,
             station_cd,
             station_g_cd,
@@ -456,8 +456,11 @@ mod tests {
         let _: i32 = line.e_status;
         let _: i32 = line.e_sort;
         let _: Option<f64> = line.average_distance;
-        let _: Option<Station> = line.station;
-        let _: Option<TrainType> = line.train_type;
+        // 入れ子の構造体は Box で持つ。値で抱えると Line 自体が
+        // sizeof(Station) + sizeof(TrainType) ぶん太り、索引が常駐させる
+        // Vec<Line> と、駅ごとに作る lines の器がそのまま膨らむ。
+        let _: Option<Box<Station>> = line.station;
+        let _: Option<Box<TrainType>> = line.train_type;
         let _: Option<i32> = line.line_group_cd;
         let _: Option<i32> = line.station_cd;
         let _: Option<i32> = line.station_g_cd;
