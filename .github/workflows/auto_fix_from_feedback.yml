@@ -74,10 +74,16 @@ jobs:
           issues_repo_token: ${{ secrets.ISSUES_REPO_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          # 既定は P1 だけ。P1 の Bug は 2026 年に入って 8 件（duplicate を除く）
-          # しか来ていないので、それだけだとほとんど動かない。P2 を足すと同じ
-          # 期間で 43 件、月あたり 1 件弱から 6 件弱になる。
-          triage_labels: "🟠 P1 / High,🟡 P2 / Medium"
+          # 共通アクションの既定は P1 だけ。2026 年に入って立った Bug は P1 が
+          # 8 件、P2 が 43 件、P3 が 3 件（duplicate と Spam を除く）で、P1 だけだと
+          # 月 1 件動くかどうかになる。3 つ足しても月 6 件弱。
+          #
+          # P3 を外す理由は無い。作るものから決める Feature Request や Improvement は
+          # カテゴリの条件が弾くので、ここへ残るのは Bug と Crash だけ。
+          #
+          # 3 つとも入れたことでこの条件はほぼ素通りになるが、外さないこと。優先度が
+          # 付く前の issue を先に渡さないための関門になっている。
+          triage_labels: "🟠 P1 / High,🟡 P2 / Medium,🟢 P3 / Low"
           handoffs: MobileApp,Functions
           guidelines_file: AGENTS.md
           pr_template: .github/pull_request_template.md
