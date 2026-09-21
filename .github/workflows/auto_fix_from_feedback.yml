@@ -130,6 +130,10 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: |
+            # Sonnet で始める。まず費用を見たいため。上げるかどうかは「直せない」と
+            # 誤って判断した件数で決めること。この経路がいちばん高くつく。管理チケット
+            # に「済み」の目印が残り、次から打ち切られるので、手つかずのまま対応済みに
+            # 見える。出来の悪い修正は人のレビューで止まるが、誤った辞退は止まらない。
             --model claude-sonnet-5
             --allowedTools "Edit,Read,Write,Glob,Grep,TodoWrite,Bash(cargo:*),Bash(rustup:*),Bash(git:*),Bash(gh:*)"
 
