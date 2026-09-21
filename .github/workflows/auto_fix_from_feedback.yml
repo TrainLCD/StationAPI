@@ -1,0 +1,154 @@
+# アプリに届いたフィードバックのうち、原因がこのリポジトリにあると判定された
+# ものを Claude Code に読ませ、直せるなら修正の Pull Request まで作らせる。
+#
+# 起点は TrainLCD/Functions のフィードバックトリアージがこのリポジトリに立てる
+# スタブ issue。原因のリポジトリは Worker が本文を読んで判定済みなので、ここで
+# 振り分けをやり直さない。判定・無害化・プロンプトの組み立て・結果の報告は
+# TrainLCD/feedback-autofix の composite action が持っている。
+#
+# 出来上がった PR は必ず人がレビューすること。フィードバックの本文はアプリの
+# 利用者がそのまま書いたもので、誰かが内容を確かめる工程が無い。個人情報を
+# 取り除いたうえでデータとして渡しているが、プロンプトインジェクションの
+# 抜け道を完全にはふさげない。自動マージもしない。
+name: Auto Fix From Feedback
+
+on:
+  # Worker がこのリポジトリに立てるスタブ issue を起点にする。
+  issues:
+    types: [opened]
+  # 取りこぼしをやり直すときと、スタブを介さず動かすときに使う。
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "TrainLCD/Issues の issue 番号"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  # prepare がスタブ issue を GITHUB_TOKEN で取得する。permissions を書いた
+  # 時点で挙げなかった権限は none になるので、これを省くとそこで止まる。
+  issues: read
+  pull-requests: write
+
+# 同じ管理チケットに対する実行を直列にする。スタブ issue の番号で束ねると、
+# 同じチケットを指すスタブが 2 つあったときに別のグループへ入って同時に走る。
+# エージェントが 2 つ動き、同じ名前のブランチを取り合う。
+#
+# 題名には管理チケットへの参照が入っていて、Worker が立てるものも引き継ぎで
+# 立つものも同じ形なので、これで同じチケットは同じグループに入る。
+# cancel-in-progress を false にしてあるので後続は待たされ、先行が結果を
+# 書き終えてから動き出してそこで打ち切られる。
+#
+# 題名にコロンが入るため、値は引用符で囲むこと。囲まないと YAML がそこを
+# キーの区切りと読み、このファイルを読み込めなくなる。
+concurrency:
+  group: "auto-fix-from-feedback-${{ github.event.issue.title || format('フィードバック対応: {0}#{1}', 'TrainLCD/Issues', inputs.issue_number) }}"
+  cancel-in-progress: false
+
+jobs:
+  auto-fix:
+    name: Auto fix from feedback
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      # persist-credentials: false を外さないこと。既定の true だと、書き込み
+      # 権限付きの GITHUB_TOKEN がローカルの git 設定に残り、エージェントの
+      # Bash(git:*) から素で使える状態になる。
+      # 外部 action は可変タグではなく commit SHA で固定する。このジョブは
+      # contents: write と pull-requests: write を持ち、secret も渡している。
+      # タグが差し替えられると、その内容がここで動く。
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: TrainLCD/feedback-autofix/prepare@406de875a89dd1e640f8b66b71d4de9516a952ca # feedback-autofix#1
+        id: prepare
+        with:
+          stub_issue_number: ${{ github.event.issue.number }}
+          issue_number: ${{ inputs.issue_number }}
+          # スタブ issue の作成者として認めるアカウントの数値 ID。このリポジトリ
+          # は公開されていて issue は誰でも立てられるので、これが無いと第三者が
+          # 管理チケットの番号を書いた issue を立てるだけで、非公開チケットの
+          # 本文を取得させられる。
+          allowed_authors: "32848922"
+          issues_repo_token: ${{ secrets.ISSUES_REPO_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # 共通アクションの既定は P1 だけ。2026 年に入って立った Bug は P1 が
+          # 8 件、P2 が 43 件、P3 が 3 件（duplicate と Spam を除く）で、P1 だけだと
+          # 月 1 件動くかどうかになる。3 つ足しても月 6 件程度（54 件 ÷ 8.6 か月）。
+          #
+          # P3 を外す理由は無い。作るものから決める Feature Request や Improvement は
+          # カテゴリの条件が弾くので、ここへ残るのは Bug と Crash だけ。
+          #
+          # 3 つとも入れたことでこの条件はほぼ素通りになるが、外さないこと。優先度が
+          # 付く前の issue を先に渡さないための関門になっている。
+          triage_labels: "🟠 P1 / High,🟡 P2 / Medium,🟢 P3 / Low"
+          handoffs: MobileApp,Functions
+          guidelines_file: AGENTS.md
+          pr_template: .github/pull_request_template.md
+          # ci.yml の 6 つに cargo run -p data_validator を足したもの。ci.yml は
+          # paths で *.csv を除いていて、CSV の検証は verify_data_Integrity.yml が
+          # data_validator で行っている。エージェントには CSV も直させるので、
+          # これを入れないと 6 つすべてを通した PR がデータ検証で落ちる。
+          checks: |
+            cargo check -p stationapi -p stationapi-preprocessor -p data_validator
+            cargo check --target wasm32-unknown-unknown -p stationapi-worker
+            cargo test -p stationapi -p stationapi-preprocessor -p data_validator
+            cargo fmt --all -- --check
+            cargo clippy -p stationapi -p stationapi-preprocessor -p data_validator --all-targets -- -D warnings
+            cargo clippy --target wasm32-unknown-unknown -p stationapi-worker --all-targets -- -D warnings
+            cargo run -p data_validator
+          scope: |
+            - `data/*.csv` の駅・路線・種別データ
+            - `stationapi/` `preprocessor/` `data_validator/` `src/` の Rust のコード
+
+      # ここから先は対象だったときだけ走らせる。届く issue のうち条件を満たす
+      # ものは一部なので、判定より先に重い準備を置かない。
+      - name: Set up the Rust toolchain
+        if: steps.prepare.outputs.eligible == 'true'
+        run: |
+          rustup target add wasm32-unknown-unknown
+          rustup component add rustfmt clippy
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        if: steps.prepare.outputs.eligible == 'true'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: auto-fix-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1
+        id: claude
+        if: steps.prepare.outputs.eligible == 'true'
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: ${{ steps.prepare.outputs.prompt }}
+          claude_args: |
+            # Sonnet で始める。まず費用を見たいため。上げるかどうかは「直せない」と
+            # 誤って判断した件数で決めること。この経路がいちばん高くつく。管理チケット
+            # に「済み」の目印が残り、次から打ち切られるので、手つかずのまま対応済みに
+            # 見える。出来の悪い修正は人のレビューで止まるが、誤った辞退は止まらない。
+            --model claude-sonnet-5
+            --allowedTools "Edit,Read,Write,Glob,Grep,TodoWrite,Bash(cargo:*),Bash(rustup:*),Bash(git:*),Bash(gh:*)"
+
+      # always() を外さないこと。エージェントが失敗した場合こそ報告が要る。
+      # 何も言わずに終わると、管理チケットを見た人には「調べたうえで何もしな
+      # かった」のか「そもそも動かなかった」のかが分からない。
+      - uses: TrainLCD/feedback-autofix/report@406de875a89dd1e640f8b66b71d4de9516a952ca # feedback-autofix#1
+        if: ${{ always() && steps.prepare.outputs.eligible == 'true' }}
+        with:
+          issue_number: ${{ steps.prepare.outputs.issue_number }}
+          issues_repo_token: ${{ secrets.ISSUES_REPO_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.prepare.outputs.branch }}
+          verdict_path: ${{ steps.prepare.outputs.verdict_path }}
+          claude_outcome: ${{ steps.claude.outcome }}
+          # 引き継ぎ先に issue を立てられるトークン。省くと引き継ぎ先の名前が
+          # コメントに出るだけで、向こうは動かない。
+          handoff_token: ${{ secrets.HANDOFF_ISSUE_TOKEN }}
