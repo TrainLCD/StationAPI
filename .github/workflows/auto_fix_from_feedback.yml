@@ -64,7 +64,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: TrainLCD/feedback-autofix/prepare@v1
+      - uses: TrainLCD/feedback-autofix/prepare@406de875a89dd1e640f8b66b71d4de9516a952ca # v1
         id: prepare
         with:
           stub_issue_number: ${{ github.event.issue.number }}
@@ -136,7 +136,7 @@ jobs:
       # always() を外さないこと。エージェントが失敗した場合こそ報告が要る。
       # 何も言わずに終わると、管理チケットを見た人には「調べたうえで何もしな
       # かった」のか「そもそも動かなかった」のかが分からない。
-      - uses: TrainLCD/feedback-autofix/report@v1
+      - uses: TrainLCD/feedback-autofix/report@406de875a89dd1e640f8b66b71d4de9516a952ca # v1
         if: ${{ always() && steps.prepare.outputs.eligible == 'true' }}
         with:
           issue_number: ${{ steps.prepare.outputs.issue_number }}
