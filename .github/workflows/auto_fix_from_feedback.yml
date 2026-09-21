@@ -55,7 +55,10 @@ jobs:
       # persist-credentials: false を外さないこと。既定の true だと、書き込み
       # 権限付きの GITHUB_TOKEN がローカルの git 設定に残り、エージェントの
       # Bash(git:*) から素で使える状態になる。
-      - uses: actions/checkout@v4
+      # 外部 action は可変タグではなく commit SHA で固定する。このジョブは
+      # contents: write と pull-requests: write を持ち、secret も渡している。
+      # タグが差し替えられると、その内容がここで動く。
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
@@ -76,7 +79,7 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           # 共通アクションの既定は P1 だけ。2026 年に入って立った Bug は P1 が
           # 8 件、P2 が 43 件、P3 が 3 件（duplicate と Spam を除く）で、P1 だけだと
-          # 月 1 件動くかどうかになる。3 つ足しても月 6 件弱。
+          # 月 1 件動くかどうかになる。3 つ足しても月 6 件程度（54 件 ÷ 8.6 か月）。
           #
           # P3 を外す理由は無い。作るものから決める Feature Request や Improvement は
           # カテゴリの条件が弾くので、ここへ残るのは Bug と Crash だけ。
@@ -111,7 +114,7 @@ jobs:
           rustup target add wasm32-unknown-unknown
           rustup component add rustfmt clippy
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         if: steps.prepare.outputs.eligible == 'true'
         with:
           path: |
@@ -120,7 +123,7 @@ jobs:
             target
           key: auto-fix-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1
         id: claude
         if: steps.prepare.outputs.eligible == 'true'
         with:
