@@ -64,7 +64,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: TrainLCD/feedback-autofix/prepare@406de875a89dd1e640f8b66b71d4de9516a952ca # feedback-autofix#1
+      - uses: TrainLCD/feedback-autofix/prepare@c71e2b4abf4149b4b83e9a87cd185b1558ed8237 # feedback-autofix#4
         id: prepare
         with:
           stub_issue_number: ${{ github.event.issue.number }}
@@ -140,8 +140,12 @@ jobs:
       # always() を外さないこと。エージェントが失敗した場合こそ報告が要る。
       # 何も言わずに終わると、管理チケットを見た人には「調べたうえで何もしな
       # かった」のか「そもそも動かなかった」のかが分からない。
-      - uses: TrainLCD/feedback-autofix/report@406de875a89dd1e640f8b66b71d4de9516a952ca # feedback-autofix#1
-        if: ${{ always() && steps.prepare.outputs.eligible == 'true' }}
+      #
+      # failed も外さないこと。prepare が対象だと分かったあとで落ちた場合、
+      # eligible は 'true' になりません。この条件が無いとここが走らず、ジョブが
+      # 赤くなるだけで管理チケットには何も残りません。
+      - uses: TrainLCD/feedback-autofix/report@c71e2b4abf4149b4b83e9a87cd185b1558ed8237 # feedback-autofix#4
+        if: ${{ always() && (steps.prepare.outputs.eligible == 'true' || steps.prepare.outputs.failed == 'true') }}
         with:
           issue_number: ${{ steps.prepare.outputs.issue_number }}
           issues_repo_token: ${{ secrets.ISSUES_REPO_TOKEN }}
