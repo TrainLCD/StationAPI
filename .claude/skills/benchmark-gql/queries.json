@@ -176,7 +176,7 @@
       "name": "connectedRoutes",
       "weight": "heavy",
       "uses": ["TrainTypeTop", "StationCore", "LineCore", "TrainTypeCore"],
-      "query": "query Bench_connectedRoutes($from: Int!, $to: Int!) { connectedRoutes(fromStationGroupId: $from, toStationGroupId: $to) { estimatedMinutes transferCount legs { trainType { ...TrainTypeTop } fromStation { ...StationCore } toStation { ...StationCore } } } }",
+      "query": "query Bench_connectedRoutes($from: Int!, $to: Int!) { connectedRoutes(fromStationGroupId: $from, toStationGroupId: $to) { legs { trainTypes { ...TrainTypeTop } fromStation { ...StationCore } toStation { ...StationCore } } } }",
       "variables": { "from": 1130205, "to": 1130212 },
       "note": "渋谷 → 池袋。乗換を含む経路探索 (RAPTOR、初回は系統網の構築を含む)"
     },

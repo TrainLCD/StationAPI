@@ -98,8 +98,6 @@ type Query {
 }
 
 type ConnectedRoute {
-	estimatedMinutes: Float
-	transferCount: Int
 	legs: [RouteLeg!]
 }
 
@@ -294,7 +292,6 @@ input RouteLegInput {
 }
 
 type RouteLeg {
-	trainType: TrainType
 	trainTypes: [TrainType!]
 	fromStation: Station
 	toStation: Station

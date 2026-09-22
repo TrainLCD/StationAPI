@@ -215,17 +215,17 @@ PostgreSQL のクエリは以下のように置き換えています。
 
 アプリは 1 本の列車 (系統) ごとに「種別を選ぶ → `lineGroupStations` で系統
 全体の駅を取る → LCD を動かす」流れで動きます。乗換経路もこの流れに乗せられる
-よう、経路は区間 (`legs`) の並びで返し、各区間は `routeTypes` と同じ形の
-`TrainType` (実在の `groupId`) と乗車駅・降車駅 (`Station`) を持ちます。
-乗降駅にはその系統が走る路線の駅を返すので、乗換駅では前の区間の降車駅と
+よう、経路は区間 (`legs`) の並びで返し、各区間はその区間で乗れる種別
+(`trainTypes`、`routeTypes` と同じ形で実在の `groupId`) と乗車駅・降車駅
+(`Station`) を持ちます。乗降駅には探索が乗った系統が走る路線の駅を返すので、乗換駅では前の区間の降車駅と
 次の区間の乗車駅が別の駅 (同じ駅グループ) になることがあります
 (例: 丸ノ内線の赤坂見附 → 半蔵門線の永田町)。
 
 ```graphql
 connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int): [ConnectedRoute!]!
 
-type ConnectedRoute { estimatedMinutes: Float  transferCount: Int  legs: [RouteLeg!] }
-type RouteLeg { trainType: TrainType  trainTypes: [TrainType!]  fromStation: Station  toStation: Station }
+type ConnectedRoute { legs: [RouteLeg!] }
+type RouteLeg { trainTypes: [TrainType!]  fromStation: Station  toStation: Station }
 ```
 
 探索は停車駅が同じ並行種別 (中央線の快速・通勤快速など) を 1 つの経路に
@@ -235,8 +235,8 @@ type RouteLeg { trainType: TrainType  trainTypes: [TrainType!]  fromStation: Sta
 乗れる種別すべてを返します。中身は
 `routeTypes(乗車駅グループ, 降車駅グループ, 降車駅の路線)` そのもので、停車駅が
 同じ種別のまとめ・路線の付与・並び順も `routeTypes` と同じです (同じ関数を
-呼んでいます)。`trainType` は探索が選んだ代表の 1 件で、まとめの結果
-`trainTypes` に含まれないことがあります。
+呼んでいます)。探索が選んだ代表の種別、推定所要時間、乗換回数は並べ替えに
+使うだけで、API では返しません (アプリが使わないため)。
 
 `viaLineId` は `routeTypes` と同じく検索結果でタップした駅の路線で、目的地に
 その路線の駅で着く経路 (最後の区間がその路線を走る経路) だけに絞ります。
@@ -269,9 +269,7 @@ type RouteLeg { trainType: TrainType  trainTypes: [TrainType!]  fromStation: Sta
 | 乗換の徒歩 | 3 分 |
 
 待ち時間を入れないと、本数の少ない特急が「直通で速い」ことになり、
-東京→渋谷で山手線より成田エクスプレスを勧めてしまいます。返す推定所要時間
-(`ConnectedRoute.estimatedMinutes`) は評価値から最初の列車の待ち時間を除いたもので、
-乗換先の待ち時間は含みます。
+東京→渋谷で山手線より成田エクスプレスを勧めてしまいます。
 
 ### 代替経路と並び順
 
@@ -297,9 +295,16 @@ type RouteLeg { trainType: TrainType  trainTypes: [TrainType!]  fromStation: Sta
 ### 到着見込みと走行区間 (`estimateArrivalTimes` / `trainRoute`)
 
 どちらも `legs: [RouteLegInput!]` を受け付け、乗換経路全体を通した値を返します。
-`legs` には `connectedRoutes` の各区間の `trainType.groupId`・`fromStation.id`・
-`toStation.id` をそのまま渡します。経路 ID は持たないので、経路はクライアントが
-区間の並びとして渡します。
+`legs` には `connectedRoutes` の各区間の `trainTypes` から選んだ種別の
+`groupId` と、区間の `fromStation.id`・`toStation.id` を渡します。経路 ID は
+持たないので、経路はクライアントが区間の並びとして渡します。
+
+選んだ種別が区間の乗降駅とは別の路線の駅に止まることがあります (乗降駅は
+中央線快速の三鷹だが、選んだ各停は中央・総武線の三鷹に止まる、など)。そこで
+系統に無い乗降駅は、同じ駅グループの駅で引き当てます。`station_cd` が一致する
+駅があればそれを使い、駅グループの候補が複数あれば区間が最も短くなる組を
+選びます (直通系統は接続駅で同じ駅グループの駅を 2 行持つため。宇都宮線の上野と
+上野東京ラインの上野など)。
 
 ```graphql
 input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! }
@@ -309,8 +314,7 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
   系統は使わない)、出発駅からの累積でつないだ 1 本の経路を返します (`id` は
   系統をまたぐので空)。乗換駅は前の区間の降車駅と次の区間の乗車駅の 2 行で、
   乗車駅の行は「徒歩 3 分後に着き、乗換先の種別の待ち時間の後に出る」値です。
-  見込みは `connectedRoutes` と同じなので、最後の駅の値は `estimatedMinutes` と
-  (ほぼ) 一致します。
+  見込みは `connectedRoutes` の並べ替えと同じ (徒歩 3 分と種別ごとの待ち時間) です。
 - `trainRoute`: 区間ごとの走行区間を順につなげます。区間ごとに別の列車なので、
   各区間の最初の駅の `distanceFromPrevious` は 0 で、通過駅の有無 (優等種別の
   速度を使うか) も区間ごとに判定します。

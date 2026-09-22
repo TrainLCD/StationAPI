@@ -1206,6 +1206,7 @@ impl TrainTypeRepository for MemTrainTypeRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use stationapi::domain::route_search::Journey;
     use stationapi::model;
 
     const TOKYO: u32 = 1130101;
@@ -1230,16 +1231,22 @@ mod tests {
             .collect()
     }
 
-    fn route_legs(route: &model::ConnectedRoute) -> Vec<model::RouteLegRequest> {
-        route
+    /// 探索結果の経路を estimateArrivalTimes / trainRoute の legs にする
+    /// (connectedRoutes が区間ごとに返す乗降駅と、探索が選んだ系統)
+    fn journey_legs(journey: &Journey) -> Vec<model::RouteLegRequest> {
+        journey
             .legs
             .iter()
             .map(|leg| model::RouteLegRequest {
-                line_group_id: leg.train_type.group_id,
-                from_station_id: leg.from_station.id,
-                to_station_id: leg.to_station.id,
+                line_group_id: leg.line_group_id,
+                from_station_id: leg.station_cds[0] as u32,
+                to_station_id: *leg.station_cds.last().unwrap() as u32,
             })
             .collect()
+    }
+
+    fn station_ids_of(eta: &[stationapi::domain::arrival_estimation::EstimatedStop]) -> Vec<i32> {
+        eta.iter().map(|stop| stop.station_cd).collect()
     }
 
     #[test]
@@ -1249,52 +1256,43 @@ mod tests {
         // 大宮 → 新大阪 (はやぶさ → 東京 → のぞみ など) と、山手線の継ぎ目を
         // 跨ぎうる東京 → 渋谷
         for (from, to) in [(1131906, 1160213), (TOKYO, SHIBUYA)] {
-            let routes = block_on(interactor.get_connected_routes(from, to, None)).unwrap();
-            assert!(!routes.is_empty());
-            for route in &routes {
-                let legs = route_legs(route);
+            let journeys = route_network().search(from, to, None);
+            assert!(!journeys.is_empty());
+            for journey in &journeys {
+                let legs = journey_legs(journey);
                 let eta =
                     block_on(interactor.estimate_connected_route_arrival_times(&legs)).unwrap();
                 let train_route = block_on(interactor.get_connected_train_route(&legs)).unwrap();
 
                 // 同じ区間を同じ弧で切り出す
-                let eta_ids: Vec<i32> = eta.iter().map(|stop| stop.station_cd).collect();
+                let eta_ids = station_ids_of(&eta);
                 let train_route_ids: Vec<i32> = train_route
                     .iter()
                     .map(|segment| segment.station.as_ref().unwrap().id as i32)
                     .collect();
                 assert_eq!(eta_ids, train_route_ids);
-                // 区間ごとに乗車駅から降車駅まで
-                assert_eq!(eta_ids.first(), Some(&(legs[0].from_station_id as i32)));
-                assert_eq!(
-                    eta_ids.last(),
-                    Some(&(legs.last().unwrap().to_station_id as i32))
-                );
-                // 累積は減らず、最後は connectedRoutes の見込みと (ほぼ) 一致する
+                // 探索の区間と同じ駅を通る
+                let journey_ids: Vec<i32> = journey
+                    .legs
+                    .iter()
+                    .flat_map(|leg| leg.station_cds.iter().copied())
+                    .collect();
+                assert_eq!(eta_ids, journey_ids);
+                // 累積は減らず、最後は探索の所要時間と (ほぼ) 一致する
                 assert!(eta.windows(2).all(|pair| {
                     pair[1].cumulative_minutes >= pair[0].departure_cumulative_minutes - 1e-9
                 }));
                 let last = eta.last().unwrap().cumulative_minutes;
+                let expected = f64::from(journey.total_seconds) / 60.0;
                 assert!(
-                    (last - route.estimated_minutes).abs() < 1.0,
-                    "eta {last} vs connectedRoutes {}",
-                    route.estimated_minutes
+                    (last - expected).abs() < 1.0,
+                    "eta {last} vs search {expected}"
                 );
-                // 乗換では徒歩の後に乗換先の列車を待つ。乗車駅の行は、前の区間の
-                // 降車駅の行のすぐ後 (乗換駅は両方の区間に 1 行ずつある)
-                let mut start = 0;
-                let mut boards = Vec::new();
-                for leg in &legs[..legs.len() - 1] {
-                    let alight = start
-                        + eta_ids[start..]
-                            .iter()
-                            .position(|&id| id == leg.to_station_id as i32)
-                            .unwrap();
-                    boards.push(alight + 1);
-                    start = alight + 2;
-                }
-                for (board, leg) in boards.iter().copied().zip(&legs[1..]) {
-                    assert_eq!(eta_ids[board], leg.from_station_id as i32);
+                // 乗換では徒歩の後に乗換先の列車を待ち、走行区間は距離 0 から始まる。
+                // 乗車駅の行は、前の区間の降車駅の行のすぐ後
+                let mut board = 0;
+                for leg in &journey.legs[..journey.legs.len() - 1] {
+                    board += leg.station_cds.len();
                     assert!(
                         eta[board].departure_cumulative_minutes > eta[board].cumulative_minutes
                     );
@@ -1305,11 +1303,70 @@ mod tests {
     }
 
     #[test]
+    fn connected_route_legs_accept_any_train_type_of_the_leg() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+        let interactor = crate::interactor();
+        // 区間の乗降駅は中央線 (快速) の三鷹 (1131220) と新宿 (1131211) だが、
+        // 中央・総武線の各停 (系統 585) を選んでも、同じ駅グループにある各停の駅で
+        // 切り出す
+        let legs = [model::RouteLegRequest {
+            line_group_id: 585,
+            from_station_id: 1131220,
+            to_station_id: 1131211,
+        }];
+        let eta = block_on(interactor.estimate_connected_route_arrival_times(&legs)).unwrap();
+        let group_of = |station_cd: i32| index::station_by_cd(station_cd).unwrap().station_g_cd;
+        let (first, last) = (eta[0].station_cd, eta.last().unwrap().station_cd);
+        assert_eq!((group_of(first), group_of(last)), (MITAKA as i32, 1130208));
+        assert!(
+            first != 1131220 && last != 1131211,
+            "the local's own stations"
+        );
+        let train_route = block_on(interactor.get_connected_train_route(&legs)).unwrap();
+        assert_eq!(train_route.len(), eta.len());
+
+        // connectedRoutes の区間の trainTypes は、どれを選んでも区間の乗降駅で使える
+        let routes = block_on(interactor.get_connected_routes(MITAKA, NAKA_MEGURO, None)).unwrap();
+        for route in &routes {
+            let choices = route
+                .legs
+                .iter()
+                .map(|leg| leg.train_types.len())
+                .max()
+                .unwrap();
+            for choice in 0..choices {
+                let legs: Vec<model::RouteLegRequest> = route
+                    .legs
+                    .iter()
+                    .map(|leg| model::RouteLegRequest {
+                        line_group_id: leg.train_types[choice.min(leg.train_types.len() - 1)]
+                            .group_id,
+                        from_station_id: leg.from_station.id,
+                        to_station_id: leg.to_station.id,
+                    })
+                    .collect();
+                let eta =
+                    block_on(interactor.estimate_connected_route_arrival_times(&legs)).unwrap();
+                let train_route = block_on(interactor.get_connected_train_route(&legs)).unwrap();
+                assert_eq!(eta.len(), train_route.len());
+            }
+        }
+    }
+
+    #[test]
     fn connected_route_rejects_legs_that_do_not_connect() {
         use stationapi::use_case::traits::query::QueryUseCase;
         let interactor = crate::interactor();
         let routes = block_on(interactor.get_connected_routes(MITAKA, NAKA_MEGURO, None)).unwrap();
-        let mut legs = route_legs(&routes[0]);
+        let mut legs: Vec<model::RouteLegRequest> = routes[0]
+            .legs
+            .iter()
+            .map(|leg| model::RouteLegRequest {
+                line_group_id: leg.train_types[0].group_id,
+                from_station_id: leg.from_station.id,
+                to_station_id: leg.to_station.id,
+            })
+            .collect();
         assert!(legs.len() > 1);
         // 2 区間目を飛ばすと、1 区間目の降車駅と 3 区間目の乗車駅がつながらない
         legs.remove(1);
