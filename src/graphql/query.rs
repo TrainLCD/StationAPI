@@ -320,11 +320,13 @@ impl QueryRoot {
         ctx: &Context<'_>,
         from_station_group_id: i32,
         to_station_group_id: i32,
-    ) -> GqlResult<Vec<Route>> {
+        via_line_id: Option<i32>,
+    ) -> GqlResult<Vec<ConnectedRoute>> {
         let found = use_case(ctx)
             .get_connected_routes(
                 to_id(from_station_group_id, "fromStationGroupId")?,
                 to_id(to_station_group_id, "toStationGroupId")?,
+                to_opt_id(via_line_id, "viaLineId")?,
             )
             .await?;
         Ok(found.into_iter().map(Into::into).collect())

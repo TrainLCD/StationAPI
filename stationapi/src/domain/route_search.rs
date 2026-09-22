@@ -78,7 +78,7 @@ struct Pattern {
     line_group_id: u32,
     /// 位置ごとの節点。環状の場合は一周ぶん(閉じた終端を除く)。
     nodes: Vec<u32>,
-    sst_ids: Vec<i32>,
+    station_cds: Vec<i32>,
     line_cds: Vec<i32>,
     /// 乗降できる(= 通過ではない)か。
     stoppable: Vec<bool>,
@@ -115,7 +115,8 @@ struct LegRef {
 pub struct JourneyLeg {
     pub line_group_id: u32,
     /// 乗車駅から降車駅までの駅(通過駅を含む)を進行順に並べたもの。
-    pub sst_ids: Vec<i32>,
+    /// 駅はこの系統が走る路線の駅 (`station_cd`) で、乗換駅でも系統ごとに異なる。
+    pub station_cds: Vec<i32>,
     pub station_group_ids: Vec<u32>,
 }
 
@@ -239,10 +240,7 @@ impl RouteNetwork {
         self.patterns.push(Pattern {
             line_group_id: line_group_id as u32,
             nodes,
-            sst_ids: stations
-                .iter()
-                .map(|s| s.sst_id.unwrap_or_default())
-                .collect(),
+            station_cds: stations.iter().map(|s| s.station_cd).collect(),
             line_cds: stations.iter().map(|s| s.line_cd).collect(),
             stoppable,
             arrival,
@@ -260,7 +258,10 @@ impl RouteNetwork {
     /// 埋める。代替経路は、見つかった経路の区間を 1 つずつ禁止した再探索で集める
     /// (Yen の k 最短経路の簡略版)。最良の経路に比べて大きく遠回りなものと、
     /// 乗換の多すぎるものは捨てる。
-    pub fn search(&self, from: u32, to: u32) -> Vec<Journey> {
+    ///
+    /// `via_line_id` を指定すると、目的地にその路線の駅で到着する経路 (最後の
+    /// 区間がその路線を走る経路) だけを返す。
+    pub fn search(&self, from: u32, to: u32, via_line_id: Option<i32>) -> Vec<Journey> {
         let (Some(&origin), Some(&target)) =
             (self.node_by_group.get(&from), self.node_by_group.get(&to))
         else {
@@ -270,7 +271,12 @@ impl RouteNetwork {
             return Vec::new();
         }
 
-        let pareto = self.raptor(origin, target, &HashSet::new(), UNREACHED);
+        let arrival = Arrival {
+            node: target as usize,
+            line_cd: via_line_id,
+        };
+        let mut pareto = self.raptor(origin, arrival, &HashSet::new(), UNREACHED);
+        pareto.retain(|(_, legs)| !self.revisits_station_group(legs));
         if pareto.is_empty() {
             return Vec::new();
         }
@@ -316,8 +322,11 @@ impl RouteNetwork {
             }
             runs += 1;
             // 許容幅を超える経路は捨てるので、それを目的地の上限にして枝を刈る
-            for (cost, legs) in self.raptor(origin, target, &banned, score_limit + 1) {
-                if !acceptable(cost, &legs) || !seen.insert(self.journey_key(&legs)) {
+            for (cost, legs) in self.raptor(origin, arrival, &banned, score_limit + 1) {
+                if !acceptable(cost, &legs)
+                    || self.revisits_station_group(&legs)
+                    || !seen.insert(self.journey_key(&legs))
+                {
                     continue;
                 }
                 push_children(&mut queue, &banned, &legs);
@@ -354,10 +363,11 @@ impl RouteNetwork {
     fn raptor(
         &self,
         origin: u32,
-        target: u32,
+        arrival: Arrival,
         banned: &HashSet<(u32, u32)>,
         bound: i64,
     ) -> Vec<(i64, Vec<LegRef>)> {
+        let target = arrival.node as u32;
         let node_count = self.stop_patterns.len();
         let mut labels: Vec<Vec<i64>> = Vec::with_capacity(MAX_RIDES + 1);
         let mut parents: Vec<Vec<Option<LegRef>>> = Vec::with_capacity(MAX_RIDES + 1);
@@ -407,7 +417,7 @@ impl RouteNetwork {
                 best: &mut best,
                 parents: &mut round_parents,
                 improved: &mut improved,
-                target: target as usize,
+                arrival,
                 transfer_walk,
                 banned,
             };
@@ -539,6 +549,35 @@ impl RouteNetwork {
         }
     }
 
+    /// 別々の区間で同じ駅グループを通るか。乗換駅 (前の区間の降車駅 = 次の区間の
+    /// 乗車駅) は除く。
+    ///
+    /// 区間を禁止して再探索すると、「1 駅戻って同じ列車に乗り直す」逆戻りの経路が
+    /// 代替経路として出てくるので捨てる。1 つの区間の中で同じ駅を通るのは
+    /// 実在する運行 (大江戸線の都庁前など) なので構わない。
+    fn revisits_station_group(&self, legs: &[LegRef]) -> bool {
+        let mut visited: HashSet<u32> = HashSet::new();
+        for leg in legs {
+            let pattern = &self.patterns[leg.pattern as usize];
+            let len = pattern.len();
+            let (board, alight) = (leg.board as usize, leg.alight as usize);
+            let board_node = pattern.nodes[board % len];
+            let mut leg_nodes: HashSet<u32> = HashSet::new();
+            for q in board.min(alight)..=board.max(alight) {
+                leg_nodes.insert(pattern.nodes[q % len]);
+            }
+            if leg_nodes
+                .iter()
+                .any(|node| *node != board_node && visited.contains(node))
+            {
+                return true;
+            }
+            // 乗車駅は前の区間の降車駅なので、既に入っている
+            visited.extend(leg_nodes);
+        }
+        false
+    }
+
     /// 同一視する経路のキー。乗車・降車の駅グループと路線が同じなら、種別違い
     /// でも利用者から見て同じ経路とみなす。
     fn journey_key(&self, legs: &[LegRef]) -> Vec<(u32, u32, i32, i32)> {
@@ -575,9 +614,9 @@ impl RouteNetwork {
                 };
                 JourneyLeg {
                     line_group_id: pattern.line_group_id,
-                    sst_ids: positions
+                    station_cds: positions
                         .iter()
-                        .map(|&q| pattern.sst_ids[q % pattern.len()])
+                        .map(|&q| pattern.station_cds[q % pattern.len()])
                         .collect(),
                     station_group_ids: positions
                         .iter()
@@ -593,6 +632,14 @@ impl RouteNetwork {
     }
 }
 
+/// 目的地の条件。
+#[derive(Clone, Copy)]
+struct Arrival {
+    node: usize,
+    /// 指定があれば、目的地にはこの路線の駅で着かなければならない。
+    line_cd: Option<i32>,
+}
+
 /// 1 ラウンドぶんの作業領域。
 struct RoundState<'a> {
     /// 前ラウンドの到着。乗車はこちらからだけ行う(同ラウンドの到着から乗ると
@@ -603,7 +650,7 @@ struct RoundState<'a> {
     best: &'a mut [i64],
     parents: &'a mut [Option<LegRef>],
     improved: &'a mut [bool],
-    target: usize,
+    arrival: Arrival,
     /// 乗換の徒歩。最初の乗車 (ラウンド 1) では 0。
     transfer_walk: i64,
     banned: &'a HashSet<(u32, u32)>,
@@ -646,7 +693,12 @@ impl RoundState<'_> {
                     -i64::from(pattern.departure[q])
                 };
                 let arrival = base + alight_key;
-                if arrival < self.best[node].min(self.best[self.target]) {
+                let accepted = node != self.arrival.node
+                    || self
+                        .arrival
+                        .line_cd
+                        .is_none_or(|line_cd| pattern.line_cds[stop] == line_cd);
+                if accepted && arrival < self.best[node].min(self.best[self.arrival.node]) {
                     self.current[node] = arrival;
                     self.best[node] = arrival;
                     self.parents[node] = Some(LegRef {
@@ -785,16 +837,20 @@ mod tests {
     #[test]
     fn finds_direct_route_in_both_directions() {
         let network = t_shaped();
-        let forward = network.search(1, 4);
+        let forward = network.search(1, 4, None);
         assert_eq!(forward.len(), 1);
         assert_eq!(line_groups(&forward[0]), vec![100]);
+        assert_eq!(
+            forward[0].legs[0].station_cds,
+            vec![10000, 10001, 10002, 10003]
+        );
         assert_eq!(
             forward[0].legs[0].station_group_ids,
             vec![1, 2, 3, 4],
             "the leg lists every station from boarding to alighting"
         );
 
-        let backward = network.search(4, 1);
+        let backward = network.search(4, 1, None);
         assert_eq!(backward[0].legs[0].station_group_ids, vec![4, 3, 2, 1]);
         assert_eq!(forward[0].total_seconds, backward[0].total_seconds);
     }
@@ -802,7 +858,7 @@ mod tests {
     #[test]
     fn transfers_at_shared_station_group() {
         let network = t_shaped();
-        let journeys = network.search(1, 6);
+        let journeys = network.search(1, 6, None);
         assert_eq!(journeys.len(), 1);
         let journey = &journeys[0];
         assert_eq!(line_groups(journey), vec![100, 200]);
@@ -810,7 +866,7 @@ mod tests {
         assert_eq!(journey.legs[0].station_group_ids, vec![1, 2, 3]);
         assert_eq!(journey.legs[1].station_group_ids, vec![3, 5, 6]);
 
-        let direct = network.search(1, 3)[0].total_seconds;
+        let direct = network.search(1, 3, None)[0].total_seconds;
         assert!(
             journey.total_seconds >= direct + TRANSFER_WALK_SECONDS + boarding_wait_seconds(None),
             "a transfer adds the walk and the wait for the next train"
@@ -820,9 +876,9 @@ mod tests {
     #[test]
     fn unknown_or_identical_endpoints_return_nothing() {
         let network = t_shaped();
-        assert!(network.search(1, 1).is_empty());
-        assert!(network.search(1, 99).is_empty());
-        assert!(network.search(99, 1).is_empty());
+        assert!(network.search(1, 1, None).is_empty());
+        assert!(network.search(1, 99, None).is_empty());
+        assert!(network.search(99, 1, None).is_empty());
     }
 
     #[test]
@@ -833,8 +889,8 @@ mod tests {
         );
         express[1].pass = Some(1);
         let network = RouteNetwork::build([express], &EstimationParams::default());
-        assert!(network.search(1, 2).is_empty());
-        let through = network.search(1, 4);
+        assert!(network.search(1, 2, None).is_empty());
+        let through = network.search(1, 4, None);
         assert_eq!(
             through[0].legs[0].station_group_ids,
             vec![1, 2, 3, 4],
@@ -854,7 +910,7 @@ mod tests {
         let feeder = straight(300, &[(9, 27.0, 0.0), (10, 30.0, 0.0)]);
         let network = RouteNetwork::build([local, rapid, feeder], &EstimationParams::default());
 
-        let journeys = network.search(1, 10);
+        let journeys = network.search(1, 10, None);
         let shapes: Vec<Vec<u32>> = journeys.iter().map(line_groups).collect();
         assert!(shapes.contains(&vec![100]), "the direct local must be kept");
         let score = |journey: &Journey| {
@@ -879,9 +935,51 @@ mod tests {
             ],
             &EstimationParams::default(),
         );
-        let journeys = network.search(1, 4);
+        let journeys = network.search(1, 4, None);
         let shapes: Vec<Vec<u32>> = journeys.iter().map(line_groups).collect();
         assert_eq!(shapes, vec![vec![100, 200], vec![300, 400]]);
+    }
+
+    #[test]
+    fn via_line_restricts_the_line_arriving_at_the_destination() {
+        // collects_alternative_routes_through_other_stations と同じ網。
+        // テストの駅は line_cd = line_group_cd。
+        let network = RouteNetwork::build(
+            [
+                straight(100, &[(1, 0.0, 0.0), (2, 1.0, 1.0)]),
+                straight(200, &[(2, 1.0, 1.0), (4, 2.0, 0.0)]),
+                straight(300, &[(1, 0.0, 0.0), (3, 1.0, -1.2)]),
+                straight(400, &[(3, 1.0, -1.2), (4, 2.0, 0.0)]),
+            ],
+            &EstimationParams::default(),
+        );
+        let shapes =
+            |via| -> Vec<Vec<u32>> { network.search(1, 4, via).iter().map(line_groups).collect() };
+        assert_eq!(shapes(Some(200)), vec![vec![100, 200]]);
+        assert_eq!(shapes(Some(400)), vec![vec![300, 400]]);
+        assert!(shapes(Some(100)).is_empty(), "line 100 never reaches 4");
+    }
+
+    #[test]
+    fn rejects_routes_that_backtrack_through_a_visited_station() {
+        // 1 -> 2 -> 3 の各停 (100) と、2 から 4 へ行く支線 (200)。支線は 1 に
+        // 止まらないので、1 から 4 へは 2 で乗り換える。代替経路のために 100 の
+        // 1 -> 2 を禁止しても、「別の系統 (300) で 0 へ戻ってから 100 に乗り直す」
+        // ような 1 を再訪する経路は出さない。
+        let network = RouteNetwork::build(
+            [
+                straight(
+                    100,
+                    &[(0, -1.0, 0.0), (1, 0.0, 0.0), (2, 1.0, 0.0), (3, 2.0, 0.0)],
+                ),
+                straight(200, &[(2, 1.0, 0.0), (4, 1.0, 1.0)]),
+                straight(300, &[(1, 0.0, 0.0), (0, -1.0, 0.0)]),
+            ],
+            &EstimationParams::default(),
+        );
+        let journeys = network.search(1, 4, None);
+        assert_eq!(journeys.len(), 1);
+        assert_eq!(line_groups(&journeys[0]), vec![100, 200]);
     }
 
     #[test]
@@ -892,7 +990,7 @@ mod tests {
             [straight(100, &groups), straight(200, &groups)],
             &EstimationParams::default(),
         );
-        assert_eq!(network.search(1, 3).len(), 1);
+        assert_eq!(network.search(1, 3, None).len(), 1);
     }
 
     #[test]
@@ -905,14 +1003,14 @@ mod tests {
             })
             .collect();
         let network = RouteNetwork::build([straight(100, &ring)], &EstimationParams::default());
-        let journeys = network.search(11, 2);
+        let journeys = network.search(11, 2, None);
         assert_eq!(journeys.len(), 1);
         assert_eq!(
             journeys[0].legs[0].station_group_ids,
             vec![11, 12, 1, 2],
             "the short arc wraps across the stored seam"
         );
-        let backward = network.search(2, 11);
+        let backward = network.search(2, 11, None);
         assert_eq!(backward[0].legs[0].station_group_ids, vec![2, 1, 12, 11]);
     }
 
@@ -927,6 +1025,6 @@ mod tests {
             ],
             &EstimationParams::default(),
         );
-        assert_eq!(network.search(1, 4), network.search(1, 4));
+        assert_eq!(network.search(1, 4, None), network.search(1, 4, None));
     }
 }

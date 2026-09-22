@@ -301,11 +301,6 @@ define_train_type!(TrainTypeNested, "TrainTypeNested");
 pub struct Route {
     pub id: Option<UInt32>,
     pub stops: Option<Vec<StationNested>>,
-    // 推定所要時間(分)。乗換時間の見込みを含む。`connectedRoutes` のみ。
-    // doc コメントにすると SDL の description になるため通常のコメントにする
-    pub estimated_minutes: Option<f64>,
-    // 乗換回数。`connectedRoutes` のみ。
-    pub transfer_count: Option<i32>,
 }
 
 impl From<model::Route> for Route {
@@ -313,8 +308,45 @@ impl From<model::Route> for Route {
         Self {
             id: Some(UInt32(v.id)),
             stops: Some(v.stops.into_iter().map(Into::into).collect()),
-            estimated_minutes: v.estimated_minutes,
-            transfer_count: v.transfer_count.map(|count| count as i32),
+        }
+    }
+}
+
+// 乗換経路探索 (connectedRoutes) の経路。各区間の trainType は routeTypes と
+// 同じ形で、groupId は実在の系統を指す。クライアントは区間ごとに
+// lineGroupStations で系統全体の駅を取れる。
+#[derive(SimpleObject)]
+#[graphql(name = "ConnectedRoute")]
+pub struct ConnectedRoute {
+    pub estimated_minutes: Option<f64>,
+    pub transfer_count: Option<i32>,
+    pub legs: Option<Vec<RouteLeg>>,
+}
+
+impl From<model::ConnectedRoute> for ConnectedRoute {
+    fn from(v: model::ConnectedRoute) -> Self {
+        Self {
+            estimated_minutes: Some(v.estimated_minutes),
+            transfer_count: Some(v.transfer_count as i32),
+            legs: Some(v.legs.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(name = "RouteLeg")]
+pub struct RouteLeg {
+    pub train_type: Option<TrainType>,
+    pub from_station: Option<Station>,
+    pub to_station: Option<Station>,
+}
+
+impl From<model::RouteLeg> for RouteLeg {
+    fn from(v: model::RouteLeg) -> Self {
+        Self {
+            train_type: Some(v.train_type.into()),
+            from_station: Some(v.from_station.into()),
+            to_station: Some(v.to_station.into()),
         }
     }
 }

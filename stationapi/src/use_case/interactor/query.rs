@@ -41,10 +41,9 @@ use crate::{
             company_repository::CompanyRepository, line_repository::LineRepository,
             station_repository::StationRepository, train_type_repository::TrainTypeRepository,
         },
-        route_search::Journey,
         segment_speed_table::{segment_override_applies_to_kind, segment_speed_override_kmh},
     },
-    model::{self, Route},
+    model::{self, ConnectedRoute, Route},
     use_case::{
         dto::simulation::resolve_speed_profile, error::UseCaseError, traits::query::QueryUseCase,
     },
@@ -759,8 +758,6 @@ where
             routes.push(Route {
                 id: *id as u32,
                 stops,
-                estimated_minutes: None,
-                transfer_count: None,
             });
         }
         Ok(routes)
@@ -866,55 +863,7 @@ where
                 }
             }
 
-            let mut seen_line_cds = HashSet::new();
-            train_type.lines = tt_lines
-                .iter()
-                .filter(|line| {
-                    line.line_group_cd == train_type.line_group_cd
-                        && seen_line_cds.insert(line.line_cd)
-                })
-                .map(|line| Line {
-                    line_cd: line.line_cd,
-                    company_cd: line.company_cd,
-                    company: None,
-                    line_name: line.line_name.clone(),
-                    line_name_k: line.line_name_k.clone(),
-                    line_name_h: line.line_name_h.clone(),
-                    line_name_r: line.line_name_r.clone(),
-                    line_name_zh: line.line_name_zh.clone(),
-                    line_name_ko: line.line_name_ko.clone(),
-                    line_color_c: line.line_color_c.clone(),
-                    line_type: line.line_type,
-                    line_symbols: line.line_symbols.clone(),
-                    line_symbol1: line.line_symbol1.clone(),
-                    line_symbol2: line.line_symbol2.clone(),
-                    line_symbol3: line.line_symbol3.clone(),
-                    line_symbol4: line.line_symbol4.clone(),
-                    line_symbol1_color: line.line_symbol1_color.clone(),
-                    line_symbol2_color: line.line_symbol2_color.clone(),
-                    line_symbol3_color: line.line_symbol3_color.clone(),
-                    line_symbol4_color: line.line_symbol4_color.clone(),
-                    line_symbol1_shape: line.line_symbol1_shape.clone(),
-                    line_symbol2_shape: line.line_symbol2_shape.clone(),
-                    line_symbol3_shape: line.line_symbol3_shape.clone(),
-                    line_symbol4_shape: line.line_symbol4_shape.clone(),
-                    e_status: line.e_status,
-                    e_sort: line.e_sort,
-                    average_distance: line.average_distance,
-                    station: None,
-                    train_type: line
-                        .type_cd
-                        .and_then(|cd| train_type_by_type_cd.get(&cd).cloned()),
-                    line_group_cd: line.line_group_cd,
-                    station_cd: line.station_cd,
-                    station_g_cd: line.station_g_cd,
-                    type_cd: line.type_cd,
-                    transport_type: line.transport_type,
-                })
-                .collect::<Vec<Line>>();
-
-            // Set the line field to the first line in the lines vector
-            train_type.line = train_type.lines.first().cloned().map(Box::new);
+            self.attach_train_type_lines(&mut train_type, &tt_lines, &train_type_by_type_cd);
 
             result.push(train_type);
         }
@@ -1063,98 +1012,100 @@ where
         &self,
         from_station_group_id: u32,
         to_station_group_id: u32,
-    ) -> Result<Vec<Route>, UseCaseError> {
+        via_line_id: Option<u32>,
+    ) -> Result<Vec<ConnectedRoute>, UseCaseError> {
         if from_station_group_id == to_station_group_id {
             return Ok(vec![]);
         }
 
         let network = self.station_repository.get_route_network().await?;
-        let journeys = network.search(from_station_group_id, to_station_group_id);
+        let journeys = network.search(
+            from_station_group_id,
+            to_station_group_id,
+            via_line_id.map(|id| id as i32),
+        );
         if journeys.is_empty() {
             return Ok(vec![]);
         }
 
-        // 探索は sst.id だけを扱うので、駅の詳細は経路が確定してから、
-        // 使った系統の分だけまとめて取得する
-        let detailed_line_group_ids: Vec<u32> = journeys
+        // 探索は ID だけを扱うので、列車種別と乗降駅は経路が確定してから
+        // まとめて取得する
+        let line_group_ids: Vec<u32> = journeys
             .iter()
             .flat_map(|journey| journey.legs.iter().map(|leg| leg.line_group_id))
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
-        let detailed_stops = self
-            .station_repository
-            .get_by_line_group_id_vec(&detailed_line_group_ids)
-            .await?;
-        let mut detailed_stops_by_id: HashMap<(u32, i32), Station> = HashMap::new();
-        for stop in detailed_stops {
-            if let (Some(line_group_id), Some(station_station_type_id)) =
-                (stop.line_group_cd.map(|id| id as u32), stop.sst_id)
-            {
-                detailed_stops_by_id.insert((line_group_id, station_station_type_id), stop);
-            }
-        }
+        let station_ids: Vec<u32> = journeys
+            .iter()
+            .flat_map(|journey| journey.legs.iter())
+            .flat_map(|leg| [leg.station_cds.first(), leg.station_cds.last()])
+            .flatten()
+            .map(|&station_cd| station_cd as u32)
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
 
-        let mut used_virtual_ids = HashSet::new();
-        let mut routes = Vec::with_capacity(journeys.len());
-        for journey in journeys {
-            let signature = connected_route_signature(&journey);
-            let virtual_line_group_id =
-                connected_route_virtual_id(&signature, &mut used_virtual_ids);
-            // 乗換駅は直前の区間の降車駅として 1 度だけ並べる。2 区間目以降は
-            // 先頭 (乗車駅) を飛ばす
-            let Some(detailed_stops): Option<Vec<Station>> = journey
-                .legs
-                .iter()
-                .enumerate()
-                .flat_map(|(leg_index, leg)| {
-                    leg.sst_ids
-                        .iter()
-                        .skip(usize::from(leg_index > 0))
-                        .map(move |&sst_id| (leg.line_group_id, sst_id))
-                })
-                .map(|key| detailed_stops_by_id.get(&key).cloned())
-                .collect()
-            else {
+        // routeTypes と同じ形の列車種別 (系統ごとに最初の 1 行 + 系統の路線)
+        let train_types = self
+            .train_type_repository
+            .get_by_line_group_id_vec(&line_group_ids)
+            .await?;
+        let mut tt_lines = self
+            .line_repository
+            .get_by_line_group_id_vec(&line_group_ids)
+            .await?;
+        for line in tt_lines.iter_mut() {
+            line.line_symbols = self.get_line_symbols(line);
+        }
+        let train_type_by_type_cd: HashMap<i32, TrainType> = train_types
+            .iter()
+            .filter_map(|tt| tt.type_cd.map(|cd| (cd, tt.clone())))
+            .collect();
+        let mut train_type_by_line_group: HashMap<u32, TrainType> = HashMap::new();
+        for mut train_type in train_types {
+            let Some(line_group_id) = train_type.line_group_cd.map(|id| id as u32) else {
                 continue;
             };
-            let stops = detailed_stops
-                .into_iter()
-                .map(|row| {
-                    let extracted_line = self.extract_line_from_station(&row);
-                    let train_type = TrainType {
-                        id: row.type_id,
-                        station_cd: Some(row.station_cd),
-                        type_cd: row.type_cd,
-                        line_group_cd: Some(virtual_line_group_id as i32),
-                        pass: row.pass,
-                        type_name: row.type_name.clone().unwrap_or_default(),
-                        type_name_k: row.type_name_k.clone().unwrap_or_default(),
-                        type_name_r: row.type_name_r.clone(),
-                        type_name_zh: row.type_name_zh.clone(),
-                        type_name_ko: row.type_name_ko.clone(),
-                        color: row.color.clone().unwrap_or_default(),
-                        direction: row.direction,
-                        kind: row.kind,
-                        line: Some(Box::new(extracted_line.clone())),
-                        lines: vec![extracted_line.clone()],
-                    };
-                    let mut stop = self.build_station_from_row(
-                        &row,
-                        &extracted_line,
-                        Some(Box::new(train_type)),
-                    );
-                    stop.line_group_cd = Some(virtual_line_group_id as i32);
-                    model::Station::from(stop)
-                })
-                .collect();
-            routes.push(Route {
-                id: virtual_line_group_id,
-                stops,
-                estimated_minutes: Some(f64::from(journey.total_seconds) / 60.0),
-                transfer_count: Some(journey.transfer_count() as u32),
-            });
+            if train_type_by_line_group.contains_key(&line_group_id) {
+                continue;
+            }
+            self.attach_train_type_lines(&mut train_type, &tt_lines, &train_type_by_type_cd);
+            train_type_by_line_group.insert(line_group_id, train_type);
         }
+
+        // 乗降駅は stations クエリと同じ付帯情報を付ける
+        let stations: HashMap<i32, model::Station> = self
+            .get_stations_by_id_vec(&station_ids, TransportTypeFilter::Rail)
+            .await?
+            .into_iter()
+            .map(|station| (station.station_cd, model::Station::from(station)))
+            .collect();
+
+        let routes = journeys
+            .into_iter()
+            .filter_map(|journey| {
+                let legs = journey
+                    .legs
+                    .iter()
+                    .map(|leg| {
+                        Some(model::RouteLeg {
+                            train_type: model::TrainType::from(
+                                train_type_by_line_group.get(&leg.line_group_id)?.clone(),
+                            ),
+                            from_station: stations.get(leg.station_cds.first()?)?.clone(),
+                            to_station: stations.get(leg.station_cds.last()?)?.clone(),
+                        })
+                    })
+                    // 種別か駅を引けない区間があれば、その経路は返さない
+                    .collect::<Option<Vec<_>>>()?;
+                Some(ConnectedRoute {
+                    estimated_minutes: f64::from(journey.total_seconds) / 60.0,
+                    transfer_count: journey.transfer_count() as u32,
+                    legs,
+                })
+            })
+            .collect();
         Ok(routes)
     }
 
@@ -1649,6 +1600,65 @@ where
             )
     }
 
+    /// `routeTypes` と同じ形に、系統が走る路線 (`lines`) と先頭の路線 (`line`) を
+    /// 列車種別へ付ける。`tt_lines` は `get_by_line_group_id_vec` で取った路線に
+    /// 路線記号を付けたもの。
+    fn attach_train_type_lines(
+        &self,
+        train_type: &mut TrainType,
+        tt_lines: &[Line],
+        train_type_by_type_cd: &HashMap<i32, TrainType>,
+    ) {
+        let mut seen_line_cds = HashSet::new();
+        train_type.lines = tt_lines
+            .iter()
+            .filter(|line| {
+                line.line_group_cd == train_type.line_group_cd && seen_line_cds.insert(line.line_cd)
+            })
+            .map(|line| Line {
+                line_cd: line.line_cd,
+                company_cd: line.company_cd,
+                company: None,
+                line_name: line.line_name.clone(),
+                line_name_k: line.line_name_k.clone(),
+                line_name_h: line.line_name_h.clone(),
+                line_name_r: line.line_name_r.clone(),
+                line_name_zh: line.line_name_zh.clone(),
+                line_name_ko: line.line_name_ko.clone(),
+                line_color_c: line.line_color_c.clone(),
+                line_type: line.line_type,
+                line_symbols: line.line_symbols.clone(),
+                line_symbol1: line.line_symbol1.clone(),
+                line_symbol2: line.line_symbol2.clone(),
+                line_symbol3: line.line_symbol3.clone(),
+                line_symbol4: line.line_symbol4.clone(),
+                line_symbol1_color: line.line_symbol1_color.clone(),
+                line_symbol2_color: line.line_symbol2_color.clone(),
+                line_symbol3_color: line.line_symbol3_color.clone(),
+                line_symbol4_color: line.line_symbol4_color.clone(),
+                line_symbol1_shape: line.line_symbol1_shape.clone(),
+                line_symbol2_shape: line.line_symbol2_shape.clone(),
+                line_symbol3_shape: line.line_symbol3_shape.clone(),
+                line_symbol4_shape: line.line_symbol4_shape.clone(),
+                e_status: line.e_status,
+                e_sort: line.e_sort,
+                average_distance: line.average_distance,
+                station: None,
+                train_type: line
+                    .type_cd
+                    .and_then(|cd| train_type_by_type_cd.get(&cd).cloned()),
+                line_group_cd: line.line_group_cd,
+                station_cd: line.station_cd,
+                station_g_cd: line.station_g_cd,
+                type_cd: line.type_cd,
+                transport_type: line.transport_type,
+            })
+            .collect::<Vec<Line>>();
+
+        // Set the line field to the first line in the lines vector
+        train_type.line = train_type.lines.first().cloned().map(Box::new);
+    }
+
     fn build_station_from_row(
         &self,
         row: &Station,
@@ -1723,45 +1733,6 @@ where
             transport_type: row.transport_type,
         }
     }
-}
-
-/// 経路の仮想 ID の元になる署名。乗った系統の並びと、各区間の駅グループの並びで決まる。
-fn connected_route_signature(journey: &Journey) -> Vec<u8> {
-    let stop_count: usize = journey
-        .legs
-        .iter()
-        .map(|leg| leg.station_group_ids.len())
-        .sum();
-    let mut signature =
-        Vec::with_capacity((journey.legs.len() * 2 + stop_count + 1) * std::mem::size_of::<u32>());
-    signature.extend_from_slice(&(journey.legs.len() as u32).to_le_bytes());
-    for leg in &journey.legs {
-        signature.extend_from_slice(&leg.line_group_id.to_le_bytes());
-        signature.extend_from_slice(&(leg.station_group_ids.len() as u32).to_le_bytes());
-        for station_group_id in &leg.station_group_ids {
-            signature.extend_from_slice(&station_group_id.to_le_bytes());
-        }
-    }
-    signature
-}
-
-fn connected_route_virtual_id(signature: &[u8], used_ids: &mut HashSet<u32>) -> u32 {
-    const FNV_OFFSET_BASIS: u32 = 2_166_136_261;
-    const FNV_PRIME: u32 = 16_777_619;
-
-    let mut hash = FNV_OFFSET_BASIS;
-    for byte in signature {
-        hash ^= u32::from(*byte);
-        hash = hash.wrapping_mul(FNV_PRIME);
-    }
-
-    // Persisted line_group_cd is a signed 32-bit integer. Reserving the
-    // upper half of u32 therefore guarantees that virtual IDs cannot overlap it.
-    let mut candidate = hash | 0x8000_0000;
-    while !used_ids.insert(candidate) {
-        candidate = candidate.wrapping_add(1) | 0x8000_0000;
-    }
-    candidate
 }
 
 /// Build a signature describing the stations a train type actually stops at within the
@@ -3440,8 +3411,15 @@ mod tests {
             async fn find_by_id(&self, _: u32) -> Result<Option<Station>, DomainError> {
                 Ok(None)
             }
-            async fn get_by_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
-                Ok(vec![])
+            async fn get_by_id_vec(&self, ids: &[u32]) -> Result<Vec<Station>, DomainError> {
+                // 系統の駅から、要求された駅を 1 件ずつ返す
+                let mut seen = HashSet::new();
+                Ok(self
+                    .stations_by_line_group
+                    .iter()
+                    .filter(|s| ids.contains(&(s.station_cd as u32)) && seen.insert(s.station_cd))
+                    .cloned()
+                    .collect())
             }
             async fn get_by_line_id(
                 &self,
@@ -4705,39 +4683,73 @@ mod tests {
             stops[1].lon = 139.7 + 1.5 * 0.011;
             stops[8].lon = 139.7 + 2.5 * 0.011;
             stops[8].lat += 0.5;
+            // 系統ごとに先頭の駅を指す列車種別を 1 つずつ
+            let train_types = [(100, 101), (200, 202), (300, 303), (500, 501)]
+                .into_iter()
+                .map(|(line_group_id, station_cd)| {
+                    TrainType::new(
+                        Some(line_group_id),
+                        Some(station_cd),
+                        Some(line_group_id),
+                        Some(line_group_id),
+                        Some(0),
+                        format!("種別{line_group_id}"),
+                        format!("シュベツ{line_group_id}"),
+                        None,
+                        None,
+                        None,
+                        "#000000".to_string(),
+                        Some(0),
+                        Some(0),
+                    )
+                })
+                .collect();
 
             QueryInteractor {
                 station_repository: ConfigurableMockStationRepository::new(vec![], vec![])
                     .with_line_group_stations(stops),
                 line_repository: ConfigurableMockLineRepository::new(vec![]),
-                train_type_repository: ConfigurableMockTrainTypeRepository::new(vec![]),
+                train_type_repository: ConfigurableMockTrainTypeRepository::new(train_types),
                 company_repository: ConfigurableMockCompanyRepository::new(vec![]),
             }
         }
 
-        fn stop_groups(route: &Route) -> Vec<u32> {
-            route.stops.iter().map(|stop| stop.group_id).collect()
+        /// 区間ごとの (系統, 乗車駅, 降車駅)
+        fn leg_shapes(route: &ConnectedRoute) -> Vec<(u32, u32, u32)> {
+            route
+                .legs
+                .iter()
+                .map(|leg| {
+                    (
+                        leg.train_type.group_id,
+                        leg.from_station.id,
+                        leg.to_station.id,
+                    )
+                })
+                .collect()
         }
 
         #[tokio::test]
-        async fn test_get_connected_routes_returns_direct_and_transfer_routes() {
+        async fn test_get_connected_routes_returns_legs_with_real_train_types() {
             let interactor = create_connected_route_interactor();
 
-            let routes = interactor.get_connected_routes(1, 4).await.unwrap();
+            let routes = interactor.get_connected_routes(1, 4, None).await.unwrap();
 
             assert_eq!(
-                routes.iter().map(stop_groups).collect::<Vec<_>>(),
-                vec![vec![1, 5, 2, 3, 4], vec![1, 6, 4]],
+                routes.iter().map(leg_shapes).collect::<Vec<_>>(),
+                vec![
+                    vec![(100, 101, 102), (200, 202, 203), (300, 303, 304)],
+                    vec![(500, 501, 504)],
+                ],
                 "the faster transfer route comes first and the direct detour is kept \
-                 as the route with the fewest transfers"
+                 as the route with the fewest transfers; every leg carries the real \
+                 line group and the stations of that line group"
             );
-            assert_eq!(routes[0].transfer_count, Some(2));
-            assert_eq!(routes[1].transfer_count, Some(0));
-            let transfer_minutes = routes[0].estimated_minutes.unwrap();
-            let direct_minutes = routes[1].estimated_minutes.unwrap();
-            assert!(transfer_minutes < direct_minutes);
+            assert_eq!(routes[0].transfer_count, 2);
+            assert_eq!(routes[1].transfer_count, 0);
+            assert!(routes[0].estimated_minutes < routes[1].estimated_minutes);
             assert!(
-                transfer_minutes
+                routes[0].estimated_minutes
                     > 2.0
                         * f64::from(
                             route_search::TRANSFER_WALK_SECONDS
@@ -4746,53 +4758,65 @@ mod tests {
                         / 60.0,
                 "each transfer adds the walk and the wait for the next train"
             );
+            let first_leg = &routes[0].legs[0];
+            assert_eq!(first_leg.train_type.name, "種別100");
+            assert_eq!(first_leg.from_station.group_id, 1);
+            assert_eq!(first_leg.to_station.group_id, 2);
+        }
 
-            let connected = &routes[0];
-            assert_eq!(connected.stops[1].stop_condition, StopCondition::Not as i32);
-            assert!(connected.id >= 0x8000_0000);
-            assert!(connected.stops.iter().all(|stop| {
-                stop.train_type
-                    .as_ref()
-                    .is_some_and(|train_type| train_type.group_id == connected.id)
-            }));
-            // 乗換駅 (2, 3) は直前の区間の降車駅として並び、乗った種別が変わる
-            let type_ids: Vec<u32> = connected
-                .stops
-                .iter()
-                .map(|stop| stop.train_type.as_ref().unwrap().type_id)
-                .collect();
-            assert_eq!(type_ids, vec![100, 100, 100, 200, 300]);
+        #[tokio::test]
+        async fn test_get_connected_routes_filters_by_arriving_line() {
+            let interactor = create_connected_route_interactor();
+
+            // テストの駅は line_cd = line_group_cd
+            let via_direct = interactor
+                .get_connected_routes(1, 4, Some(500))
+                .await
+                .unwrap();
+            assert_eq!(
+                via_direct.iter().map(leg_shapes).collect::<Vec<_>>(),
+                vec![vec![(500, 501, 504)]]
+            );
+            let via_transfer = interactor
+                .get_connected_routes(1, 4, Some(300))
+                .await
+                .unwrap();
+            assert_eq!(via_transfer.len(), 1);
+            assert_eq!(
+                via_transfer[0].legs.last().unwrap().train_type.group_id,
+                300
+            );
+            assert!(interactor
+                .get_connected_routes(1, 4, Some(100))
+                .await
+                .unwrap()
+                .is_empty());
         }
 
         #[tokio::test]
         async fn test_get_connected_routes_is_deterministic_and_handles_no_route() {
             let interactor = create_connected_route_interactor();
 
-            let first = interactor.get_connected_routes(1, 4).await.unwrap();
-            let second = interactor.get_connected_routes(1, 4).await.unwrap();
+            let first = interactor.get_connected_routes(1, 4, None).await.unwrap();
+            let second = interactor.get_connected_routes(1, 4, None).await.unwrap();
             assert_eq!(first, second);
-            assert_eq!(
-                first.len(),
-                first
-                    .iter()
-                    .map(|route| route.id)
-                    .collect::<HashSet<_>>()
-                    .len()
-            );
 
-            let backward = interactor.get_connected_routes(4, 1).await.unwrap();
+            let backward = interactor.get_connected_routes(4, 1, None).await.unwrap();
             assert_eq!(
-                backward.iter().map(stop_groups).collect::<Vec<_>>(),
-                vec![vec![4, 3, 2, 5, 1], vec![4, 6, 1]]
+                backward.iter().map(leg_shapes).collect::<Vec<_>>(),
+                vec![
+                    vec![(300, 304, 303), (200, 203, 202), (100, 102, 101)],
+                    vec![(500, 504, 501)],
+                ]
             );
 
             assert!(interactor
-                .get_connected_routes(1, 99)
+                .get_connected_routes(1, 99, None)
                 .await
                 .unwrap()
                 .is_empty());
             assert!(interactor
-                .get_connected_routes(1, 1)
+                .get_connected_routes(1, 1, None)
                 .await
                 .unwrap()
                 .is_empty());

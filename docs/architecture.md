@@ -211,6 +211,26 @@ PostgreSQL のクエリは以下のように置き換えています。
 対し、こちらは系統をまたいで乗り継ぐ経路を返します。実装は
 `stationapi/src/domain/route_search.rs` (純粋ロジック) にあります。
 
+### 返す形
+
+アプリは 1 本の列車 (系統) ごとに「種別を選ぶ → `lineGroupStations` で系統
+全体の駅を取る → LCD を動かす」流れで動きます。乗換経路もこの流れに乗せられる
+よう、経路は区間 (`legs`) の並びで返し、各区間は `routeTypes` と同じ形の
+`TrainType` (実在の `groupId`) と乗車駅・降車駅 (`Station`) を持ちます。
+乗降駅にはその系統が走る路線の駅を返すので、乗換駅では前の区間の降車駅と
+次の区間の乗車駅が別の駅 (同じ駅グループ) になることがあります
+(例: 丸ノ内線の赤坂見附 → 半蔵門線の永田町)。
+
+```graphql
+connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int): [ConnectedRoute!]!
+
+type ConnectedRoute { estimatedMinutes: Float  transferCount: Int  legs: [RouteLeg!] }
+type RouteLeg { trainType: TrainType  fromStation: Station  toStation: Station }
+```
+
+`viaLineId` は `routeTypes` と同じく検索結果でタップした駅の路線で、目的地に
+その路線の駅で着く経路 (最後の区間がその路線を走る経路) だけに絞ります。
+
 ### 系統網
 
 系統 (`line_group_cd`) ごとの停車駅列を 1 本のパターンとし、駅グループ
@@ -240,7 +260,7 @@ PostgreSQL のクエリは以下のように置き換えています。
 
 待ち時間を入れないと、本数の少ない特急が「直通で速い」ことになり、
 東京→渋谷で山手線より成田エクスプレスを勧めてしまいます。返す推定所要時間
-(`Route.estimatedMinutes`) は評価値から最初の列車の待ち時間を除いたもので、
+(`ConnectedRoute.estimatedMinutes`) は評価値から最初の列車の待ち時間を除いたもので、
 乗換先の待ち時間は含みます。
 
 ### 代替経路と並び順
@@ -256,9 +276,10 @@ PostgreSQL のクエリは以下のように置き換えています。
 上回るものを捨てます。乗車回数を増やしても順位の値が良くならないパレート解
 (1 分縮めるために乗り換え続ける経路) も捨てます。
 
-乗換駅は直前の区間の降車駅として 1 度だけ並べ、各駅の列車種別で乗った系統を
-表します。経路 ID は乗った系統と駅の並びから決まる仮想 ID (`uint32` の上半分)
-です。
+別々の区間で同じ駅グループを通る経路も捨てます。区間を禁止して再探索すると、
+「1 駅戻って同じ列車に乗り直す」逆戻りが代替経路として出てくるためです
+(例: 大宮 → 土呂 → 大宮を通過して東京)。1 つの区間の中で同じ駅を通るのは
+実在する運行 (大江戸線の都庁前など) なので構いません。
 
 ### 計算量
 

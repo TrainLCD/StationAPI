@@ -306,11 +306,27 @@ pub struct Station {
 pub struct Route {
     pub id: u32,
     pub stops: Vec<Station>,
-    /// 乗換経路探索 (`connectedRoutes`) の推定所要時間(分)。乗換時間の見込みを含む。
-    /// それ以外の経路では `None`。
-    pub estimated_minutes: Option<f64>,
-    /// 乗換経路探索 (`connectedRoutes`) の乗換回数。それ以外の経路では `None`。
-    pub transfer_count: Option<u32>,
+}
+
+/// 乗換経路探索 (`connectedRoutes`) の経路 1 本。
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ConnectedRoute {
+    /// 推定所要時間(分)。最初の列車の発車から到着まで。乗換の徒歩と乗換先の
+    /// 待ち時間の見込みを含む。
+    pub estimated_minutes: f64,
+    pub transfer_count: u32,
+    pub legs: Vec<RouteLeg>,
+}
+
+/// 乗換経路の 1 区間 (1 本の列車)。
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RouteLeg {
+    /// 乗る列車種別。`routeTypes` と同じ形で、`group_id` は実在の系統。
+    pub train_type: TrainType,
+    /// 乗車駅。この系統が走る路線の駅。
+    pub from_station: Station,
+    /// 降車駅。次の区間の乗車駅 (同じ駅グループの別路線の駅のことがある) か目的地。
+    pub to_station: Station,
 }
 
 /// 走行シミュレーション用の 1 区間。

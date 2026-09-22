@@ -1159,11 +1159,11 @@ mod tests {
         assert!(network.pattern_count() > 0);
 
         // 山手線で乗り換えずに行ける
-        let journeys = network.search(TOKYO, SHIBUYA);
+        let journeys = network.search(TOKYO, SHIBUYA, None);
         assert!(journeys.iter().any(|journey| journey.transfer_count() == 0));
 
         // 直通の系統が無く、乗換が要る (旧実装は探索の上限に先に達して 0 件だった)
-        let journeys = network.search(MITAKA, NAKA_MEGURO);
+        let journeys = network.search(MITAKA, NAKA_MEGURO, None);
         assert!(!journeys.is_empty());
         assert!(journeys.iter().all(|journey| journey.transfer_count() > 0));
         for journey in &journeys {
