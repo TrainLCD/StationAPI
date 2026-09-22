@@ -8,7 +8,7 @@
 //! use_case の DTO が計算しているので、domain エンティティから直接ではなく
 //! モデルを経由することでそのロジックをそのまま使える。
 
-use async_graphql::SimpleObject;
+use async_graphql::{InputObject, SimpleObject};
 use stationapi::model;
 
 use super::enums::*;
@@ -331,6 +331,16 @@ impl From<model::ConnectedRoute> for ConnectedRoute {
             legs: Some(v.legs.into_iter().map(Into::into).collect()),
         }
     }
+}
+
+// estimateArrivalTimes / trainRoute に乗換経路を渡すときの 1 区間。
+// connectedRoutes の区間の trainType.groupId・fromStation.id・toStation.id を渡す
+#[derive(InputObject)]
+#[graphql(name = "RouteLegInput")]
+pub struct RouteLegInput {
+    pub line_group_id: i32,
+    pub from_station_id: i32,
+    pub to_station_id: i32,
 }
 
 #[derive(SimpleObject)]

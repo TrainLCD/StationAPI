@@ -41,6 +41,7 @@ use crate::{
             company_repository::CompanyRepository, line_repository::LineRepository,
             station_repository::StationRepository, train_type_repository::TrainTypeRepository,
         },
+        route_search,
         segment_speed_table::{segment_override_applies_to_kind, segment_speed_override_kmh},
     },
     model::{self, ConnectedRoute, Route},
@@ -912,77 +913,94 @@ where
             v.reverse();
             v
         };
-        let sliced = self
-            .update_station_vec_with_attributes(
-                sliced,
-                Some(line_group_id),
-                TransportTypeFilter::RailAndBus,
+        self.train_route_segments(sliced, line_group_id).await
+    }
+
+    async fn estimate_connected_route_arrival_times(
+        &self,
+        legs: &[model::RouteLegRequest],
+    ) -> Result<Vec<EstimatedStop>, UseCaseError> {
+        self.validate_route_legs(legs).await?;
+        let params = EstimationParams::default();
+        let walk_minutes = f64::from(route_search::TRANSFER_WALK_SECONDS) / 60.0;
+
+        let mut result: Vec<EstimatedStop> = Vec::new();
+        for (index, leg) in legs.iter().enumerate() {
+            let stops = self
+                .station_repository
+                .get_route_stops_by_station_cd(leg.from_station_id, leg.to_station_id, &[], None)
+                .await?;
+            // 区間は指定された系統だけで推定する (両駅に止まる別の系統は使わない)
+            let group_stops: Vec<&Station> = stops
+                .iter()
+                .filter(|s| s.line_group_cd == Some(leg.line_group_id as i32))
+                .collect();
+            let segment = estimate_group_segment(
+                &group_stops,
+                leg.from_station_id,
+                leg.to_station_id,
                 false,
+                &params,
             )
-            .await?;
+            .ok_or_else(|| UseCaseError::NotFound {
+                entity_type: "station in route",
+                entity_id: format!(
+                    "{}-{} on line group {}",
+                    leg.from_station_id, leg.to_station_id, leg.line_group_id
+                ),
+            })?;
 
-        let mut segments: Vec<model::TrainRouteSegment> = Vec::with_capacity(sliced.len());
-        // 経路スライス内で路線ごとに通過駅があるか。通過駅が無い路線では優等種別でも
-        // 実質各駅停車として走る(東急田園都市線の急行が半蔵門線内で各駅停車になる
-        // 直通など)ため、種別の速度を適用せず各停(Default)として扱う。
-        // arrival_estimation と同様に端点は常に停車扱いとし、中間の通過駅だけを
-        // 優等扱いの根拠にする。
-        let sliced_len = sliced.len();
-        let mut line_has_pass: std::collections::HashMap<i32, bool> =
-            std::collections::HashMap::new();
-        for (i, station) in sliced.iter().enumerate() {
-            let is_endpoint = i == 0 || i + 1 == sliced_len;
-            let passed = !is_endpoint
-                && (station.stop_condition == model::StopCondition::Not || station.pass == Some(1));
-            let entry = line_has_pass.entry(station.line_cd).or_insert(false);
-            *entry = *entry || passed;
-        }
-        let mut prev_stop: Option<(f64, f64, i32)> = None;
-        for station in sliced {
-            let stops = station.stop_condition != model::StopCondition::Not;
-
-            let distance_from_previous = match prev_stop {
-                Some((plat, plon, _)) => haversine_distance(plat, plon, station.lat, station.lon),
-                None => 0.0,
-            };
-
-            let is_bus = station.transport_type == TransportType::Bus;
-            let kind = station.train_type.as_ref().and_then(|tt| tt.kind);
-            let effective_kind = if line_has_pass
-                .get(&station.line_cd)
-                .copied()
-                .unwrap_or(false)
-            {
-                kind
-            } else {
-                None
-            };
-            let mut profile =
-                resolve_speed_profile(station.line_cd, station.line_type, is_bus, effective_kind);
-            // 隣接駅ペア単位の較正(GTFS 実ダイヤ由来)があれば、このセグメントの
-            // 最高速度を路線単位のプロファイルより優先して上書きする(各停系のみ)。
-            if !is_bus && segment_override_applies_to_kind(effective_kind) {
-                if let Some((_, _, prev_cd)) = prev_stop {
-                    if let Some(v_kmh) =
-                        segment_speed_override_kmh(station.line_cd, prev_cd, station.station_cd)
-                    {
-                        profile.max_speed = v_kmh / 3.6;
-                    }
+            // 乗換では、乗換駅に歩いて着いた時刻を到着、乗換先の列車を待った後を
+            // 出発とする。見込みは connectedRoutes の所要時間と同じ (最初の列車の
+            // 待ち時間は含めない)
+            let (board_arrival, board_departure) = match result.last() {
+                Some(previous) if index > 0 => {
+                    let wait_minutes = f64::from(route_search::boarding_wait_seconds(
+                        group_stops.first().and_then(|s| s.kind),
+                    )) / 60.0;
+                    let arrival = previous.cumulative_minutes + walk_minutes;
+                    (arrival, arrival + wait_minutes)
                 }
+                _ => (0.0, 0.0),
+            };
+            for (position, mut stop) in segment.into_iter().enumerate() {
+                if position == 0 {
+                    stop.cumulative_minutes = board_arrival;
+                    stop.departure_cumulative_minutes = board_departure;
+                } else {
+                    stop.cumulative_minutes += board_departure;
+                    stop.departure_cumulative_minutes += board_departure;
+                }
+                result.push(stop);
             }
-            prev_stop = Some((station.lat, station.lon, station.station_cd));
-
-            let model_station: model::Station = station.into();
-            segments.push(model::TrainRouteSegment {
-                station: Some(model_station),
-                stops,
-                distance_from_previous,
-                max_speed: profile.max_speed,
-                max_acceleration: profile.max_acceleration,
-                max_deceleration: profile.max_deceleration,
-            });
         }
+        Ok(result)
+    }
 
+    async fn get_connected_train_route(
+        &self,
+        legs: &[model::RouteLegRequest],
+    ) -> Result<Vec<model::TrainRouteSegment>, UseCaseError> {
+        self.validate_route_legs(legs).await?;
+        let mut segments = Vec::new();
+        for leg in legs {
+            let stations = self
+                .station_repository
+                .get_by_line_group_id(leg.line_group_id)
+                .await?;
+            // 区間は connectedRoutes が探した弧なので、環状線では継ぎ目を跨ぐ
+            // 短い弧を取る (estimateArrivalTimes と同じ選び方)
+            let sliced = slice_group_stations(stations, leg.from_station_id, leg.to_station_id)
+                .ok_or_else(|| UseCaseError::NotFound {
+                    entity_type: "station in route",
+                    entity_id: format!(
+                        "{}-{} on line group {}",
+                        leg.from_station_id, leg.to_station_id, leg.line_group_id
+                    ),
+                })?;
+            // 区間ごとに別の列車なので、通過駅の有無や距離の起点も区間ごとに数える
+            segments.extend(self.train_route_segments(sliced, leg.line_group_id).await?);
+        }
         Ok(segments)
     }
 
@@ -1168,58 +1186,14 @@ where
 
         let mut result: Vec<EstimatedStop> = Vec::new();
         for group_stops in route_row_tree_map.values() {
-            // 先頭駅が末尾にも重複格納された「閉じた」環状データ(ポートライナー等)は、
-            // そのままだとラップ時に閉じ駅が二重になるため重複終端を除いてから
-            // 環状判定・弧選択する。
-            let mut route_stops: &[&Station] = group_stops.as_slice();
-            if route_stops.len() > 1
-                && route_stops[0].station_cd == route_stops[route_stops.len() - 1].station_cd
-            {
-                route_stops = &route_stops[..route_stops.len() - 1];
-            }
-
-            let from_pos = route_stops
-                .iter()
-                .position(|s| s.station_cd as u32 == from_station_id);
-            let to_pos = route_stops
-                .iter()
-                .position(|s| s.station_cd as u32 == to_station_id);
-
-            // 始点・終点の両方がこの経路候補に含まれない、または同一駅の場合は対象外。
-            let (Some(fi), Some(ti)) = (from_pos, to_pos) else {
-                continue;
-            };
-            if fi == ti {
-                continue;
-            }
-
-            // 経路全体ではなく、始点→終点の区間だけに絞り込んで推定する。
-            // 環状経路(山手線・大阪環状線など)は線形スライスだと格納順の
-            // 継ぎ目(例: 品川⇔大崎)を跨ぐ乗車で逆側の弧を返してしまうため、
-            // シームをラップする弧を選択する。
-            // 迂回係数の較正母数には切り出し前の経路全体を渡す。切り出した区間の
-            // 駅間隔が路線平均と異なると較正が破綻するため(スライス較正バグ)。
-            if is_circular_route(route_stops) {
-                let arc = select_circular_arc(route_stops, fi, ti, direction_id.is_some());
-                result.extend(estimate_arrival_minutes_calibrated(
-                    &arc,
-                    route_stops,
-                    &params,
-                ));
-            } else if fi < ti {
-                result.extend(estimate_arrival_minutes_calibrated(
-                    &route_stops[fi..=ti],
-                    route_stops,
-                    &params,
-                ));
-            } else {
-                let mut segment: Vec<&Station> = route_stops[ti..=fi].to_vec();
-                segment.reverse();
-                result.extend(estimate_arrival_minutes_calibrated(
-                    &segment,
-                    route_stops,
-                    &params,
-                ));
+            if let Some(segment) = estimate_group_segment(
+                group_stops,
+                from_station_id,
+                to_station_id,
+                direction_id.is_some(),
+                &params,
+            ) {
+                result.extend(segment);
             }
         }
 
@@ -1234,6 +1208,129 @@ where
     TR: TrainTypeRepository,
     CR: CompanyRepository,
 {
+    /// 乗換経路の区間の並びが 1 本の経路としてつながっているか確かめる。
+    /// 前の区間の降車駅と次の区間の乗車駅は同じ駅グループでなければならない。
+    async fn validate_route_legs(
+        &self,
+        legs: &[model::RouteLegRequest],
+    ) -> Result<(), UseCaseError> {
+        if legs.is_empty() {
+            return Err(UseCaseError::InvalidArgument(
+                "legs には 1 つ以上の区間を指定してください".to_string(),
+            ));
+        }
+        let ids: Vec<u32> = legs
+            .iter()
+            .flat_map(|leg| [leg.from_station_id, leg.to_station_id])
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        let group_of: HashMap<u32, i32> = self
+            .station_repository
+            .get_by_id_vec(&ids)
+            .await?
+            .into_iter()
+            .map(|station| (station.station_cd as u32, station.station_g_cd))
+            .collect();
+        for id in &ids {
+            if !group_of.contains_key(id) {
+                return Err(UseCaseError::NotFound {
+                    entity_type: "station",
+                    entity_id: id.to_string(),
+                });
+            }
+        }
+        for pair in legs.windows(2) {
+            if group_of[&pair[0].to_station_id] != group_of[&pair[1].from_station_id] {
+                return Err(UseCaseError::InvalidArgument(format!(
+                    "区間がつながっていません: 降車駅 {} と次の乗車駅 {} は別の駅グループです",
+                    pair[0].to_station_id, pair[1].from_station_id
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// 切り出した系統の駅列に付帯情報を付け、走行区間にする。
+    async fn train_route_segments(
+        &self,
+        sliced: Vec<Station>,
+        line_group_id: u32,
+    ) -> Result<Vec<model::TrainRouteSegment>, UseCaseError> {
+        let sliced = self
+            .update_station_vec_with_attributes(
+                sliced,
+                Some(line_group_id),
+                TransportTypeFilter::RailAndBus,
+                false,
+            )
+            .await?;
+
+        let mut segments: Vec<model::TrainRouteSegment> = Vec::with_capacity(sliced.len());
+        // 経路スライス内で路線ごとに通過駅があるか。通過駅が無い路線では優等種別でも
+        // 実質各駅停車として走る(東急田園都市線の急行が半蔵門線内で各駅停車になる
+        // 直通など)ため、種別の速度を適用せず各停(Default)として扱う。
+        // arrival_estimation と同様に端点は常に停車扱いとし、中間の通過駅だけを
+        // 優等扱いの根拠にする。
+        let sliced_len = sliced.len();
+        let mut line_has_pass: std::collections::HashMap<i32, bool> =
+            std::collections::HashMap::new();
+        for (i, station) in sliced.iter().enumerate() {
+            let is_endpoint = i == 0 || i + 1 == sliced_len;
+            let passed = !is_endpoint
+                && (station.stop_condition == model::StopCondition::Not || station.pass == Some(1));
+            let entry = line_has_pass.entry(station.line_cd).or_insert(false);
+            *entry = *entry || passed;
+        }
+        let mut prev_stop: Option<(f64, f64, i32)> = None;
+        for station in sliced {
+            let stops = station.stop_condition != model::StopCondition::Not;
+
+            let distance_from_previous = match prev_stop {
+                Some((plat, plon, _)) => haversine_distance(plat, plon, station.lat, station.lon),
+                None => 0.0,
+            };
+
+            let is_bus = station.transport_type == TransportType::Bus;
+            let kind = station.train_type.as_ref().and_then(|tt| tt.kind);
+            let effective_kind = if line_has_pass
+                .get(&station.line_cd)
+                .copied()
+                .unwrap_or(false)
+            {
+                kind
+            } else {
+                None
+            };
+            let mut profile =
+                resolve_speed_profile(station.line_cd, station.line_type, is_bus, effective_kind);
+            // 隣接駅ペア単位の較正(GTFS 実ダイヤ由来)があれば、このセグメントの
+            // 最高速度を路線単位のプロファイルより優先して上書きする(各停系のみ)。
+            if !is_bus && segment_override_applies_to_kind(effective_kind) {
+                if let Some((_, _, prev_cd)) = prev_stop {
+                    if let Some(v_kmh) =
+                        segment_speed_override_kmh(station.line_cd, prev_cd, station.station_cd)
+                    {
+                        profile.max_speed = v_kmh / 3.6;
+                    }
+                }
+            }
+            prev_stop = Some((station.lat, station.lon, station.station_cd));
+
+            let model_station: model::Station = station.into();
+            segments.push(model::TrainRouteSegment {
+                station: Some(model_station),
+                stops,
+                distance_from_previous,
+                max_speed: profile.max_speed,
+                max_acceleration: profile.max_acceleration,
+                max_deceleration: profile.max_deceleration,
+            });
+        }
+
+        Ok(segments)
+    }
+
     async fn get_stations_by_group_id_vec_no_types(
         &self,
         station_group_id_vec: &[u32],
@@ -1767,6 +1864,85 @@ where
             transport_type: row.transport_type,
         }
     }
+}
+
+/// 1 系統の駅列 (sst.id 順) から `from_station_cd` → `to_station_cd` の区間を切り出し、
+/// 始点からの推定到着時間を返す。両駅が含まれない、または同じ駅なら `None`。
+///
+/// 先頭駅が末尾にも重複格納された「閉じた」環状データ (ポートライナー等) は重複
+/// 終端を除いてから扱う。環状経路 (山手線・大阪環状線など) は、線形スライスだと
+/// 格納順の継ぎ目 (例: 品川⇔大崎) を跨ぐ乗車で逆側の弧を返してしまうため、
+/// シームをラップする弧を選ぶ (`directed` なら格納順、そうでなければ短い方)。
+/// 迂回係数の較正母数には切り出し前の系統全体を渡す (切り出した区間の駅間隔が
+/// 路線平均と異なると較正が破綻するため)。
+fn estimate_group_segment(
+    group_stops: &[&Station],
+    from_station_cd: u32,
+    to_station_cd: u32,
+    directed: bool,
+    params: &EstimationParams,
+) -> Option<Vec<EstimatedStop>> {
+    let mut route_stops: &[&Station] = group_stops;
+    if route_stops.len() > 1
+        && route_stops[0].station_cd == route_stops[route_stops.len() - 1].station_cd
+    {
+        route_stops = &route_stops[..route_stops.len() - 1];
+    }
+    let from = route_stops
+        .iter()
+        .position(|s| s.station_cd as u32 == from_station_cd)?;
+    let to = route_stops
+        .iter()
+        .position(|s| s.station_cd as u32 == to_station_cd)?;
+    if from == to {
+        return None;
+    }
+    Some(if is_circular_route(route_stops) {
+        let arc = select_circular_arc(route_stops, from, to, directed);
+        estimate_arrival_minutes_calibrated(&arc, route_stops, params)
+    } else if from < to {
+        estimate_arrival_minutes_calibrated(&route_stops[from..=to], route_stops, params)
+    } else {
+        let mut segment: Vec<&Station> = route_stops[to..=from].to_vec();
+        segment.reverse();
+        estimate_arrival_minutes_calibrated(&segment, route_stops, params)
+    })
+}
+
+/// 1 系統の駅列 (sst.id 順) から `from_station_cd` → `to_station_cd` の区間を進行順に
+/// 切り出す。環状経路は [`estimate_group_segment`] と同じく短い方の弧を取るので、
+/// 乗換経路の区間の走行区間と推定到着時間が同じ駅列になる。両駅が含まれない、
+/// または同じ駅なら `None`。
+fn slice_group_stations(
+    mut stations: Vec<Station>,
+    from_station_cd: u32,
+    to_station_cd: u32,
+) -> Option<Vec<Station>> {
+    if stations.len() > 1 && stations[0].station_cd == stations[stations.len() - 1].station_cd {
+        stations.pop();
+    }
+    let from = stations
+        .iter()
+        .position(|s| s.station_cd as u32 == from_station_cd)?;
+    let to = stations
+        .iter()
+        .position(|s| s.station_cd as u32 == to_station_cd)?;
+    if from == to {
+        return None;
+    }
+    let refs: Vec<&Station> = stations.iter().collect();
+    Some(if is_circular_route(&refs) {
+        select_circular_arc(&refs, from, to, false)
+            .into_iter()
+            .cloned()
+            .collect()
+    } else if from < to {
+        stations[from..=to].to_vec()
+    } else {
+        let mut segment = stations[to..=from].to_vec();
+        segment.reverse();
+        segment
+    })
 }
 
 /// Build a signature describing the stations a train type actually stops at within the

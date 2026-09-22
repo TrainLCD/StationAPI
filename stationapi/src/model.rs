@@ -318,6 +318,15 @@ pub struct ConnectedRoute {
     pub legs: Vec<RouteLeg>,
 }
 
+/// 乗換経路の区間の指定 (`estimateArrivalTimes` / `trainRoute` の `legs`)。
+/// `connectedRoutes` の区間の `trainType.groupId`・`fromStation.id`・`toStation.id`。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RouteLegRequest {
+    pub line_group_id: u32,
+    pub from_station_id: u32,
+    pub to_station_id: u32,
+}
+
 /// 乗換経路の 1 区間 (1 本の列車)。
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct RouteLeg {

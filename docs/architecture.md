@@ -294,6 +294,33 @@ type RouteLeg { trainType: TrainType  trainTypes: [TrainType!]  fromStation: Sta
 探索のパレート解 (最適解) にはこの除外をかけません。かけると、逆戻りしか経路の
 無い駅が「行ける駅」(`stationsByName`) なのに 0 件になるためです。
 
+### 到着見込みと走行区間 (`estimateArrivalTimes` / `trainRoute`)
+
+どちらも `legs: [RouteLegInput!]` を受け付け、乗換経路全体を通した値を返します。
+`legs` には `connectedRoutes` の各区間の `trainType.groupId`・`fromStation.id`・
+`toStation.id` をそのまま渡します。経路 ID は持たないので、経路はクライアントが
+区間の並びとして渡します。
+
+```graphql
+input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! }
+```
+
+- `estimateArrivalTimes`: 各区間を指定された系統だけで推定し (両駅に止まる別の
+  系統は使わない)、出発駅からの累積でつないだ 1 本の経路を返します (`id` は
+  系統をまたぐので空)。乗換駅は前の区間の降車駅と次の区間の乗車駅の 2 行で、
+  乗車駅の行は「徒歩 3 分後に着き、乗換先の種別の待ち時間の後に出る」値です。
+  見込みは `connectedRoutes` と同じなので、最後の駅の値は `estimatedMinutes` と
+  (ほぼ) 一致します。
+- `trainRoute`: 区間ごとの走行区間を順につなげます。区間ごとに別の列車なので、
+  各区間の最初の駅の `distanceFromPrevious` は 0 で、通過駅の有無 (優等種別の
+  速度を使うか) も区間ごとに判定します。
+
+区間の切り出しは 2 つで同じ関数を通し、環状線では継ぎ目を跨ぐ短い方の弧を取る
+ので、両者の駅の並びは一致します (`lineGroupId` 指定の `trainRoute` は従来どおり
+格納順で切り出します)。区間がつながっていない (前の区間の降車駅と次の区間の
+乗車駅が別の駅グループ)、端の駅が `fromStationId` / `toStationId` と食い違う、
+`viaLineIds`・`directionId`・`lineGroupId` と併用した、のいずれかはエラーです。
+
 ### 行き先の検索 (`stationsByName`)
 
 `stationsByName` に `fromStationGroupId` を指定すると、そこから行ける駅に

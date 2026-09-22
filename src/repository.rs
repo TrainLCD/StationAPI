@@ -1206,6 +1206,7 @@ impl TrainTypeRepository for MemTrainTypeRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use stationapi::model;
 
     const TOKYO: u32 = 1130101;
     const SHIBUYA: u32 = 1130205;
@@ -1227,6 +1228,97 @@ mod tests {
             .into_iter()
             .map(|s| (s.station_name, s.line_cd, s.has_train_types))
             .collect()
+    }
+
+    fn route_legs(route: &model::ConnectedRoute) -> Vec<model::RouteLegRequest> {
+        route
+            .legs
+            .iter()
+            .map(|leg| model::RouteLegRequest {
+                line_group_id: leg.train_type.group_id,
+                from_station_id: leg.from_station.id,
+                to_station_id: leg.to_station.id,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn connected_route_eta_and_train_route_follow_the_legs() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+        let interactor = crate::interactor();
+        // 大宮 → 新大阪 (はやぶさ → 東京 → のぞみ など) と、山手線の継ぎ目を
+        // 跨ぎうる東京 → 渋谷
+        for (from, to) in [(1131906, 1160213), (TOKYO, SHIBUYA)] {
+            let routes = block_on(interactor.get_connected_routes(from, to, None)).unwrap();
+            assert!(!routes.is_empty());
+            for route in &routes {
+                let legs = route_legs(route);
+                let eta =
+                    block_on(interactor.estimate_connected_route_arrival_times(&legs)).unwrap();
+                let train_route = block_on(interactor.get_connected_train_route(&legs)).unwrap();
+
+                // 同じ区間を同じ弧で切り出す
+                let eta_ids: Vec<i32> = eta.iter().map(|stop| stop.station_cd).collect();
+                let train_route_ids: Vec<i32> = train_route
+                    .iter()
+                    .map(|segment| segment.station.as_ref().unwrap().id as i32)
+                    .collect();
+                assert_eq!(eta_ids, train_route_ids);
+                // 区間ごとに乗車駅から降車駅まで
+                assert_eq!(eta_ids.first(), Some(&(legs[0].from_station_id as i32)));
+                assert_eq!(
+                    eta_ids.last(),
+                    Some(&(legs.last().unwrap().to_station_id as i32))
+                );
+                // 累積は減らず、最後は connectedRoutes の見込みと (ほぼ) 一致する
+                assert!(eta.windows(2).all(|pair| {
+                    pair[1].cumulative_minutes >= pair[0].departure_cumulative_minutes - 1e-9
+                }));
+                let last = eta.last().unwrap().cumulative_minutes;
+                assert!(
+                    (last - route.estimated_minutes).abs() < 1.0,
+                    "eta {last} vs connectedRoutes {}",
+                    route.estimated_minutes
+                );
+                // 乗換では徒歩の後に乗換先の列車を待つ。乗車駅の行は、前の区間の
+                // 降車駅の行のすぐ後 (乗換駅は両方の区間に 1 行ずつある)
+                let mut start = 0;
+                let mut boards = Vec::new();
+                for leg in &legs[..legs.len() - 1] {
+                    let alight = start
+                        + eta_ids[start..]
+                            .iter()
+                            .position(|&id| id == leg.to_station_id as i32)
+                            .unwrap();
+                    boards.push(alight + 1);
+                    start = alight + 2;
+                }
+                for (board, leg) in boards.iter().copied().zip(&legs[1..]) {
+                    assert_eq!(eta_ids[board], leg.from_station_id as i32);
+                    assert!(
+                        eta[board].departure_cumulative_minutes > eta[board].cumulative_minutes
+                    );
+                    assert!(train_route[board].distance_from_previous == 0.0);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn connected_route_rejects_legs_that_do_not_connect() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+        let interactor = crate::interactor();
+        let routes = block_on(interactor.get_connected_routes(MITAKA, NAKA_MEGURO, None)).unwrap();
+        let mut legs = route_legs(&routes[0]);
+        assert!(legs.len() > 1);
+        // 2 区間目を飛ばすと、1 区間目の降車駅と 3 区間目の乗車駅がつながらない
+        legs.remove(1);
+        let error = block_on(interactor.estimate_connected_route_arrival_times(&legs))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("区間がつながっていません"), "{error}");
+        assert!(block_on(interactor.get_connected_train_route(&legs)).is_err());
+        assert!(block_on(interactor.get_connected_train_route(&[])).is_err());
     }
 
     #[test]

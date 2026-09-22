@@ -55,6 +55,36 @@ fn to_opt_id(value: Option<i32>, name: &str) -> Result<Option<u32>, async_graphq
     value.map(|v| to_id(v, name)).transpose()
 }
 
+/// 乗換経路の区間の指定を検証して変換する。区間の端は `fromStationId` /
+/// `toStationId` と一致しなければならない (食い違うと、どちらが正しいか決められない)。
+fn route_legs(
+    legs: Vec<RouteLegInput>,
+    from_station_id: u32,
+    to_station_id: u32,
+) -> Result<Vec<model::RouteLegRequest>, async_graphql::Error> {
+    let legs: Vec<model::RouteLegRequest> = legs
+        .into_iter()
+        .map(|leg| {
+            Ok(model::RouteLegRequest {
+                line_group_id: to_id(leg.line_group_id, "legs.lineGroupId")?,
+                from_station_id: to_id(leg.from_station_id, "legs.fromStationId")?,
+                to_station_id: to_id(leg.to_station_id, "legs.toStationId")?,
+            })
+        })
+        .collect::<Result<_, async_graphql::Error>>()?;
+    let (Some(first), Some(last)) = (legs.first(), legs.last()) else {
+        return Err(async_graphql::Error::new(
+            "legs には 1 つ以上の区間を指定してください",
+        ));
+    };
+    if first.from_station_id != from_station_id || last.to_station_id != to_station_id {
+        return Err(async_graphql::Error::new(
+            "legs の最初の乗車駅と最後の降車駅は fromStationId と toStationId に一致させてください",
+        ));
+    }
+    Ok(legs)
+}
+
 fn use_case<'a>(ctx: &Context<'a>) -> &'a Interactor {
     ctx.data_unchecked::<Interactor>()
 }
@@ -339,7 +369,46 @@ impl QueryRoot {
         to_station_id: i32,
         via_line_ids: Option<Vec<i32>>,
         direction_id: Option<i32>,
+        legs: Option<Vec<RouteLegInput>>,
     ) -> GqlResult<EstimatedArrivalPage> {
+        // 乗換経路: 区間をつないだ 1 本の経路を、出発駅からの累積で返す。
+        // 経路は legs で決まるので、経路を絞る viaLineIds / directionId とは併用しない
+        if let Some(legs) = legs {
+            if via_line_ids.is_some_and(|ids| !ids.is_empty()) || direction_id.is_some() {
+                return Err(async_graphql::Error::new(
+                    "legs を指定するときは viaLineIds と directionId を指定しないでください",
+                ));
+            }
+            let legs = route_legs(
+                legs,
+                to_id(from_station_id, "fromStationId")?,
+                to_id(to_station_id, "toStationId")?,
+            )?;
+            let stops = use_case(ctx)
+                .estimate_connected_route_arrival_times(&legs)
+                .await?;
+            return Ok(EstimatedArrivalPage {
+                routes: Some(vec![EstimatedArrivalRoute {
+                    // 系統をまたぐので 1 つの系統 ID では表せない
+                    id: None,
+                    stops: Some(
+                        stops
+                            .iter()
+                            .map(|stop| EstimatedArrivalStop {
+                                station_id: Some(stop.station_cd),
+                                station_group_id: Some(UInt32(stop.station_g_cd as u32)),
+                                cumulative_minutes: Some(stop.cumulative_minutes),
+                                stops_here: Some(stop.stops_here),
+                                departure_cumulative_minutes: Some(
+                                    stop.departure_cumulative_minutes,
+                                ),
+                            })
+                            .collect(),
+                    ),
+                }]),
+            });
+        }
+
         let via: Vec<u32> = via_line_ids
             .unwrap_or_default()
             .into_iter()
@@ -392,7 +461,26 @@ impl QueryRoot {
         from_station_id: i32,
         to_station_id: i32,
         line_group_id: Option<i32>,
+        legs: Option<Vec<RouteLegInput>>,
     ) -> GqlResult<TrainRouteResponse> {
+        // 乗換経路: 区間ごとの走行区間を順につなげる。系統は区間ごとに決まるので
+        // lineGroupId とは併用しない
+        if let Some(legs) = legs {
+            if line_group_id.is_some() {
+                return Err(async_graphql::Error::new(
+                    "legs を指定するときは lineGroupId を指定しないでください",
+                ));
+            }
+            let legs = route_legs(
+                legs,
+                to_id(from_station_id, "fromStationId")?,
+                to_id(to_station_id, "toStationId")?,
+            )?;
+            let segments = use_case(ctx).get_connected_train_route(&legs).await?;
+            return Ok(TrainRouteResponse {
+                segments: Some(segments.into_iter().map(Into::into).collect()),
+            });
+        }
         let segments = use_case(ctx)
             .get_train_route(
                 to_id(from_station_id, "fromStationId")?,
