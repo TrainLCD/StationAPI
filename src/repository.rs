@@ -20,6 +20,7 @@ use stationapi::domain::repository::line_repository::LineRepository;
 use stationapi::domain::repository::station_repository::StationRepository;
 use stationapi::domain::repository::train_type_repository::TrainTypeRepository;
 use stationapi::domain::route_search::RouteNetwork;
+use stationapi::domain::route_topology::{RouteStop, RouteTopology};
 use stationapi::model::StopCondition;
 
 use crate::index;
@@ -96,28 +97,36 @@ fn apply_first_train_type(station: &mut Station) {
     }
 }
 
+/// 系統の停車駅の行を sst.id 昇順で返す。駅・路線・種別のいずれかが引けない行と、
+/// 無効な駅・路線の行は落とす。
+///
+/// 経路探索の網 (`RouteNetwork`) と到達判定の網 (`RouteTopology`) はどちらも
+/// この行から作るので、同じ系統からは同じ網になる。
+fn line_group_rows(
+    group_id: i32,
+) -> impl Iterator<
+    Item = (
+        &'static index::SstRecord,
+        &'static index::StationRecord,
+        &'static Line,
+        &'static index::TypeRecord,
+    ),
+> {
+    index::sst_by_group(group_id).filter_map(|sst| {
+        let record = index::station_by_cd(sst.station_cd).filter(|r| r.e_status == 0)?;
+        let line = index::line_by_cd(record.line_cd).filter(|l| l.e_status == 0)?;
+        // 種別が引けない系統は落とす
+        let ty = index::type_by_cd(sst.type_cd)?;
+        Some((sst, record, line, ty))
+    })
+}
+
 /// 指定した系統の停車駅を返す。並びは指定された系統の順、各系統内は sst.id 昇順。
 /// 駅・路線・種別のいずれかが引けない行は落とす。
 fn stations_of_line_groups(group_ids: &[u32]) -> Vec<Station> {
     let mut out = Vec::new();
     for &group_id in group_ids {
-        for sst in index::sst_by_group(group_id as i32) {
-            let Some(record) = index::station_by_cd(sst.station_cd) else {
-                continue;
-            };
-            if record.e_status != 0 {
-                continue;
-            }
-            let Some(line) = index::line_by_cd(record.line_cd) else {
-                continue;
-            };
-            if line.e_status != 0 {
-                continue;
-            }
-            // 種別が引けない系統は落とす
-            let Some(ty) = index::type_by_cd(sst.type_cd) else {
-                continue;
-            };
+        for (sst, record, line, ty) in line_group_rows(group_id as i32) {
             let mut station = record.to_entity(Some(line));
             apply_train_type(&mut station, sst, ty);
             out.push(station);
@@ -126,26 +135,57 @@ fn stations_of_line_groups(group_ids: &[u32]) -> Vec<Station> {
     out
 }
 
-/// 乗換経路探索用の系統網。全系統の駅と所要時間の推定から組み立てるので、
-/// 最初に `connectedRoutes` が呼ばれたときに一度だけ作り、isolate の寿命の間
-/// 使い回す。他のクエリしか来ない isolate では組み立てない。
-static ROUTE_NETWORK: OnceLock<Arc<RouteNetwork>> = OnceLock::new();
-
-/// 有効な鉄道路線の系統だけで系統網を組み立てる。バスは探索の対象にしない。
+/// 鉄道の系統 (line_group_cd の昇順)。バスは探索の対象にしない。
 ///
-/// 系統の種別判定は先頭の駅で行い、バスの系統では `Station` を組み立てない
-/// (GTFS 由来のバス系統は数が多く、作ってから捨てると起動が遅くなる)。
-fn build_route_network() -> RouteNetwork {
-    let rail_line_groups = index::line_group_cds().into_iter().filter(|&group| {
+/// 系統の種別判定は先頭の駅で行う (GTFS 由来のバス系統は数が多いので、行を
+/// 作ってから捨てると組み立てが遅くなる)。
+fn rail_line_group_cds() -> impl Iterator<Item = i32> {
+    index::line_group_cds().into_iter().filter(|&group| {
         index::sst_by_group(group)
             .find_map(|sst| index::station_by_cd(sst.station_cd))
             .and_then(|record| index::line_by_cd(record.line_cd))
             .is_some_and(|line| line.transport_type == TransportType::Rail)
-    });
+    })
+}
+
+/// 乗換経路探索 (`connectedRoutes`) 用の系統網。全系統の駅と所要時間の推定から
+/// 組み立てるので、最初に `connectedRoutes` が呼ばれたときに一度だけ作り、
+/// isolate の寿命の間使い回す。
+static ROUTE_NETWORK: OnceLock<Arc<RouteNetwork>> = OnceLock::new();
+
+fn route_network() -> &'static Arc<RouteNetwork> {
+    ROUTE_NETWORK.get_or_init(|| Arc::new(build_route_network()))
+}
+
+fn build_route_network() -> RouteNetwork {
     RouteNetwork::build(
-        rail_line_groups.map(|group| stations_of_line_groups(&[group as u32])),
+        rail_line_group_cds().map(|group| stations_of_line_groups(&[group as u32])),
         &EstimationParams::default(),
     )
+}
+
+/// 行き先の検索 (`stationsByName`) で乗換の到達判定に使う、所要時間を持たない
+/// 系統網。`Station` も所要時間の推定も要らないので、`ROUTE_NETWORK` よりずっと
+/// 速く組み立てられる。`ROUTE_NETWORK` の中の網と同じものになる (テストで確認)。
+static ROUTE_TOPOLOGY: OnceLock<RouteTopology> = OnceLock::new();
+
+fn route_topology() -> &'static RouteTopology {
+    ROUTE_TOPOLOGY.get_or_init(build_route_topology)
+}
+
+fn build_route_topology() -> RouteTopology {
+    RouteTopology::build(rail_line_group_cds().map(|group| {
+        line_group_rows(group)
+            .map(|(sst, record, _, _)| RouteStop {
+                station_cd: record.station_cd,
+                station_group_id: record.station_g_cd as u32,
+                line_cd: record.line_cd,
+                // RouteNetwork は pass と stop_condition で判定する。apply_train_type は
+                // pass == 1 のときだけ stop_condition を Not にするので同じ結果になる
+                stoppable: sst.pass != Some(1),
+            })
+            .collect()
+    }))
 }
 
 // ---------------------------------------------------------------- 駅
@@ -156,9 +196,7 @@ pub struct MemStationRepository;
 #[async_trait]
 impl StationRepository for MemStationRepository {
     async fn get_route_network(&self) -> Result<Arc<RouteNetwork>, DomainError> {
-        Ok(Arc::clone(
-            ROUTE_NETWORK.get_or_init(|| Arc::new(build_route_network())),
-        ))
+        Ok(Arc::clone(route_network()))
     }
 
     async fn get_by_coordinates(
@@ -234,6 +272,11 @@ impl StationRepository for MemStationRepository {
             }
         }
 
+        // 乗換で行ける駅の判定。connectedRoutes と同じ系統から作った、所要時間を
+        // 持たない網を使う。乗換が要る駅が出たときに一度だけ作る。網は鉄道だけ
+        let rail_wanted = want.is_none_or(|t| t == TransportType::Rail as i32);
+        let mut reachability = None;
+
         let mut out = Vec::new();
         for record in hits {
             let mut dst_has_sst = false;
@@ -251,8 +294,22 @@ impl StationRepository for MemStationRepository {
             } else {
                 from_line_cds.contains(&record.line_cd)
             };
+            // 分岐 C: 乗り換えれば、この駅にこの路線の列車で着ける
+            // (connectedRoutes(viaLineId = この駅の路線) で経路が出る)。
+            // 共有する系統は無いので line_group_cd は空、has_train_types は false
             if shared_group.is_none() && !same_line {
-                continue;
+                if !rail_wanted {
+                    continue;
+                }
+                let reachability =
+                    reachability.get_or_insert_with(|| route_topology().reachability(group_id));
+                if !reachability.can_arrive(
+                    record.station_cd,
+                    record.station_g_cd as u32,
+                    record.line_cd,
+                ) {
+                    continue;
+                }
             }
 
             let mut station = record.to_entity(index::line_by_cd(record.line_cd));
@@ -1152,6 +1209,64 @@ mod tests {
     const SHIBUYA: u32 = 1130205;
     const MITAKA: u32 = 1131105;
     const NAKA_MEGURO: u32 = 2600103;
+
+    /// repository の実装は await しない (索引を引くだけ) ので、1 回 poll すれば終わる
+    fn block_on<F: std::future::Future>(future: F) -> F::Output {
+        let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+        match std::pin::pin!(future).poll(&mut context) {
+            std::task::Poll::Ready(value) => value,
+            std::task::Poll::Pending => panic!("repository futures complete without waiting"),
+        }
+    }
+
+    fn names_by_line(from: u32, name: &str) -> Vec<(String, i32, bool)> {
+        block_on(MemStationRepository.get_by_name(name.to_string(), Some(100), Some(from), None))
+            .unwrap()
+            .into_iter()
+            .map(|s| (s.station_name, s.line_cd, s.has_train_types))
+            .collect()
+    }
+
+    #[test]
+    fn route_topology_matches_the_topology_inside_the_route_network() {
+        // 行き先の検索は軽い網、connectedRoutes は所要時間つきの網を使う。
+        // 両者がずれると「行ける」と返した駅で経路が出なくなる
+        assert_eq!(route_topology(), route_network().topology());
+    }
+
+    #[test]
+    fn stations_by_name_includes_stations_reached_by_transfer() {
+        // 三鷹から中目黒へは直通の系統が無いが、乗り換えれば東横線でも日比谷線でも着く
+        let found = names_by_line(MITAKA, "中目黒");
+        assert!(found.contains(&("中目黒".to_string(), 26001, false)));
+        assert!(found.contains(&("中目黒".to_string(), 28003, false)));
+
+        // 返した駅には、その路線を viaLineId にした connectedRoutes で経路がある
+        let network = route_network();
+        for (_, line_cd, _) in &found {
+            assert!(!network
+                .search(MITAKA, NAKA_MEGURO, Some(*line_cd))
+                .is_empty());
+        }
+    }
+
+    #[test]
+    fn stations_by_name_skips_a_branch_junction_reached_only_by_backtracking() {
+        // 石橋阪大前は宝塚線 (34002) と、そこから出る箕面線 (34007) の駅。
+        // 箕面線の石橋阪大前に箕面線で着くには、一度箕面線へ出て戻るしかない
+        let found = names_by_line(MITAKA, "石橋阪大前");
+        let lines: Vec<i32> = found.iter().map(|(_, line_cd, _)| *line_cd).collect();
+        assert_eq!(lines, vec![34002]);
+    }
+
+    #[test]
+    fn stations_by_name_keeps_direct_stations_marked_as_sharing_a_line_group() {
+        // 東京から品川は山手線などで直通なので、共有する系統が付く
+        let found = names_by_line(TOKYO, "品川");
+        assert!(found
+            .iter()
+            .any(|(name, _, has_train_types)| name == "品川" && *has_train_types));
+    }
 
     #[test]
     fn route_network_finds_direct_and_transfer_routes_in_real_data() {
