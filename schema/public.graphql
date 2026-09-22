@@ -279,6 +279,8 @@ type TrainTypeNested {
 type Route {
 	id: UInt32
 	stops: [StationNested!]
+	estimatedMinutes: Float
+	transferCount: Int
 }
 
 type EstimatedArrivalStop {

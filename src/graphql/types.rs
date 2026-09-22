@@ -301,6 +301,11 @@ define_train_type!(TrainTypeNested, "TrainTypeNested");
 pub struct Route {
     pub id: Option<UInt32>,
     pub stops: Option<Vec<StationNested>>,
+    // 推定所要時間(分)。乗換時間の見込みを含む。`connectedRoutes` のみ。
+    // doc コメントにすると SDL の description になるため通常のコメントにする
+    pub estimated_minutes: Option<f64>,
+    // 乗換回数。`connectedRoutes` のみ。
+    pub transfer_count: Option<i32>,
 }
 
 impl From<model::Route> for Route {
@@ -308,6 +313,8 @@ impl From<model::Route> for Route {
         Self {
             id: Some(UInt32(v.id)),
             stops: Some(v.stops.into_iter().map(Into::into).collect()),
+            estimated_minutes: v.estimated_minutes,
+            transfer_count: v.transfer_count.map(|count| count as i32),
         }
     }
 }

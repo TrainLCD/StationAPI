@@ -306,6 +306,11 @@ pub struct Station {
 pub struct Route {
     pub id: u32,
     pub stops: Vec<Station>,
+    /// 乗換経路探索 (`connectedRoutes`) の推定所要時間(分)。乗換時間の見込みを含む。
+    /// それ以外の経路では `None`。
+    pub estimated_minutes: Option<f64>,
+    /// 乗換経路探索 (`connectedRoutes`) の乗換回数。それ以外の経路では `None`。
+    pub transfer_count: Option<u32>,
 }
 
 /// 走行シミュレーション用の 1 区間。

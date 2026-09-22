@@ -1007,8 +1007,8 @@ pub fn first_line_group_cd(station_cd: i32) -> Option<i32> {
 /// line_group_cd -> station_station_types の添字リスト (sst.id 昇順)
 static SST_BY_GROUP: OnceLock<HashMap<i32, Vec<usize>>> = OnceLock::new();
 
-pub fn sst_by_group(line_group_cd: i32) -> impl Iterator<Item = &'static SstRecord> {
-    let idx = SST_BY_GROUP.get_or_init(|| {
+fn sst_group_index() -> &'static HashMap<i32, Vec<usize>> {
+    SST_BY_GROUP.get_or_init(|| {
         let mut map: HashMap<i32, Vec<usize>> = HashMap::with_capacity(4_000);
         for (i, s) in ssts().iter().enumerate() {
             if let Some(group) = s.line_group_cd {
@@ -1016,8 +1016,19 @@ pub fn sst_by_group(line_group_cd: i32) -> impl Iterator<Item = &'static SstReco
             }
         }
         map
-    });
-    idx.get(&line_group_cd)
+    })
+}
+
+/// 全系統の line_group_cd を昇順で返す。
+pub fn line_group_cds() -> Vec<i32> {
+    let mut groups: Vec<i32> = sst_group_index().keys().copied().collect();
+    groups.sort_unstable();
+    groups
+}
+
+pub fn sst_by_group(line_group_cd: i32) -> impl Iterator<Item = &'static SstRecord> {
+    sst_group_index()
+        .get(&line_group_cd)
         .map(Vec::as_slice)
         .unwrap_or(&[])
         .iter()

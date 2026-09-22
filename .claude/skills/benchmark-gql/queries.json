@@ -178,7 +178,7 @@
       "uses": ["StationNestedCore", "LineCore", "TrainTypeCore"],
       "query": "query Bench_connectedRoutes($from: Int!, $to: Int!) { connectedRoutes(fromStationGroupId: $from, toStationGroupId: $to) { id stops { ...StationNestedCore } } }",
       "variables": { "from": 1130205, "to": 1130212 },
-      "note": "渋谷 → 池袋。乗り換えを含む有界 BFS"
+      "note": "渋谷 → 池袋。乗換を含む経路探索 (RAPTOR、初回は系統網の構築を含む)"
     },
     {
       "name": "estimateArrivalTimes",
