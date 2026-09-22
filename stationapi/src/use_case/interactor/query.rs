@@ -1075,12 +1075,38 @@ where
         }
 
         // 乗降駅は stations クエリと同じ付帯情報を付ける
-        let stations: HashMap<i32, model::Station> = self
+        let stations: HashMap<i32, Station> = self
             .get_stations_by_id_vec(&station_ids, TransportTypeFilter::Rail)
             .await?
             .into_iter()
-            .map(|station| (station.station_cd, model::Station::from(station)))
+            .map(|station| (station.station_cd, station))
             .collect();
+
+        // 区間ごとの「乗れる種別すべて」は routeTypes(乗車駅グループ, 降車駅グループ,
+        // 降車駅の路線) そのもの。探索は停車駅が同じ並行種別 (各停・快速など) を
+        // 1 つの経路にまとめるので、アプリが種別を選べるようにここで列挙し直す。
+        // 同じ区間を複数の経路が使うので、組ごとに 1 回だけ引く
+        let mut leg_train_types: HashMap<(u32, u32, u32), Vec<model::TrainType>> = HashMap::new();
+        for leg in journeys.iter().flat_map(|journey| journey.legs.iter()) {
+            let (Some(&from_group), Some(&to_group), Some(to_station)) = (
+                leg.station_group_ids.first(),
+                leg.station_group_ids.last(),
+                leg.station_cds.last().and_then(|cd| stations.get(cd)),
+            ) else {
+                continue;
+            };
+            let key = (from_group, to_group, to_station.line_cd as u32);
+            if leg_train_types.contains_key(&key) {
+                continue;
+            }
+            let train_types = self
+                .get_train_types(key.0, key.1, Some(key.2))
+                .await?
+                .into_iter()
+                .map(model::TrainType::from)
+                .collect();
+            leg_train_types.insert(key, train_types);
+        }
 
         let routes = journeys
             .into_iter()
@@ -1089,12 +1115,20 @@ where
                     .legs
                     .iter()
                     .map(|leg| {
+                        let from_station = stations.get(leg.station_cds.first()?)?;
+                        let to_station = stations.get(leg.station_cds.last()?)?;
+                        let key = (
+                            *leg.station_group_ids.first()?,
+                            *leg.station_group_ids.last()?,
+                            to_station.line_cd as u32,
+                        );
                         Some(model::RouteLeg {
                             train_type: model::TrainType::from(
                                 train_type_by_line_group.get(&leg.line_group_id)?.clone(),
                             ),
-                            from_station: stations.get(leg.station_cds.first()?)?.clone(),
-                            to_station: stations.get(leg.station_cds.last()?)?.clone(),
+                            train_types: leg_train_types.get(&key)?.clone(),
+                            from_station: model::Station::from(from_station.clone()),
+                            to_station: model::Station::from(to_station.clone()),
                         })
                     })
                     // 種別か駅を引けない区間があれば、その経路は返さない
@@ -3532,11 +3566,32 @@ mod tests {
             }
             async fn get_route_stops(
                 &self,
-                _: u32,
-                _: u32,
-                _: &[u32],
+                from_station_id: u32,
+                to_station_id: u32,
+                via_line_ids: &[u32],
             ) -> Result<Vec<Station>, DomainError> {
-                Ok(vec![])
+                // Worker の実装と同じく、発着の双方に通過ではない停車を持つ系統の駅を
+                // 系統の並び順で返す (via 指定時はその路線の駅だけ)
+                let stopping_groups = |group_id: u32| -> HashSet<i32> {
+                    self.stations_by_line_group
+                        .iter()
+                        .filter(|s| s.station_g_cd as u32 == group_id && s.pass != Some(1))
+                        .filter_map(|s| s.line_group_cd)
+                        .collect()
+                };
+                let common: HashSet<i32> = stopping_groups(from_station_id)
+                    .intersection(&stopping_groups(to_station_id))
+                    .copied()
+                    .collect();
+                Ok(self
+                    .stations_by_line_group
+                    .iter()
+                    .filter(|s| s.line_group_cd.is_some_and(|g| common.contains(&g)))
+                    .filter(|s| {
+                        via_line_ids.is_empty() || via_line_ids.contains(&(s.line_cd as u32))
+                    })
+                    .cloned()
+                    .collect())
             }
             async fn get_route_stops_by_station_cd(
                 &self,
@@ -3700,9 +3755,17 @@ mod tests {
             }
             async fn get_by_line_group_id_vec(
                 &self,
-                _: &[u32],
+                line_group_ids: &[u32],
             ) -> Result<Vec<TrainType>, DomainError> {
-                Ok(self.train_types.clone())
+                Ok(self
+                    .train_types
+                    .iter()
+                    .filter(|t| {
+                        t.line_group_cd
+                            .is_some_and(|g| line_group_ids.contains(&(g as u32)))
+                    })
+                    .cloned()
+                    .collect())
             }
         }
 
@@ -4678,13 +4741,22 @@ mod tests {
                 create_connected_stop(501, 1, 500, 0),
                 create_connected_stop(506, 6, 500, 0),
                 create_connected_stop(504, 4, 500, 0),
+                // 100 と同じ路線を走り、5 にも止まる並行種別 (各停)。探索は
+                // 停車駅の少ない 100 を選ぶが、区間の種別一覧には出る
+                create_connected_stop(601, 1, 600, 0),
+                create_connected_stop(605, 5, 600, 0),
+                create_connected_stop(602, 2, 600, 0),
             ];
             // 5 は座標の上で 1 と 2 の間、6 は 2 と 3 の中間の遠く北に置く
             stops[1].lon = 139.7 + 1.5 * 0.011;
             stops[8].lon = 139.7 + 2.5 * 0.011;
             stops[8].lat += 0.5;
+            stops[11].lon = stops[1].lon;
+            for stop in &mut stops[10..13] {
+                stop.line_cd = 100;
+            }
             // 系統ごとに先頭の駅を指す列車種別を 1 つずつ
-            let train_types = [(100, 101), (200, 202), (300, 303), (500, 501)]
+            let train_types = [(100, 101), (200, 202), (300, 303), (500, 501), (600, 601)]
                 .into_iter()
                 .map(|(line_group_id, station_cd)| {
                     TrainType::new(
@@ -4762,6 +4834,42 @@ mod tests {
             assert_eq!(first_leg.train_type.name, "種別100");
             assert_eq!(first_leg.from_station.group_id, 1);
             assert_eq!(first_leg.to_station.group_id, 2);
+        }
+
+        #[tokio::test]
+        async fn test_get_connected_routes_lists_every_train_type_of_each_leg() {
+            let interactor = create_connected_route_interactor();
+
+            let routes = interactor.get_connected_routes(1, 4, None).await.unwrap();
+            let transfer_route = &routes[0];
+            let first_leg = &transfer_route.legs[0];
+            assert_eq!(first_leg.train_type.group_id, 100);
+
+            // 各区間の一覧は routeTypes(乗車駅グループ, 降車駅グループ, 降車駅の路線)
+            // と同じ結果・同じ並び
+            for leg in &transfer_route.legs {
+                let expected: Vec<model::TrainType> = interactor
+                    .get_train_types(
+                        leg.from_station.group_id,
+                        leg.to_station.group_id,
+                        Some(leg.to_station.line.as_ref().unwrap().id),
+                    )
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(model::TrainType::from)
+                    .collect();
+                assert_eq!(leg.train_types, expected);
+            }
+            assert_eq!(
+                first_leg
+                    .train_types
+                    .iter()
+                    .map(|t| t.group_id)
+                    .collect::<Vec<_>>(),
+                vec![100, 600],
+                "the parallel local that the search collapsed is listed"
+            );
         }
 
         #[tokio::test]

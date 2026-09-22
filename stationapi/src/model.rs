@@ -321,8 +321,11 @@ pub struct ConnectedRoute {
 /// 乗換経路の 1 区間 (1 本の列車)。
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct RouteLeg {
-    /// 乗る列車種別。`routeTypes` と同じ形で、`group_id` は実在の系統。
+    /// 探索が選んだ代表の列車種別。`routeTypes` と同じ形で、`group_id` は実在の系統。
     pub train_type: TrainType,
+    /// この区間で乗れる列車種別すべて。`routeTypes(乗車駅グループ, 降車駅グループ,
+    /// 降車駅の路線)` と同じ結果・同じ並び。
+    pub train_types: Vec<TrainType>,
     /// 乗車駅。この系統が走る路線の駅。
     pub from_station: Station,
     /// 降車駅。次の区間の乗車駅 (同じ駅グループの別路線の駅のことがある) か目的地。

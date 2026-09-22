@@ -337,6 +337,9 @@ impl From<model::ConnectedRoute> for ConnectedRoute {
 #[graphql(name = "RouteLeg")]
 pub struct RouteLeg {
     pub train_type: Option<TrainType>,
+    // この区間で乗れる種別すべて。routeTypes(乗車駅グループ, 降車駅グループ,
+    // 降車駅の路線) と同じ結果・同じ並び
+    pub train_types: Option<Vec<TrainType>>,
     pub from_station: Option<Station>,
     pub to_station: Option<Station>,
 }
@@ -345,6 +348,7 @@ impl From<model::RouteLeg> for RouteLeg {
     fn from(v: model::RouteLeg) -> Self {
         Self {
             train_type: Some(v.train_type.into()),
+            train_types: Some(v.train_types.into_iter().map(Into::into).collect()),
             from_station: Some(v.from_station.into()),
             to_station: Some(v.to_station.into()),
         }

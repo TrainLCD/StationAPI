@@ -289,6 +289,7 @@ type Route {
 
 type RouteLeg {
 	trainType: TrainType
+	trainTypes: [TrainType!]
 	fromStation: Station
 	toStation: Station
 }

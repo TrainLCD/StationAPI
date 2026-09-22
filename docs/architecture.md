@@ -225,8 +225,18 @@ PostgreSQL のクエリは以下のように置き換えています。
 connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int): [ConnectedRoute!]!
 
 type ConnectedRoute { estimatedMinutes: Float  transferCount: Int  legs: [RouteLeg!] }
-type RouteLeg { trainType: TrainType  fromStation: Station  toStation: Station }
+type RouteLeg { trainType: TrainType  trainTypes: [TrainType!]  fromStation: Station  toStation: Station }
 ```
+
+探索は停車駅が同じ並行種別 (中央線の快速・通勤快速など) を 1 つの経路に
+まとめ、代替経路の再探索でもその並行種別を外します。このままでは並行する
+種別がレスポンスに一度も出ず、アプリが種別一覧 (TrainTypeListModal) を出して
+既定で各停を選ぶ今の挙動を保てません。そこで `trainTypes` に、その区間で
+乗れる種別すべてを返します。中身は
+`routeTypes(乗車駅グループ, 降車駅グループ, 降車駅の路線)` そのもので、停車駅が
+同じ種別のまとめ・路線の付与・並び順も `routeTypes` と同じです (同じ関数を
+呼んでいます)。`trainType` は探索が選んだ代表の 1 件で、まとめの結果
+`trainTypes` に含まれないことがあります。
 
 `viaLineId` は `routeTypes` と同じく検索結果でタップした駅の路線で、目的地に
 その路線の駅で着く経路 (最後の区間がその路線を走る経路) だけに絞ります。
