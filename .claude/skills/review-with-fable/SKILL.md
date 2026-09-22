@@ -51,14 +51,17 @@ TrainLCD の開発プロセス上の位置づけ（TrainLCD/MobileApp#6473 / #64
    case "$BRANCH" in hotfix/*) BASE_BRANCH=master ;; *) BASE_BRANCH=dev ;; esac
    BASE="origin/$BASE_BRANCH"
    # refspec を明示する（AGENTS.md「Version Control」: 絞られた remote.origin.fetch だと origin/* が古いまま残る）
-   git fetch origin "+refs/heads/$BASE_BRANCH:refs/remotes/$BASE" --quiet
+   if ! git fetch origin "+refs/heads/$BASE_BRANCH:refs/remotes/$BASE" --quiet; then
+     echo "$BASE の取得に失敗した。古い base で差分を取らないよう中断する" >&2
+     exit 1
+   fi
    git status --short
    git --no-pager diff "$BASE...HEAD" --stat
    git --no-pager diff HEAD --stat
    git ls-files --others --exclude-standard
    ```
 
-   `$BASE...HEAD`（3 点）でマージベースからの差分を取る。2 点にすると base 側の進行分まで差分に混ざり、Fable が他人のコミットを指摘し始める。`git fetch origin dev` のように refspec を省くと、`remote.origin.fetch` が絞られた環境では `origin/dev` が更新されず、古いマージベースから測った差分（= 既に `dev` に入ったコミット込み）を渡してしまう。
+   `$BASE...HEAD`（3 点）でマージベースからの差分を取る。2 点にすると base 側の進行分まで差分に混ざり、Fable が他人のコミットを指摘し始める。`git fetch origin dev` のように refspec を省くと、`remote.origin.fetch` が絞られた環境では `origin/dev` が更新されず、古いマージベースから測った差分（= 既に `dev` に入ったコミット込み）を渡してしまう。fetch 自体の失敗（ネットワーク断・認証切れ）も同じで、既存の `origin/*` が残っていると後続の `diff` は古い base のまま通ってしまうため、失敗したらその場で止める。
 
    detached HEAD ではこのブロックが止まる。`git symbolic-ref --quiet` は失敗しても終了コードを返すだけで `BRANCH` が空になるので、`||` で明示的に落とさないと `case` の既定分岐に落ちて `origin/dev` 基準の差分を確認なしに取ってしまう。止まったら base をユーザーに確認してから再実行する。
 
@@ -83,7 +86,14 @@ TrainLCD の開発プロセス上の位置づけ（TrainLCD/MobileApp#6473 / #64
    | `pr=<番号>` | `gh pr diff <番号> > "$OUT/pr.diff"`（下記の head 一致チェックを先に通す） |
    | パス列挙 | 書き出し不要。ファイル全文を読ませるので、ブリーフにパスを列挙するだけでよい |
 
-   **`data/*.csv` の差分は行単位で巨大になりやすい。** 数千行規模になる場合は `git --no-pager diff --stat` と、変更行を含む CSV のパスをブリーフに書き、差分ファイルからは除外してよい（`git diff "$BASE...HEAD" -- . ':(exclude)data/*.csv'`）。除外したことは必ずブリーフの「レビュー対象」に書く。`generated/*.csv` はビルド生成物なので対象に含めない。
+   **`data/*.csv` の差分は行単位で巨大になりやすい。** 数千行規模になる場合は `git --no-pager diff --stat` と、変更行を含む CSV のパスをブリーフに書き、通常の差分ファイルからは除外してよい（`git diff "$BASE...HEAD" -- . ':(exclude)data/*.csv'`）。ただし変更行そのものは落とさない。除外した CSV は文脈行なし（`--unified=0`）の差分を別ファイルに書き出し、ブリーフの「レビュー対象」に載せる。パスと統計だけでは、Fable は現在の CSV しか読めず、削除された行や書き換え前の値を突き合わせられない:
+
+   ```bash
+   git --no-pager diff --unified=0 "$BASE...HEAD" -- 'data/*.csv' > "$OUT/committed-csv.diff"   # コミット済み
+   git --no-pager diff --unified=0 HEAD -- 'data/*.csv' > "$OUT/worktree-csv.diff"              # 未コミット
+   ```
+
+   除外したことは必ずブリーフの「レビュー対象」に書く。`generated/*.csv` はビルド生成物なので対象に含めない。
 
    untracked ファイルは `git diff` に出ないので、空ファイルとの差分として個別に追記する。ただし**一覧を先に出し、成果物に含まれるパスだけに絞ってから**差分化する。`--exclude-standard` が外すのは gitignore 済みのファイルだけで（`.env.local` はここで外れる）、ignore されていない手元の作業ファイル（ダンプ、メモ、ODPT のトークンの控え、ダウンロードした GTFS）は素通りしてそのまま Fable に渡る:
 
@@ -137,7 +147,7 @@ TrainLCD の開発プロセス上の位置づけ（TrainLCD/MobileApp#6473 / #64
    （手順 2 で実際に書き出したファイルだけを列挙する。存在しないものを載せない）
 
    - 例: コミット済み差分 <OUT>/committed.diff / 未コミット差分 <OUT>/worktree.diff / 新規ファイル <OUT>/untracked.diff
-   - 差分から除外した CSV があればそのパスと `--stat`
+   - 差分から除外した CSV があればそのパスと `--stat`、および <OUT>/committed-csv.diff / <OUT>/worktree-csv.diff
    - パス指定レビューのときは対象ファイルの絶対パスを列挙する
    - リポジトリのルート: <worktree のパス>
 
