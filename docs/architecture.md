@@ -225,8 +225,17 @@ PostgreSQL のクエリは以下のように置き換えています。
 connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int): [ConnectedRoute!]!
 
 type ConnectedRoute { legs: [RouteLeg!] }
-type RouteLeg { trainTypes: [TrainType!]  fromStation: Station  toStation: Station }
+type RouteLeg { trainTypes: [TrainType!]  fromStation: Station  toStation: Station  stationGroupIds: [Int!] }
 ```
+
+`stationGroupIds` は乗車駅から降車駅までの駅グループ ID を進行順に並べたもの
+(通過駅を含む) で、探索が乗った系統の並びそのものです。駅 ID ではなく駅
+グループ ID にしているのは、アプリが区間ごとに選ぶ種別 (既定は各停) が探索で
+使われた系統と別の路線を走ることがあるためです。駅 ID は路線ごとに違いますが、
+駅グループ ID ならどの種別の駅リストとも突き合わせられます。アプリはこの並びに
+沿って選んだ種別の駅リストから駅を拾うので、環状線でどちらの弧を使うかを
+アプリ側で決める必要がありません。同じ駅グループが 2 回出る系統 (大江戸線の
+都庁前) では、直前に拾った駅に隣り合うほうを選びます。
 
 探索は停車駅が同じ並行種別 (中央線の快速・通勤快速など) を 1 つの経路に
 まとめ、代替経路の再探索でもその並行種別を外します。このままでは並行する

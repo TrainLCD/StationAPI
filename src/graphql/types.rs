@@ -348,6 +348,10 @@ pub struct RouteLeg {
     pub train_types: Option<Vec<TrainType>>,
     pub from_station: Option<Station>,
     pub to_station: Option<Station>,
+    // 乗車駅から降車駅までの駅グループ ID を進行順に並べたもの (通過駅を含む)。
+    // 駅 ID は路線ごとに違うが、駅グループ ID ならアプリが選んだどの種別の駅リストとも
+    // 突き合わせられる。同じ駅グループが 2 回出る系統 (大江戸線の都庁前) がある
+    pub station_group_ids: Option<Vec<i32>>,
 }
 
 impl From<model::RouteLeg> for RouteLeg {
@@ -356,6 +360,12 @@ impl From<model::RouteLeg> for RouteLeg {
             train_types: Some(v.train_types.into_iter().map(Into::into).collect()),
             from_station: Some(v.from_station.into()),
             to_station: Some(v.to_station.into()),
+            station_group_ids: Some(
+                v.station_group_ids
+                    .into_iter()
+                    .map(|id| id as i32)
+                    .collect(),
+            ),
         }
     }
 }
