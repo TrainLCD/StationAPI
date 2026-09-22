@@ -1328,6 +1328,20 @@ mod tests {
         // connectedRoutes の区間の trainTypes は、どれを選んでも区間の乗降駅で使える
         let routes = block_on(interactor.get_connected_routes(MITAKA, NAKA_MEGURO, None)).unwrap();
         for route in &routes {
+            // stationGroupIds は乗車駅の駅グループから降車駅の駅グループまでの並び
+            for leg in &route.legs {
+                assert!(leg.station_group_ids.len() >= 2);
+                assert_eq!(
+                    (
+                        leg.station_group_ids.first().copied(),
+                        leg.station_group_ids.last().copied()
+                    ),
+                    (
+                        Some(leg.from_station.group_id),
+                        Some(leg.to_station.group_id)
+                    )
+                );
+            }
             let choices = route
                 .legs
                 .iter()
