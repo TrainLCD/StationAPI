@@ -88,6 +88,11 @@ impl Reachability<'_> {
         let Some(&target) = self.topology.node_by_group.get(&station_group_id) else {
             return false;
         };
+        // 出発駅グループ自身へは search が必ず 0 件を返す。到達集合には、別の駅から
+        // 同じ系統に乗り直した分として出発駅グループの駅が入ることがある
+        if self.origin == Some(target) {
+            return false;
+        }
         if !self.topology.cut_nodes[target as usize] {
             return true;
         }

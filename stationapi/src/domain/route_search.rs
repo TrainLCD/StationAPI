@@ -1062,6 +1062,23 @@ mod tests {
     }
 
     #[test]
+    fn cannot_arrive_at_the_origin_station_group() {
+        // 2 から同じ系統に乗り直した分として、出発駅 1 の駅も到達集合に入る。
+        // 1 は関節点でもないが、search は出発駅と同じ駅グループへは 0 件を返す
+        let network = RouteNetwork::build(
+            [straight(
+                100,
+                &[(1, 0.0, 0.0), (2, 1.0, 0.0), (3, 2.0, 0.0)],
+            )],
+            &EstimationParams::default(),
+        );
+        let topology = network.topology();
+        assert!(topology.reachable_station_cds(1).contains(&10000));
+        assert!(!topology.reachability(1).can_arrive(10000, 1, 100));
+        assert!(network.search(1, 1, Some(100)).is_empty());
+    }
+
+    #[test]
     fn reachability_matches_search_on_a_ring_with_branches() {
         // 環状 (100) に支線 (200, 300) が付き、支線同士は 5 で接する。どの駅も
         // 「着けると判定した駅には経路がある」ことを総当たりで確かめる
