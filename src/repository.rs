@@ -6,7 +6,9 @@
 
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, OnceLock};
 
+use stationapi::domain::arrival_estimation::EstimationParams;
 use stationapi::domain::entity::company::Company;
 use stationapi::domain::entity::gtfs::TransportType;
 use stationapi::domain::entity::line::Line;
@@ -17,6 +19,7 @@ use stationapi::domain::repository::company_repository::CompanyRepository;
 use stationapi::domain::repository::line_repository::LineRepository;
 use stationapi::domain::repository::station_repository::StationRepository;
 use stationapi::domain::repository::train_type_repository::TrainTypeRepository;
+use stationapi::domain::route_search::RouteNetwork;
 use stationapi::model::StopCondition;
 
 use crate::index;
@@ -123,6 +126,28 @@ fn stations_of_line_groups(group_ids: &[u32]) -> Vec<Station> {
     out
 }
 
+/// 乗換経路探索用の系統網。全系統の駅と所要時間の推定から組み立てるので、
+/// 最初に `connectedRoutes` が呼ばれたときに一度だけ作り、isolate の寿命の間
+/// 使い回す。他のクエリしか来ない isolate では組み立てない。
+static ROUTE_NETWORK: OnceLock<Arc<RouteNetwork>> = OnceLock::new();
+
+/// 有効な鉄道路線の系統だけで系統網を組み立てる。バスは探索の対象にしない。
+///
+/// 系統の種別判定は先頭の駅で行い、バスの系統では `Station` を組み立てない
+/// (GTFS 由来のバス系統は数が多く、作ってから捨てると起動が遅くなる)。
+fn build_route_network() -> RouteNetwork {
+    let rail_line_groups = index::line_group_cds().into_iter().filter(|&group| {
+        index::sst_by_group(group)
+            .find_map(|sst| index::station_by_cd(sst.station_cd))
+            .and_then(|record| index::line_by_cd(record.line_cd))
+            .is_some_and(|line| line.transport_type == TransportType::Rail)
+    });
+    RouteNetwork::build(
+        rail_line_groups.map(|group| stations_of_line_groups(&[group as u32])),
+        &EstimationParams::default(),
+    )
+}
+
 // ---------------------------------------------------------------- 駅
 
 #[derive(Clone, Default)]
@@ -130,6 +155,12 @@ pub struct MemStationRepository;
 
 #[async_trait]
 impl StationRepository for MemStationRepository {
+    async fn get_route_network(&self) -> Result<Arc<RouteNetwork>, DomainError> {
+        Ok(Arc::clone(
+            ROUTE_NETWORK.get_or_init(|| Arc::new(build_route_network())),
+        ))
+    }
+
     async fn get_by_coordinates(
         &self,
         latitude: f64,
@@ -1079,36 +1110,6 @@ impl TrainTypeRepository for MemTrainTypeRepository {
         Ok(out)
     }
 
-    async fn get_line_group_ids_by_station_group_ids(
-        &self,
-        station_group_ids: &[u32],
-    ) -> Result<HashMap<u32, Vec<u32>>, DomainError> {
-        let mut out: HashMap<u32, Vec<u32>> = HashMap::new();
-        for &group_id in station_group_ids {
-            let mut groups: Vec<u32> = Vec::new();
-            for record in index::stations_by_group(group_id as i32) {
-                if record.e_status != 0 {
-                    continue;
-                }
-                for sst in index::sst_by_station(record.station_cd) {
-                    if !sst_is_stop(sst) {
-                        continue;
-                    }
-                    if let Some(lg) = sst.line_group_cd {
-                        let lg = lg as u32;
-                        if !groups.contains(&lg) {
-                            groups.push(lg);
-                        }
-                    }
-                }
-            }
-            if !groups.is_empty() {
-                out.insert(group_id, groups);
-            }
-        }
-        Ok(out)
-    }
-
     async fn find_by_line_group_id_and_line_id(
         &self,
         line_group_id: u32,
@@ -1140,5 +1141,44 @@ impl TrainTypeRepository for MemTrainTypeRepository {
             }
         }
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TOKYO: u32 = 1130101;
+    const SHIBUYA: u32 = 1130205;
+    const MITAKA: u32 = 1131105;
+    const NAKA_MEGURO: u32 = 2600103;
+
+    #[test]
+    fn route_network_finds_direct_and_transfer_routes_in_real_data() {
+        let network = build_route_network();
+        assert!(network.pattern_count() > 0);
+
+        // 山手線で乗り換えずに行ける
+        let journeys = network.search(TOKYO, SHIBUYA, None);
+        assert!(journeys.iter().any(|journey| journey.transfer_count() == 0));
+
+        // 直通の系統が無く、乗換が要る (旧実装は探索の上限に先に達して 0 件だった)
+        let journeys = network.search(MITAKA, NAKA_MEGURO, None);
+        assert!(!journeys.is_empty());
+        assert!(journeys.iter().all(|journey| journey.transfer_count() > 0));
+        for journey in &journeys {
+            assert_eq!(journey.legs[0].station_group_ids[0], MITAKA);
+            assert_eq!(
+                journey.legs.last().unwrap().station_group_ids.last(),
+                Some(&NAKA_MEGURO)
+            );
+            // 区間はつながっている
+            for pair in journey.legs.windows(2) {
+                assert_eq!(
+                    pair[0].station_group_ids.last(),
+                    pair[1].station_group_ids.first()
+                );
+            }
+        }
     }
 }

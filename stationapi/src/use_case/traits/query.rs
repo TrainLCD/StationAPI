@@ -8,7 +8,7 @@ use crate::{
             station::Station, station_number::StationNumber, train_type::TrainType,
         },
     },
-    model::{Route, TrainRouteSegment},
+    model::{ConnectedRoute, Route, TrainRouteSegment},
     use_case::error::UseCaseError,
 };
 
@@ -122,7 +122,8 @@ pub trait QueryUseCase: Send + Sync + 'static {
         &self,
         from_station_group_id: u32,
         to_station_group_id: u32,
-    ) -> Result<Vec<Route>, UseCaseError>;
+        via_line_id: Option<u32>,
+    ) -> Result<Vec<ConnectedRoute>, UseCaseError>;
     async fn estimate_route_arrival_times(
         &self,
         from_station_id: u32,
