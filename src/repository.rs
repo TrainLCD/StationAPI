@@ -6,7 +6,9 @@
 
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, OnceLock};
 
+use stationapi::domain::arrival_estimation::EstimationParams;
 use stationapi::domain::entity::company::Company;
 use stationapi::domain::entity::gtfs::TransportType;
 use stationapi::domain::entity::line::Line;
@@ -17,6 +19,8 @@ use stationapi::domain::repository::company_repository::CompanyRepository;
 use stationapi::domain::repository::line_repository::LineRepository;
 use stationapi::domain::repository::station_repository::StationRepository;
 use stationapi::domain::repository::train_type_repository::TrainTypeRepository;
+use stationapi::domain::route_search::RouteNetwork;
+use stationapi::domain::route_topology::{RouteStop, RouteTopology};
 use stationapi::model::StopCondition;
 
 use crate::index;
@@ -93,34 +97,95 @@ fn apply_first_train_type(station: &mut Station) {
     }
 }
 
+/// 系統の停車駅の行を sst.id 昇順で返す。駅・路線・種別のいずれかが引けない行と、
+/// 無効な駅・路線の行は落とす。
+///
+/// 経路探索の網 (`RouteNetwork`) と到達判定の網 (`RouteTopology`) はどちらも
+/// この行から作るので、同じ系統からは同じ網になる。
+fn line_group_rows(
+    group_id: i32,
+) -> impl Iterator<
+    Item = (
+        &'static index::SstRecord,
+        &'static index::StationRecord,
+        &'static Line,
+        &'static index::TypeRecord,
+    ),
+> {
+    index::sst_by_group(group_id).filter_map(|sst| {
+        let record = index::station_by_cd(sst.station_cd).filter(|r| r.e_status == 0)?;
+        let line = index::line_by_cd(record.line_cd).filter(|l| l.e_status == 0)?;
+        // 種別が引けない系統は落とす
+        let ty = index::type_by_cd(sst.type_cd)?;
+        Some((sst, record, line, ty))
+    })
+}
+
 /// 指定した系統の停車駅を返す。並びは指定された系統の順、各系統内は sst.id 昇順。
 /// 駅・路線・種別のいずれかが引けない行は落とす。
 fn stations_of_line_groups(group_ids: &[u32]) -> Vec<Station> {
     let mut out = Vec::new();
     for &group_id in group_ids {
-        for sst in index::sst_by_group(group_id as i32) {
-            let Some(record) = index::station_by_cd(sst.station_cd) else {
-                continue;
-            };
-            if record.e_status != 0 {
-                continue;
-            }
-            let Some(line) = index::line_by_cd(record.line_cd) else {
-                continue;
-            };
-            if line.e_status != 0 {
-                continue;
-            }
-            // 種別が引けない系統は落とす
-            let Some(ty) = index::type_by_cd(sst.type_cd) else {
-                continue;
-            };
+        for (sst, record, line, ty) in line_group_rows(group_id as i32) {
             let mut station = record.to_entity(Some(line));
             apply_train_type(&mut station, sst, ty);
             out.push(station);
         }
     }
     out
+}
+
+/// 鉄道の系統 (line_group_cd の昇順)。バスは探索の対象にしない。
+///
+/// 系統の種別判定は先頭の駅で行う (GTFS 由来のバス系統は数が多いので、行を
+/// 作ってから捨てると組み立てが遅くなる)。
+fn rail_line_group_cds() -> impl Iterator<Item = i32> {
+    index::line_group_cds().into_iter().filter(|&group| {
+        index::sst_by_group(group)
+            .find_map(|sst| index::station_by_cd(sst.station_cd))
+            .and_then(|record| index::line_by_cd(record.line_cd))
+            .is_some_and(|line| line.transport_type == TransportType::Rail)
+    })
+}
+
+/// 乗換経路探索 (`connectedRoutes`) 用の系統網。全系統の駅と所要時間の推定から
+/// 組み立てるので、最初に `connectedRoutes` が呼ばれたときに一度だけ作り、
+/// isolate の寿命の間使い回す。
+static ROUTE_NETWORK: OnceLock<Arc<RouteNetwork>> = OnceLock::new();
+
+fn route_network() -> &'static Arc<RouteNetwork> {
+    ROUTE_NETWORK.get_or_init(|| Arc::new(build_route_network()))
+}
+
+fn build_route_network() -> RouteNetwork {
+    RouteNetwork::build(
+        rail_line_group_cds().map(|group| stations_of_line_groups(&[group as u32])),
+        &EstimationParams::default(),
+    )
+}
+
+/// 行き先の検索 (`stationsByName`) で乗換の到達判定に使う、所要時間を持たない
+/// 系統網。`Station` も所要時間の推定も要らないので、`ROUTE_NETWORK` よりずっと
+/// 速く組み立てられる。`ROUTE_NETWORK` の中の網と同じものになる (テストで確認)。
+static ROUTE_TOPOLOGY: OnceLock<RouteTopology> = OnceLock::new();
+
+fn route_topology() -> &'static RouteTopology {
+    ROUTE_TOPOLOGY.get_or_init(build_route_topology)
+}
+
+fn build_route_topology() -> RouteTopology {
+    RouteTopology::build(rail_line_group_cds().map(|group| {
+        line_group_rows(group)
+            .map(|(sst, record, _, _)| RouteStop {
+                station_cd: record.station_cd,
+                station_group_id: record.station_g_cd as u32,
+                line_cd: record.line_cd,
+                // RouteNetwork は pass と stop_condition で判定する。apply_train_type は
+                // pass == 1 のときだけ stop_condition を Not にするので同じ結果になる
+                stoppable: sst.pass != Some(1),
+            })
+            .collect()
+    }))
 }
 
 // ---------------------------------------------------------------- 駅
@@ -130,6 +195,10 @@ pub struct MemStationRepository;
 
 #[async_trait]
 impl StationRepository for MemStationRepository {
+    async fn get_route_network(&self) -> Result<Arc<RouteNetwork>, DomainError> {
+        Ok(Arc::clone(route_network()))
+    }
+
     async fn get_by_coordinates(
         &self,
         latitude: f64,
@@ -155,10 +224,12 @@ impl StationRepository for MemStationRepository {
     }
 
     /// 名前の部分一致に加えて、`from_station_group_id` が指定された場合は
-    /// 「その駅から乗り換えなしで行けるか」で絞り込む。条件は次のどちらか。
+    /// 「その駅から行けるか」で絞り込む。条件は次のいずれか。
     ///
-    /// - 出発駅と同じ系統に、通過ではない停車として含まれる
-    /// - 出発駅か目的駅のどちらかが系統を持たず、かつ同じ路線にある
+    /// - 出発駅と同じ系統に、通過ではない停車として含まれる (分岐 A)
+    /// - 出発駅か目的駅のどちらかが系統を持たず、かつ同じ路線にある (分岐 B)
+    /// - 鉄道で、乗り換えればその駅の路線の列車で着ける (分岐 C。
+    ///   `connectedRoutes(viaLineId = その駅の路線)` で経路が出る駅)
     ///
     /// `from_station_group_id` が無ければ絞り込みは掛からない。
     /// 件数の上限は絞り込みの後に効くため、切るのは最後。
@@ -203,6 +274,11 @@ impl StationRepository for MemStationRepository {
             }
         }
 
+        // 乗換で行ける駅の判定。connectedRoutes と同じ系統から作った、所要時間を
+        // 持たない網を使う。乗換が要る駅が出たときに一度だけ作る。網は鉄道だけ
+        let rail_wanted = want.is_none_or(|t| t == TransportType::Rail as i32);
+        let mut reachability = None;
+
         let mut out = Vec::new();
         for record in hits {
             let mut dst_has_sst = false;
@@ -220,8 +296,22 @@ impl StationRepository for MemStationRepository {
             } else {
                 from_line_cds.contains(&record.line_cd)
             };
+            // 分岐 C: 乗り換えれば、この駅にこの路線の列車で着ける
+            // (connectedRoutes(viaLineId = この駅の路線) で経路が出る)。
+            // 共有する系統は無いので line_group_cd は空、has_train_types は false
             if shared_group.is_none() && !same_line {
-                continue;
+                if !rail_wanted {
+                    continue;
+                }
+                let reachability =
+                    reachability.get_or_insert_with(|| route_topology().reachability(group_id));
+                if !reachability.can_arrive(
+                    record.station_cd,
+                    record.station_g_cd as u32,
+                    record.line_cd,
+                ) {
+                    continue;
+                }
             }
 
             let mut station = record.to_entity(index::line_by_cd(record.line_cd));
@@ -1079,36 +1169,6 @@ impl TrainTypeRepository for MemTrainTypeRepository {
         Ok(out)
     }
 
-    async fn get_line_group_ids_by_station_group_ids(
-        &self,
-        station_group_ids: &[u32],
-    ) -> Result<HashMap<u32, Vec<u32>>, DomainError> {
-        let mut out: HashMap<u32, Vec<u32>> = HashMap::new();
-        for &group_id in station_group_ids {
-            let mut groups: Vec<u32> = Vec::new();
-            for record in index::stations_by_group(group_id as i32) {
-                if record.e_status != 0 {
-                    continue;
-                }
-                for sst in index::sst_by_station(record.station_cd) {
-                    if !sst_is_stop(sst) {
-                        continue;
-                    }
-                    if let Some(lg) = sst.line_group_cd {
-                        let lg = lg as u32;
-                        if !groups.contains(&lg) {
-                            groups.push(lg);
-                        }
-                    }
-                }
-            }
-            if !groups.is_empty() {
-                out.insert(group_id, groups);
-            }
-        }
-        Ok(out)
-    }
-
     async fn find_by_line_group_id_and_line_id(
         &self,
         line_group_id: u32,
@@ -1140,5 +1200,276 @@ impl TrainTypeRepository for MemTrainTypeRepository {
             }
         }
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use stationapi::domain::route_search::{self, Journey};
+    use stationapi::model;
+
+    const TOKYO: u32 = 1130101;
+    const SHIBUYA: u32 = 1130205;
+    const MITAKA: u32 = 1131105;
+    const NAKA_MEGURO: u32 = 2600103;
+
+    /// repository の実装は await しない (索引を引くだけ) ので、1 回 poll すれば終わる
+    fn block_on<F: std::future::Future>(future: F) -> F::Output {
+        let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+        match std::pin::pin!(future).poll(&mut context) {
+            std::task::Poll::Ready(value) => value,
+            std::task::Poll::Pending => panic!("repository futures complete without waiting"),
+        }
+    }
+
+    fn names_by_line(from: u32, name: &str) -> Vec<(String, i32, bool)> {
+        block_on(MemStationRepository.get_by_name(name.to_string(), Some(100), Some(from), None))
+            .unwrap()
+            .into_iter()
+            .map(|s| (s.station_name, s.line_cd, s.has_train_types))
+            .collect()
+    }
+
+    /// 探索結果の経路を estimateArrivalTimes / trainRoute の legs にする
+    /// (connectedRoutes が区間ごとに返す乗降駅と、探索が選んだ系統)
+    fn journey_legs(journey: &Journey) -> Vec<model::RouteLegRequest> {
+        journey
+            .legs
+            .iter()
+            .map(|leg| model::RouteLegRequest {
+                line_group_id: leg.line_group_id,
+                from_station_id: leg.station_cds[0] as u32,
+                to_station_id: *leg.station_cds.last().unwrap() as u32,
+            })
+            .collect()
+    }
+
+    fn station_ids_of(eta: &[stationapi::domain::arrival_estimation::EstimatedStop]) -> Vec<i32> {
+        eta.iter().map(|stop| stop.station_cd).collect()
+    }
+
+    #[test]
+    fn connected_route_eta_and_train_route_follow_the_legs() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+        let interactor = crate::interactor();
+        // 大宮 → 新大阪 (はやぶさ → 東京 → のぞみ など) と、山手線の継ぎ目を
+        // 跨ぎうる東京 → 渋谷
+        for (from, to) in [(1131906, 1160213), (TOKYO, SHIBUYA)] {
+            let journeys = route_network().search(from, to, None);
+            assert!(!journeys.is_empty());
+            for journey in &journeys {
+                let legs = journey_legs(journey);
+                let eta =
+                    block_on(interactor.estimate_connected_route_arrival_times(&legs)).unwrap();
+                let train_route = block_on(interactor.get_connected_train_route(&legs)).unwrap();
+
+                // 同じ区間を同じ弧で切り出す
+                let eta_ids = station_ids_of(&eta);
+                let train_route_ids: Vec<i32> = train_route
+                    .iter()
+                    .map(|segment| segment.station.as_ref().unwrap().id as i32)
+                    .collect();
+                assert_eq!(eta_ids, train_route_ids);
+                // 探索の区間と同じ駅を通る
+                let journey_ids: Vec<i32> = journey
+                    .legs
+                    .iter()
+                    .flat_map(|leg| leg.station_cds.iter().copied())
+                    .collect();
+                assert_eq!(eta_ids, journey_ids);
+                // 累積は減らず、最後は探索の所要時間と (ほぼ) 一致する
+                assert!(eta.windows(2).all(|pair| {
+                    pair[1].cumulative_minutes >= pair[0].departure_cumulative_minutes - 1e-9
+                }));
+                let last = eta.last().unwrap().cumulative_minutes;
+                let expected = f64::from(journey.total_seconds) / 60.0;
+                assert!(
+                    (last - expected).abs() < 1.0,
+                    "eta {last} vs search {expected}"
+                );
+                // 乗換では徒歩の後に乗換先の列車を待ち、走行区間は距離 0 から始まる。
+                // 乗車駅の行は、前の区間の降車駅の行のすぐ後
+                let mut board = 0;
+                for leg in &journey.legs[..journey.legs.len() - 1] {
+                    board += leg.station_cds.len();
+                    assert!(
+                        eta[board].departure_cumulative_minutes > eta[board].cumulative_minutes
+                    );
+                    assert!(train_route[board].distance_from_previous == 0.0);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn connected_route_legs_accept_any_train_type_of_the_leg() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+        let interactor = crate::interactor();
+        // 区間の乗降駅は中央線 (快速) の三鷹 (1131220) と新宿 (1131211) だが、
+        // 中央・総武線の各停 (系統 585) を選んでも、同じ駅グループにある各停の駅で
+        // 切り出す
+        let legs = [model::RouteLegRequest {
+            line_group_id: 585,
+            from_station_id: 1131220,
+            to_station_id: 1131211,
+        }];
+        let eta = block_on(interactor.estimate_connected_route_arrival_times(&legs)).unwrap();
+        let group_of = |station_cd: i32| index::station_by_cd(station_cd).unwrap().station_g_cd;
+        let (first, last) = (eta[0].station_cd, eta.last().unwrap().station_cd);
+        assert_eq!((group_of(first), group_of(last)), (MITAKA as i32, 1130208));
+        assert!(
+            first != 1131220 && last != 1131211,
+            "the local's own stations"
+        );
+        let train_route = block_on(interactor.get_connected_train_route(&legs)).unwrap();
+        assert_eq!(train_route.len(), eta.len());
+
+        // connectedRoutes の区間の trainTypes は、どれを選んでも区間の乗降駅で使える
+        let routes = block_on(interactor.get_connected_routes(MITAKA, NAKA_MEGURO, None)).unwrap();
+        for route in &routes {
+            let choices = route
+                .legs
+                .iter()
+                .map(|leg| leg.train_types.len())
+                .max()
+                .unwrap();
+            for choice in 0..choices {
+                let legs: Vec<model::RouteLegRequest> = route
+                    .legs
+                    .iter()
+                    .map(|leg| model::RouteLegRequest {
+                        line_group_id: leg.train_types[choice.min(leg.train_types.len() - 1)]
+                            .group_id,
+                        from_station_id: leg.from_station.id,
+                        to_station_id: leg.to_station.id,
+                    })
+                    .collect();
+                let eta =
+                    block_on(interactor.estimate_connected_route_arrival_times(&legs)).unwrap();
+                let train_route = block_on(interactor.get_connected_train_route(&legs)).unwrap();
+                assert_eq!(eta.len(), train_route.len());
+            }
+        }
+    }
+
+    #[test]
+    fn connected_route_rejects_legs_that_do_not_connect() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+        let interactor = crate::interactor();
+        let routes = block_on(interactor.get_connected_routes(MITAKA, NAKA_MEGURO, None)).unwrap();
+        let mut legs: Vec<model::RouteLegRequest> = routes[0]
+            .legs
+            .iter()
+            .map(|leg| model::RouteLegRequest {
+                line_group_id: leg.train_types[0].group_id,
+                from_station_id: leg.from_station.id,
+                to_station_id: leg.to_station.id,
+            })
+            .collect();
+        assert!(legs.len() > 1);
+        // 2 区間目を飛ばすと、1 区間目の降車駅と 3 区間目の乗車駅がつながらない
+        legs.remove(1);
+        let error = block_on(interactor.estimate_connected_route_arrival_times(&legs))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("区間がつながっていません"), "{error}");
+        assert!(block_on(interactor.get_connected_train_route(&legs)).is_err());
+        assert!(block_on(interactor.get_connected_train_route(&[])).is_err());
+
+        // connectedRoutes が返しうる乗車回数 (MAX_RIDES) を超える区間は断る。
+        // つながった区間 (三鷹と新宿を中央線快速で往復) でも受け付けない
+        let back_and_forth: Vec<model::RouteLegRequest> = (0..=route_search::MAX_RIDES)
+            .map(|index| {
+                let (from, to) = if index % 2 == 0 {
+                    (1131220, 1131211)
+                } else {
+                    (1131211, 1131220)
+                };
+                model::RouteLegRequest {
+                    line_group_id: 20,
+                    from_station_id: from,
+                    to_station_id: to,
+                }
+            })
+            .collect();
+        let error = block_on(interactor.estimate_connected_route_arrival_times(&back_and_forth))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("区間までにしてください"), "{error}");
+        assert!(block_on(interactor.get_connected_train_route(&back_and_forth)).is_err());
+        // 上限ちょうどは受け付ける
+        let at_limit = &back_and_forth[..route_search::MAX_RIDES];
+        assert!(block_on(interactor.get_connected_train_route(at_limit)).is_ok());
+    }
+
+    #[test]
+    fn route_topology_matches_the_topology_inside_the_route_network() {
+        // 行き先の検索は軽い網、connectedRoutes は所要時間つきの網を使う。
+        // 両者がずれると「行ける」と返した駅で経路が出なくなる
+        assert_eq!(route_topology(), route_network().topology());
+    }
+
+    #[test]
+    fn stations_by_name_includes_stations_reached_by_transfer() {
+        // 三鷹から中目黒へは直通の系統が無いが、乗り換えれば東横線でも日比谷線でも着く
+        let found = names_by_line(MITAKA, "中目黒");
+        assert!(found.contains(&("中目黒".to_string(), 26001, false)));
+        assert!(found.contains(&("中目黒".to_string(), 28003, false)));
+
+        // 返した駅には、その路線を viaLineId にした connectedRoutes で経路がある
+        let network = route_network();
+        for (_, line_cd, _) in &found {
+            assert!(!network
+                .search(MITAKA, NAKA_MEGURO, Some(*line_cd))
+                .is_empty());
+        }
+    }
+
+    #[test]
+    fn stations_by_name_skips_a_branch_junction_reached_only_by_backtracking() {
+        // 石橋阪大前は宝塚線 (34002) と、そこから出る箕面線 (34007) の駅。
+        // 箕面線の石橋阪大前に箕面線で着くには、一度箕面線へ出て戻るしかない
+        let found = names_by_line(MITAKA, "石橋阪大前");
+        let lines: Vec<i32> = found.iter().map(|(_, line_cd, _)| *line_cd).collect();
+        assert_eq!(lines, vec![34002]);
+    }
+
+    #[test]
+    fn stations_by_name_keeps_direct_stations_marked_as_sharing_a_line_group() {
+        // 東京から品川は山手線などで直通なので、共有する系統が付く
+        let found = names_by_line(TOKYO, "品川");
+        assert!(found
+            .iter()
+            .any(|(name, _, has_train_types)| name == "品川" && *has_train_types));
+    }
+
+    #[test]
+    fn route_network_finds_direct_and_transfer_routes_in_real_data() {
+        let network = build_route_network();
+        assert!(network.pattern_count() > 0);
+
+        // 山手線で乗り換えずに行ける
+        let journeys = network.search(TOKYO, SHIBUYA, None);
+        assert!(journeys.iter().any(|journey| journey.transfer_count() == 0));
+
+        // 直通の系統が無く、乗換が要る (旧実装は探索の上限に先に達して 0 件だった)
+        let journeys = network.search(MITAKA, NAKA_MEGURO, None);
+        assert!(!journeys.is_empty());
+        assert!(journeys.iter().all(|journey| journey.transfer_count() > 0));
+        for journey in &journeys {
+            assert_eq!(journey.legs[0].station_group_ids[0], MITAKA);
+            assert_eq!(
+                journey.legs.last().unwrap().station_group_ids.last(),
+                Some(&NAKA_MEGURO)
+            );
+            // 区間はつながっている
+            for pair in journey.legs.windows(2) {
+                assert_eq!(
+                    pair[0].station_group_ids.last(),
+                    pair[1].station_group_ids.first()
+                );
+            }
+        }
     }
 }

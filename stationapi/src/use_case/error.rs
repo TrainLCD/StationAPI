@@ -13,6 +13,9 @@ pub enum UseCaseError {
     Other(anyhow::Error),
     #[error("{0}")]
     Unexpected(String),
+    /// 引数どうしが矛盾している (区間がつながっていない、など)。
+    #[error("{0}")]
+    InvalidArgument(String),
 }
 
 impl From<DomainError> for UseCaseError {

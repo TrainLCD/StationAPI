@@ -308,6 +308,34 @@ pub struct Route {
     pub stops: Vec<Station>,
 }
 
+/// 乗換経路探索 (`connectedRoutes`) の経路 1 本。
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ConnectedRoute {
+    pub legs: Vec<RouteLeg>,
+}
+
+/// 乗換経路の区間の指定 (`estimateArrivalTimes` / `trainRoute` の `legs`)。
+/// `connectedRoutes` の区間の `trainTypes` から選んだ種別の `groupId` と、区間の
+/// `fromStation.id`・`toStation.id`。乗降駅は駅グループで系統の中から引き当てる。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RouteLegRequest {
+    pub line_group_id: u32,
+    pub from_station_id: u32,
+    pub to_station_id: u32,
+}
+
+/// 乗換経路の 1 区間 (1 本の列車)。
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RouteLeg {
+    /// この区間で乗れる列車種別すべて。`routeTypes(乗車駅グループ, 降車駅グループ,
+    /// 降車駅の路線)` と同じ結果・同じ並び。
+    pub train_types: Vec<TrainType>,
+    /// 乗車駅。探索が選んだ系統が走る路線の駅。
+    pub from_station: Station,
+    /// 降車駅。次の区間の乗車駅 (同じ駅グループの別路線の駅のことがある) か目的地。
+    pub to_station: Station,
+}
+
 /// 走行シミュレーション用の 1 区間。
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TrainRouteSegment {

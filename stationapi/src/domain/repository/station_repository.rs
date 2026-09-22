@@ -1,17 +1,12 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 
 use crate::domain::{
     entity::{gtfs::TransportType, station::Station},
     error::DomainError,
+    route_search::RouteNetwork,
 };
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ConnectedRoutePatternStop {
-    pub line_group_id: u32,
-    pub station_station_type_id: i32,
-    pub station_group_id: u32,
-    pub pass: Option<i32>,
-}
 
 #[async_trait]
 pub trait StationRepository: Send + Sync + 'static {
@@ -51,6 +46,12 @@ pub trait StationRepository: Send + Sync + 'static {
         limit: Option<u32>,
         transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, DomainError>;
+    /// 駅名で探す。`from_station_group_id` を指定すると、そこから行ける駅に絞る。
+    /// 行ける駅は、出発駅と系統を共有する駅 (`line_group_cd` にその系統が入り
+    /// `has_train_types` が真)、どちらかが系統を持たない同じ路線の駅、および
+    /// 乗り換えればその駅の路線の列車で着ける駅 (`connectedRoutes` で
+    /// `viaLineId` をその駅の路線にすると経路が出る駅。系統を共有しないので
+    /// `line_group_cd` は空、`has_train_types` は偽)。
     async fn get_by_name(
         &self,
         station_name: String,
@@ -63,28 +64,15 @@ pub trait StationRepository: Send + Sync + 'static {
         &self,
         line_group_ids: &[u32],
     ) -> Result<Vec<Station>, DomainError>;
-    /// Fetch only the fields needed while exploring connected routes.
+    /// 乗換経路探索 (`connectedRoutes`) に使う、鉄道の全系統の網。
     ///
-    /// The default keeps lightweight test repositories source-compatible.
-    /// Production repositories should override this to avoid materializing full
-    /// `Station` entities for every explored line group.
-    async fn get_connected_route_pattern_stops(
-        &self,
-        line_group_ids: &[u32],
-    ) -> Result<Vec<ConnectedRoutePatternStop>, DomainError> {
-        Ok(self
-            .get_by_line_group_id_vec(line_group_ids)
-            .await?
-            .into_iter()
-            .filter_map(|stop| {
-                Some(ConnectedRoutePatternStop {
-                    line_group_id: stop.line_group_cd? as u32,
-                    station_station_type_id: stop.sst_id?,
-                    station_group_id: stop.station_g_cd as u32,
-                    pass: stop.pass,
-                })
-            })
-            .collect())
+    /// 組み立てには全系統の駅と所要時間の推定が要るので、実装は一度組み立てた
+    /// ものを使い回すこと。既定は空の網ではなくエラーを返す (未実装が
+    /// 「経路なし」という正常応答に見えないように)。
+    async fn get_route_network(&self) -> Result<Arc<RouteNetwork>, DomainError> {
+        Err(DomainError::Unexpected(
+            "route network is not supported by this repository".to_string(),
+        ))
     }
     /// 各座標から `radius_meters` 以内のバス停を、近い順に最大
     /// `limit_per_station` 件返す。半径の外は呼び出し側でも採用されないため、

@@ -8,7 +8,7 @@
 //! use_case の DTO が計算しているので、domain エンティティから直接ではなく
 //! モデルを経由することでそのロジックをそのまま使える。
 
-use async_graphql::SimpleObject;
+use async_graphql::{InputObject, SimpleObject};
 use stationapi::model;
 
 use super::enums::*;
@@ -308,6 +308,54 @@ impl From<model::Route> for Route {
         Self {
             id: Some(UInt32(v.id)),
             stops: Some(v.stops.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+// 乗換経路探索 (connectedRoutes) の経路。区間ごとに乗れる種別 (routeTypes と同じ形で、
+// groupId は実在の系統) と乗降駅を持つ。クライアントは区間ごとに種別を選び、
+// lineGroupStations で系統全体の駅を取れる
+#[derive(SimpleObject)]
+#[graphql(name = "ConnectedRoute")]
+pub struct ConnectedRoute {
+    pub legs: Option<Vec<RouteLeg>>,
+}
+
+impl From<model::ConnectedRoute> for ConnectedRoute {
+    fn from(v: model::ConnectedRoute) -> Self {
+        Self {
+            legs: Some(v.legs.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+// estimateArrivalTimes / trainRoute に乗換経路を渡すときの 1 区間。connectedRoutes の
+// 区間の trainTypes から選んだ種別の groupId と、区間の fromStation.id・toStation.id。
+// 乗降駅は駅グループで系統の中から引き当てるので、どの種別を選んでもよい
+#[derive(InputObject)]
+#[graphql(name = "RouteLegInput")]
+pub struct RouteLegInput {
+    pub line_group_id: i32,
+    pub from_station_id: i32,
+    pub to_station_id: i32,
+}
+
+#[derive(SimpleObject)]
+#[graphql(name = "RouteLeg")]
+pub struct RouteLeg {
+    // この区間で乗れる種別すべて。routeTypes(乗車駅グループ, 降車駅グループ,
+    // 降車駅の路線) と同じ結果・同じ並び
+    pub train_types: Option<Vec<TrainType>>,
+    pub from_station: Option<Station>,
+    pub to_station: Option<Station>,
+}
+
+impl From<model::RouteLeg> for RouteLeg {
+    fn from(v: model::RouteLeg) -> Self {
+        Self {
+            train_types: Some(v.train_types.into_iter().map(Into::into).collect()),
+            from_station: Some(v.from_station.into()),
+            to_station: Some(v.to_station.into()),
         }
     }
 }

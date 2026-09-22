@@ -92,9 +92,13 @@ type Query {
 	stationTrainTypes(stationId: Int!): [TrainType!]!
 	routes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int, pageSize: Int, pageToken: String): RoutePage!
 	routeTypes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int, pageSize: Int, pageToken: String): RouteTypePage!
-	connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!): [Route!]!
-	estimateArrivalTimes(fromStationId: Int!, toStationId: Int!, viaLineIds: [Int!], directionId: Int): EstimatedArrivalPage!
-	trainRoute(fromStationId: Int!, toStationId: Int!, lineGroupId: Int): TrainRouteResponse!
+	connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int): [ConnectedRoute!]!
+	estimateArrivalTimes(fromStationId: Int!, toStationId: Int!, viaLineIds: [Int!], directionId: Int, legs: [RouteLegInput!]): EstimatedArrivalPage!
+	trainRoute(fromStationId: Int!, toStationId: Int!, lineGroupId: Int, legs: [RouteLegInput!]): TrainRouteResponse!
+}
+
+type ConnectedRoute {
+	legs: [RouteLeg!]
 }
 
 type RoutePage {
@@ -279,6 +283,18 @@ type TrainTypeNested {
 type Route {
 	id: UInt32
 	stops: [StationNested!]
+}
+
+input RouteLegInput {
+	lineGroupId: Int!
+	fromStationId: Int!
+	toStationId: Int!
+}
+
+type RouteLeg {
+	trainTypes: [TrainType!]
+	fromStation: Station
+	toStation: Station
 }
 
 type EstimatedArrivalStop {
