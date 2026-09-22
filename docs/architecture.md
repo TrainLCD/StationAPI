@@ -322,7 +322,8 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
 区間の切り出しは 2 つで同じ関数を通し、環状線では継ぎ目を跨ぐ短い方の弧を取る
 ので、両者の駅の並びは一致します (`lineGroupId` 指定の `trainRoute` は従来どおり
 格納順で切り出します)。区間がつながっていない (前の区間の降車駅と次の区間の
-乗車駅が別の駅グループ)、端の駅が `fromStationId` / `toStationId` と食い違う、
+乗車駅が別の駅グループ)、区間が 6 (`MAX_RIDES`、`connectedRoutes` が返しうる
+乗車回数) を超える、端の駅が `fromStationId` / `toStationId` と食い違う、
 `viaLineIds`・`directionId`・`lineGroupId` と併用した、のいずれかはエラーです。
 
 ### 行き先の検索 (`stationsByName`)

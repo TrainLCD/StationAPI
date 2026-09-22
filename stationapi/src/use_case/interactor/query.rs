@@ -1178,6 +1178,14 @@ where
                 "legs には 1 つ以上の区間を指定してください".to_string(),
             ));
         }
+        // connectedRoutes は乗車 MAX_RIDES 本までしか返さない。区間ごとに駅の取得と
+        // 推定・付帯情報の付与が走るので、それを超える指定は断る
+        if legs.len() > route_search::MAX_RIDES {
+            return Err(UseCaseError::InvalidArgument(format!(
+                "legs は {} 区間までにしてください",
+                route_search::MAX_RIDES
+            )));
+        }
         let ids: Vec<u32> = legs
             .iter()
             .flat_map(|leg| [leg.from_station_id, leg.to_station_id])

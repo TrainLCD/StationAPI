@@ -1206,7 +1206,7 @@ impl TrainTypeRepository for MemTrainTypeRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use stationapi::domain::route_search::Journey;
+    use stationapi::domain::route_search::{self, Journey};
     use stationapi::model;
 
     const TOKYO: u32 = 1130101;
@@ -1376,6 +1376,31 @@ mod tests {
         assert!(error.contains("区間がつながっていません"), "{error}");
         assert!(block_on(interactor.get_connected_train_route(&legs)).is_err());
         assert!(block_on(interactor.get_connected_train_route(&[])).is_err());
+
+        // connectedRoutes が返しうる乗車回数 (MAX_RIDES) を超える区間は断る。
+        // つながった区間 (三鷹と新宿を中央線快速で往復) でも受け付けない
+        let back_and_forth: Vec<model::RouteLegRequest> = (0..=route_search::MAX_RIDES)
+            .map(|index| {
+                let (from, to) = if index % 2 == 0 {
+                    (1131220, 1131211)
+                } else {
+                    (1131211, 1131220)
+                };
+                model::RouteLegRequest {
+                    line_group_id: 20,
+                    from_station_id: from,
+                    to_station_id: to,
+                }
+            })
+            .collect();
+        let error = block_on(interactor.estimate_connected_route_arrival_times(&back_and_forth))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("区間までにしてください"), "{error}");
+        assert!(block_on(interactor.get_connected_train_route(&back_and_forth)).is_err());
+        // 上限ちょうどは受け付ける
+        let at_limit = &back_and_forth[..route_search::MAX_RIDES];
+        assert!(block_on(interactor.get_connected_train_route(at_limit)).is_ok());
     }
 
     #[test]

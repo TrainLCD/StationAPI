@@ -6,6 +6,7 @@
 
 use async_graphql::{Context, Object, Result as GqlResult};
 use stationapi::domain::entity::gtfs::TransportTypeFilter;
+use stationapi::domain::route_search;
 use stationapi::model;
 use stationapi::use_case::traits::query::QueryUseCase;
 
@@ -62,6 +63,14 @@ fn route_legs(
     from_station_id: u32,
     to_station_id: u32,
 ) -> Result<Vec<model::RouteLegRequest>, async_graphql::Error> {
+    // connectedRoutes は乗車 MAX_RIDES 本までしか返さない。区間ごとに駅の取得と
+    // 推定・付帯情報の付与が走るので、それを超える指定は変換する前に断る
+    if legs.len() > route_search::MAX_RIDES {
+        return Err(async_graphql::Error::new(format!(
+            "legs は {} 区間までにしてください",
+            route_search::MAX_RIDES
+        )));
+    }
     let legs: Vec<model::RouteLegRequest> = legs
         .into_iter()
         .map(|leg| {
