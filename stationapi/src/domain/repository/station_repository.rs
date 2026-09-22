@@ -46,6 +46,12 @@ pub trait StationRepository: Send + Sync + 'static {
         limit: Option<u32>,
         transport_type: Option<TransportType>,
     ) -> Result<Vec<Station>, DomainError>;
+    /// 駅名で探す。`from_station_group_id` を指定すると、そこから行ける駅に絞る。
+    /// 行ける駅は、出発駅と系統を共有する駅 (`line_group_cd` にその系統が入り
+    /// `has_train_types` が真)、どちらかが系統を持たない同じ路線の駅、および
+    /// 乗り換えればその駅の路線の列車で着ける駅 (`connectedRoutes` で
+    /// `viaLineId` をその駅の路線にすると経路が出る駅。系統を共有しないので
+    /// `line_group_cd` は空、`has_train_types` は偽)。
     async fn get_by_name(
         &self,
         station_name: String,

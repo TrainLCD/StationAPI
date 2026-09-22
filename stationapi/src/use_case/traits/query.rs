@@ -8,7 +8,7 @@ use crate::{
             station::Station, station_number::StationNumber, train_type::TrainType,
         },
     },
-    model::{ConnectedRoute, Route, TrainRouteSegment},
+    model::{ConnectedRoute, Route, RouteLegRequest, TrainRouteSegment},
     use_case::error::UseCaseError,
 };
 
@@ -124,6 +124,17 @@ pub trait QueryUseCase: Send + Sync + 'static {
         to_station_group_id: u32,
         via_line_id: Option<u32>,
     ) -> Result<Vec<ConnectedRoute>, UseCaseError>;
+    /// 乗換経路 (`connectedRoutes` の区間の並び) の各駅の推定到着時間。
+    /// 出発駅からの累積で、乗換ごとに徒歩と乗換先の待ち時間の見込みを加える。
+    async fn estimate_connected_route_arrival_times(
+        &self,
+        legs: &[RouteLegRequest],
+    ) -> Result<Vec<EstimatedStop>, UseCaseError>;
+    /// 乗換経路 (`connectedRoutes` の区間の並び) の走行区間を、区間の順につなげたもの。
+    async fn get_connected_train_route(
+        &self,
+        legs: &[RouteLegRequest],
+    ) -> Result<Vec<TrainRouteSegment>, UseCaseError>;
     async fn estimate_route_arrival_times(
         &self,
         from_station_id: u32,

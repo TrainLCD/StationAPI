@@ -215,17 +215,17 @@ PostgreSQL のクエリは以下のように置き換えています。
 
 アプリは 1 本の列車 (系統) ごとに「種別を選ぶ → `lineGroupStations` で系統
 全体の駅を取る → LCD を動かす」流れで動きます。乗換経路もこの流れに乗せられる
-よう、経路は区間 (`legs`) の並びで返し、各区間は `routeTypes` と同じ形の
-`TrainType` (実在の `groupId`) と乗車駅・降車駅 (`Station`) を持ちます。
-乗降駅にはその系統が走る路線の駅を返すので、乗換駅では前の区間の降車駅と
+よう、経路は区間 (`legs`) の並びで返し、各区間はその区間で乗れる種別
+(`trainTypes`、`routeTypes` と同じ形で実在の `groupId`) と乗車駅・降車駅
+(`Station`) を持ちます。乗降駅には探索が乗った系統が走る路線の駅を返すので、乗換駅では前の区間の降車駅と
 次の区間の乗車駅が別の駅 (同じ駅グループ) になることがあります
 (例: 丸ノ内線の赤坂見附 → 半蔵門線の永田町)。
 
 ```graphql
 connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int): [ConnectedRoute!]!
 
-type ConnectedRoute { estimatedMinutes: Float  transferCount: Int  legs: [RouteLeg!] }
-type RouteLeg { trainType: TrainType  trainTypes: [TrainType!]  fromStation: Station  toStation: Station }
+type ConnectedRoute { legs: [RouteLeg!] }
+type RouteLeg { trainTypes: [TrainType!]  fromStation: Station  toStation: Station }
 ```
 
 探索は停車駅が同じ並行種別 (中央線の快速・通勤快速など) を 1 つの経路に
@@ -235,8 +235,8 @@ type RouteLeg { trainType: TrainType  trainTypes: [TrainType!]  fromStation: Sta
 乗れる種別すべてを返します。中身は
 `routeTypes(乗車駅グループ, 降車駅グループ, 降車駅の路線)` そのもので、停車駅が
 同じ種別のまとめ・路線の付与・並び順も `routeTypes` と同じです (同じ関数を
-呼んでいます)。`trainType` は探索が選んだ代表の 1 件で、まとめの結果
-`trainTypes` に含まれないことがあります。
+呼んでいます)。探索が選んだ代表の種別、推定所要時間、乗換回数は並べ替えに
+使うだけで、API では返しません (アプリが使わないため)。
 
 `viaLineId` は `routeTypes` と同じく検索結果でタップした駅の路線で、目的地に
 その路線の駅で着く経路 (最後の区間がその路線を走る経路) だけに絞ります。
@@ -269,9 +269,7 @@ type RouteLeg { trainType: TrainType  trainTypes: [TrainType!]  fromStation: Sta
 | 乗換の徒歩 | 3 分 |
 
 待ち時間を入れないと、本数の少ない特急が「直通で速い」ことになり、
-東京→渋谷で山手線より成田エクスプレスを勧めてしまいます。返す推定所要時間
-(`ConnectedRoute.estimatedMinutes`) は評価値から最初の列車の待ち時間を除いたもので、
-乗換先の待ち時間は含みます。
+東京→渋谷で山手線より成田エクスプレスを勧めてしまいます。
 
 ### 代替経路と並び順
 
@@ -286,10 +284,72 @@ type RouteLeg { trainType: TrainType  trainTypes: [TrainType!]  fromStation: Sta
 上回るものを捨てます。乗車回数を増やしても順位の値が良くならないパレート解
 (1 分縮めるために乗り換え続ける経路) も捨てます。
 
-別々の区間で同じ駅グループを通る経路も捨てます。区間を禁止して再探索すると、
-「1 駅戻って同じ列車に乗り直す」逆戻りが代替経路として出てくるためです
-(例: 大宮 → 土呂 → 大宮を通過して東京)。1 つの区間の中で同じ駅を通るのは
-実在する運行 (大江戸線の都庁前など) なので構いません。
+代替経路では、別々の区間で同じ駅グループに停車する経路も捨てます。区間を
+禁止して再探索すると、「1 駅戻って同じ列車に乗り直す」逆戻りが代替経路として
+出てくるためです (例: 大宮 → 土呂 → 大宮に停車して東京)。通過した駅は数えません
+(急行で通過した駅へ先の駅から戻るのは実際にある乗り方です)。1 つの区間の中で
+同じ駅に止まるのは実在する運行 (大江戸線の都庁前など) なので構いません。初回
+探索のパレート解 (最適解) にはこの除外をかけません。かけると、逆戻りしか経路の
+無い駅が「行ける駅」(`stationsByName`) なのに 0 件になるためです。
+
+### 到着見込みと走行区間 (`estimateArrivalTimes` / `trainRoute`)
+
+どちらも `legs: [RouteLegInput!]` を受け付け、乗換経路全体を通した値を返します。
+`legs` には `connectedRoutes` の各区間の `trainTypes` から選んだ種別の
+`groupId` と、区間の `fromStation.id`・`toStation.id` を渡します。経路 ID は
+持たないので、経路はクライアントが区間の並びとして渡します。
+
+選んだ種別が区間の乗降駅とは別の路線の駅に止まることがあります (乗降駅は
+中央線快速の三鷹だが、選んだ各停は中央・総武線の三鷹に止まる、など)。そこで
+系統に無い乗降駅は、同じ駅グループの駅で引き当てます。`station_cd` が一致する
+駅があればそれを使い、駅グループの候補が複数あれば区間が最も短くなる組を
+選びます (直通系統は接続駅で同じ駅グループの駅を 2 行持つため。宇都宮線の上野と
+上野東京ラインの上野など)。
+
+```graphql
+input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! }
+```
+
+- `estimateArrivalTimes`: 各区間を指定された系統だけで推定し (両駅に止まる別の
+  系統は使わない)、出発駅からの累積でつないだ 1 本の経路を返します (`id` は
+  系統をまたぐので空)。乗換駅は前の区間の降車駅と次の区間の乗車駅の 2 行で、
+  乗車駅の行は「徒歩 3 分後に着き、乗換先の種別の待ち時間の後に出る」値です。
+  見込みは `connectedRoutes` の並べ替えと同じ (徒歩 3 分と種別ごとの待ち時間) です。
+- `trainRoute`: 区間ごとの走行区間を順につなげます。区間ごとに別の列車なので、
+  各区間の最初の駅の `distanceFromPrevious` は 0 で、通過駅の有無 (優等種別の
+  速度を使うか) も区間ごとに判定します。
+
+区間の切り出しは 2 つで同じ関数を通し、環状線では継ぎ目を跨ぐ短い方の弧を取る
+ので、両者の駅の並びは一致します (`lineGroupId` 指定の `trainRoute` は従来どおり
+格納順で切り出します)。区間がつながっていない (前の区間の降車駅と次の区間の
+乗車駅が別の駅グループ)、区間が 6 (`MAX_RIDES`、`connectedRoutes` が返しうる
+乗車回数) を超える、端の駅が `fromStationId` / `toStationId` と食い違う、
+`viaLineIds`・`directionId`・`lineGroupId` と併用した、のいずれかはエラーです。
+
+### 行き先の検索 (`stationsByName`)
+
+`stationsByName` に `fromStationGroupId` を指定すると、そこから行ける駅に
+絞ります。出発駅と系統を共有する駅 (直通) と、どちらかが系統を持たない同じ
+路線の駅に加え、乗り換えればその駅の路線の列車で着ける鉄道駅も返します。
+最後のものは「`connectedRoutes` で `viaLineId` をその駅の路線にすると経路が
+出る駅」と一致させてあり、系統を共有しないので `line_group_cd` は空、
+`hasTrainTypes` は偽です (直通の駅と見分けられます)。
+
+判定には、`connectedRoutes` と同じ系統から作った**所要時間を持たない網**
+(`stationapi/src/domain/route_topology.rs` の `RouteTopology`) を使います。
+要るのは「どの系統がどの駅に止まるか」だけなので、`Station` の組み立ても
+所要時間の推定もせず索引から直接作り、組み立ては約 20ms (所要時間つきの網の
+約 1/10) です。`RouteNetwork` も内部に同じ網を持ち、系統の整え方
+(`trim_pattern`) と駅の選び方 (`line_group_rows`) を共有しています。両者が
+一致することは実データのテストで確かめています。乗車 6 本以内で系統を
+幅優先でたどります (1 回数 ms)。ただし探索は目的地の駅グループで途中下車しないので、
+幅優先だけでは「支線の根元の駅に、支線へ一度出て戻って着く」経路を数えて
+しまいます (石橋阪大前に箕面線で着く、新函館北斗に函館本線で着く、など。
+実データで 0.3〜0.7% の駅)。これが起きるのは目的地が駅と系統の二部グラフの
+関節点のときだけなので、系統網の組み立て時に関節点を求めておき (Tarjan)、
+該当する駅に限って目的地で降りない幅優先で確かめます。実データの 3 つの
+出発駅で各 1,500 駅を突き合わせ、探索との食い違いが無いことを確認しています。
+`stationsByName` は 100 件ヒットでも 2〜4ms です (網の組み立て後)。
 
 ### 計算量
 

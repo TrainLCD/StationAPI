@@ -30,6 +30,7 @@ use crate::domain::arrival_estimation::{
     estimate_arrival_minutes_calibrated, is_circular_route, EstimationParams,
 };
 use crate::domain::entity::station::Station;
+use crate::domain::route_topology::{trim_pattern, RouteStop, RouteTopology};
 
 /// 乗換 1 回あたりの乗換通路の徒歩(秒)。
 pub const TRANSFER_WALK_SECONDS: i32 = 3 * 60;
@@ -144,6 +145,8 @@ pub struct RouteNetwork {
     node_groups: Vec<u32>,
     /// 節点 -> (パターン, 一周目の位置)。乗降できる位置だけ。
     stop_patterns: Vec<Vec<(u32, u32)>>,
+    /// 同じ系統から作った、所要時間を持たない網。到達判定はこちらで行う。
+    topology: RouteTopology,
 }
 
 impl RouteNetwork {
@@ -160,7 +163,13 @@ impl RouteNetwork {
         for stations in line_groups {
             network.add_pattern(stations, params);
         }
+        network.topology.finish();
         network
+    }
+
+    /// 同じ系統から作った、所要時間を持たない網 (到達判定用)。
+    pub fn topology(&self) -> &RouteTopology {
+        &self.topology
     }
 
     pub fn pattern_count(&self) -> usize {
@@ -185,18 +194,24 @@ impl RouteNetwork {
         let Some(line_group_id) = stations.first().and_then(|s| s.line_group_cd) else {
             return;
         };
-        // 先頭駅が末尾にも重複格納された「閉じた」環状データは、重複終端を
-        // 除いてから環状判定する(estimate_route_arrival_times と同じ扱い)。
-        if stations.len() > 1 && stations[0].station_cd == stations[stations.len() - 1].station_cd {
-            stations.pop();
-        }
-        let stoppable: Vec<bool> = stations
-            .iter()
-            .map(|s| s.pass != Some(1) && s.stop_condition != crate::model::StopCondition::Not)
-            .collect();
-        if stoppable.iter().filter(|&&s| s).count() < 2 {
+        let is_stoppable =
+            |s: &Station| s.pass != Some(1) && s.stop_condition != crate::model::StopCondition::Not;
+        // 系統の整え方は到達判定の網と共有する (同じ系統から同じ網を作るため)
+        if !trim_pattern(&mut stations, |s| s.station_cd, is_stoppable) {
             return;
         }
+        let stoppable: Vec<bool> = stations.iter().map(is_stoppable).collect();
+        self.topology.add_pattern(
+            stations
+                .iter()
+                .map(|s| RouteStop {
+                    station_cd: s.station_cd,
+                    station_group_id: s.station_g_cd as u32,
+                    line_cd: s.line_cd,
+                    stoppable: is_stoppable(s),
+                })
+                .collect(),
+        );
 
         let refs: Vec<&Station> = stations.iter().collect();
         let circular = is_circular_route(&refs);
@@ -275,8 +290,9 @@ impl RouteNetwork {
             node: target as usize,
             line_cd: via_line_id,
         };
-        let mut pareto = self.raptor(origin, arrival, &HashSet::new(), UNREACHED);
-        pareto.retain(|(_, legs)| !self.revisits_station_group(legs));
+        // パレート解は最適解なので逆戻りの除外をかけない。かけると、逆戻りしか
+        // 経路が無い駅が「行ける駅」(reachable_station_cds) なのに 0 件になる
+        let pareto = self.raptor(origin, arrival, &HashSet::new(), UNREACHED);
         if pareto.is_empty() {
             return Vec::new();
         }
@@ -549,12 +565,13 @@ impl RouteNetwork {
         }
     }
 
-    /// 別々の区間で同じ駅グループを通るか。乗換駅 (前の区間の降車駅 = 次の区間の
-    /// 乗車駅) は除く。
+    /// 別々の区間で同じ駅グループに停車するか。乗換駅 (前の区間の降車駅 = 次の
+    /// 区間の乗車駅) は除く。
     ///
     /// 区間を禁止して再探索すると、「1 駅戻って同じ列車に乗り直す」逆戻りの経路が
-    /// 代替経路として出てくるので捨てる。1 つの区間の中で同じ駅を通るのは
-    /// 実在する運行 (大江戸線の都庁前など) なので構わない。
+    /// 代替経路として出てくるので捨てる。通過した駅へ戻るのは (急行で先の駅まで
+    /// 行って戻るなど) 実際にある乗り方なので数えない。1 つの区間の中で同じ駅に
+    /// 止まるのは実在する運行 (大江戸線の都庁前など) なので構わない。
     fn revisits_station_group(&self, legs: &[LegRef]) -> bool {
         let mut visited: HashSet<u32> = HashSet::new();
         for leg in legs {
@@ -564,7 +581,9 @@ impl RouteNetwork {
             let board_node = pattern.nodes[board % len];
             let mut leg_nodes: HashSet<u32> = HashSet::new();
             for q in board.min(alight)..=board.max(alight) {
-                leg_nodes.insert(pattern.nodes[q % len]);
+                if pattern.stoppable[q % len] {
+                    leg_nodes.insert(pattern.nodes[q % len]);
+                }
             }
             if leg_nodes
                 .iter()
@@ -980,6 +999,185 @@ mod tests {
         let journeys = network.search(1, 4, None);
         assert_eq!(journeys.len(), 1);
         assert_eq!(line_groups(&journeys[0]), vec![100, 200]);
+    }
+
+    #[test]
+    fn reachable_stations_follow_transfers_and_skip_passed_stations() {
+        let mut express = straight(300, &[(3, 2.0, 0.0), (7, 3.0, 0.0), (8, 4.0, 0.0)]);
+        express[1].pass = Some(1);
+        let mut line_groups = vec![
+            straight(100, &[(1, 0.0, 0.0), (2, 1.0, 0.0), (3, 2.0, 0.0)]),
+            straight(200, &[(3, 2.0, 0.0), (5, 2.0, 1.0)]),
+            express,
+            // 1 からつながっていない系統
+            straight(400, &[(9, 9.0, 9.0), (10, 9.5, 9.0)]),
+        ];
+        // 7 は急行 (300) が通過するが、別の路線 (500) の駅としてなら止まる
+        line_groups.push(straight(500, &[(8, 4.0, 0.0), (7, 3.0, 0.0)]));
+        let network = RouteNetwork::build(line_groups, &EstimationParams::default());
+
+        let reachable = network.topology().reachable_station_cds(1);
+        // straight() の station_cd は line_group * 100 + 位置
+        for station_cd in [
+            10000, 10001, 10002, 20000, 20001, 30000, 30002, 50000, 50001,
+        ] {
+            assert!(reachable.contains(&station_cd), "{station_cd} is reachable");
+        }
+        assert!(
+            !reachable.contains(&30001),
+            "the express passes 7, so 7 on line 300 is not a place to get off"
+        );
+        assert!(!reachable.contains(&40000) && !reachable.contains(&40001));
+        assert!(network.topology().reachable_station_cds(99).is_empty());
+
+        // 到達できると判定した駅は、その路線を via にした探索で経路が出る
+        assert!(!network.search(1, 7, Some(500)).is_empty());
+        assert!(network.search(1, 7, Some(300)).is_empty());
+    }
+
+    #[test]
+    fn cannot_arrive_at_a_junction_on_the_branch_that_starts_there() {
+        // 本線 (100) 1 - 2 - 3 と、3 から出る支線 (200) 3 - 4 (石橋阪大前と箕面線)。
+        // 支線の 3 に支線の列車で着くには、3 を通って 4 へ出てから戻るしかない
+        let network = RouteNetwork::build(
+            [
+                straight(100, &[(1, 0.0, 0.0), (2, 1.0, 0.0), (3, 2.0, 0.0)]),
+                straight(200, &[(3, 2.0, 0.0), (4, 2.0, 1.0)]),
+            ],
+            &EstimationParams::default(),
+        );
+        let reachability = network.topology().reachability(1);
+        // straight() の station_cd は line_group * 100 + 位置、line_cd は line_group
+        assert!(reachability.can_arrive(10002, 3, 100));
+        assert!(reachability.can_arrive(20001, 4, 200));
+        assert!(
+            !reachability.can_arrive(20000, 3, 200),
+            "the branch's junction station is not reached by the branch itself"
+        );
+        assert!(network.search(1, 3, Some(200)).is_empty());
+        assert!(
+            !reachability.can_arrive(99999, 3, 100),
+            "unknown stations are unreachable"
+        );
+    }
+
+    #[test]
+    fn cannot_arrive_at_the_origin_station_group() {
+        // 2 から同じ系統に乗り直した分として、出発駅 1 の駅も到達集合に入る。
+        // 1 は関節点でもないが、search は出発駅と同じ駅グループへは 0 件を返す
+        let network = RouteNetwork::build(
+            [straight(
+                100,
+                &[(1, 0.0, 0.0), (2, 1.0, 0.0), (3, 2.0, 0.0)],
+            )],
+            &EstimationParams::default(),
+        );
+        let topology = network.topology();
+        assert!(topology.reachable_station_cds(1).contains(&10000));
+        assert!(!topology.reachability(1).can_arrive(10000, 1, 100));
+        assert!(network.search(1, 1, Some(100)).is_empty());
+    }
+
+    #[test]
+    fn reachability_matches_search_on_a_ring_with_branches() {
+        // 環状 (100) に支線 (200, 300) が付き、支線同士は 5 で接する。どの駅も
+        // 「着けると判定した駅には経路がある」ことを総当たりで確かめる
+        let ring: Vec<(i32, f64, f64)> = (0..12)
+            .map(|i| {
+                let angle = i as f64 / 12.0 * std::f64::consts::TAU;
+                (i + 1, angle.cos() * 3.0, angle.sin() * 3.0)
+            })
+            .collect();
+        let line_groups = vec![
+            straight(100, &ring),
+            straight(200, &[(3, 1.5, 2.6), (20, 3.0, 5.0), (5, -1.5, 2.6)]),
+            straight(300, &[(20, 3.0, 5.0), (21, 4.0, 6.0)]),
+            straight(400, &[(9, 0.0, -3.0), (30, 0.0, -5.0)]),
+        ];
+        let stations: Vec<(i32, u32, i32)> = line_groups
+            .iter()
+            .flatten()
+            .map(|s| (s.station_cd, s.station_g_cd as u32, s.line_cd))
+            .collect();
+        let network = RouteNetwork::build(line_groups, &EstimationParams::default());
+        for origin in [1, 20, 21, 30] {
+            let reachability = network.topology().reachability(origin);
+            for &(station_cd, group, line_cd) in &stations {
+                if group == origin {
+                    continue;
+                }
+                assert_eq!(
+                    reachability.can_arrive(station_cd, group, line_cd),
+                    !network.search(origin, group, Some(line_cd)).is_empty(),
+                    "origin {origin}, station {station_cd}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn topology_built_from_route_stops_matches_the_one_inside_the_network() {
+        // 閉じた環状 (先頭駅を末尾にも持つ)、通過駅、停車駅が 1 つしかない系統を含む
+        let mut closed_ring = straight(
+            100,
+            &[(1, 0.0, 0.0), (2, 1.0, 0.0), (3, 1.0, 1.0), (4, 0.0, 1.0)],
+        );
+        let mut closing = closed_ring[0].clone();
+        closing.sst_id = Some(10099);
+        closed_ring.push(closing);
+        let mut express = straight(200, &[(2, 1.0, 0.0), (5, 2.0, 0.0), (6, 3.0, 0.0)]);
+        express[1].pass = Some(1);
+        let mut single_stop = straight(300, &[(6, 3.0, 0.0), (7, 4.0, 0.0)]);
+        single_stop[1].pass = Some(1);
+        let line_groups = vec![closed_ring, express, single_stop];
+
+        let stops: Vec<Vec<RouteStop>> = line_groups
+            .iter()
+            .map(|stations| {
+                stations
+                    .iter()
+                    .map(|s| RouteStop {
+                        station_cd: s.station_cd,
+                        station_group_id: s.station_g_cd as u32,
+                        line_cd: s.line_cd,
+                        stoppable: s.pass != Some(1),
+                    })
+                    .collect()
+            })
+            .collect();
+        let network = RouteNetwork::build(line_groups, &EstimationParams::default());
+        let topology = RouteTopology::build(stops);
+        assert_eq!(&topology, network.topology());
+        assert_eq!(
+            topology.pattern_count(),
+            2,
+            "the single-stop line group is dropped"
+        );
+    }
+
+    #[test]
+    fn reachable_stations_stop_after_the_ride_limit() {
+        // 0 -> 1 -> ... -> 7 を 1 駅ずつ別の系統でつなぐ。乗車 6 本で 6 まで
+        let line_groups: Vec<Vec<Station>> = (0..7)
+            .map(|i| {
+                straight(
+                    100 + i,
+                    &[(i, f64::from(i), 0.0), (i + 1, f64::from(i + 1), 0.0)],
+                )
+            })
+            .collect();
+        let network = RouteNetwork::build(line_groups, &EstimationParams::default());
+        let reachable = network.topology().reachable_station_cds(0);
+        assert!(
+            reachable.contains(&(105 * 100 + 1)),
+            "group 6 by the sixth ride"
+        );
+        assert!(
+            !reachable.contains(&(106 * 100 + 1)),
+            "group 7 needs a seventh ride"
+        );
+        assert!(network.search(0, 6, None).len() == 1);
+        assert!(network.search(0, 7, None).is_empty());
     }
 
     #[test]
