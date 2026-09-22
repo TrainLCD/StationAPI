@@ -1110,6 +1110,7 @@ where
                             train_types: leg_train_types.get(&key)?.clone(),
                             from_station: model::Station::from(from_station.clone()),
                             to_station: model::Station::from(to_station.clone()),
+                            station_group_ids: leg.station_group_ids.clone(),
                         })
                     })
                     // 駅か種別を引けない区間があれば、その経路は返さない

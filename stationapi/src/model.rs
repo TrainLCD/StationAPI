@@ -334,6 +334,9 @@ pub struct RouteLeg {
     pub from_station: Station,
     /// 降車駅。次の区間の乗車駅 (同じ駅グループの別路線の駅のことがある) か目的地。
     pub to_station: Station,
+    /// 乗車駅から降車駅までの駅グループ ID を進行順に並べたもの (通過駅を含む)。
+    /// 探索が乗った系統の並びで、ループ系統では同じ駅グループが 2 回出ることがある。
+    pub station_group_ids: Vec<u32>,
 }
 
 /// 走行シミュレーション用の 1 区間。

@@ -295,6 +295,7 @@ type RouteLeg {
 	trainTypes: [TrainType!]
 	fromStation: Station
 	toStation: Station
+	stationGroupIds: [Int!]
 }
 
 type EstimatedArrivalStop {
