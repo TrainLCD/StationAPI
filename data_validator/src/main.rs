@@ -52,12 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let line_records: Vec<StringRecord> = rdr.records().collect::<Result<Vec<_>, _>>()?;
     let line_ids: HashSet<u32> = line_records
         .iter()
-        .map(|row| {
-            row.get(LINES_COL_LINE_CD)
-                .unwrap()
-                .parse::<u32>()
-                .unwrap()
-        })
+        .map(|row| row.get(LINES_COL_LINE_CD).unwrap().parse::<u32>().unwrap())
         .collect();
 
     let mut rdr = ReaderBuilder::new().from_path(data_path.join("4!types.csv"))?;
