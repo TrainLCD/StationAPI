@@ -13,6 +13,7 @@ A GraphQL API that provides nearby Japanese train stations and bus stops, runnin
 - For automation agent and contributor workflows, see [AGENTS.md](AGENTS.md).
 - For contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 - For system architecture and design decisions, see [docs/architecture.md](docs/architecture.md).
+- For the design of the transfer route search (`connectedRoutes`, RAPTOR), see [docs/route-search.md](docs/route-search.md).
 - For technical debt analysis and architectural concerns, see [docs/technical_debt.md](docs/technical_debt.md).
 - For the record of the Cloudflare Workers migration, see [docs/cloudflare-workers-migration.md](docs/cloudflare-workers-migration.md).
 - For the published GraphQL schema, see [schema/public.graphql](schema/public.graphql).

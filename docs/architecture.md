@@ -210,6 +210,8 @@ PostgreSQL のクエリは以下のように置き換えています。
 探します。`routes` / `routeTypes` が「発着の両方に停車する系統」だけを返すのに
 対し、こちらは系統をまたいで乗り継ぐ経路を返します。実装は
 `stationapi/src/domain/route_search.rs` (純粋ロジック) にあります。
+探索アルゴリズムの内部設計 (データ構造、走査の式、枝刈り、代替経路の生成、
+決定性) は [乗換経路探索 (RAPTOR) の設計](./route-search.md) にまとめています。
 
 ### 返す形
 
@@ -613,4 +615,5 @@ staging を指す場合も `--env=""` を明示します。
 - [Cloudflare Workers 移行の記録](./cloudflare-workers-migration.md)
 - [技術負債分析レポート](./technical_debt.md)
 - [近傍バス停検索機能](./nearby-bus-stops.md)
+- [乗換経路探索 (RAPTOR) の設計](./route-search.md)
 - [データ貢献ガイドライン](../data/README.md)
