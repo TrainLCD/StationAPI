@@ -1,25 +1,5 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-const CONNECTED_ROUTE_MAX_SEGMENTS: usize = 8;
-const CONNECTED_ROUTE_MAX_STATES: usize = 4096;
-const CONNECTED_ROUTE_MAX_CANDIDATES: usize = 65_536;
-const CONNECTED_ROUTE_MAX_RESULTS: usize = 32;
-
-#[derive(Clone)]
-struct ConnectedRouteState {
-    current_group_id: u32,
-    line_group_ids: Vec<u32>,
-    visited_station_groups: HashSet<u32>,
-    stops: Vec<ConnectedRouteStopRef>,
-}
-
-#[derive(Clone, Copy)]
-struct ConnectedRouteStopRef {
-    line_group_id: u32,
-    station_station_type_id: i32,
-    station_group_id: u32,
-}
-
 /// Maximum distance in meters to search for nearby bus stops from a rail station
 const NEARBY_BUS_STOP_RADIUS_METERS: f64 = 300.0;
 
@@ -58,14 +38,13 @@ use crate::{
         },
         normalize::normalize_for_search,
         repository::{
-            company_repository::CompanyRepository,
-            line_repository::LineRepository,
-            station_repository::{ConnectedRoutePatternStop, StationRepository},
-            train_type_repository::TrainTypeRepository,
+            company_repository::CompanyRepository, line_repository::LineRepository,
+            station_repository::StationRepository, train_type_repository::TrainTypeRepository,
         },
+        route_search,
         segment_speed_table::{segment_override_applies_to_kind, segment_speed_override_kmh},
     },
-    model::{self, Route},
+    model::{self, ConnectedRoute, Route},
     use_case::{
         dto::simulation::resolve_speed_profile, error::UseCaseError, traits::query::QueryUseCase,
     },
@@ -885,55 +864,7 @@ where
                 }
             }
 
-            let mut seen_line_cds = HashSet::new();
-            train_type.lines = tt_lines
-                .iter()
-                .filter(|line| {
-                    line.line_group_cd == train_type.line_group_cd
-                        && seen_line_cds.insert(line.line_cd)
-                })
-                .map(|line| Line {
-                    line_cd: line.line_cd,
-                    company_cd: line.company_cd,
-                    company: None,
-                    line_name: line.line_name.clone(),
-                    line_name_k: line.line_name_k.clone(),
-                    line_name_h: line.line_name_h.clone(),
-                    line_name_r: line.line_name_r.clone(),
-                    line_name_zh: line.line_name_zh.clone(),
-                    line_name_ko: line.line_name_ko.clone(),
-                    line_color_c: line.line_color_c.clone(),
-                    line_type: line.line_type,
-                    line_symbols: line.line_symbols.clone(),
-                    line_symbol1: line.line_symbol1.clone(),
-                    line_symbol2: line.line_symbol2.clone(),
-                    line_symbol3: line.line_symbol3.clone(),
-                    line_symbol4: line.line_symbol4.clone(),
-                    line_symbol1_color: line.line_symbol1_color.clone(),
-                    line_symbol2_color: line.line_symbol2_color.clone(),
-                    line_symbol3_color: line.line_symbol3_color.clone(),
-                    line_symbol4_color: line.line_symbol4_color.clone(),
-                    line_symbol1_shape: line.line_symbol1_shape.clone(),
-                    line_symbol2_shape: line.line_symbol2_shape.clone(),
-                    line_symbol3_shape: line.line_symbol3_shape.clone(),
-                    line_symbol4_shape: line.line_symbol4_shape.clone(),
-                    e_status: line.e_status,
-                    e_sort: line.e_sort,
-                    average_distance: line.average_distance,
-                    station: None,
-                    train_type: line
-                        .type_cd
-                        .and_then(|cd| train_type_by_type_cd.get(&cd).cloned()),
-                    line_group_cd: line.line_group_cd,
-                    station_cd: line.station_cd,
-                    station_g_cd: line.station_g_cd,
-                    type_cd: line.type_cd,
-                    transport_type: line.transport_type,
-                })
-                .collect::<Vec<Line>>();
-
-            // Set the line field to the first line in the lines vector
-            train_type.line = train_type.lines.first().cloned().map(Box::new);
+            self.attach_train_type_lines(&mut train_type, &tt_lines, &train_type_by_type_cd);
 
             result.push(train_type);
         }
@@ -982,6 +913,318 @@ where
             v.reverse();
             v
         };
+        self.train_route_segments(sliced, line_group_id).await
+    }
+
+    async fn estimate_connected_route_arrival_times(
+        &self,
+        legs: &[model::RouteLegRequest],
+    ) -> Result<Vec<EstimatedStop>, UseCaseError> {
+        let group_of = self.validate_route_legs(legs).await?;
+        let params = EstimationParams::default();
+        let walk_minutes = f64::from(route_search::TRANSFER_WALK_SECONDS) / 60.0;
+
+        let mut result: Vec<EstimatedStop> = Vec::new();
+        for (index, leg) in legs.iter().enumerate() {
+            // trainRoute と同じく系統の駅列から切り出す。系統に無い乗降駅は駅グループで
+            // 引き当てるので、区間の trainTypes のどの種別を lineGroupId にしてもよい
+            let stations = self
+                .station_repository
+                .get_by_line_group_id(leg.line_group_id)
+                .await?;
+            let group_stops: Vec<&Station> = stations.iter().collect();
+            let (from_group, to_group) =
+                (group_of[&leg.from_station_id], group_of[&leg.to_station_id]);
+            let segment = estimate_group_segment(
+                &group_stops,
+                SegmentEndpoints {
+                    from_station_cd: leg.from_station_id,
+                    to_station_cd: leg.to_station_id,
+                    groups: Some((from_group, to_group)),
+                },
+                false,
+                &params,
+            )
+            .ok_or_else(|| leg_not_found(leg))?;
+
+            // 乗換では、乗換駅に歩いて着いた時刻を到着、乗換先の列車を待った後を
+            // 出発とする。見込みは connectedRoutes の所要時間と同じ (最初の列車の
+            // 待ち時間は含めない)
+            let (board_arrival, board_departure) = match result.last() {
+                Some(previous) if index > 0 => {
+                    let wait_minutes = f64::from(route_search::boarding_wait_seconds(
+                        group_stops.first().and_then(|s| s.kind),
+                    )) / 60.0;
+                    let arrival = previous.cumulative_minutes + walk_minutes;
+                    (arrival, arrival + wait_minutes)
+                }
+                _ => (0.0, 0.0),
+            };
+            for (position, mut stop) in segment.into_iter().enumerate() {
+                if position == 0 {
+                    stop.cumulative_minutes = board_arrival;
+                    stop.departure_cumulative_minutes = board_departure;
+                } else {
+                    stop.cumulative_minutes += board_departure;
+                    stop.departure_cumulative_minutes += board_departure;
+                }
+                result.push(stop);
+            }
+        }
+        Ok(result)
+    }
+
+    async fn get_connected_train_route(
+        &self,
+        legs: &[model::RouteLegRequest],
+    ) -> Result<Vec<model::TrainRouteSegment>, UseCaseError> {
+        let group_of = self.validate_route_legs(legs).await?;
+        let mut segments = Vec::new();
+        for leg in legs {
+            let stations = self
+                .station_repository
+                .get_by_line_group_id(leg.line_group_id)
+                .await?;
+            // 区間は connectedRoutes が探した弧なので、環状線では継ぎ目を跨ぐ
+            // 短い弧を取る (estimateArrivalTimes と同じ選び方)
+            // 系統に無い乗降駅は駅グループで引き当てる (estimateArrivalTimes と同じ)
+            let (from_group, to_group) =
+                (group_of[&leg.from_station_id], group_of[&leg.to_station_id]);
+            let sliced = slice_group_stations(
+                stations,
+                SegmentEndpoints {
+                    from_station_cd: leg.from_station_id,
+                    to_station_cd: leg.to_station_id,
+                    groups: Some((from_group, to_group)),
+                },
+            )
+            .ok_or_else(|| leg_not_found(leg))?;
+            // 区間ごとに別の列車なので、通過駅の有無や距離の起点も区間ごとに数える
+            segments.extend(self.train_route_segments(sliced, leg.line_group_id).await?);
+        }
+        Ok(segments)
+    }
+
+    async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError> {
+        let line = self.line_repository.find_by_id(line_id).await?;
+        Ok(line)
+    }
+
+    async fn get_lines_by_id_vec(&self, line_ids: &[u32]) -> Result<Vec<Line>, UseCaseError> {
+        let lines = self.line_repository.get_by_ids(line_ids).await?;
+        Ok(lines)
+    }
+
+    async fn get_lines_by_name(
+        &self,
+        line_name: String,
+        limit: Option<u32>,
+    ) -> Result<Vec<Line>, UseCaseError> {
+        let lines = self
+            .line_repository
+            .get_by_name(normalize_for_search(&line_name), limit)
+            .await?;
+        Ok(lines)
+    }
+
+    async fn get_connected_routes(
+        &self,
+        from_station_group_id: u32,
+        to_station_group_id: u32,
+        via_line_id: Option<u32>,
+    ) -> Result<Vec<ConnectedRoute>, UseCaseError> {
+        if from_station_group_id == to_station_group_id {
+            return Ok(vec![]);
+        }
+
+        let network = self.station_repository.get_route_network().await?;
+        let journeys = network.search(
+            from_station_group_id,
+            to_station_group_id,
+            via_line_id.map(|id| id as i32),
+        );
+        if journeys.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // 探索は ID だけを扱うので、乗降駅と種別は経路が確定してからまとめて取得する
+        let station_ids: Vec<u32> = journeys
+            .iter()
+            .flat_map(|journey| journey.legs.iter())
+            .flat_map(|leg| [leg.station_cds.first(), leg.station_cds.last()])
+            .flatten()
+            .map(|&station_cd| station_cd as u32)
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        // 乗降駅は stations クエリと同じ付帯情報を付ける
+        let stations: HashMap<i32, Station> = self
+            .get_stations_by_id_vec(&station_ids, TransportTypeFilter::Rail)
+            .await?
+            .into_iter()
+            .map(|station| (station.station_cd, station))
+            .collect();
+
+        // 区間ごとの「乗れる種別すべて」は routeTypes(乗車駅グループ, 降車駅グループ,
+        // 降車駅の路線) そのもの。探索は停車駅が同じ並行種別 (各停・快速など) を
+        // 1 つの経路にまとめるので、アプリが種別を選べるようにここで列挙し直す。
+        // 同じ区間を複数の経路が使うので、組ごとに 1 回だけ引く
+        let mut leg_train_types: HashMap<(u32, u32, u32), Vec<model::TrainType>> = HashMap::new();
+        for leg in journeys.iter().flat_map(|journey| journey.legs.iter()) {
+            let (Some(&from_group), Some(&to_group), Some(to_station)) = (
+                leg.station_group_ids.first(),
+                leg.station_group_ids.last(),
+                leg.station_cds.last().and_then(|cd| stations.get(cd)),
+            ) else {
+                continue;
+            };
+            let key = (from_group, to_group, to_station.line_cd as u32);
+            if leg_train_types.contains_key(&key) {
+                continue;
+            }
+            let train_types = self
+                .get_train_types(key.0, key.1, Some(key.2))
+                .await?
+                .into_iter()
+                .map(model::TrainType::from)
+                .collect();
+            leg_train_types.insert(key, train_types);
+        }
+
+        let routes = journeys
+            .into_iter()
+            .filter_map(|journey| {
+                let legs = journey
+                    .legs
+                    .iter()
+                    .map(|leg| {
+                        let from_station = stations.get(leg.station_cds.first()?)?;
+                        let to_station = stations.get(leg.station_cds.last()?)?;
+                        let key = (
+                            *leg.station_group_ids.first()?,
+                            *leg.station_group_ids.last()?,
+                            to_station.line_cd as u32,
+                        );
+                        Some(model::RouteLeg {
+                            train_types: leg_train_types.get(&key)?.clone(),
+                            from_station: model::Station::from(from_station.clone()),
+                            to_station: model::Station::from(to_station.clone()),
+                            station_group_ids: leg.station_group_ids.clone(),
+                        })
+                    })
+                    // 駅か種別を引けない区間があれば、その経路は返さない
+                    .collect::<Option<Vec<_>>>()?;
+                Some(ConnectedRoute { legs })
+            })
+            .collect();
+        Ok(routes)
+    }
+
+    /// `from_station_id` から `to_station_id` までの区間の各駅について、始点からの
+    /// 推定到着時間(分)を返す。経路候補ごとに両端が含まれる区間だけへ絞り込み、
+    /// `direction_id` の有無に関わらず from→to 順になるよう並べ替える。
+    async fn estimate_route_arrival_times(
+        &self,
+        from_station_id: u32,
+        to_station_id: u32,
+        via_line_ids: &[u32],
+        direction_id: Option<u32>,
+    ) -> Result<Vec<EstimatedStop>, UseCaseError> {
+        let stops = self
+            .station_repository
+            .get_route_stops_by_station_cd(
+                from_station_id,
+                to_station_id,
+                via_line_ids,
+                direction_id,
+            )
+            .await?;
+
+        let route_row_tree_map = self.build_route_tree_map(&stops);
+        let params = EstimationParams::default();
+
+        let mut result: Vec<EstimatedStop> = Vec::new();
+        for group_stops in route_row_tree_map.values() {
+            if let Some(segment) = estimate_group_segment(
+                group_stops,
+                SegmentEndpoints::exact(from_station_id, to_station_id),
+                direction_id.is_some(),
+                &params,
+            ) {
+                result.extend(segment);
+            }
+        }
+
+        Ok(result)
+    }
+}
+
+impl<SR, LR, TR, CR> QueryInteractor<SR, LR, TR, CR>
+where
+    SR: StationRepository,
+    LR: LineRepository,
+    TR: TrainTypeRepository,
+    CR: CompanyRepository,
+{
+    /// 乗換経路の区間の並びが 1 本の経路としてつながっているか確かめる。
+    /// 前の区間の降車駅と次の区間の乗車駅は同じ駅グループでなければならない。
+    /// 返り値は、区間の乗降駅の `station_cd` -> 駅グループ。
+    async fn validate_route_legs(
+        &self,
+        legs: &[model::RouteLegRequest],
+    ) -> Result<HashMap<u32, i32>, UseCaseError> {
+        if legs.is_empty() {
+            return Err(UseCaseError::InvalidArgument(
+                "legs には 1 つ以上の区間を指定してください".to_string(),
+            ));
+        }
+        // connectedRoutes は乗車 MAX_RIDES 本までしか返さない。区間ごとに駅の取得と
+        // 推定・付帯情報の付与が走るので、それを超える指定は断る
+        if legs.len() > route_search::MAX_RIDES {
+            return Err(UseCaseError::InvalidArgument(format!(
+                "legs は {} 区間までにしてください",
+                route_search::MAX_RIDES
+            )));
+        }
+        let ids: Vec<u32> = legs
+            .iter()
+            .flat_map(|leg| [leg.from_station_id, leg.to_station_id])
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        let group_of: HashMap<u32, i32> = self
+            .station_repository
+            .get_by_id_vec(&ids)
+            .await?
+            .into_iter()
+            .map(|station| (station.station_cd as u32, station.station_g_cd))
+            .collect();
+        for id in &ids {
+            if !group_of.contains_key(id) {
+                return Err(UseCaseError::NotFound {
+                    entity_type: "station",
+                    entity_id: id.to_string(),
+                });
+            }
+        }
+        for pair in legs.windows(2) {
+            if group_of[&pair[0].to_station_id] != group_of[&pair[1].from_station_id] {
+                return Err(UseCaseError::InvalidArgument(format!(
+                    "区間がつながっていません: 降車駅 {} と次の乗車駅 {} は別の駅グループです",
+                    pair[0].to_station_id, pair[1].from_station_id
+                )));
+            }
+        }
+        Ok(group_of)
+    }
+
+    /// 切り出した系統の駅列に付帯情報を付け、走行区間にする。
+    async fn train_route_segments(
+        &self,
+        sliced: Vec<Station>,
+        line_group_id: u32,
+    ) -> Result<Vec<model::TrainRouteSegment>, UseCaseError> {
         let sliced = self
             .update_station_vec_with_attributes(
                 sliced,
@@ -1056,399 +1299,6 @@ where
         Ok(segments)
     }
 
-    async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError> {
-        let line = self.line_repository.find_by_id(line_id).await?;
-        Ok(line)
-    }
-
-    async fn get_lines_by_id_vec(&self, line_ids: &[u32]) -> Result<Vec<Line>, UseCaseError> {
-        let lines = self.line_repository.get_by_ids(line_ids).await?;
-        Ok(lines)
-    }
-
-    async fn get_lines_by_name(
-        &self,
-        line_name: String,
-        limit: Option<u32>,
-    ) -> Result<Vec<Line>, UseCaseError> {
-        let lines = self
-            .line_repository
-            .get_by_name(normalize_for_search(&line_name), limit)
-            .await?;
-        Ok(lines)
-    }
-
-    async fn get_connected_routes(
-        &self,
-        from_station_group_id: u32,
-        to_station_group_id: u32,
-    ) -> Result<Vec<Route>, UseCaseError> {
-        if from_station_group_id == to_station_group_id {
-            return Ok(vec![]);
-        }
-
-        let mut states = vec![ConnectedRouteState {
-            current_group_id: from_station_group_id,
-            line_group_ids: vec![],
-            visited_station_groups: HashSet::from([from_station_group_id]),
-            stops: vec![],
-        }];
-        let mut line_groups_by_station: HashMap<u32, Vec<u32>> = HashMap::new();
-        let mut stops_by_line_group: HashMap<u32, Vec<ConnectedRoutePatternStop>> = HashMap::new();
-        let mut completed = Vec::new();
-        let mut completed_signatures = HashSet::new();
-        let mut expanded_states = 0usize;
-        let mut evaluated_candidates = 0usize;
-
-        for _ in 0..CONNECTED_ROUTE_MAX_SEGMENTS {
-            if states.is_empty()
-                || completed.len() >= CONNECTED_ROUTE_MAX_RESULTS
-                || expanded_states >= CONNECTED_ROUTE_MAX_STATES
-                || evaluated_candidates >= CONNECTED_ROUTE_MAX_CANDIDATES
-            {
-                break;
-            }
-
-            let missing_station_groups: Vec<u32> = states
-                .iter()
-                .map(|state| state.current_group_id)
-                .filter(|id| !line_groups_by_station.contains_key(id))
-                .collect::<HashSet<_>>()
-                .into_iter()
-                .collect();
-            let discovered = self
-                .train_type_repository
-                .get_line_group_ids_by_station_group_ids(&missing_station_groups)
-                .await?;
-            for station_group_id in missing_station_groups {
-                line_groups_by_station.insert(
-                    station_group_id,
-                    discovered
-                        .get(&station_group_id)
-                        .cloned()
-                        .unwrap_or_default(),
-                );
-            }
-
-            let missing_line_groups: Vec<u32> = states
-                .iter()
-                .flat_map(|state| {
-                    line_groups_by_station
-                        .get(&state.current_group_id)
-                        .into_iter()
-                        .flatten()
-                })
-                .copied()
-                .filter(|id| !stops_by_line_group.contains_key(id))
-                .collect::<HashSet<_>>()
-                .into_iter()
-                .collect();
-            let fetched_stops = self
-                .station_repository
-                .get_connected_route_pattern_stops(&missing_line_groups)
-                .await?;
-            for line_group_id in &missing_line_groups {
-                stops_by_line_group.insert(*line_group_id, vec![]);
-            }
-            for stop in fetched_stops {
-                stops_by_line_group
-                    .entry(stop.line_group_id)
-                    .or_default()
-                    .push(stop);
-            }
-
-            let mut next_states = Vec::new();
-            'expand_states: for state in states {
-                if expanded_states >= CONNECTED_ROUTE_MAX_STATES {
-                    break;
-                }
-                expanded_states += 1;
-                let Some(available_line_groups) =
-                    line_groups_by_station.get(&state.current_group_id)
-                else {
-                    continue;
-                };
-
-                for &line_group_id in available_line_groups {
-                    if state.line_group_ids.contains(&line_group_id) {
-                        continue;
-                    }
-                    let Some(pattern) = stops_by_line_group.get(&line_group_id) else {
-                        continue;
-                    };
-                    let start_indices: Vec<usize> = pattern
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, stop)| {
-                            stop.station_group_id == state.current_group_id && stop.pass != Some(1)
-                        })
-                        .map(|(index, _)| index)
-                        .collect();
-
-                    for start_index in start_indices {
-                        for end_index in 0..pattern.len() {
-                            if evaluated_candidates >= CONNECTED_ROUTE_MAX_CANDIDATES {
-                                break 'expand_states;
-                            }
-                            evaluated_candidates += 1;
-                            let destination = &pattern[end_index];
-                            let destination_group_id = destination.station_group_id;
-                            if end_index == start_index
-                                || destination.pass == Some(1)
-                                || state.visited_station_groups.contains(&destination_group_id)
-                            {
-                                continue;
-                            }
-
-                            let intersects_visited = if start_index < end_index {
-                                pattern[start_index + 1..=end_index].iter().any(|stop| {
-                                    state
-                                        .visited_station_groups
-                                        .contains(&stop.station_group_id)
-                                })
-                            } else {
-                                pattern[end_index..start_index].iter().any(|stop| {
-                                    state
-                                        .visited_station_groups
-                                        .contains(&stop.station_group_id)
-                                })
-                            };
-                            if intersects_visited {
-                                continue;
-                            }
-                            let mut visited_station_groups = state.visited_station_groups.clone();
-                            let mut stops = state.stops.clone();
-                            let append_stop =
-                                |stops: &mut Vec<ConnectedRouteStopRef>, pattern_index: usize| {
-                                    stops.push(ConnectedRouteStopRef {
-                                        line_group_id,
-                                        station_station_type_id: pattern[pattern_index]
-                                            .station_station_type_id,
-                                        station_group_id: pattern[pattern_index].station_group_id,
-                                    });
-                                };
-                            if start_index < end_index {
-                                visited_station_groups.extend(
-                                    pattern[start_index + 1..=end_index]
-                                        .iter()
-                                        .map(|stop| stop.station_group_id),
-                                );
-                                let append_from = start_index + usize::from(!stops.is_empty());
-                                for pattern_index in append_from..=end_index {
-                                    append_stop(&mut stops, pattern_index);
-                                }
-                            } else {
-                                visited_station_groups.extend(
-                                    pattern[end_index..start_index]
-                                        .iter()
-                                        .map(|stop| stop.station_group_id),
-                                );
-                                if stops.is_empty() {
-                                    append_stop(&mut stops, start_index);
-                                }
-                                for pattern_index in (end_index..start_index).rev() {
-                                    append_stop(&mut stops, pattern_index);
-                                }
-                            }
-                            let mut line_group_ids = state.line_group_ids.clone();
-                            line_group_ids.push(line_group_id);
-
-                            let candidate = ConnectedRouteState {
-                                current_group_id: destination_group_id,
-                                line_group_ids,
-                                visited_station_groups,
-                                stops,
-                            };
-                            if destination_group_id == to_station_group_id {
-                                let signature = connected_route_signature(&candidate);
-                                if completed_signatures.insert(signature) {
-                                    completed.push(candidate);
-                                }
-                                if completed.len() >= CONNECTED_ROUTE_MAX_RESULTS {
-                                    break 'expand_states;
-                                }
-                            } else if next_states.len() + expanded_states
-                                < CONNECTED_ROUTE_MAX_STATES
-                            {
-                                next_states.push(candidate);
-                            }
-                        }
-                    }
-                }
-            }
-            states = next_states;
-        }
-
-        if completed.is_empty() {
-            return Ok(vec![]);
-        }
-
-        let detailed_line_group_ids: Vec<u32> = completed
-            .iter()
-            .flat_map(|candidate| candidate.line_group_ids.iter().copied())
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect();
-        let detailed_stops = self
-            .station_repository
-            .get_by_line_group_id_vec(&detailed_line_group_ids)
-            .await?;
-        let mut detailed_stops_by_id: HashMap<(u32, i32), Station> = HashMap::new();
-        for stop in detailed_stops {
-            if let (Some(line_group_id), Some(station_station_type_id)) =
-                (stop.line_group_cd.map(|id| id as u32), stop.sst_id)
-            {
-                detailed_stops_by_id.insert((line_group_id, station_station_type_id), stop);
-            }
-        }
-
-        let mut used_virtual_ids = HashSet::new();
-        let mut routes = Vec::new();
-        for candidate in completed {
-            let signature = connected_route_signature(&candidate);
-            let virtual_line_group_id =
-                connected_route_virtual_id(&signature, &mut used_virtual_ids);
-            let Some(detailed_stops): Option<Vec<Station>> = candidate
-                .stops
-                .iter()
-                .map(|stop| {
-                    detailed_stops_by_id
-                        .get(&(stop.line_group_id, stop.station_station_type_id))
-                        .cloned()
-                })
-                .collect()
-            else {
-                continue;
-            };
-            let stops = detailed_stops
-                .into_iter()
-                .map(|row| {
-                    let extracted_line = self.extract_line_from_station(&row);
-                    let train_type = TrainType {
-                        id: row.type_id,
-                        station_cd: Some(row.station_cd),
-                        type_cd: row.type_cd,
-                        line_group_cd: Some(virtual_line_group_id as i32),
-                        pass: row.pass,
-                        type_name: row.type_name.clone().unwrap_or_default(),
-                        type_name_k: row.type_name_k.clone().unwrap_or_default(),
-                        type_name_r: row.type_name_r.clone(),
-                        type_name_zh: row.type_name_zh.clone(),
-                        type_name_ko: row.type_name_ko.clone(),
-                        color: row.color.clone().unwrap_or_default(),
-                        direction: row.direction,
-                        kind: row.kind,
-                        line: Some(Box::new(extracted_line.clone())),
-                        lines: vec![extracted_line.clone()],
-                    };
-                    let mut stop = self.build_station_from_row(
-                        &row,
-                        &extracted_line,
-                        Some(Box::new(train_type)),
-                    );
-                    stop.line_group_cd = Some(virtual_line_group_id as i32);
-                    model::Station::from(stop)
-                })
-                .collect();
-            routes.push(Route {
-                id: virtual_line_group_id,
-                stops,
-            });
-        }
-        Ok(routes)
-    }
-
-    /// `from_station_id` から `to_station_id` までの区間の各駅について、始点からの
-    /// 推定到着時間(分)を返す。経路候補ごとに両端が含まれる区間だけへ絞り込み、
-    /// `direction_id` の有無に関わらず from→to 順になるよう並べ替える。
-    async fn estimate_route_arrival_times(
-        &self,
-        from_station_id: u32,
-        to_station_id: u32,
-        via_line_ids: &[u32],
-        direction_id: Option<u32>,
-    ) -> Result<Vec<EstimatedStop>, UseCaseError> {
-        let stops = self
-            .station_repository
-            .get_route_stops_by_station_cd(
-                from_station_id,
-                to_station_id,
-                via_line_ids,
-                direction_id,
-            )
-            .await?;
-
-        let route_row_tree_map = self.build_route_tree_map(&stops);
-        let params = EstimationParams::default();
-
-        let mut result: Vec<EstimatedStop> = Vec::new();
-        for group_stops in route_row_tree_map.values() {
-            // 先頭駅が末尾にも重複格納された「閉じた」環状データ(ポートライナー等)は、
-            // そのままだとラップ時に閉じ駅が二重になるため重複終端を除いてから
-            // 環状判定・弧選択する。
-            let mut route_stops: &[&Station] = group_stops.as_slice();
-            if route_stops.len() > 1
-                && route_stops[0].station_cd == route_stops[route_stops.len() - 1].station_cd
-            {
-                route_stops = &route_stops[..route_stops.len() - 1];
-            }
-
-            let from_pos = route_stops
-                .iter()
-                .position(|s| s.station_cd as u32 == from_station_id);
-            let to_pos = route_stops
-                .iter()
-                .position(|s| s.station_cd as u32 == to_station_id);
-
-            // 始点・終点の両方がこの経路候補に含まれない、または同一駅の場合は対象外。
-            let (Some(fi), Some(ti)) = (from_pos, to_pos) else {
-                continue;
-            };
-            if fi == ti {
-                continue;
-            }
-
-            // 経路全体ではなく、始点→終点の区間だけに絞り込んで推定する。
-            // 環状経路(山手線・大阪環状線など)は線形スライスだと格納順の
-            // 継ぎ目(例: 品川⇔大崎)を跨ぐ乗車で逆側の弧を返してしまうため、
-            // シームをラップする弧を選択する。
-            // 迂回係数の較正母数には切り出し前の経路全体を渡す。切り出した区間の
-            // 駅間隔が路線平均と異なると較正が破綻するため(スライス較正バグ)。
-            if is_circular_route(route_stops) {
-                let arc = select_circular_arc(route_stops, fi, ti, direction_id.is_some());
-                result.extend(estimate_arrival_minutes_calibrated(
-                    &arc,
-                    route_stops,
-                    &params,
-                ));
-            } else if fi < ti {
-                result.extend(estimate_arrival_minutes_calibrated(
-                    &route_stops[fi..=ti],
-                    route_stops,
-                    &params,
-                ));
-            } else {
-                let mut segment: Vec<&Station> = route_stops[ti..=fi].to_vec();
-                segment.reverse();
-                result.extend(estimate_arrival_minutes_calibrated(
-                    &segment,
-                    route_stops,
-                    &params,
-                ));
-            }
-        }
-
-        Ok(result)
-    }
-}
-
-impl<SR, LR, TR, CR> QueryInteractor<SR, LR, TR, CR>
-where
-    SR: StationRepository,
-    LR: LineRepository,
-    TR: TrainTypeRepository,
-    CR: CompanyRepository,
-{
     async fn get_stations_by_group_id_vec_no_types(
         &self,
         station_group_id_vec: &[u32],
@@ -1849,6 +1699,65 @@ where
             )
     }
 
+    /// `routeTypes` と同じ形に、系統が走る路線 (`lines`) と先頭の路線 (`line`) を
+    /// 列車種別へ付ける。`tt_lines` は `get_by_line_group_id_vec` で取った路線に
+    /// 路線記号を付けたもの。
+    fn attach_train_type_lines(
+        &self,
+        train_type: &mut TrainType,
+        tt_lines: &[Line],
+        train_type_by_type_cd: &HashMap<i32, TrainType>,
+    ) {
+        let mut seen_line_cds = HashSet::new();
+        train_type.lines = tt_lines
+            .iter()
+            .filter(|line| {
+                line.line_group_cd == train_type.line_group_cd && seen_line_cds.insert(line.line_cd)
+            })
+            .map(|line| Line {
+                line_cd: line.line_cd,
+                company_cd: line.company_cd,
+                company: None,
+                line_name: line.line_name.clone(),
+                line_name_k: line.line_name_k.clone(),
+                line_name_h: line.line_name_h.clone(),
+                line_name_r: line.line_name_r.clone(),
+                line_name_zh: line.line_name_zh.clone(),
+                line_name_ko: line.line_name_ko.clone(),
+                line_color_c: line.line_color_c.clone(),
+                line_type: line.line_type,
+                line_symbols: line.line_symbols.clone(),
+                line_symbol1: line.line_symbol1.clone(),
+                line_symbol2: line.line_symbol2.clone(),
+                line_symbol3: line.line_symbol3.clone(),
+                line_symbol4: line.line_symbol4.clone(),
+                line_symbol1_color: line.line_symbol1_color.clone(),
+                line_symbol2_color: line.line_symbol2_color.clone(),
+                line_symbol3_color: line.line_symbol3_color.clone(),
+                line_symbol4_color: line.line_symbol4_color.clone(),
+                line_symbol1_shape: line.line_symbol1_shape.clone(),
+                line_symbol2_shape: line.line_symbol2_shape.clone(),
+                line_symbol3_shape: line.line_symbol3_shape.clone(),
+                line_symbol4_shape: line.line_symbol4_shape.clone(),
+                e_status: line.e_status,
+                e_sort: line.e_sort,
+                average_distance: line.average_distance,
+                station: None,
+                train_type: line
+                    .type_cd
+                    .and_then(|cd| train_type_by_type_cd.get(&cd).cloned()),
+                line_group_cd: line.line_group_cd,
+                station_cd: line.station_cd,
+                station_g_cd: line.station_g_cd,
+                type_cd: line.type_cd,
+                transport_type: line.transport_type,
+            })
+            .collect::<Vec<Line>>();
+
+        // Set the line field to the first line in the lines vector
+        train_type.line = train_type.lines.first().cloned().map(Box::new);
+    }
+
     fn build_station_from_row(
         &self,
         row: &Station,
@@ -1925,38 +1834,129 @@ where
     }
 }
 
-fn connected_route_signature(route: &ConnectedRouteState) -> Vec<u8> {
-    let mut signature = Vec::with_capacity(
-        (route.line_group_ids.len() + route.stops.len() + 2) * std::mem::size_of::<u32>(),
-    );
-    signature.extend_from_slice(&(route.line_group_ids.len() as u32).to_le_bytes());
-    for line_group_id in &route.line_group_ids {
-        signature.extend_from_slice(&line_group_id.to_le_bytes());
-    }
-    signature.extend_from_slice(&(route.stops.len() as u32).to_le_bytes());
-    for stop in &route.stops {
-        signature.extend_from_slice(&stop.station_group_id.to_le_bytes());
-    }
-    signature
+/// 系統の駅列から切り出す区間の両端。
+#[derive(Clone, Copy)]
+struct SegmentEndpoints {
+    from_station_cd: u32,
+    to_station_cd: u32,
+    /// 指定すると、`station_cd` が系統に無い端を同じ駅グループ (from, to) の駅で
+    /// 引き当てる。乗換経路の区間で、選んだ種別が区間の乗降駅とは別の路線の駅に
+    /// 止まる場合 (中央線快速の三鷹と中央・総武線の三鷹など) に使う。
+    groups: Option<(i32, i32)>,
 }
 
-fn connected_route_virtual_id(signature: &[u8], used_ids: &mut HashSet<u32>) -> u32 {
-    const FNV_OFFSET_BASIS: u32 = 2_166_136_261;
-    const FNV_PRIME: u32 = 16_777_619;
-
-    let mut hash = FNV_OFFSET_BASIS;
-    for byte in signature {
-        hash ^= u32::from(*byte);
-        hash = hash.wrapping_mul(FNV_PRIME);
+impl SegmentEndpoints {
+    fn exact(from_station_cd: u32, to_station_cd: u32) -> Self {
+        Self {
+            from_station_cd,
+            to_station_cd,
+            groups: None,
+        }
     }
 
-    // Persisted line_group_cd is a signed 32-bit integer. Reserving the
-    // upper half of u32 therefore guarantees that virtual IDs cannot overlap it.
-    let mut candidate = hash | 0x8000_0000;
-    while !used_ids.insert(candidate) {
-        candidate = candidate.wrapping_add(1) | 0x8000_0000;
+    /// 駅列の中の両端の位置。`station_cd` が一致する駅を優先し、無い端だけ駅
+    /// グループで探す。直通系統は接続駅で同じ駅グループの駅を 2 行持つ (宇都宮線の
+    /// 上野と上野東京ラインの上野など) ので、候補が複数あれば区間が最も短くなる
+    /// 組を選ぶ (同じ長さなら先の行)。両端が同じ位置なら `None`。
+    fn positions(&self, stations: &[&Station]) -> Option<(usize, usize)> {
+        let candidates = |station_cd: u32, group: Option<i32>| -> Vec<usize> {
+            let exact: Vec<usize> = stations
+                .iter()
+                .position(|s| s.station_cd as u32 == station_cd)
+                .into_iter()
+                .collect();
+            if !exact.is_empty() {
+                return exact;
+            }
+            let Some(group) = group else {
+                return exact;
+            };
+            stations
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| s.station_g_cd == group)
+                .map(|(index, _)| index)
+                .collect()
+        };
+        let froms = candidates(self.from_station_cd, self.groups.map(|(from, _)| from));
+        let tos = candidates(self.to_station_cd, self.groups.map(|(_, to)| to));
+        froms
+            .iter()
+            .flat_map(|&from| tos.iter().map(move |&to| (from, to)))
+            .filter(|(from, to)| from != to)
+            .min_by_key(|(from, to)| from.abs_diff(*to))
     }
-    candidate
+}
+
+/// 1 系統の駅列 (sst.id 順) から `endpoints` の区間を切り出し、始点からの推定到着
+/// 時間を返す。両駅が含まれない、または同じ駅なら `None`。
+///
+/// 先頭駅が末尾にも重複格納された「閉じた」環状データ (ポートライナー等) は重複
+/// 終端を除いてから扱う。環状経路 (山手線・大阪環状線など) は、線形スライスだと
+/// 格納順の継ぎ目 (例: 品川⇔大崎) を跨ぐ乗車で逆側の弧を返してしまうため、
+/// シームをラップする弧を選ぶ (`directed` なら格納順、そうでなければ短い方)。
+/// 迂回係数の較正母数には切り出し前の系統全体を渡す (切り出した区間の駅間隔が
+/// 路線平均と異なると較正が破綻するため)。
+fn estimate_group_segment(
+    group_stops: &[&Station],
+    endpoints: SegmentEndpoints,
+    directed: bool,
+    params: &EstimationParams,
+) -> Option<Vec<EstimatedStop>> {
+    let mut route_stops: &[&Station] = group_stops;
+    if route_stops.len() > 1
+        && route_stops[0].station_cd == route_stops[route_stops.len() - 1].station_cd
+    {
+        route_stops = &route_stops[..route_stops.len() - 1];
+    }
+    let (from, to) = endpoints.positions(route_stops)?;
+    Some(if is_circular_route(route_stops) {
+        let arc = select_circular_arc(route_stops, from, to, directed);
+        estimate_arrival_minutes_calibrated(&arc, route_stops, params)
+    } else if from < to {
+        estimate_arrival_minutes_calibrated(&route_stops[from..=to], route_stops, params)
+    } else {
+        let mut segment: Vec<&Station> = route_stops[to..=from].to_vec();
+        segment.reverse();
+        estimate_arrival_minutes_calibrated(&segment, route_stops, params)
+    })
+}
+
+/// 1 系統の駅列 (sst.id 順) から `endpoints` の区間を進行順に切り出す。環状経路は [`estimate_group_segment`] と同じく短い方の弧を取るので、
+/// 乗換経路の区間の走行区間と推定到着時間が同じ駅列になる。両駅が含まれない、
+/// または同じ駅なら `None`。
+fn slice_group_stations(
+    mut stations: Vec<Station>,
+    endpoints: SegmentEndpoints,
+) -> Option<Vec<Station>> {
+    if stations.len() > 1 && stations[0].station_cd == stations[stations.len() - 1].station_cd {
+        stations.pop();
+    }
+    let refs: Vec<&Station> = stations.iter().collect();
+    let (from, to) = endpoints.positions(&refs)?;
+    Some(if is_circular_route(&refs) {
+        select_circular_arc(&refs, from, to, false)
+            .into_iter()
+            .cloned()
+            .collect()
+    } else if from < to {
+        stations[from..=to].to_vec()
+    } else {
+        let mut segment = stations[to..=from].to_vec();
+        segment.reverse();
+        segment
+    })
+}
+
+/// 区間の乗降駅が指定された系統に見つからないときのエラー。
+fn leg_not_found(leg: &model::RouteLegRequest) -> UseCaseError {
+    UseCaseError::NotFound {
+        entity_type: "station in route",
+        entity_id: format!(
+            "{}-{} on line group {}",
+            leg.from_station_id, leg.to_station_id, leg.line_group_id
+        ),
+    }
 }
 
 /// Build a signature describing the stations a train type actually stops at within the
@@ -3590,6 +3590,7 @@ mod tests {
                 company_repository::CompanyRepository, line_repository::LineRepository,
                 station_repository::StationRepository, train_type_repository::TrainTypeRepository,
             },
+            route_search::RouteNetwork,
         };
 
         /// Configurable mock station repository for testing
@@ -3616,11 +3617,33 @@ mod tests {
 
         #[async_trait::async_trait]
         impl StationRepository for ConfigurableMockStationRepository {
+            async fn get_route_network(&self) -> Result<std::sync::Arc<RouteNetwork>, DomainError> {
+                let mut by_line_group: BTreeMap<i32, Vec<Station>> = BTreeMap::new();
+                for station in &self.stations_by_line_group {
+                    if let Some(line_group_id) = station.line_group_cd {
+                        by_line_group
+                            .entry(line_group_id)
+                            .or_default()
+                            .push(station.clone());
+                    }
+                }
+                Ok(std::sync::Arc::new(RouteNetwork::build(
+                    by_line_group.into_values(),
+                    &EstimationParams::default(),
+                )))
+            }
             async fn find_by_id(&self, _: u32) -> Result<Option<Station>, DomainError> {
                 Ok(None)
             }
-            async fn get_by_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
-                Ok(vec![])
+            async fn get_by_id_vec(&self, ids: &[u32]) -> Result<Vec<Station>, DomainError> {
+                // 系統の駅から、要求された駅を 1 件ずつ返す
+                let mut seen = HashSet::new();
+                Ok(self
+                    .stations_by_line_group
+                    .iter()
+                    .filter(|s| ids.contains(&(s.station_cd as u32)) && seen.insert(s.station_cd))
+                    .cloned()
+                    .collect())
             }
             async fn get_by_line_id(
                 &self,
@@ -3733,11 +3756,32 @@ mod tests {
             }
             async fn get_route_stops(
                 &self,
-                _: u32,
-                _: u32,
-                _: &[u32],
+                from_station_id: u32,
+                to_station_id: u32,
+                via_line_ids: &[u32],
             ) -> Result<Vec<Station>, DomainError> {
-                Ok(vec![])
+                // Worker の実装と同じく、発着の双方に通過ではない停車を持つ系統の駅を
+                // 系統の並び順で返す (via 指定時はその路線の駅だけ)
+                let stopping_groups = |group_id: u32| -> HashSet<i32> {
+                    self.stations_by_line_group
+                        .iter()
+                        .filter(|s| s.station_g_cd as u32 == group_id && s.pass != Some(1))
+                        .filter_map(|s| s.line_group_cd)
+                        .collect()
+                };
+                let common: HashSet<i32> = stopping_groups(from_station_id)
+                    .intersection(&stopping_groups(to_station_id))
+                    .copied()
+                    .collect();
+                Ok(self
+                    .stations_by_line_group
+                    .iter()
+                    .filter(|s| s.line_group_cd.is_some_and(|g| common.contains(&g)))
+                    .filter(|s| {
+                        via_line_ids.is_empty() || via_line_ids.contains(&(s.line_cd as u32))
+                    })
+                    .cloned()
+                    .collect())
             }
             async fn get_route_stops_by_station_cd(
                 &self,
@@ -3814,7 +3858,6 @@ mod tests {
         struct ConfigurableMockTrainTypeRepository {
             train_types: Vec<TrainType>,
             expected_line_group_id: Option<u32>,
-            connection_line_groups: HashMap<u32, Vec<u32>>,
         }
 
         impl ConfigurableMockTrainTypeRepository {
@@ -3822,20 +3865,11 @@ mod tests {
                 Self {
                     train_types,
                     expected_line_group_id: None,
-                    connection_line_groups: HashMap::new(),
                 }
             }
 
             fn with_expected_line_group_id(mut self, line_group_id: Option<u32>) -> Self {
                 self.expected_line_group_id = line_group_id;
-                self
-            }
-
-            fn with_connection_line_groups(
-                mut self,
-                connection_line_groups: HashMap<u32, Vec<u32>>,
-            ) -> Self {
-                self.connection_line_groups = connection_line_groups;
                 self
             }
         }
@@ -3855,20 +3889,6 @@ mod tests {
 
         #[async_trait::async_trait]
         impl TrainTypeRepository for ConfigurableMockTrainTypeRepository {
-            async fn get_line_group_ids_by_station_group_ids(
-                &self,
-                station_group_ids: &[u32],
-            ) -> Result<HashMap<u32, Vec<u32>>, DomainError> {
-                Ok(station_group_ids
-                    .iter()
-                    .filter_map(|id| {
-                        self.connection_line_groups
-                            .get(id)
-                            .cloned()
-                            .map(|groups| (*id, groups))
-                    })
-                    .collect())
-            }
             async fn find_by_line_group_id_and_line_id(
                 &self,
                 line_group_id: u32,
@@ -3925,9 +3945,17 @@ mod tests {
             }
             async fn get_by_line_group_id_vec(
                 &self,
-                _: &[u32],
+                line_group_ids: &[u32],
             ) -> Result<Vec<TrainType>, DomainError> {
-                Ok(self.train_types.clone())
+                Ok(self
+                    .train_types
+                    .iter()
+                    .filter(|t| {
+                        t.line_group_cd
+                            .is_some_and(|g| line_group_ids.contains(&(g as u32)))
+                    })
+                    .cloned()
+                    .collect())
             }
         }
 
@@ -4855,6 +4883,7 @@ mod tests {
             assert!(result.is_empty());
         }
 
+        /// 駅グループ `station_group_id` を東西に 1km 間隔で並べた停車駅。
         fn create_connected_stop(
             station_cd: i32,
             station_group_id: i32,
@@ -4867,6 +4896,7 @@ mod tests {
                 line_group_id,
                 Some(line_group_id),
             );
+            station.lon = 139.7 + f64::from(station_group_id) * 0.011;
             station.type_id = Some(line_group_id);
             station.sst_id = Some(station_cd);
             station.type_cd = Some(line_group_id);
@@ -4881,109 +4911,196 @@ mod tests {
             station
         }
 
+        /// 駅グループは西から 1, 5, 2, 3, 4 の順に並ぶ (5 は 1 と 2 の間)。
+        /// 1 -> 4 は 100 -> 200 -> 300 の乗り継ぎと、北へ 50km 以上大回りする
+        /// 直通の系統 500 (途中 6) で行ける。
         fn create_connected_route_interactor() -> QueryInteractor<
             ConfigurableMockStationRepository,
             ConfigurableMockLineRepository,
             ConfigurableMockTrainTypeRepository,
             ConfigurableMockCompanyRepository,
         > {
-            let stops = vec![
+            let mut stops = vec![
                 create_connected_stop(101, 1, 100, 0),
-                create_connected_stop(109, 9, 100, 1),
+                create_connected_stop(105, 5, 100, 1),
                 create_connected_stop(102, 2, 100, 0),
                 create_connected_stop(202, 2, 200, 0),
                 create_connected_stop(203, 3, 200, 0),
                 create_connected_stop(303, 3, 300, 0),
                 create_connected_stop(304, 4, 300, 0),
-                // This group closes a cycle back to the origin. The search must
-                // reject it because station group 1 was already visited.
-                create_connected_stop(402, 2, 400, 0),
-                create_connected_stop(401, 1, 400, 0),
-                // A direct candidate verifies that one-segment routes remain valid.
                 create_connected_stop(501, 1, 500, 0),
+                create_connected_stop(506, 6, 500, 0),
                 create_connected_stop(504, 4, 500, 0),
+                // 100 と同じ路線を走り、5 にも止まる並行種別 (各停)。探索は
+                // 停車駅の少ない 100 を選ぶが、区間の種別一覧には出る
+                create_connected_stop(601, 1, 600, 0),
+                create_connected_stop(605, 5, 600, 0),
+                create_connected_stop(602, 2, 600, 0),
             ];
-            let connection_line_groups = HashMap::from([
-                (1, vec![100, 400, 500]),
-                (2, vec![100, 200, 400]),
-                (3, vec![200, 300]),
-                (4, vec![300, 500]),
-            ]);
+            // 5 は座標の上で 1 と 2 の間、6 は 2 と 3 の中間の遠く北に置く
+            stops[1].lon = 139.7 + 1.5 * 0.011;
+            stops[8].lon = 139.7 + 2.5 * 0.011;
+            stops[8].lat += 0.5;
+            stops[11].lon = stops[1].lon;
+            for stop in &mut stops[10..13] {
+                stop.line_cd = 100;
+            }
+            // 系統ごとに先頭の駅を指す列車種別を 1 つずつ
+            let train_types = [(100, 101), (200, 202), (300, 303), (500, 501), (600, 601)]
+                .into_iter()
+                .map(|(line_group_id, station_cd)| {
+                    TrainType::new(
+                        Some(line_group_id),
+                        Some(station_cd),
+                        Some(line_group_id),
+                        Some(line_group_id),
+                        Some(0),
+                        format!("種別{line_group_id}"),
+                        format!("シュベツ{line_group_id}"),
+                        None,
+                        None,
+                        None,
+                        "#000000".to_string(),
+                        Some(0),
+                        Some(0),
+                    )
+                })
+                .collect();
 
             QueryInteractor {
                 station_repository: ConfigurableMockStationRepository::new(vec![], vec![])
                     .with_line_group_stations(stops),
                 line_repository: ConfigurableMockLineRepository::new(vec![]),
-                train_type_repository: ConfigurableMockTrainTypeRepository::new(vec![])
-                    .with_connection_line_groups(connection_line_groups),
+                train_type_repository: ConfigurableMockTrainTypeRepository::new(train_types),
                 company_repository: ConfigurableMockCompanyRepository::new(vec![]),
             }
         }
 
-        #[tokio::test]
-        async fn test_get_connected_routes_returns_direct_and_three_segment_routes() {
-            let interactor = create_connected_route_interactor();
-
-            let routes = interactor.get_connected_routes(1, 4).await.unwrap();
-
-            assert!(routes.iter().any(|route| route.stops.len() == 2));
-            let connected = routes
+        /// 区間ごとの (乗車駅, 降車駅)。テストの駅は系統ごとに別の ID (系統 100 なら
+        /// 1xx) なので、どの系統の区間かも表す
+        fn leg_shapes(route: &ConnectedRoute) -> Vec<(u32, u32)> {
+            route
+                .legs
                 .iter()
-                .find(|route| {
-                    route
-                        .stops
-                        .iter()
-                        .map(|stop| stop.group_id)
-                        .collect::<Vec<_>>()
-                        == vec![1, 9, 2, 3, 4]
-                })
-                .expect("three-segment route should be returned");
-            assert_eq!(
-                connected
-                    .stops
-                    .iter()
-                    .filter(|stop| stop.group_id == 2 || stop.group_id == 3)
-                    .count(),
-                2,
-                "connection stations must not be duplicated"
-            );
-            assert_eq!(connected.stops[1].stop_condition, StopCondition::Not as i32);
-            assert!(connected.id >= 0x8000_0000);
-            assert!(connected.stops.iter().all(|stop| {
-                stop.train_type
-                    .as_ref()
-                    .is_some_and(|train_type| train_type.group_id == connected.id)
-            }));
+                .map(|leg| (leg.from_station.id, leg.to_station.id))
+                .collect()
         }
 
         #[tokio::test]
-        async fn test_get_connected_routes_is_deterministic_and_handles_cycles_and_no_route() {
+        async fn test_get_connected_routes_returns_legs_on_real_line_groups() {
             let interactor = create_connected_route_interactor();
 
-            let first = interactor.get_connected_routes(1, 4).await.unwrap();
-            let second = interactor.get_connected_routes(1, 4).await.unwrap();
-            assert_eq!(
-                first.iter().map(|route| route.id).collect::<Vec<_>>(),
-                second.iter().map(|route| route.id).collect::<Vec<_>>()
-            );
-            assert_eq!(
-                first.len(),
-                first
-                    .iter()
-                    .map(|route| route.id)
-                    .collect::<HashSet<_>>()
-                    .len()
-            );
-            for route in &first {
-                assert_eq!(
-                    route.stops.iter().filter(|stop| stop.group_id == 1).count(),
-                    1,
-                    "origin station group must appear once per route"
-                );
-            }
+            let routes = interactor.get_connected_routes(1, 4, None).await.unwrap();
 
-            let unreachable = interactor.get_connected_routes(1, 99).await.unwrap();
-            assert!(unreachable.is_empty());
+            assert_eq!(
+                routes.iter().map(leg_shapes).collect::<Vec<_>>(),
+                vec![vec![(101, 102), (202, 203), (303, 304)], vec![(501, 504)],],
+                "the faster transfer route comes first and the direct detour is kept \
+                 as the route with the fewest transfers; every leg carries the stations \
+                 of the line group it rides"
+            );
+            let first_leg = &routes[0].legs[0];
+            assert_eq!(first_leg.train_types[0].name, "種別100");
+            assert_eq!(first_leg.from_station.group_id, 1);
+            assert_eq!(first_leg.to_station.group_id, 2);
+        }
+
+        #[tokio::test]
+        async fn test_get_connected_routes_lists_every_train_type_of_each_leg() {
+            let interactor = create_connected_route_interactor();
+
+            let routes = interactor.get_connected_routes(1, 4, None).await.unwrap();
+            let transfer_route = &routes[0];
+            let first_leg = &transfer_route.legs[0];
+
+            // 各区間の一覧は routeTypes(乗車駅グループ, 降車駅グループ, 降車駅の路線)
+            // と同じ結果・同じ並び
+            for leg in &transfer_route.legs {
+                let expected: Vec<model::TrainType> = interactor
+                    .get_train_types(
+                        leg.from_station.group_id,
+                        leg.to_station.group_id,
+                        Some(leg.to_station.line.as_ref().unwrap().id),
+                    )
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(model::TrainType::from)
+                    .collect();
+                assert_eq!(leg.train_types, expected);
+            }
+            assert_eq!(
+                first_leg
+                    .train_types
+                    .iter()
+                    .map(|t| t.group_id)
+                    .collect::<Vec<_>>(),
+                vec![100, 600],
+                "the parallel local that the search collapsed is listed"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_get_connected_routes_filters_by_arriving_line() {
+            let interactor = create_connected_route_interactor();
+
+            // テストの駅は line_cd = line_group_cd
+            let via_direct = interactor
+                .get_connected_routes(1, 4, Some(500))
+                .await
+                .unwrap();
+            assert_eq!(
+                via_direct.iter().map(leg_shapes).collect::<Vec<_>>(),
+                vec![vec![(501, 504)]]
+            );
+            let via_transfer = interactor
+                .get_connected_routes(1, 4, Some(300))
+                .await
+                .unwrap();
+            assert_eq!(via_transfer.len(), 1);
+            assert_eq!(
+                via_transfer[0]
+                    .legs
+                    .last()
+                    .unwrap()
+                    .to_station
+                    .line
+                    .as_ref()
+                    .unwrap()
+                    .id,
+                300
+            );
+            assert!(interactor
+                .get_connected_routes(1, 4, Some(100))
+                .await
+                .unwrap()
+                .is_empty());
+        }
+
+        #[tokio::test]
+        async fn test_get_connected_routes_is_deterministic_and_handles_no_route() {
+            let interactor = create_connected_route_interactor();
+
+            let first = interactor.get_connected_routes(1, 4, None).await.unwrap();
+            let second = interactor.get_connected_routes(1, 4, None).await.unwrap();
+            assert_eq!(first, second);
+
+            let backward = interactor.get_connected_routes(4, 1, None).await.unwrap();
+            assert_eq!(
+                backward.iter().map(leg_shapes).collect::<Vec<_>>(),
+                vec![vec![(304, 303), (203, 202), (102, 101)], vec![(504, 501)],]
+            );
+
+            assert!(interactor
+                .get_connected_routes(1, 99, None)
+                .await
+                .unwrap()
+                .is_empty());
+            assert!(interactor
+                .get_connected_routes(1, 1, None)
+                .await
+                .unwrap()
+                .is_empty());
         }
     }
 
@@ -5691,12 +5808,6 @@ mod tests {
                 _: &[u32],
             ) -> Result<Vec<TrainType>, DomainError> {
                 Ok(vec![])
-            }
-            async fn get_line_group_ids_by_station_group_ids(
-                &self,
-                _: &[u32],
-            ) -> Result<std::collections::HashMap<u32, Vec<u32>>, DomainError> {
-                Ok(std::collections::HashMap::new())
             }
             async fn find_by_line_group_id_and_line_id(
                 &self,

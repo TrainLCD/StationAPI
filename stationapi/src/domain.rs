@@ -5,5 +5,7 @@ pub mod ipa;
 pub mod normalize;
 pub mod repository;
 pub mod romaji;
+pub mod route_search;
+pub mod route_topology;
 pub mod segment_speed_table;
 pub mod speed_table;
