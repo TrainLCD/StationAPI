@@ -43,7 +43,7 @@ CODE_PATHS = [
 ]
 DATA_PATHS = ["data/*.csv"]
 DOC_PATHS = ["*.md", "docs/*", "README*", ".claude/*"]
-CI_PATHS = [".github/workflows/*", ".github/*.yml", ".github/*.yaml", "Makefile"]
+CI_PATHS = [".github/workflows/*", ".github/actions/*", ".github/*.yml", ".github/*.yaml", "Makefile"]
 
 # コミット件名のトリガ語句。英字は単語として一致したときだけ数える (`cd` が `line_cd` に、
 # `data` が `data_validator` に当たらないように)。語尾の s / es / ed / d / ing は許す。
@@ -130,8 +130,21 @@ def classify(subjects: list[str], files: list[str]) -> dict:
 # --------------------------------------------------------------------------- git / gh
 
 
+# git fetch が認証待ちで止まるなどしても、Abort として理由を返して終わらせる。
+TIMEOUT_SEC = 300
+
+
+def spawn(argv: tuple[str, ...]) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(argv, capture_output=True, text=True, timeout=TIMEOUT_SEC)
+    except subprocess.TimeoutExpired:
+        raise Abort(f"`{' '.join(argv)}` が {TIMEOUT_SEC} 秒以内に終わらなかった") from None
+    except OSError as e:
+        raise Abort(f"`{argv[0]}` を起動できない: {e}") from None
+
+
 def run(*argv: str) -> str:
-    result = subprocess.run(argv, capture_output=True, text=True)
+    result = spawn(argv)
     if result.returncode != 0:
         raise Abort(f"`{' '.join(argv)}` が失敗した:\n{result.stderr.strip()}")
     return result.stdout
@@ -148,8 +161,7 @@ def validate_ref(name: str, role: str) -> None:
 
 def rev(ref: str) -> str | None:
     # 短縮名だと同名のタグやローカルブランチが優先されるので、完全形で解決する。
-    result = subprocess.run(["git", "rev-parse", "--verify", "--quiet", ref], capture_output=True, text=True)
-    return result.stdout.strip() or None
+    return spawn(("git", "rev-parse", "--verify", "--quiet", ref)).stdout.strip() or None
 
 
 def default_base() -> str:
@@ -188,7 +200,9 @@ def prepare_range(base: str, head: str) -> dict:
                     "未 push のコミットがあるので、push の可否をユーザーに確認する")
 
     subjects = lines(run("git", "log", "--pretty=%s", f"{base_rev}..{head_rev}"))
-    files = lines(run("git", "diff", "--name-only", base_rev, head_rev))
+    # GitHub の PR 差分と同じく merge-base から測る。先端同士を比べると、head を切った後に
+    # base へ入ったコミットの変更まで混ざる。
+    files = lines(run("git", "diff", "--name-only", f"{base_rev}...{head_rev}"))
     # コミットだけを見ると空コミットのブランチが通るので、ファイル差分も確かめる。
     if not subjects or not files:
         raise Abort("PR 対象の差分が無い")
@@ -208,7 +222,8 @@ def prepare_worktree(base: str) -> dict:
     validate_ref(base, "base")
     fetch(base)
     base_ref = f"refs/remotes/origin/{base}"
-    files = sorted(set(lines(run("git", "diff", "--name-only", base_ref)))
+    merge_base = run("git", "merge-base", base_ref, "HEAD").strip()
+    files = sorted(set(lines(run("git", "diff", "--name-only", merge_base)))
                    | set(lines(run("git", "ls-files", "--others", "--exclude-standard"))))
     subjects = lines(run("git", "log", "--pretty=%s", f"{base_ref}..HEAD"))
     if not files:
@@ -244,6 +259,8 @@ _CASES = [
      ["CIでWorkerのユニットテストを実行する"], [".github/workflows/ci.yml"], {"CI/CD"}, False),
     ("composite action の変更は CI/CD",
      ["build-worker の既定値を揃える"], [".github/actions/build-worker/action.yml"], {"CI/CD"}, False),
+    ("composite action のスクリプトだけの変更も CI/CD",
+     ["build-worker の手順を直す"], [".github/actions/build-worker/entrypoint.sh"], {"CI/CD"}, False),
     ("コードとドキュメントが混ざればドキュメントは付けない",
      ["駅番号の照合漏れを修正", "README を更新"],
      ["stationapi/src/use_case/interactor/query.rs", "README.md"], {"バグ修正"}, True),
