@@ -41,7 +41,7 @@ use crate::{
             company_repository::CompanyRepository, line_repository::LineRepository,
             station_repository::StationRepository, train_type_repository::TrainTypeRepository,
         },
-        route_search,
+        route_search::{self, JourneySort},
         segment_speed_table::{segment_override_applies_to_kind, segment_speed_override_kmh},
     },
     model::{self, ConnectedRoute, Route},
@@ -1032,13 +1032,14 @@ where
         from_station_group_id: u32,
         to_station_group_id: u32,
         via_line_id: Option<u32>,
+        sort: JourneySort,
     ) -> Result<Vec<ConnectedRoute>, UseCaseError> {
         if from_station_group_id == to_station_group_id {
             return Ok(vec![]);
         }
 
         let network = self.station_repository.get_route_network().await?;
-        let journeys = network.search(
+        let mut journeys = network.search(
             from_station_group_id,
             to_station_group_id,
             via_line_id.map(|id| id as i32),
@@ -1046,6 +1047,8 @@ where
         if journeys.is_empty() {
             return Ok(vec![]);
         }
+        // 所要時間と乗換回数は API で返さないので、並べ替えはここで済ませる
+        route_search::sort_journeys(&mut journeys, sort);
 
         // 探索は ID だけを扱うので、乗降駅と種別は経路が確定してからまとめて取得する
         let station_ids: Vec<u32> = journeys
@@ -4990,7 +4993,10 @@ mod tests {
         async fn test_get_connected_routes_returns_legs_on_real_line_groups() {
             let interactor = create_connected_route_interactor();
 
-            let routes = interactor.get_connected_routes(1, 4, None).await.unwrap();
+            let routes = interactor
+                .get_connected_routes(1, 4, None, JourneySort::Recommended)
+                .await
+                .unwrap();
 
             assert_eq!(
                 routes.iter().map(leg_shapes).collect::<Vec<_>>(),
@@ -5009,7 +5015,10 @@ mod tests {
         async fn test_get_connected_routes_lists_every_train_type_of_each_leg() {
             let interactor = create_connected_route_interactor();
 
-            let routes = interactor.get_connected_routes(1, 4, None).await.unwrap();
+            let routes = interactor
+                .get_connected_routes(1, 4, None, JourneySort::Recommended)
+                .await
+                .unwrap();
             let transfer_route = &routes[0];
             let first_leg = &transfer_route.legs[0];
 
@@ -5041,12 +5050,40 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn test_get_connected_routes_sorts_by_arrival_time_or_transfer_count() {
+            let interactor = create_connected_route_interactor();
+            let shapes =
+                |routes: Vec<ConnectedRoute>| routes.iter().map(leg_shapes).collect::<Vec<_>>();
+            let transfer_route = vec![(101, 102), (202, 203), (303, 304)];
+            let direct_route = vec![(501, 504)];
+
+            let by_arrival = interactor
+                .get_connected_routes(1, 4, None, JourneySort::ArrivalTime)
+                .await
+                .unwrap();
+            assert_eq!(
+                shapes(by_arrival),
+                vec![transfer_route.clone(), direct_route.clone()],
+                "the transfer route arrives earlier than the direct detour"
+            );
+            let by_transfers = interactor
+                .get_connected_routes(1, 4, None, JourneySort::TransferCount)
+                .await
+                .unwrap();
+            assert_eq!(
+                shapes(by_transfers),
+                vec![direct_route, transfer_route],
+                "the direct detour needs no transfer, so it comes first"
+            );
+        }
+
+        #[tokio::test]
         async fn test_get_connected_routes_filters_by_arriving_line() {
             let interactor = create_connected_route_interactor();
 
             // テストの駅は line_cd = line_group_cd
             let via_direct = interactor
-                .get_connected_routes(1, 4, Some(500))
+                .get_connected_routes(1, 4, Some(500), JourneySort::Recommended)
                 .await
                 .unwrap();
             assert_eq!(
@@ -5054,7 +5091,7 @@ mod tests {
                 vec![vec![(501, 504)]]
             );
             let via_transfer = interactor
-                .get_connected_routes(1, 4, Some(300))
+                .get_connected_routes(1, 4, Some(300), JourneySort::Recommended)
                 .await
                 .unwrap();
             assert_eq!(via_transfer.len(), 1);
@@ -5071,7 +5108,7 @@ mod tests {
                 300
             );
             assert!(interactor
-                .get_connected_routes(1, 4, Some(100))
+                .get_connected_routes(1, 4, Some(100), JourneySort::Recommended)
                 .await
                 .unwrap()
                 .is_empty());
@@ -5081,23 +5118,32 @@ mod tests {
         async fn test_get_connected_routes_is_deterministic_and_handles_no_route() {
             let interactor = create_connected_route_interactor();
 
-            let first = interactor.get_connected_routes(1, 4, None).await.unwrap();
-            let second = interactor.get_connected_routes(1, 4, None).await.unwrap();
+            let first = interactor
+                .get_connected_routes(1, 4, None, JourneySort::Recommended)
+                .await
+                .unwrap();
+            let second = interactor
+                .get_connected_routes(1, 4, None, JourneySort::Recommended)
+                .await
+                .unwrap();
             assert_eq!(first, second);
 
-            let backward = interactor.get_connected_routes(4, 1, None).await.unwrap();
+            let backward = interactor
+                .get_connected_routes(4, 1, None, JourneySort::Recommended)
+                .await
+                .unwrap();
             assert_eq!(
                 backward.iter().map(leg_shapes).collect::<Vec<_>>(),
                 vec![vec![(304, 303), (203, 202), (102, 101)], vec![(504, 501)],]
             );
 
             assert!(interactor
-                .get_connected_routes(1, 99, None)
+                .get_connected_routes(1, 99, None, JourneySort::Recommended)
                 .await
                 .unwrap()
                 .is_empty());
             assert!(interactor
-                .get_connected_routes(1, 1, None)
+                .get_connected_routes(1, 1, None, JourneySort::Recommended)
                 .await
                 .unwrap()
                 .is_empty());

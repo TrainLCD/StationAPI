@@ -136,6 +136,39 @@ impl Journey {
     }
 }
 
+/// 経路の並べ方。どれを選んでも返す経路の集め方 ([`RouteNetwork::search`]) は
+/// 変わらず、並びだけが変わる。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum JourneySort {
+    /// おすすめ順。評価値 + 乗換 1 回あたり [`TRANSFER_RANK_SECONDS`] の小さい順で、
+    /// [`RouteNetwork::search`] が返す順そのもの。
+    #[default]
+    Recommended,
+    /// 到着の早い順。[`Journey::total_seconds`] (`estimateArrivalTimes` の見込みと
+    /// 同じく、最初の列車の待ち時間を含まない) の小さい順で、同じなら乗換の少ない順。
+    ArrivalTime,
+    /// 乗換の少ない順。同じなら到着の早い順。
+    TransferCount,
+}
+
+/// [`RouteNetwork::search`] が返した経路を `sort` の順に並べ替える。
+///
+/// 安定ソートなので、到着時刻と乗換回数がともに同じ経路はおすすめ順を保ち、
+/// 結果は決定的なまま。最少乗換の経路はパレート解として必ず候補に入る。
+/// 到着の早い順は候補の中での順で、候補は待ち時間込みの評価値で集めているため、
+/// 待ち時間を除けば速いだけの本数の少ない特急が新たに加わることはない。
+pub fn sort_journeys(journeys: &mut [Journey], sort: JourneySort) {
+    match sort {
+        JourneySort::Recommended => {}
+        JourneySort::ArrivalTime => {
+            journeys.sort_by_key(|journey| (journey.total_seconds, journey.transfer_count()))
+        }
+        JourneySort::TransferCount => {
+            journeys.sort_by_key(|journey| (journey.transfer_count(), journey.total_seconds))
+        }
+    }
+}
+
 /// 探索用の系統網。一度組み立てれば読み取り専用で、リクエスト間で共有できる。
 #[derive(Debug, Default)]
 pub struct RouteNetwork {
@@ -1224,5 +1257,84 @@ mod tests {
             &EstimationParams::default(),
         );
         assert_eq!(network.search(1, 4, None), network.search(1, 4, None));
+    }
+
+    /// 乗車区間の系統だけを持つ経路 (並べ替えは区間の中身を見ない)。
+    fn journey(line_groups: &[u32], total_seconds: i32) -> Journey {
+        Journey {
+            legs: line_groups
+                .iter()
+                .map(|&line_group_id| JourneyLeg {
+                    line_group_id,
+                    station_cds: Vec::new(),
+                    station_group_ids: Vec::new(),
+                })
+                .collect(),
+            total_seconds,
+        }
+    }
+
+    #[test]
+    fn sorts_journeys_by_arrival_time_or_transfer_count() {
+        // おすすめ順 (評価値 + 乗換の重み): 直通 33 分、1 回乗換 30 分、
+        // 2 回乗換 28 分、1 回乗換 30 分 (別経路)
+        let recommended = vec![
+            journey(&[100], 33 * 60),
+            journey(&[200, 300], 30 * 60),
+            journey(&[400, 500, 600], 28 * 60),
+            journey(&[700, 800], 30 * 60),
+        ];
+        let sorted = |sort: JourneySort| {
+            let mut journeys = recommended.clone();
+            sort_journeys(&mut journeys, sort);
+            journeys.iter().map(line_groups).collect::<Vec<_>>()
+        };
+
+        assert_eq!(
+            sorted(JourneySort::Recommended),
+            recommended.iter().map(line_groups).collect::<Vec<_>>(),
+            "the recommended order is the order search returns"
+        );
+        assert_eq!(
+            sorted(JourneySort::ArrivalTime),
+            vec![
+                vec![400, 500, 600],
+                vec![200, 300],
+                vec![700, 800],
+                vec![100]
+            ],
+            "earliest arrival first; ties keep the recommended order"
+        );
+        assert_eq!(
+            sorted(JourneySort::TransferCount),
+            vec![
+                vec![100],
+                vec![200, 300],
+                vec![700, 800],
+                vec![400, 500, 600]
+            ],
+            "fewest transfers first; ties keep the recommended order"
+        );
+    }
+
+    #[test]
+    fn breaks_arrival_ties_by_transfers_and_transfer_ties_by_arrival() {
+        let recommended = vec![
+            journey(&[100, 200], 30 * 60),
+            journey(&[300], 30 * 60),
+            journey(&[400, 500], 25 * 60),
+        ];
+        let mut by_arrival = recommended.clone();
+        sort_journeys(&mut by_arrival, JourneySort::ArrivalTime);
+        assert_eq!(
+            by_arrival.iter().map(line_groups).collect::<Vec<_>>(),
+            vec![vec![400, 500], vec![300], vec![100, 200]]
+        );
+        let mut by_transfers = recommended;
+        sort_journeys(&mut by_transfers, JourneySort::TransferCount);
+        assert_eq!(
+            by_transfers.iter().map(line_groups).collect::<Vec<_>>(),
+            vec![vec![300], vec![400, 500], vec![100, 200]]
+        );
     }
 }

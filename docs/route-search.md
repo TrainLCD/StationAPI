@@ -293,7 +293,24 @@ while queue から禁止集合を取り出す:
 
 パレート解は必ず残し、残りの枠を代替経路で埋めます。最後に
 「評価値 + 乗換 1 回あたり 5 分」、同点なら乗車回数の少ない順で並べ、
-最大 6 件を返します。
+最大 6 件を返します。これがおすすめ順 (`JourneySort::Recommended`) です。
+
+`connectedRoutes` の `sortBy` で到着の早い順・乗換の少ない順を選ぶと、
+use case が `search` の結果を `sort_journeys` で並べ替えます。返す経路の
+集め方は変えず、並びだけを変えます。
+
+| `JourneySort` | キー (小さい順) |
+|---|---|
+| `Recommended` | `search` の並びのまま |
+| `ArrivalTime` | (`total_seconds`, 乗換回数) |
+| `TransferCount` | (乗換回数, `total_seconds`) |
+
+到着の早い順は `total_seconds` (最初の列車の待ち時間を含まない所要時間) で
+並べます。`estimateArrivalTimes` が返す見込みと同じ定義ですが、値は探索が
+選んだ代表の種別でのものなので、アプリが別の種別 (既定の各停など) を選んで
+求め直した見込みとは並びが一致しないことがあります。候補は待ち時間込みの
+評価値で集めているので、待ち時間を除けば速いだけの本数の少ない特急が新たに候補に加わる
+ことはありません。最少乗換の経路はパレート解として必ず候補に入っています。
 
 ## 決定性
 
@@ -304,6 +321,7 @@ while queue から禁止集合を取り出す:
 - 値が同じときは先に記録したものを残す (`<` でしか更新しない)
 - 次ラウンドの `marked`: 節点番号順
 - 並べ替えは安定ソートで、同点は乗車回数、次に発見順
+- `sort_journeys` も安定ソートで、キーが同じ経路はおすすめ順を保つ
 
 `search_is_deterministic` テストで確認しています。
 
@@ -353,6 +371,8 @@ while queue から禁止集合を取り出す:
 | `collapses_parallel_train_types_into_one_route` | 並行種別をまとめる |
 | `rides_across_the_seam_of_a_circular_line` | 環状線の継ぎ目 |
 | `search_is_deterministic` | 決定性 |
+| `sorts_journeys_by_arrival_time_or_transfer_count` | 到着の早い順・乗換の少ない順 |
+| `breaks_arrival_ties_by_transfers_and_transfer_ties_by_arrival` | 並べ替えの同点の扱い |
 
 実データでの確認 (東京 → 渋谷が乗換なしで出る、三鷹 → 中目黒が乗換ありで
 出る、2 つの網が一致する、など) は `src/repository.rs` のテストにあります。
