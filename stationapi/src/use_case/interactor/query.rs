@@ -492,7 +492,12 @@ where
         }
     }
     fn get_line_symbols(&self, line: &Line) -> Vec<LineSymbol> {
-        let line_symbols_raw = [&line.line_symbol1, &line.line_symbol2, &line.line_symbol3];
+        let line_symbols_raw = [
+            &line.line_symbol1,
+            &line.line_symbol2,
+            &line.line_symbol3,
+            &line.line_symbol4,
+        ];
 
         let line_symbol1_color = line
             .line_symbol1_color
@@ -502,12 +507,14 @@ where
             line_symbol1_color,
             line.line_symbol2_color.as_ref(),
             line.line_symbol3_color.as_ref(),
+            line.line_symbol4_color.as_ref(),
         ];
 
         let line_symbols_shape_raw = [
             &line.line_symbol1_shape,
             &line.line_symbol2_shape,
             &line.line_symbol3_shape,
+            &line.line_symbol4_shape,
         ];
 
         if line_symbols_raw.is_empty() {
@@ -3508,6 +3515,23 @@ mod tests {
         }
 
         #[test]
+        fn test_get_line_symbols_includes_fourth_symbol_after_empty_third() {
+            let interactor = create_interactor();
+            let mut line = create_test_line(11103);
+            line.line_symbol3 = None;
+            line.line_symbol4 = Some("S".to_string());
+            line.line_symbol4_color = Some("#ED1C23".to_string());
+            line.line_symbol4_shape = Some("ROUND".to_string());
+
+            let symbols = interactor.get_line_symbols(&line);
+
+            assert_eq!(symbols.len(), 3);
+            assert_eq!(symbols[2].symbol, "S");
+            assert_eq!(symbols[2].color, "#ED1C23");
+            assert_eq!(symbols[2].shape, "ROUND");
+        }
+
+        #[test]
         fn test_get_line_symbols_uses_line_color_as_fallback() {
             let interactor = create_interactor();
             let mut line = create_test_line(100);
@@ -3526,6 +3550,7 @@ mod tests {
             line.line_symbol1 = None;
             line.line_symbol2 = None;
             line.line_symbol3 = None;
+            line.line_symbol4 = None;
 
             let symbols = interactor.get_line_symbols(&line);
             assert!(symbols.is_empty());
