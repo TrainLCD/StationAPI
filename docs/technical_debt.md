@@ -15,7 +15,8 @@
 >
 > 一方、domain / use_case 層への次の指摘は今も当てはまります。
 >
-> - `Station` エンティティのフィールドが多い (現在 65 個)。`Line` も 34 個あり、
+> - `Station` エンティティ (`stationapi/src/domain/entity/station.rs`) の
+>   フィールドが多い (現在 65 個)。`Line` エンティティ (`line.rs`) も 34 個あり、
 >   `Station` と `TrainType` を埋め込んだままです
 > - `Station` / `Line` / `TrainType` / `Company` の impl ブロックに
 >   `#![allow(clippy::too_many_arguments)]` が残っています
@@ -68,7 +69,7 @@ StationAPI の技術負債を洗い出し、整理したドキュメントです
 #### Station 構造体
 
 - **ファイル**: `stationapi/src/domain/entity/station.rs:8-76`
-- **フィールド数**: 64 個 (分析時点。現在は 65 個)
+- **フィールド数**: 64 個 (分析時点。現在の `domain/entity/station.rs` では 65 個。API が返す `model.rs` の `Station` とは別の型)
 - **問題点**:
   - 駅・路線・列車種別の情報が 1 つの構造体に混在している
   - `Line`、`TrainType`、`StationNumber` などの関連データを抱え込んでいる
@@ -87,7 +88,7 @@ pub struct Station {
 #### Line 構造体
 
 - **ファイル**: `stationapi/src/domain/entity/line.rs:6-41`
-- **フィールド数**: 33 個 (分析時点。現在は 34 個)
+- **フィールド数**: 33 個 (分析時点。現在の `domain/entity/line.rs` では 34 個。API が返す `model.rs` の `Line` とは別の型)
 - **問題点**:
   - `Station` を埋め込んでいる (循環参照になるおそれがある)
   - `TrainType` も埋め込んでいる
