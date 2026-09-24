@@ -60,6 +60,12 @@ enum TransportType {
 	RailAndBus
 }
 
+enum ConnectedRouteSort {
+	Recommended
+	ArrivalTime
+	TransferCount
+}
+
 enum TtsAlphabet {
 	TtsAlphabetUnspecified
 	Ipa
@@ -92,7 +98,7 @@ type Query {
 	stationTrainTypes(stationId: Int!): [TrainType!]!
 	routes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int, pageSize: Int, pageToken: String): RoutePage!
 	routeTypes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int, pageSize: Int, pageToken: String): RouteTypePage!
-	connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int): [ConnectedRoute!]!
+	connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int, sortBy: ConnectedRouteSort): [ConnectedRoute!]!
 	estimateArrivalTimes(fromStationId: Int!, toStationId: Int!, viaLineIds: [Int!], directionId: Int, legs: [RouteLegInput!]): EstimatedArrivalPage!
 	trainRoute(fromStationId: Int!, toStationId: Int!, lineGroupId: Int, legs: [RouteLegInput!]): TrainRouteResponse!
 }

@@ -10,7 +10,7 @@ use stationapi::domain::route_search;
 use stationapi::model;
 use stationapi::use_case::traits::query::QueryUseCase;
 
-use super::enums::TransportType as GqlTransportType;
+use super::enums::{ConnectedRouteSort, TransportType as GqlTransportType};
 use super::scalar::UInt32;
 use super::types::*;
 use crate::Interactor;
@@ -360,12 +360,14 @@ impl QueryRoot {
         from_station_group_id: i32,
         to_station_group_id: i32,
         via_line_id: Option<i32>,
+        sort_by: Option<ConnectedRouteSort>,
     ) -> GqlResult<Vec<ConnectedRoute>> {
         let found = use_case(ctx)
             .get_connected_routes(
                 to_id(from_station_group_id, "fromStationGroupId")?,
                 to_id(to_station_group_id, "toStationGroupId")?,
                 to_opt_id(via_line_id, "viaLineId")?,
+                sort_by.map(Into::into).unwrap_or_default(),
             )
             .await?;
         Ok(found.into_iter().map(Into::into).collect())
