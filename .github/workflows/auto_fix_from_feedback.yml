@@ -90,14 +90,15 @@ jobs:
           handoffs: MobileApp,Functions
           guidelines_file: AGENTS.md
           pr_template: .github/pull_request_template.md
-          # ci.yml の 6 つに cargo run -p data_validator を足したもの。ci.yml は
+          # ci.yml の 7 つに cargo run -p data_validator を足したもの。ci.yml は
           # paths で *.csv を除いていて、CSV の検証は verify_data_Integrity.yml が
           # data_validator で行っている。エージェントには CSV も直させるので、
-          # これを入れないと 6 つすべてを通した PR がデータ検証で落ちる。
+          # これを入れないと 7 つすべてを通した PR がデータ検証で落ちる。
           checks: |
             cargo check -p stationapi -p stationapi-preprocessor -p data_validator
             cargo check --target wasm32-unknown-unknown -p stationapi-worker
             cargo test -p stationapi -p stationapi-preprocessor -p data_validator
+            cargo test -p stationapi-worker
             cargo fmt --all -- --check
             cargo clippy -p stationapi -p stationapi-preprocessor -p data_validator --all-targets -- -D warnings
             cargo clippy --target wasm32-unknown-unknown -p stationapi-worker --all-targets -- -D warnings

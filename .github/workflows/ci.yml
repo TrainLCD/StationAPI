@@ -57,6 +57,10 @@ jobs:
             target
           key: test-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo test $NATIVE_PACKAGES
+      # worker は Workers 上でしか動かないが、索引 (src/index.rs) と repository は
+      # ネイティブでも動く純粋なデータ構造なので、そのユニットテストはここで走らせる。
+      # generated/ が無いので data/*.csv にフォールバックしてビルドされる。
+      - run: cargo test -p stationapi-worker
 
   fmt:
     name: Rustfmt

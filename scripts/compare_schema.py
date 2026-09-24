@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Worker が生成した SDL を、公開スキーマ (worker/schema/public.graphql) と突き合わせる。
+"""Worker が生成した SDL を、公開スキーマ (schema/public.graphql) と突き合わせる。
 
 async-graphql はコードファーストなので、Rust の型を変えると SDL が変わる。
 クライアントが壊れる変更に気付けるよう、CI でこの比較を行う。
