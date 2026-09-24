@@ -64,7 +64,7 @@ fn reader(csv_text: &'static str) -> csv::Reader<&'static [u8]> {
 // ---------------------------------------------------------------- 駅
 
 /// 検索に必要な列だけを持つ軽量レコード。
-/// Station エンティティ (66 フィールド) は応答生成時にのみ組み立てる。
+/// Station エンティティ (65 フィールド) は応答生成時にのみ組み立てる。
 pub struct StationRecord {
     pub station_cd: i32,
     pub station_g_cd: i32,

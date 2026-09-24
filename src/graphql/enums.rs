@@ -6,6 +6,7 @@
 #![allow(clippy::enum_variant_names)]
 
 use async_graphql::Enum;
+use stationapi::domain::route_search::JourneySort;
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 #[graphql(rename_items = "PascalCase", name = "LineType")]
@@ -85,6 +86,29 @@ pub enum TtsAlphabet {
     Ipa,
     Yomigana,
     Plain,
+}
+
+// connectedRoutes の並べ方。どれを選んでも返す経路の集合は同じで、並びだけが変わる
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[graphql(rename_items = "PascalCase", name = "ConnectedRouteSort")]
+pub enum ConnectedRouteSort {
+    // おすすめ順 (評価値 = 最初の列車の待ち時間を含む所要時間の見込み、に乗換 1 回あたり
+    // 5 分を足した値の小さい順)。既定
+    Recommended,
+    // 到着の早い順 (estimateArrivalTimes の見込みと同じ所要時間)。同じなら乗換の少ない順
+    ArrivalTime,
+    // 乗換の少ない順。同じなら到着の早い順
+    TransferCount,
+}
+
+impl From<ConnectedRouteSort> for JourneySort {
+    fn from(value: ConnectedRouteSort) -> Self {
+        match value {
+            ConnectedRouteSort::Recommended => JourneySort::Recommended,
+            ConnectedRouteSort::ArrivalTime => JourneySort::ArrivalTime,
+            ConnectedRouteSort::TransferCount => JourneySort::TransferCount,
+        }
+    }
 }
 
 macro_rules! from_i32 {

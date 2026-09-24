@@ -1206,7 +1206,7 @@ impl TrainTypeRepository for MemTrainTypeRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use stationapi::domain::route_search::{self, Journey};
+    use stationapi::domain::route_search::{self, Journey, JourneySort};
     use stationapi::model;
 
     const TOKYO: u32 = 1130101;
@@ -1326,7 +1326,13 @@ mod tests {
         assert_eq!(train_route.len(), eta.len());
 
         // connectedRoutes の区間の trainTypes は、どれを選んでも区間の乗降駅で使える
-        let routes = block_on(interactor.get_connected_routes(MITAKA, NAKA_MEGURO, None)).unwrap();
+        let routes = block_on(interactor.get_connected_routes(
+            MITAKA,
+            NAKA_MEGURO,
+            None,
+            JourneySort::Recommended,
+        ))
+        .unwrap();
         for route in &routes {
             // stationGroupIds は乗車駅の駅グループから降車駅の駅グループまでの並び
             for leg in &route.legs {
@@ -1368,10 +1374,54 @@ mod tests {
     }
 
     #[test]
+    fn connected_route_sort_only_reorders_the_recommended_routes() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+        let interactor = crate::interactor();
+        // 三鷹 → 中目黒、東京 → 渋谷、大宮 → 新大阪
+        for (from, to) in [(MITAKA, NAKA_MEGURO), (TOKYO, SHIBUYA), (1131906, 1160213)] {
+            let recommended = route_network().search(from, to, None);
+            assert!(!recommended.is_empty());
+            let mut by_arrival = recommended.clone();
+            route_search::sort_journeys(&mut by_arrival, JourneySort::ArrivalTime);
+            assert!(by_arrival
+                .windows(2)
+                .all(|w| (w[0].total_seconds, w[0].transfer_count())
+                    <= (w[1].total_seconds, w[1].transfer_count())));
+            let mut by_transfers = recommended.clone();
+            route_search::sort_journeys(&mut by_transfers, JourneySort::TransferCount);
+            assert!(by_transfers
+                .windows(2)
+                .all(|w| (w[0].transfer_count(), w[0].total_seconds)
+                    <= (w[1].transfer_count(), w[1].total_seconds)));
+
+            // connectedRoutes も同じ集合を並べ替えるだけ
+            let routes =
+                |sort| block_on(interactor.get_connected_routes(from, to, None, sort)).unwrap();
+            let base = routes(JourneySort::Recommended);
+            for sort in [JourneySort::ArrivalTime, JourneySort::TransferCount] {
+                let sorted = routes(sort);
+                assert_eq!(sorted.len(), base.len());
+                assert!(sorted.iter().all(|route| base.contains(route)));
+            }
+            let transfers: Vec<usize> = routes(JourneySort::TransferCount)
+                .iter()
+                .map(|route| route.legs.len())
+                .collect();
+            assert!(transfers.windows(2).all(|w| w[0] <= w[1]), "{transfers:?}");
+        }
+    }
+
+    #[test]
     fn connected_route_rejects_legs_that_do_not_connect() {
         use stationapi::use_case::traits::query::QueryUseCase;
         let interactor = crate::interactor();
-        let routes = block_on(interactor.get_connected_routes(MITAKA, NAKA_MEGURO, None)).unwrap();
+        let routes = block_on(interactor.get_connected_routes(
+            MITAKA,
+            NAKA_MEGURO,
+            None,
+            JourneySort::Recommended,
+        ))
+        .unwrap();
         let mut legs: Vec<model::RouteLegRequest> = routes[0]
             .legs
             .iter()
