@@ -35,44 +35,9 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 ## 前提条件
 
 - カレントディレクトリが `git rev-parse --show-toplevel` で解決できるリポジトリ内。
-- `gh` CLI が認証済み。
-- `head` ブランチが origin に push 済み。未 push の場合はユーザーに push の可否を確認する（勝手に push しない）。散文の前提で終わらせず、手順 2 でローカルと origin の commit ID を突き合わせて機械的に検出する。
-- **ref 名をシェルソースへ直接埋め込まない。** 本書の `<base>` / `<head>` は説明用のプレースホルダ。実際のコマンドでは値を `BASE_REF` / `HEAD_REF` に取り込み、以降は必ず `"$BASE_REF"` / `"$HEAD_REF"` で参照する。git の ref 名は `'` / `$( )` / バッククォート / `;` を含められるため、リテラルを直接置換すると構文が壊れるか、意図しないコマンドが実行される。値はコマンド出力から取り込む（ユーザー指定がある場合のみ、その値を代入する）:
-
-  ```bash
-  BASE_REF="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)"
-
-  HEAD_REF="$(git rev-parse --abbrev-ref HEAD)"
-  if [ "$HEAD_REF" = "HEAD" ] || [ "$HEAD_REF" = "$BASE_REF" ]; then
-    printf 'PR の head にできるブランチに居ない: %s\n' "$HEAD_REF" >&2
-    exit 1   # 手順 1 で切り出す
-  fi
-
-  # ref 名の文字種を検証する。gh --head・ファイル名 slug・シェル展開の
-  # すべてで安全に使える集合か。BASE_REF / HEAD_REF に同じ規則を適用する
-  validate_ref() {
-    case "$1" in
-      '' | *[!A-Za-z0-9._/-]*)
-        printf 'ref 名に想定外の文字が含まれる: %s\n' "$1" >&2; return 1 ;;
-    esac
-  }
-  validate_ref "$BASE_REF" || exit 1
-  validate_ref "$HEAD_REF" || exit 1
-
-  # origin 上のブランチを commit ID へ解決する。
-  # 実際の解決は fetch 後（手順 2）に一度だけ行うので、ここでは定義のみ
-  resolve_remote_rev() {
-    validate_ref "$1" || return 1
-    rev="$(git rev-parse --verify --quiet "refs/remotes/origin/$1")"
-    if [ -z "$rev" ]; then
-      printf 'origin 上に存在しない: %s\n' "$1" >&2; return 1
-    fi
-    printf '%s\n' "$rev"
-  }
-  ```
-
-- **ref は `refs/remotes/origin/<名前>` / `refs/heads/<名前>` の完全形で解決する。** 短縮名を `git rev-parse` に渡すと、同名のタグやローカルブランチが優先されて意図と違うコミットを指すことがある。`--verify --quiet` を付けると、存在しない ref は終了コード 1 と空出力になるので、**解決結果が空でないことの検証が必須**。省くと未 push のブランチが空の `BASE_REV` / `HEAD_REV` として無言で通過する。
-- **`BASE_REF` / `HEAD_REF` が `^[A-Za-z0-9._/-]+$` に一致しない場合は自動で進めない。** git の ref 名には `gh --head` やファイル名 slug に使えない文字、シェルに解釈される文字が入り得る。`gh repo view` 由来の `BASE_REF` にも同じ検査を適用し（`resolve_remote_rev` の `case` がこれを担う）、一致しない値が返ったらユーザーに正しいブランチ名を確認する。
+- `gh` CLI が認証済みで、Python 3 がある（`prepare.py` は標準ライブラリしか使わない）。
+- `head` ブランチが origin に push 済み。未 push の場合はユーザーに push の可否を確認する（勝手に push しない）。未 push かどうかは `prepare.py` がローカルと origin の commit ID を突き合わせて検出する。
+- **ref の検証・解決、差分の取得、変更の種類の判定は `prepare.py` に任せ、シェルで書き直さない。** `prepare.py` は git と gh をシェルを通さずに起動する。そのため `'` / `$( )` / `;` を含む ref 名が実行されることも、zsh が `"$BASE_REF:refs/..."` の `:r` を修飾子として展開して ref を壊すこともない。スキル本文に位置引数（`$` と数字）を書くと、Claude Code がスキルを読み込む時点で呼び出し時の引数に置き換えるので、シェル断片でも使わない。
 
 ## 手順
 
@@ -108,109 +73,44 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    ```
    - **`git add -A` / `git add .` は使わない。** `.gitignore` に載っていない一時ファイルまで巻き込む。`git status` の出力を読んでから、追跡済みは `git add -u`、未追跡は明示パスで追加する。関係ないファイルが入ったら `git restore --staged <path>` で外す。
    - 変更が既にコミット済みでブランチだけが無い（`dev` の上に直接コミットした等）場合は、`git switch -c <inferred-branch>` だけでそのコミットを新ブランチへ引き継げる。`dev` 側を元に戻す必要があれば、**作業ツリーに触れない `git branch -f dev origin/dev`** を使う（実行の可否はユーザーに確認する）。`dev` が別の worktree で checkout 済みなら git 自身がこのコマンドを拒否するので、取り違えも起きない。`git switch dev && git reset --hard origin/dev` は避ける: 追跡済みファイルの staged／unstaged 変更を問答無用で捨てるうえ、`dev` を別の worktree が持っていると `git switch` 自体が失敗する。どうしても checkout して戻すなら、`git worktree list` で `dev` の所在を確認し、その worktree で `git status --short` が空であることを確かめてから実行する（変更があれば先に WIP コミット（推奨）か名前付き stash（`git stash push -u -m "<tag>"`。stash スタックは全 worktree 共有なので `git stash pop` ではなく `git stash apply <sha>` で戻す）へ退避する）。
-   - コミット前に下記の品質チェックを通す（`CONTRIBUTING.md` ルール、手順 3 で定義する「コード本体パス」に変更が無ければ省略可）:
+   - コミット前に `python3 .claude/skills/create-pr/prepare.py --worktree` を実行し、origin の base から作業ツリーまでの変更（未コミット・未追跡・未 push を含む）を判定する。`code_changed` が true なら下記の品質チェックを通す（`CONTRIBUTING.md` ルール）:
      - `cargo fmt --all -- --check`
      - `make clippy`
      - `make test`
-   - データのみの変更（`data/*.csv` 等）を含む場合は `cargo run -p data_validator` も流す。
+   - `data_changed` が true なら `cargo run -p data_validator` も流す。
    - push は新規ブランチなので安全だが、実行前にユーザーへ要約（ブランチ名・含めるファイル・コミットメッセージ案）を提示して承認を取る。
 
    以降の手順では推論後の head を使う。
 
 2. **状態確認とモード決定（新規作成 / 更新）**
-   - `git fetch` で `BASE_REF` / `HEAD_REF` の remote-tracking ref を更新する。**`BASE_REV` / `HEAD_REV` の解決は必ず fetch の後に行う。** 先に解決すると古い commit ID で差分を測ることになる。前提条件で済ませておくのは ref 名の文字種検証までにとどめる。
-   - **fetch 対象は refspec で明示する。** ブランチ名だけを渡す形（`git fetch origin <branch>`）は remote-tracking ref の更新が `remote.origin.fetch` の設定に依存する。別マシンで refspec が絞られていると `refs/remotes/origin/<branch>` が古いまま後続の解決と一致検査を通ってしまう。
-   - **`BASE_REV` / `HEAD_REV` は origin 側の位置なので、ローカルの `HEAD_REF` がそれと一致することを機械的に確かめる。** 一致しなければ未 push のコミットがあり、そのまま進むとその分を含まない範囲で PR が組み上がる。検出したら push の可否をユーザーに確認して中断する（勝手に push しない）。
-   - **ローカルに `HEAD_REF` が無い場合も中断する。** 空は「未 push が無い」証拠ではなく、単に検証できていない状態（ローカルで削除済み、あるいは origin にしか無いブランチを `head` に指定した、など）。`git switch --track "origin/<名前>"` でローカルへ取り込んでからやり直す。
-   - コミットとファイル差分の**両方**を確認する。`git log` はコミットの有無しか見ないため、空コミットだけが載ったブランチが通過してしまう。
 
-     ```bash
-     # remote.origin.fetch の設定に左右されないよう refspec で明示する
-     git fetch origin \
-       "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF" \
-       "+refs/heads/$HEAD_REF:refs/remotes/origin/$HEAD_REF"
-     BASE_REV="$(resolve_remote_rev "$BASE_REF")" || exit 1   # 前提条件で定義したヘルパ。解決はここが最初
-     HEAD_REV="$(resolve_remote_rev "$HEAD_REF")" || exit 1
+   ```bash
+   python3 .claude/skills/create-pr/prepare.py    # --base / --head で上書きできる
+   ```
 
-     # ローカルの HEAD_REF を解決し、origin の先端と一致することを確認する。
-     # HEAD_REF は validate_ref で検証済み
-     HEAD_LOCAL_REV="$(git rev-parse --verify --quiet "refs/heads/$HEAD_REF")"
-     # 該当が無いと空を返すので、中身で判定する
-     if [ -z "$HEAD_LOCAL_REV" ]; then
-       printf 'ローカルに %s が無い。origin だけを見て組むと一致を検証できない。\n' "$HEAD_REF" >&2
-       printf 'git switch --track "origin/%s" で取り込んでからやり直す。\n' "$HEAD_REF" >&2
-       exit 1
-     fi
-     if [ "$HEAD_LOCAL_REV" != "$HEAD_REV" ]; then
-       printf 'ローカル %s が origin と一致しない:\n  local  = %s\n  origin = %s\n' \
-         "$HEAD_REF" "$HEAD_LOCAL_REV" "$HEAD_REV" >&2
-       exit 1   # 未 push の変更がある。push の可否をユーザーに確認してから進む
-     fi
+   `prepare.py` は次の順に確かめる。途中で止まったら理由を標準エラーに出し、終了コード 1 で終わる。その場合は理由をユーザーに伝え、指示に従う。
+   - base / head の ref 名が `^[A-Za-z0-9._/-]+$` に一致するか（先頭の `-` は不可）。head が `HEAD`（detached）や base と同じなら、手順 1 で切り出す。
+   - 両ブランチを refspec で明示して fetch し、`refs/remotes/origin/<名前>` の完全形で解決する。refspec を省くと remote-tracking ref の更新が `remote.origin.fetch` の設定次第になり、短縮名だと同名のタグやローカルブランチが優先される。
+   - ローカルの head が origin と一致するか。一致しない、あるいはローカルに無い場合は、未 push のコミットを検証できないので止まる。
+   - コミットとファイル差分がどちらも空でないか（空コミットだけのブランチを通さない）。
+   - 既存の open PR を探し、「変更の種類」を判定する（手順 3）。
 
-     git log --oneline "$BASE_REV..$HEAD_REV"
-     git diff --name-only "$BASE_REV" "$HEAD_REV"
-     ```
-
-     コミット一覧が空、または `git diff --name-only` の出力が空の場合は「PR 対象の差分が無い」と報告し、**既存 PR の検索へ進まずに中断する**。
-   - `gh pr list --base "$BASE_REF" --head "$HEAD_REF" --state open --json number,url,body` で既存 open PR を確認。
-     - **存在しない場合**: 新規作成モード。以降、手順 5 で `gh pr create`。
-     - **存在する場合**: 更新モード。既存本文を最新差分で再生成する。以降、手順 5 で `gh pr edit`。タイトルは既存を**原則尊重**（ユーザー推論より優先）。ただし手順 5 の整合性チェックで主題が大きくズレていると判断した場合のみ更新案を提示する。
+   出力は JSON で、以降の手順は `base` / `head` / `commits` / `files` / `code_changed` / `data_changed` / `types` / `checklist` / `existing_pr` を使う。手順 5 のシェルでは `base` と `head` の値を `BASE_REF` / `HEAD_REF` に代入し、`"${BASE_REF}"` のように中括弧付きで引用する。
+   - `existing_pr` が null: 新規作成モード。手順 5 で `gh pr create`。
+   - `existing_pr` がある: 更新モード。既存本文（`existing_pr.body`）を最新差分で再生成し、手順 5 で `gh pr edit`。タイトルは既存を**原則尊重**（ユーザー推論より優先）。ただし手順 5 の整合性チェックで主題が大きくズレていると判断した場合のみ更新案を提示する。
 
 3. **変更の種類を判定**
 
-   `origin/<base>..origin/<head>` のコミット件名と変更ファイルを取得:
-   ```bash
-   git log --pretty=%s "$BASE_REV..$HEAD_REV"
-   git diff --name-only "$BASE_REV" "$HEAD_REV"
-   ```
+   判定は `prepare.py` の `classify()` が行い、`types`（項目ごとの ON / OFF と根拠）と `checklist`（テンプレ順のチェック欄）を返す。規則を変えるときは `prepare.py` を直して `--self-test` を回す。この文書に判定表を書き戻さない（二か所に置くと食い違う）。
 
-   **大原則: 判定はアプリ挙動／データに対する変更かどうかで決める**。下の「コード本体パス」が一切変わっていない場合、「バグ修正」「新機能」「リファクタリング」は OFF（コミット件名に `fix` / `feat` 等の語があっても）。スキル・設定・ドキュメントのメタ変更を「新機能」と誤分類しないための安全弁。「データの修正・追加」は `data/**` の変更を独立に判定する（後述「変更ファイルパスベース」「コミット件名ベース」を参照）。
+   規則の骨子:
+   - **判定はアプリの挙動やデータに対する変更かどうかで決める。** `CODE_PATHS`（Worker 本体の `src/`、`stationapi/src/`、`preprocessor/src/` など）に変更が無ければ、コミット件名に fix / feat とあってもバグ修正・新機能・リファクタリングは OFF にする。スキルやドキュメントの手入れを「新機能」と誤分類しないため。
+   - バグ修正・新機能・リファクタリングはコミット件名のトリガ語句で決める。英字の語句は単語として一致したときだけ数えるので、`line_cd` の `cd` や `data_validator` の `data` には当たらない。
+   - データの修正・追加は `data/**/*.csv` の変更で決める（`data/README.md` だけならドキュメント）。
+   - ドキュメントは、コードも CSV も含まず、変更がドキュメントだけか、コミット件名がドキュメントを示すときに ON。CI/CD は `.github/` のワークフローと action、`Makefile` の変更、またはコミット件名で決める。
+   - どれも OFF のときだけ「その他」を ON にする。
 
-   この大原則のもとで、各項目を独立に評価（複数該当可、大文字小文字無視）。英字のトリガ語句は単語として一致したときだけ数える（`ci` / `cd` / `add` / `data` が `station_cd` や `line_cd` の一部に当たって誤判定しないように）。日本語のトリガ語句は部分一致でよい。
-
-   **コード本体パス**（バグ修正 / 新機能 / リファクタリングのゲート）
-
-   - `src/**`（Worker 本体）
-   - `stationapi/src/**`
-   - `preprocessor/src/**`
-   - `data_validator/src/**`
-   - `tools/**`
-   - `build.rs`
-   - `schema/**`
-   - `Cargo.toml` / `Cargo.lock`
-   - `wrangler.jsonc`
-
-   **コード本体変更ありの場合 — コミット件名ベース**
-
-   | 項目 | トリガ語句 |
-   | ---- | ---- |
-   | バグ修正 | `fix`, `Hotfix`, `バグ`, `修正`, `不具合` |
-   | 新機能 | `feat`, `add`, `新機能`, `追加`, `導入`, `対応` |
-   | リファクタリング | `refactor`, `リファクタ`, `整理`, `clean`, `tidy` |
-
-   **変更ファイルパスベース**（コード本体変更の有無に関わらず評価）
-
-   | 項目 | パターン |
-   | ---- | ---- |
-   | データの修正・追加 | `data/**/*.csv` |
-   | ドキュメント | 変更が `*.md` / `docs/**` / `README*` / `.claude/**` / `AGENTS.md` / `CONTRIBUTING.md` のみ、またはそれらを主体とする |
-   | CI/CD | `.github/workflows/**`, `.github/**/*.yml`, `Makefile` のいずれかを含む |
-
-   **コミット件名ベース（データ・ドキュメント・CI/CD）**
-
-   | 項目 | トリガ語句 |
-   | ---- | ---- |
-   | データの修正・追加 | `データ`, `data`, `駅`, `路線`, `numbering`, `CSV`, `csv` |
-   | ドキュメント | `docs`, `ドキュメント`, `README`, `changelog`, `AGENTS`, `CONTRIBUTING` |
-   | CI/CD | `ci`, `cd`, `workflow`, `release`, `Bump version`, `labeler` |
-
-   判定ロジック:
-   - 上の「大原則」のゲートをまず適用。コード本体／データの変更が無ければバグ修正・新機能・リファクタリング・データの修正・追加は強制 OFF。
-   - 「データの修正・追加」は `data/**` の変更があれば ON。`data/README.md` のみの変更なら「ドキュメント」のみ ON にする。
-   - 「ドキュメント」は変更にコード本体や CSV を含まない場合に ON。混在する場合は基本 OFF（主目的が分かるならそちらを優先）。ただし `.claude/**` や `AGENTS.md` のみの変更は「ドキュメント」を ON にする（運用ドキュメント扱い）。
-   - 「CI/CD」は `.github/workflows/**` 等の変更があれば独立に ON。
-   - 残りの項目は、コミット件名またはファイルパスのトリガに 1 つでも当てはまれば `- [x]`、それ以外は `- [ ]`。
-   - 全項目が OFF のときのみ `その他` を `- [x]` にする。他項目が ON のときは `その他` は必ず `- [ ]`。
+   判定が PR の実態と合わないと思ったら、手で書き換えずに根拠（`types[].reasons`）をユーザーに示して確認する。
 
 4. **本文組み立て**
 
@@ -220,10 +120,10 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
    **新規作成モード**
    - 「概要」節: `summary` があれば挿入。無ければテンプレのコメントだけ残す。
-   - 「変更の種類」節: 手順 3 の結果で各 `- [ ]` / `- [x]` を決定。**項目順序は必ずテンプレ通り**（バグ修正 / 新機能 / データの修正・追加 / リファクタリング / ドキュメント / CI/CD / その他）。
+   - 「変更の種類」節: `checklist` をそのまま使う（テンプレ通りの順序で並んでいる）。
    - 「変更内容」節: コミット件名と変更ファイルから短い箇条書きを生成。`summary` があればそれを優先。データのみの PR では追加・修正した路線・駅などを箇条書きで列挙すると親切。
    - 「テスト」節:
-     - **判定基準: 手順 3 の「コード本体パス」（`stationapi/src/**` ほか）に変更が無い場合は Step 1 の `cargo` チェックを省略したとみなし、3 項目すべて OFF**（`skip_checks` より優先）。本文末尾に「省略: コード変更なし」等の短い注記を残す。
+     - **判定基準: `code_changed` が false なら Step 1 の `cargo` チェックを省略したとみなし、3 項目すべて OFF**（`skip_checks` より優先）。本文末尾に「省略: コード変更なし」等の短い注記を残す。
      - 上記に該当しない場合は `skip_checks` が真なら 3 項目すべて OFF、偽なら 3 項目すべて ON。テキストはテンプレのまま（`make fmt` / `make clippy` / `make test`）。
    - 「関連Issue」節: `related_issue` が指定されていればユーザー入力を最優先で出力（`#N` のみなら `Closes #N`、`Closes/Fixes/Refs #N` 形式なら接頭語を維持）。空のときに限りコミット件名から `Closes/Fixes/Refs #N` を抽出。どちらも無ければコメントのみ。
    - 「スクリーンショット」節: 常にコメントのみ（API レスポンスの diff など必要なら呼び出し側が後から編集する前提）。
@@ -237,7 +137,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    | 概要 | 既存内容を尊重。空欄（テンプレのコメントのみ）なら新規作成モードと同じ生成を試みる。 |
    | 変更の種類 | **常に手順 3 の結果で上書き**（機械的判定）。 |
    | 変更内容 | 冒頭の箇条書きブロック（`-` で始まる連続行）を最新差分で再生成。その下に人間が書いた散文があれば残す。 |
-   | テスト | **常に `skip_checks` に従う**（手順 4 の本文組み立てと同じルール）。 |
+   | テスト | **新規作成モードと同じルールで上書き**（`code_changed` が false なら `skip_checks` に関わらず 3 項目すべて OFF にして省略の注記を残し、それ以外は `skip_checks` に従う）。 |
    | 関連Issue | 既存内容を尊重。コミット件名に `Closes/Fixes/Refs #N` があり、かつ既存本文中に同じ Issue 番号 `#N` を指す表現が存在しない場合のみ追記（重複は作らない。比較時は `Closes` / `closes` / `Fixes` / `fixes` / `Refs` / `refs` を同一視し、空白・記号差は無視して `#N` 単位で照合）。 |
    | スクリーンショット | 既存内容を尊重。自動では触らない。 |
 
@@ -262,7 +162,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
    ```bash
    # ref 名（ブランチ名）をファイル名として安全な集合（A-Za-z0-9._-）にスラッグ化
-   REF_SLUG="$(printf '%s' "$HEAD_REF" \
+   REF_SLUG="$(printf '%s' "${HEAD_REF}" \
      | tr -d '\r\n' \
      | tr -c 'A-Za-z0-9._-' '_' \
      | sed -E 's/_+/_/g; s/^_+//; s/_+$//' \
@@ -272,8 +172,8 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    (
      trap 'rm -f "$BODY_FILE"' EXIT INT TERM
      gh pr create \
-       --base "$BASE_REF" \
-       --head "$HEAD_REF" \
+       --base "${BASE_REF}" \
+       --head "${HEAD_REF}" \
        --title "<title>" \
        --assignee TinyKitten \
        [--label "<label1>" --label "<label2>" ...] \
