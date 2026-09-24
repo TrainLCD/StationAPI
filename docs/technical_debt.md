@@ -68,7 +68,7 @@ StationAPI の技術負債を洗い出し、整理したドキュメントです
 #### Station 構造体
 
 - **ファイル**: `stationapi/src/domain/entity/station.rs:8-76`
-- **フィールド数**: 64 個
+- **フィールド数**: 64 個 (分析時点。現在は 65 個)
 - **問題点**:
   - 駅・路線・列車種別の情報が 1 つの構造体に混在している
   - `Line`、`TrainType`、`StationNumber` などの関連データを抱え込んでいる
@@ -80,14 +80,14 @@ pub struct Station {
     // 駅情報 (station_cd, station_g_cd, station_name, ...)
     // 路線情報 (line_cd, line, lines, line_name, line_symbol1, ...)
     // 列車種別情報 (train_type, type_name, ...)
-    // 合計64フィールド
+    // 合計64フィールド (分析時点)
 }
 ```
 
 #### Line 構造体
 
 - **ファイル**: `stationapi/src/domain/entity/line.rs:6-41`
-- **フィールド数**: 33 個
+- **フィールド数**: 33 個 (分析時点。現在は 34 個)
 - **問題点**:
   - `Station` を埋め込んでいる (循環参照になるおそれがある)
   - `TrainType` も埋め込んでいる

@@ -292,7 +292,7 @@ Worker Startup Time: 3〜7ms (Cloudflare の報告値)
 WASM gzip          : 3,199KB (上限10MiBの31%)
 ```
 
-**クライアントが接続を使い回すなら、実運用での平均は 3ms です。**
+**接続を使い回した (keep-alive) 20 回の測定では、平均 3ms でした。**
 
 ### コールドスタートについて
 

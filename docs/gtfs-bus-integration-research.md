@@ -17,7 +17,9 @@
 
 ---
 
-## 1. 現在のStationAPIの構造
+## 1. 調査当時のStationAPIの構造
+
+以下は調査を行った時点の構成であり、現在は Cloudflare Workers 上の GraphQL API に置き換わっている。
 
 ### 1.1 技術スタック
 
