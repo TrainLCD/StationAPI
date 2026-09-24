@@ -520,7 +520,7 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
 | 種別 | 場所 | 目的 | 特徴 |
 |---|---|---|---|
 | **Record** | `src/index.rs` | 埋め込み CSV の 1 行 | 検索に必要な列だけを持つ軽量な構造体 |
-| **Entity** | `stationapi/src/domain/entity/` | ドメインモデル | ネスト構造、多言語対応、約 66 フィールド |
+| **Entity** | `stationapi/src/domain/entity/` | ドメインモデル | ネスト構造、多言語対応、約 65 フィールド |
 | **Model** | `stationapi/src/model.rs` | API が返す値 | 列挙型を `i32` のまま保持する |
 
 ### Record 構造体
@@ -536,7 +536,7 @@ pub struct StationRecord {
 ```
 
 名前による検索はリクエストのたびに全件走査するので、索引には `Station`
-エンティティ (66 フィールド) を持たせず、レスポンスを生成するときにだけ
+エンティティ (65 フィールド) を持たせず、レスポンスを生成するときにだけ
 組み立てます。ローマ字名の小文字版のように、比較のたびに計算するとコストが
 かかる値は、索引の構築時に計算して持っておきます。
 

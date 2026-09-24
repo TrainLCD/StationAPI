@@ -1,11 +1,13 @@
 # Cloudflare Workers 移行
 
-> 最終更新: 2026年8月22日
+> 最終更新: 2026年9月24日
 >
-> **移行は完了しています。** gRPC サーバーと PostgreSQL は削除され、
-> このリポジトリは Cloudflare Workers 上の GraphQL API そのものになりました。
-> 現在の構成は [architecture.md](./architecture.md) を参照してください。
-> 以下は移行時の検証記録です。
+> **移行は完了しています。** gRPC サーバーと PostgreSQL は削除し、BFF も
+> 廃止しました。このリポジトリは、Cloudflare Workers 上で動く GraphQL API
+> そのものになっています。現在の構成は [architecture.md](./architecture.md)
+> を参照してください。
+>
+> 以下は移行時の検証記録です。数値や挙動は、特に断りがなければ当時のものです。
 
 ## 目次
 
@@ -19,34 +21,52 @@
 - [作業中に見つかった問題](#作業中に見つかった問題)
 - [運用上の注意](#運用上の注意)
 - [残作業](#残作業)
+- [追記: データパイプラインの純 Rust 化](#追記-データパイプラインの純-rust-化)
+- [追記: 本番 (BFF 経由の gRPC) との応答突き合わせ](#追記-本番-bff-経由の-grpc-との応答突き合わせ)
+- [関連](#関連)
 
 ---
 
 ## 背景と目的
 
-オンプレで動かしている gRPC-Web API を Cloudflare Workers へ移せるかを検証し、実装まで進めた。
+オンプレミスで動かしていた gRPC-Web の API を Cloudflare Workers へ移せるかを
+検証し、そのまま実装まで進めました。
 
-あわせて、クライアントは BFF (TrainLCD/BFF) が gRPC-Web を GraphQL へ変換したものを利用していたが、gRPC-Web である必然性が無いため、Worker 版は GraphQL を直接返すようにした。BFF を経由しない (BFF は廃止予定)。
+当時、クライアントは gRPC-Web を直接使わず、BFF (TrainLCD/BFF) が GraphQL に
+変換したものを使っていました。gRPC-Web を使い続ける理由がなかったため、
+Worker 版は GraphQL を直接返すようにし、BFF を経由しない構成にしました
+(BFF はその後廃止しています)。
 
-移行を検証していた時点ではオンプレ版 (gRPC) を残していたが、検証を終えたのち gRPC サーバー・sqlx のリポジトリ層・PostgreSQL・proto を削除し、Worker 版を本体とした。
+検証中はオンプレミス版 (gRPC) も残していました。検証を終えた後に、次のものを
+削除して Worker 版を本体にしています。
+
+- gRPC サーバー
+- sqlx を使った repository 層
+- PostgreSQL
+- proto
 
 ---
 
 ## 結論
 
-移行できる。BFF が公開している全18クエリを Workers 上で動かし、staging で稼働している。
+移行は可能と判断しました。BFF が公開していた 18 クエリをすべて Workers 上で
+動かし、当時は staging で稼働させていました。
 
-(gRPC の rpc は19本あるが、`GetRoutesMinimal` はどこからも呼ばれていなかったため削除した。)
+gRPC の rpc は 19 本ありましたが、`GetRoutesMinimal` はどこからも呼ばれて
+いなかったため削除しました。
 
 | 項目 | 結果 |
 |---|---|
-| domain / use_case 層 (約17,000行) | **1行も変更していない** |
+| domain / use_case 層 (約17,000行) | **既存のロジックは変更していない** (未使用の `GetRoutesMinimal` を削除しただけ) |
 | PostgreSQL | 不要 |
 | `pg_trgm` / `point() <-> point()` | 不要 |
-| GraphQL スキーマ | 公開スキーマと完全一致 (18クエリ / 28型) |
+| GraphQL スキーマ | 当時の公開スキーマと完全に一致 (18クエリ / 28型) |
 | バス (GTFS) | 対応済み (都営・西武・京王・東急) |
 
-`sqlx` と `tonic` は wasm32 で動かないため、前者は埋め込みデータのインメモリ索引に置き換え、後者は GraphQL 化により不要になった。repository トレイトの実装を差し替えるだけで、経路探索を含む既存のビジネスロジックがそのまま動く。
+`sqlx` と `tonic` は wasm32 では動きません。`sqlx` は埋め込みデータの
+インメモリ索引に置き換え、`tonic` は GraphQL 化によって不要になりました。
+repository トレイトの実装を差し替えるだけで、経路探索を含む既存の
+ビジネスロジックはそのまま動きます。
 
 ---
 
@@ -61,7 +81,7 @@ TrainLCD -> BFF (GraphQL -> gRPC-Web 変換) -> StationAPI (gRPC) -> PostgreSQL
 ### 移行後
 
 ```text
-TrainLCD -> stationapi (GraphQL 直接) -> WASM に埋め込んだデータ
+TrainLCD -> stationapi (GraphQL を直接返す) -> WASM に埋め込んだデータ
 ```
 
 ### レイヤーの対応
@@ -72,25 +92,28 @@ TrainLCD -> stationapi (GraphQL 直接) -> WASM に埋め込んだデータ
 | UseCase | `use_case/` | **同じものを使用** |
 | Domain | `domain/` | **同じものを使用** |
 | Infrastructure | `infrastructure/*_repository.rs` (sqlx) | `src/repository.rs` (インメモリ) |
-| データ生成 | `import.rs` (PostgreSQL 取り込み) | `preprocessor/` (純 Rust) |
+| データ生成 | `import.rs` (PostgreSQL への取り込み) | `preprocessor/` (Rust のみで実装) |
 
 ### crate 構成
 
-移行の検証中は `stationapi` crate を `server` feature で分割し、worker を workspace から exclude していた。gRPC 削除後は Worker がルートの crate になり、共有部分だけが `stationapi` crate として残っている。
+移行の検証中は、`stationapi` crate を `server` feature で分割し、Worker を
+workspace から除外していました。gRPC を削除した後は Worker がルートの crate に
+なり、共有部分だけが `stationapi` crate として残っています。
 
 ```text
-Cargo.toml       # stationapi-worker (wasm32 専用) + workspace
-build.rs         # データのバイナリ化と配置
+Cargo.toml       # stationapi-worker (wasm32 専用) と workspace の定義
+build.rs         # データの配置とバイナリ化
 src/
   index.rs       # 埋め込みデータのパースとインメモリ索引
-  repository.rs  # 4つの repository トレイトの実装
-  graphql/       # GraphQL の型・リゾルバ
+  repository.rs  # 4 つの repository トレイトの実装
+  graphql/       # GraphQL の型とリゾルバ
   lib.rs         # エンドポイント
-schema/public.graphql  # 公開スキーマの正 (CI が突き合わせる)
+schema/public.graphql  # 公開スキーマの正本 (CI が比較に使う)
 scripts/compare_schema.py
 
 stationapi/      # domain / use_case / model (Worker と preprocessor が共有)
-preprocessor/    # generated/*.csv の生成 (純 Rust)
+preprocessor/    # generated/*.csv の生成 (Rust のみで実装)
+data_validator/  # CSV の整合性を検証する CLI
 ```
 
 ---
@@ -99,74 +122,116 @@ preprocessor/    # generated/*.csv の生成 (純 Rust)
 
 ### SQL のインメモリ置換
 
-| PostgreSQL | Worker |
+| PostgreSQL | Worker (移行時) |
 |---|---|
-| `point(lat,lon) <-> point()` | haversine の全件走査 (`select_nth_unstable_by` で上位のみ確定) |
+| `point(lat,lon) <-> point()` | haversine による全件走査 (`select_nth_unstable_by` で上位だけを確定) |
 | `pg_trgm` の GIN インデックス | `contains()` |
 | `station_station_types` の JOIN | `HashMap` による索引 |
 
-`pg_trgm` は `LIKE '%...%'` を高速化するインデックスであって類似度検索ではないため、`contains()` で論理的に等価な結果が得られる。正規化は domain 層の `normalize_for_search` をそのまま呼んでいる。
+`pg_trgm` は `LIKE '%...%'` を高速化するためのインデックスで、類似度検索では
+ありません。そのため `contains()` で論理的に同じ結果が得られます。検索語の
+正規化には、domain 層の `normalize_for_search` をそのまま使っています。
 
-11,148駅 (バス込みで39,204件) の全件走査でも実測 10ms 台に収まる。
+当時は 11,148 駅 (バス停を含めると 39,204 件) を全件走査しても、実測で 10ms 台に
+収まっていました。
+
+なお現在の座標検索は全件走査ではなく、交通種別ごとのグリッド索引 (`Grid`、0.05° の
+セル) を使っています (`src/index.rs` の `nearest` / `within_radius`)。詳しくは
+[アーキテクチャドキュメントの「インメモリ索引」](./architecture.md#インメモリ索引)
+を参照してください。
 
 ### GraphQL
 
-`async-graphql` 7 を採用した。wasm32-unknown-unknown でビルドできることを確認してから導入している。
+`async-graphql` 7 を採用しました。wasm32-unknown-unknown 向けにビルドできる
+ことを確認してから導入しています。
 
-値は **domain エンティティ → model → GraphQL 型** の順に変換する。IPA や TTS セグメントの計算が use_case の DTO 側にあるため、この中間表現を経由するとそのロジックをそのまま使える (`model` はもともと proto から生成していた型で、gRPC 削除後は手書きの構造体になっている)。
+値は **domain エンティティ → model → GraphQL 型** の順に変換します。IPA や
+TTS セグメントの計算は use_case の DTO 側にあるので、この中間表現を経由すれば
+そのロジックをそのまま使えます。`model` はもともと proto から生成していた型で、
+gRPC を削除した後は手書きの構造体になっています。
 
-エンドポイントはクライアント互換のため、サブドメイン直下でクエリを受ける。
+クライアントとの互換性のため、エンドポイントはサブドメイン直下 (`/`) で
+クエリを受け付けます。
 
 | パス | 内容 |
 |---|---|
-| `POST /` | クエリ実行 |
+| `POST /` | クエリの実行 |
 | `GET /` | GraphiQL |
-| `GET /__schema` | SDL (CI が取得して突き合わせる) |
+| `GET /__schema` | SDL (CI が取得して公開スキーマと比較する) |
 | `GET /__health` | 索引の件数 |
-| `GET /__ping` | データに触らない疎通確認 |
+| `GET /__ping` | データに触れない疎通確認 |
 
 ### スキーマ一致の担保
 
-`async-graphql` はコードファーストなので、Rust の型を変えると SDL が変わる。クライアントが壊れる変更に気付けるよう、`schema/public.graphql` を正として `scripts/compare_schema.py` が突き合わせ、CI で差分があれば失敗させる。型とフィールドは集合として、enum は順序込みで比較する。
+`async-graphql` はコードファーストなので、Rust の型を変えると SDL も変わります。
+クライアントを壊す変更に気付けるよう、`schema/public.graphql` を正本とし、
+`scripts/compare_schema.py` で Worker の SDL と比較しています。差分があれば
+CI は失敗します。型とフィールドは順序を無視した集合として、enum は順序も含めて
+比較します。
 
-このファイルはもともと BFF の `schema.graphql` を写したものだが、BFF が廃止された後はこれが公開スキーマの基準になる。意図的にスキーマを変えるときはこのファイルも更新する。その差分がクライアントへの影響範囲そのものになる。
+このファイルはもともと BFF の `schema.graphql` を写したものです。BFF を廃止した
+現在は、これが公開スキーマの基準です。意図してスキーマを変えるときは、この
+ファイルも同じ変更で更新します。その差分が、そのままクライアントへの影響範囲に
+なります。
 
-実装時に踏んだ差分:
+実装中に遭遇した差分は次のとおりです。
 
-- `async-graphql` は enum 値を既定で SCREAMING_SNAKE_CASE にする。公開スキーマは PascalCase なので `rename_items` で揃えた
-- PascalCase 変換では `JR` が `Jr` になるため、この値だけ `name` を明示した
-- `Station` / `StationNested` のように同一構造で名前が違う型は、SDL を合わせるためマクロで両方定義した。Nested 型は互いを参照するので `Box` で間接化しないと無限サイズになる
+- `async-graphql` は enum の値を既定で SCREAMING_SNAKE_CASE にする。公開
+  スキーマは PascalCase なので、`rename_items` で揃えた
+- PascalCase に変換すると `JR` が `Jr` になるため、この値だけ `name` を
+  明示した
+- `Station` と `StationNested` のように、構造が同じで名前だけが違う型は、
+  SDL を合わせるためにマクロで両方を定義した。Nested 型は互いを参照するので、
+  `Box` で間接参照にしないと型のサイズが無限になる
 
 ---
 
 ## データの用意
 
-**`data/*.csv` をそのまま読むと本番と挙動が変わる。** 列車種別を持たない路線へ各駅停車の系統を補う必要があり、実測で 2,427行が生成され、2,268駅 (有効な駅の約21%) が影響を受ける。
+**`data/*.csv` をそのまま読むと、本番とは挙動が変わります。** 列車種別を
+持たない路線には、各駅停車の系統を補う必要があるためです。当時の実測では
+2,427 行が生成され、2,268 駅 (有効な駅の約 21%) が影響を受けていました。
 
-移行の検証中はこれを PostgreSQL への取り込みで行い、取り込み後の DB を
-`stationapi --export-worker-data` で書き出していた。gRPC 削除にあわせて
-同じ変換を純 Rust の `preprocessor` crate へ移し、PostgreSQL は不要になった。
+移行の検証中は、この変換を PostgreSQL への取り込み時に行い、取り込み後の DB を
+`stationapi --export-worker-data` で書き出していました。gRPC の削除にあわせて
+同じ変換を `preprocessor` crate (Rust のみで実装) へ移したため、PostgreSQL は
+不要になりました。
 
 ```text
 make data     # cargo run --profile tool -p stationapi-preprocessor
 ```
 
-companies / lines / stations / types / station_station_types / aliases / line_aliases の7テーブルを CSV へ出す。
+出力するのは次の 7 テーブルです。
 
-`build.rs` は `generated/*.csv` があればそれを OUT_DIR へ配置し、無ければ `data/*.csv` にフォールバックして警告を出す。
+- companies
+- lines
+- stations
+- types
+- station_station_types
+- aliases
+- line_aliases
 
-CI (`.github/workflows/build_worker.yml`) がこの流れを実行する。
+`build.rs` は、`generated/*.csv` があればそれを OUT_DIR に配置します。なければ
+`data/*.csv` にフォールバックし、警告を出します。一部のテーブルだけが
+`generated/` にある状態は、データが食い違うためビルドを失敗させます。
+あわせて、`station_station_types` を固定長のバイナリ (`sst.bin`) に変換します。
+
+CI では、この流れを composite action (`.github/actions/build-worker`) が実行
+します。検証用の `build_worker.yml` と、デプロイ用の `deploy_staging.yml` /
+`deploy_production.yml` がこれを共有しています。移行時点では
+`build_worker.yml` が単独で実行していました。
 
 ### バス (GTFS)
 
-`DISABLE_BUS_FEATURE` が立っていなければ GTFS の取得・統合も実行される。`ODPT_ACCESS_TOKEN` が必要なフィードがある。
+`DISABLE_BUS_FEATURE` を指定しなければ、GTFS の取得と統合も実行します。
+フィードによっては `ODPT_ACCESS_TOKEN` が必要です。
 
 | フィード | トークン |
 |---|---|
 | 都営バス | 不要 |
-| 西武バス / 京王バス / 東急バス (3区) / 東急バス ODPT JSON | 必要 |
+| 西武バス / 京王バス / 東急バス (3区のコミュニティバス) / 東急バス ODPT JSON | 必要 |
 
-全フィード取り込み後のデータ量:
+全フィードを取り込んだ後のデータ量 (当時) は次のとおりです。
 
 | テーブル | 鉄道のみ | 全フィード |
 |---|---|---|
@@ -179,56 +244,74 @@ CI (`.github/workflows/build_worker.yml`) がこの流れを実行する。
 
 ## 検証方法
 
-`postgres:18` に実データを投入し、**既存 SQL の結果と直接突き合わせた。** 実装を読んで「同じはず」と判断するのではなく、実際のクエリ結果を比較している。
+`postgres:18` に実データを投入し、**既存の SQL の結果と直接比較しました。**
+実装を読んで「同じになるはず」と判断するのではなく、実際のクエリ結果を
+比べています。
 
 | 対象 | 内容 |
 |---|---|
-| 名前検索 | ランダム30クエリで `station_cd` 集合が一致 |
-| `lineGroupStations` | 10グループで順序込み一致 (最大250件) |
-| `lineStations` | 5路線で順序込み一致 (種別あり/フォールバック両方) |
-| `stationTrainTypes` | 6駅で `sst.id` と種別名が順序込み一致 |
-| `linesByName` | 6クエリで順序込み一致 |
-| `lines[]` の line_cd 集合 | 9駅グループで一致 |
-| `hasTrainTypes` | lines[] / 駅本体ともに不一致 0 |
+| 名前検索 | ランダムな 30 クエリで `station_cd` の集合が一致 |
+| `lineGroupStations` | 10 グループで順序も含めて一致 (最大 250 件) |
+| `lineStations` | 5 路線で順序も含めて一致 (種別あり・フォールバックの両方) |
+| `stationTrainTypes` | 6 駅で `sst.id` と種別名が順序も含めて一致 |
+| `linesByName` | 6 クエリで順序も含めて一致 |
+| `lines[]` の line_cd の集合 | 9 駅グループで一致 |
+| `hasTrainTypes` | `lines[]`・駅本体ともに不一致 0 件 |
 
-`station_station_types.id` は `ORDER BY sst.id` として停車順序そのものに使われるため、SERIAL の採番順を保つことを `build.rs` で検証している。
+`station_station_types.id` は `ORDER BY sst.id` として停車順そのものに使われます。
+そのため、SERIAL で採番したときの順序が保たれていることを `build.rs` で検証して
+います。
 
 ### 検証手法の落とし穴
 
-途中で複数回、**検証スクリプト側の不備で誤った結論を出しかけた。**
+作業中に何度か、**検証スクリプト側の不備で誤った結論を出しかけました。**
 
-- gRPC-Web 用の比較スクリプトを GraphQL 化後もそのまま使い、404 を「1件」と誤集計して差分に見えた。さらに以前は「0件中0件が不一致」を一致と表示していた
-- Node が TTY 判定で数値に ANSI エスケープを付け、順序不一致と誤判定した
-- 比較 SQL に `transport_type` 条件が無く、Worker 側の既定フィルタとの差が差分に見えた
+- gRPC-Web 用の比較スクリプトを GraphQL 化の後もそのまま使っていたため、404 を
+  「1 件」と数えてしまい、差分があるように見えた。さらにそれ以前は、「0 件中
+  0 件が不一致」を一致と表示していた
+- Node が TTY かどうかを判定して数値に ANSI エスケープを付けたため、順序の
+  不一致と誤判定した
+- 比較用の SQL に `transport_type` の条件がなく、Worker 側の既定のフィルタとの
+  違いが差分に見えた
 
-いずれも実装は正しく、スクリプトを直すと一致した。
+いずれも実装は正しく、スクリプトを直すと結果は一致しました。
 
 ---
 
 ## 実測値
 
-staging (`gql-stg.trainlcd.app`) での測定。日本から東京エッジ (`cf-ray` は NRT)。
+staging (`gql-stg.trainlcd.app`) で測定しました。日本から東京のエッジに接続して
+います (`cf-ray` は NRT)。
 
 ```text
 全18クエリ         : 成功
-サーバー処理       : 通常 12〜20ms (接続確立の TLS が 21〜40ms を占める)
+サーバー処理       : 通常 12〜20ms (接続確立の TLS に 21〜40ms かかる)
 keep-alive 20回    : p50=0ms 最大58ms 平均3ms
 コールドスタート    : 20回に1回程度、60〜130ms
-Worker Startup Time: 3〜7ms (Cloudflare 報告値)
+Worker Startup Time: 3〜7ms (Cloudflare の報告値)
 WASM gzip          : 3,199KB (上限10MiBの31%)
 ```
 
-**実運用でクライアントが接続を使い回す前提なら平均3ms。**
+**クライアントが接続を使い回すなら、実運用での平均は 3ms です。**
 
 ### コールドスタートについて
 
-`wrangler dev` (ローカル workerd) では約200msだったが、**これは本番の指標にならなかった。** 本番の `Worker Startup Time` は 3〜7ms。
+`wrangler dev` (ローカルの workerd) では約 200ms かかりましたが、**これは本番の
+指標になりませんでした。** 本番の `Worker Startup Time` は 3〜7ms です。
 
-コールドスタートの揺れの原因を調べたところ、**データ初期化は主因ではない。** データを一切参照しない `/__ping` が `/__health` と同等かそれ以上に遅いケースがあることで確認した。
+コールドスタートのばらつきの原因を調べた結果、**データの初期化は主因ではない**
+ことが分かりました。データにまったく触れない `/__ping` が、`/__health` と同等か
+それ以上に遅い場合があったためです。
 
-`stations.csv` を固定長レコード + 文字列プールへ変換して `&'static str` 参照にする案も試したが、30回程度の測定では有意差が出ず、gzip が 235KB 増えるだけだったため破棄した。同じバイナリ版で p90 が 27ms → 83ms と変動しており、有意差を出すには数百回規模の測定と統計処理が要る水準だった。
+`stations.csv` を固定長レコードと文字列プールに変換し、`&'static str` で参照する
+案も試しました。しかし 30 回程度の測定では有意な差が出ず、gzip 後のサイズが
+235KB 増えるだけだったため採用しませんでした。同じバイナリでも p90 が
+27ms → 83ms と変動しており、有意差を確かめるには数百回規模の測定と統計処理が
+必要な水準でした。
 
-なお Workers は Spectre 対策で同期コード中に `Date.now()` が進まないため、プロセス内での区間計測はできない。切り分けは外から分布を比べる形になる。
+なお Workers では、Spectre 対策のため同期コードの実行中に `Date.now()` が
+進みません。そのためプロセス内で区間ごとの時間を計測することはできず、
+切り分けは外部から応答時間の分布を比べる形になります。
 
 ---
 
@@ -236,148 +319,190 @@ WASM gzip          : 3,199KB (上限10MiBの31%)
 
 ### Worker 実装側の漏れ (修正済み)
 
-既存 SQL と照合して見つけたもの。いずれも PR 内で修正した。
+既存の SQL と照合して見つけたものです。いずれも同じ PR の中で修正しました。
 
 | 内容 | 影響 |
 |---|---|
-| `get_by_line_id_vec_with_group_stations` 未実装 | `GetStationsByLineIdList` が 500 |
+| `get_by_line_id_vec_with_group_stations` が未実装 | `GetStationsByLineIdList` が 500 を返す |
 | `get_by_station_group_id_vec_no_types` が `line_group_cd` を埋めていない | `lines[].station.hasTrainTypes` が常に false |
 | `lines_of_groups` が路線の `e_status` を見ていない | 無効化された路線 (成田エクスプレス) が `lines[]` に混ざる |
-| `LineRepository::get_by_station_group_id_vec` が通過条件を見ていない | 停車しない系統しか持たない駅の路線が混ざる |
-| `TrainTypeRepository::get_by_line_group_id_vec` の並び順 | `priority DESC` で並べていたが SQL は `sst.id` のみ |
+| `LineRepository::get_by_station_group_id_vec` が通過の条件を見ていない | 停車しない系統しか持たない駅の路線が混ざる |
+| `TrainTypeRepository::get_by_line_group_id_vec` の並び順 | `priority DESC` で並べていたが、SQL は `sst.id` だけで並べている |
 | `LineRepository::find_by_station_id` が sst 由来の列を埋めていない | `line_group_cd` / `type_cd` が NULL のまま |
 
-未実装メソッドが `DomainError` を返す設計にしていたことで、1件目は 500 応答として検出できた。黙って空を返していれば正常応答に見えて気付けなかった。
+未実装のメソッドは `DomainError` を返す設計にしていたため、1 件目は 500 応答と
+して検出できました。黙って空の結果を返していたら、正常な応答に見えて気付け
+なかったはずです。
 
-最終的に全 repository メソッド (34個) について、対応する SQL の `WHERE` / `ORDER BY` を機械的に抽出して突き合わせた。
+最後に、すべての repository メソッド (34 個) について、対応する SQL の
+`WHERE` / `ORDER BY` を機械的に抜き出して照合しました。
 
-### 親元 (gRPC 版) のバグ
+### 移行元 (gRPC 版) のバグ
 
-Worker 移行とは独立した、既存実装の問題。gRPC 版で再現を確認して起票した。
+Worker への移行とは関係のない、既存実装の問題です。gRPC 版で再現することを
+確認してから起票しました。
 
 - **[#1636](https://github.com/TrainLCD/StationAPI/issues/1636) GetRoutes / EstimateArrivalTimes が特定の駅ペアでパニックする**
 
-  `get_route_stops` の SQL は `WHERE sst.line_group_cd IS NULL` で絞るため、返る駅の `line_group_cd` は必ず NULL。それを受け取る `build_route_tree_map` が `.expect()` しているので、1件でも返れば必ず落ちる。`100410 → 100422` で再現する。
+  `get_route_stops` の SQL は `WHERE sst.line_group_cd IS NULL` で絞り込むため、
+  返ってくる駅の `line_group_cd` は必ず NULL になります。それを受け取る
+  `build_route_tree_map` が `.expect()` していたので、1 件でも返ると必ず
+  パニックしていました。`100410 → 100422` で再現します。
 
-- **[#1637](https://github.com/TrainLCD/StationAPI/issues/1637) GTFS を含むデータ取り込みに約7分半かかる**
+- **[#1637](https://github.com/TrainLCD/StationAPI/issues/1637) GTFS を含むデータの取り込みに約 7 分半かかる**
 
-  `build_stop_route_mapping` の再帰CTEが単独で63秒。`main.rs` は起動時にこれを実行するため、再起動のたびに同じ時間がかかる。
+  `build_stop_route_mapping` の再帰 CTE だけで 63 秒かかっていました。
+  `main.rs` は起動時にこれを実行するため、再起動のたびに同じ時間がかかって
+  いました。
 
 ### 削除したもの
 
-`GetRoutesMinimal` は BFF のスキーマに対応するクエリが無く、どこからも呼ばれていなかったため削除した。proto は submodule なので [TrainLCD/gRPCProto#30](https://github.com/TrainLCD/gRPCProto/pull/30) でマージ済み。
+`GetRoutesMinimal` は、BFF のスキーマに対応するクエリがなく、どこからも
+呼ばれていなかったため削除しました。proto は submodule なので、
+[TrainLCD/gRPCProto#30](https://github.com/TrainLCD/gRPCProto/pull/30) で
+削除し、マージ済みです。
 
 ---
 
 ## 運用上の注意
 
-**データ更新のたびに再デプロイが要る。** Worker はデータを WASM に埋め込むため、`data/*.csv` や GTFS が変わったらビルドし直す必要がある。オンプレ版のように起動時取り込みで自動反映される運用とは異なる。
+**データを更新するたびに再デプロイが必要です。** Worker はデータを WASM に
+埋め込んでいるため、`data/*.csv` や GTFS が変わったらビルドし直さなければ
+なりません。オンプレミス版のように、起動時の取り込みで自動的に反映される
+わけではありません。
 
-**環境の使い分け。** 他の Worker と揃えて、env 省略時を staging にしてある。
+**環境の使い分け。** 他の Worker に揃えて、env を省略したときの環境を staging に
+しています。
 
 ```text
 staging : wrangler deploy --env=""          -> stationapi-stg
 本番    : wrangler deploy --env production  -> stationapi
 ```
 
-wrangler 4 は複数環境がある状態で `--env` を省略すると警告するため、staging を指す場合も `--env=""` を明示する。
+wrangler 4 は、複数の環境がある状態で `--env` を省略すると警告を出します。
+そのため staging にデプロイするときも `--env=""` を明示します。
 
-**custom domain は二重に登録できない。** ドメインを移す際は、先に元の Worker から外してデプロイする必要がある。
+現在は、デプロイ先をブランチで固定しています。`dev` への push で
+`deploy_staging.yml` が staging へ、`master` への push で `deploy_production.yml`
+が本番へデプロイします。手元からは `make deploy` (staging) と
+`make deploy-production` (本番) を使い、どちらも対応するブランチ以外からは
+実行できません。詳しくは [AGENTS.md](../AGENTS.md) の「Running and Deploying」を
+参照してください。
+
+**custom domain は二重に登録できません。** ドメインを別の Worker へ移すときは、
+先に元の Worker から外してデプロイしておく必要があります。
 
 ---
 
 ## 残作業
 
-- [ ] **[#1638](https://github.com/TrainLCD/StationAPI/issues/1638) 本番へ適用する** — staging での検証後に実施
-- [ ] [#1636](https://github.com/TrainLCD/StationAPI/issues/1636) のパニック修正 (方針判断が必要)
-- [x] [#1637](https://github.com/TrainLCD/StationAPI/issues/1637) の取り込み時間 — PostgreSQL を廃したことで解消した (7 分半 → 7 秒)
-- [ ] CI ワークフローの実行 (未実行。`ODPT_ACCESS_TOKEN` を Secrets に設定すると全フィードが取り込まれる)
+いずれも完了しています。
+
+- [x] **[#1638](https://github.com/TrainLCD/StationAPI/issues/1638) 本番へ適用する** — 2026年8月27日にクローズ。現在は `deploy_production.yml` が `master` から本番へデプロイしている
+- [x] [#1636](https://github.com/TrainLCD/StationAPI/issues/1636) のパニックを修正する — #1640 で `build_route_tree_map` が `line_group_cd` を持たない駅を読み飛ばすようにした
+- [x] [#1637](https://github.com/TrainLCD/StationAPI/issues/1637) の取り込み時間 — PostgreSQL をやめたことで解消した (7 分半 → 7 秒)
+- [x] CI ワークフローを実行する — `build_worker.yml` と、デプロイ用の `deploy_staging.yml` / `deploy_production.yml` が稼働している。`ODPT_ACCESS_TOKEN` は `staging` / `production` の環境 Secret に設定してあり、デプロイ時は 1 つでも取り込めないフィードがあれば失敗する (`fail-on-missing-bus-feeds`)
 
 ---
 
 ## 追記: データパイプラインの純 Rust 化
 
-gRPC 削除にあわせて、PostgreSQL への取り込みで行っていたデータ生成を
-`preprocessor` crate へ移した。移植の正しさは、**PostgreSQL 版が出力した
-`generated/*.csv` をゴールデンデータとして突き合わせる**ことで確認した。
+gRPC の削除にあわせて、PostgreSQL への取り込み時に行っていたデータ生成を
+`preprocessor` crate へ移しました。移植が正しいことは、**PostgreSQL 版が出力した
+`generated/*.csv` を正解データとして比較する**ことで確かめています。
 
 結果 (39,204 駅 / 1,601 路線 / 65,281 station_station_types):
 
 | テーブル | 結果 |
 |---|---|
-| companies / lines / aliases / line_aliases | **バイト単位で完全一致** |
-| types | `id` 以外の全列が一致。8 行の `id` のみ相違 |
+| companies / lines / aliases / line_aliases | **バイト単位で完全に一致** |
+| types | `id` 以外の全列が一致。8 行で `id` だけが異なる |
 | station_station_types | **2,587 系統すべてで停車順が一致** |
-| stations | `e_sort` 以外の全列が一致。バス停 273 件 (11 系統) の `e_sort` のみ相違 |
+| stations | `e_sort` 以外の全列が一致。バス停 273 件 (11 系統) で `e_sort` だけが異なる |
 
-相違はいずれも**元の SQL が順序を決めていなかった箇所**に由来する。
+違いはいずれも、**元の SQL が順序を決めていなかった箇所**から生じています。
 
-- `types.id` の 8 件と、それに伴う `station_station_types` の並び替えは、
-  `ORDER BY route_id` が PostgreSQL コンテナの locale (`en_US.UTF-8`) に
-  依存していたため。glibc の照合順序は大文字小文字を先に無視するので、
-  `...JiyuugaokaekiJiyuugaokaeki` と `...JiyuugaokaekiiriguchiJiyuugaokaeki` の
-  前後がバイト順と入れ替わる。純 Rust 版はバイト順で決める。CI ランナーの
-  locale に出力が左右されなくなる利点のほうが大きいと判断した
-- `stations.e_sort` の 273 件は `DISTINCT ON` の同点解決。同じ優先度・同じ
-  `stop_sequence` を持つ行が複数あり、どれが採られるかは実行計画任せだった
-  (京王 1972 系統の停留所 `1298_00` は、終点として現れる便と途中停車する便で
-  `next` が食い違う)。純 Rust 版は `trip_id` まで見て決め切る
+- `types.id` の 8 件と、それに伴う `station_station_types` の並びの違い
+  - `ORDER BY route_id` の結果が、PostgreSQL コンテナの locale (`en_US.UTF-8`)
+    に依存していたことが原因です。
+  - glibc の照合順序は、まず大文字と小文字の違いを無視して比較します。その
+    ため `...JiyuugaokaekiJiyuugaokaeki` と
+    `...JiyuugaokaekiiriguchiJiyuugaokaeki` の前後が、バイト順とは逆に
+    なります。
+  - Rust 版はバイト順で決めます。CI ランナーの locale によって出力が
+    変わらなくなる利点のほうが大きいと判断しました。
+- `stations.e_sort` の 273 件
+  - `DISTINCT ON` で同点になった行の選び方の違いです。優先度も
+    `stop_sequence` も同じ行が複数あり、どれが選ばれるかは実行計画次第でした。
+  - たとえば京王の 1972 系統の停留所 `1298_00` は、終点として現れる便と途中で
+    停車する便とで `next` が食い違います。
+  - Rust 版は `trip_id` まで見て一意に決めます。
 
-どちらも「等価な候補のうちどれを採るか」であって、停車順序そのものは
-2,587 系統すべてで一致している。
+どちらも「同等の候補のうちどれを選ぶか」の違いにすぎず、停車順そのものは
+2,587 系統すべてで一致しています。
 
 ---
 
 ## 追記: 本番 (BFF 経由の gRPC) との応答突き合わせ
 
-移行を本番へ適用する前に、当時まだ稼働していた `https://gql.trainlcd.app`
-(オンプレ gRPC + BFF) と現行実装の応答を、公開スキーマ全 18 クエリ ×
-全フィールドで突き合わせた。スキーマの内省から選択セットを自動生成し、
-配列は id で対応付けたうえで「集合」「順序」「値」に分けて比較している。
+移行を本番に適用する前に、当時まだ稼働していた `https://gql.trainlcd.app`
+(オンプレミスの gRPC + BFF) と現行実装の応答を、公開スキーマの全 18 クエリ・
+全フィールドについて比較しました。
+
+- 選択セットは、スキーマのイントロスペクションから自動生成しました。
+- 配列は id で対応付けたうえで、「集合」「順序」「値」に分けて比較しました。
 
 ### 見つかった実装の不具合 (いずれも修正済み)
 
 | 内容 | 影響 |
 |---|---|
-| `Company.name` に `nameShort` を入れていた | 略称と正式名称が違う事業者で名前が食い違う (相模鉄道 → 相鉄、東急電鉄 → 東急 など) |
+| `Company.name` に `nameShort` を入れていた | 略称と正式名称が異なる事業者で名前が食い違う (相模鉄道 → 相鉄、東急電鉄 → 東急 など) |
 | `find_by_id` / `get_by_id_vec` が `line_group_cd` を埋めていない | `station.hasTrainTypes` が常に false |
-| `LineRepository::get_by_ids` に `e_status = 0` が無い | 廃止・未開業の路線が `lines(lineIds:)` で返る |
-| `find_by_line_group_id_and_line_id` が `pass <> 1` で絞り、駅の `e_status` を見ていない | `lines[].trainType.id` が別の駅の値になる |
+| `LineRepository::get_by_ids` に `e_status = 0` の条件がない | 廃止済み・未開業の路線が `lines(lineIds:)` で返る |
+| `find_by_line_group_id_and_line_id` が `pass <> 1` で絞り込み、駅の `e_status` を見ていない | `lines[].trainType.id` が別の駅の値になる |
 | `lines.average_distance` を `f32` の最短表記で書き出していた | 読み直すと別の値になり、応答が 31664.842 と 31664.841796875 でずれる |
-| バス路線の `nameChinese` / `nameKorean` / `nameRoman` が null | DB 側は既定値 `''` を持つため、本番は空文字を返していた |
-| `LineRepository::get_by_station_group_id_vec_no_types` が通過条件を見ていない | その駅を通過するだけの路線が `station.lines` に混ざる。`skip_types_join = true` で走る `station` / `stations` / `stationsNearby` / `stationsByName` / `lineListStations` などが該当し、generated データでは中央線(快速) の代々木・大久保・東中野など 5 路線 35 駅に出る |
+| バス路線の `nameChinese` / `nameKorean` / `nameRoman` が null | DB 側の既定値が `''` だったため、本番は空文字を返していた |
+| `LineRepository::get_by_station_group_id_vec_no_types` が通過の条件を見ていない | その駅を通過するだけの路線が `station.lines` に混ざる。`skip_types_join = true` で動く `station` / `stations` / `stationsNearby` / `stationsByName` / `lineListStations` などが該当し、generated データでは中央線 (快速) の代々木・大久保・東中野など 5 路線 35 駅で発生していた |
 
 ### 残っている差分
 
-いずれも「実装の誤り」ではない。
+いずれも実装の誤りではありません。
 
 | 分類 | 内容 |
 |---|---|
-| 座標の距離計算 | 本番は `point(lat,lon) <-> point()` (ユークリッド)、こちらは haversine。近傍バス停の選択と、駅に付くバス路線の並びが変わる |
-| `stationsNearby` の `distance` | 本番は常に null。旧 SQL が距離を選択しておらず `From<StationRow>` が `None` を固定していたため。こちらは実測値を返す (本番側の不足) |
-| 並び順 | 旧 SQL が `ORDER BY` を持たない、または同値で決着しない箇所。例えば `stationsByName(name:"渋谷")` は返る 10 駅が完全に一致するが、全行が同じ `station_g_cd` と同じ駅名なので `ORDER BY station_g_cd, station_name` では順序が決まらない |
-| 既定の `transportType` | gRPC 版は未指定を Rail として扱い、こちらは RailAndBus。移行時に意図して変えている |
+| 座標の距離計算 | 本番は `point(lat,lon) <-> point()` (ユークリッド距離)、こちらは haversine。近くのバス停の選ばれ方と、駅に付くバス路線の並びが変わる |
+| `stationsNearby` の `distance` | 本番は常に null。旧 SQL が距離を SELECT しておらず、`From<StationRow>` が `None` を固定で入れていたため。こちらは実際の距離を返す (本番側の不足) |
+| 並び順 | 旧 SQL に `ORDER BY` がない、または同じ値で順序が決まらない箇所。たとえば `stationsByName(name:"渋谷")` は、返る 10 駅は完全に一致するが、全行が同じ `station_g_cd` と同じ駅名なので、`ORDER BY station_g_cd, station_name` では順序が決まらない |
+| 既定の `transportType` | gRPC 版は未指定を Rail として扱い、こちらは RailAndBus として扱う。移行時に意図して変更した |
 
-未解決の差分は無い。以下の 2 件は突き合わせで目についたが、いずれもこちらの
-挙動が正しい。
+未解決の差分はありません。次の 2 件は比較の過程で目に付きましたが、どちらも
+こちらの挙動のほうが正しいものです。
 
-- **`trainType.lines[]` の別名が駅ごとに変わる。** `line_aliases.csv` は
-  `station_cd` キーなので、別名は路線ではなく (路線, 駅) の属性。11314 (総武本線) は
-  1131401〜1131409 (東京〜錦糸町の快速区間) が別名 12 (総武快速線 / `#0067C0`)、
-  1131411〜1131431 (千葉以東) が別名 7 (`#FFD400`) に分かれている。成田エクスプレスは
-  両区間に停まるため、系統 1095 の `lines[]` に区間ごとの見え方が並ぶ。本番は 4 件とも
-  総武本線 / `#0067C0` に潰しており、別名を適用していない。
+- **`trainType.lines[]` の別名が駅ごとに変わる。**
 
-- **`viaLineId` を渡すと、経由路線側に発着駅を持たない系統が候補から外れる。**
-  via の絞り込みで範囲外の駅が落ちれば、その系統は発着駅の両方を含まなくなるので、
-  `get_routes` の判定で外れる。本番は成田エクスプレス (系統 1095) を返すが、
-  その停車駅 16 件に目的地の新宿が含まれておらず、目的地へ着かない経路を返している。
+  `line_aliases.csv` は `station_cd` をキーにしているので、別名は路線ではなく
+  (路線, 駅) の組に付く属性です。11314 (総武本線) では、次のように区間ごとに
+  別名が分かれています。
+
+  - 1131401〜1131409 (東京〜錦糸町の快速区間): 別名 12 (総武快速線 / `#0067C0`)
+  - 1131411〜1131431 (千葉以東): 別名 7 (`#FFD400`)
+
+  成田エクスプレスは両方の区間に停まるため、系統 1095 の `lines[]` には区間
+  ごとの見え方が並びます。本番は 4 件とも総武本線 / `#0067C0` にまとめており、
+  別名を適用していませんでした。
+
+- **`viaLineId` を渡すと、経由路線上に発駅・着駅を持たない系統が候補から外れる。**
+
+  経由路線での絞り込みによって範囲外の駅が除かれると、その系統は発駅と着駅の
+  両方を含まなくなるため、`get_routes` の判定で候補から外れます。本番は
+  成田エクスプレス (系統 1095) を返していましたが、その停車駅 16 件には目的地の
+  新宿が含まれていません。つまり、目的地に着かない経路を返していました。
 
   | | 本番 | こちら |
   |---|---|---|
   | `routes(fromStationGroupId: 1130205, toStationGroupId: 1130208, viaLineId: 11302)` | `[363, 1095]` (1095 は新宿を含まない) | `[363]` |
 
-  `viaLineId` を指定しなければ両者とも 20 件で一致する。
+  `viaLineId` を指定しなければ、どちらも 20 件で一致します。
 
 ---
 
@@ -385,6 +510,6 @@ gRPC 削除にあわせて、PostgreSQL への取り込みで行っていたデ�
 
 | リポジトリ | 内容 |
 |---|---|
-| [StationAPI#1635](https://github.com/TrainLCD/StationAPI/pull/1635) | 本体の PR |
-| [gRPCProto#30](https://github.com/TrainLCD/gRPCProto/pull/30) | GetRoutesMinimal 削除 (マージ済み) |
-| [BFF#51](https://github.com/TrainLCD/BFF/pull/51) | staging の route 削除 (マージ済み) |
+| [StationAPI#1635](https://github.com/TrainLCD/StationAPI/pull/1635) | 移行の PR |
+| [gRPCProto#30](https://github.com/TrainLCD/gRPCProto/pull/30) | GetRoutesMinimal の削除 (マージ済み) |
+| [BFF#51](https://github.com/TrainLCD/BFF/pull/51) | staging の route の削除 (マージ済み) |
