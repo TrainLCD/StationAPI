@@ -166,15 +166,17 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 
    **大原則: 判定はアプリ挙動／データに対する変更かどうかで決める**。下の「コード本体パス」が一切変わっていない場合、「バグ修正」「新機能」「リファクタリング」は OFF（コミット件名に `fix` / `feat` 等の語があっても）。スキル・設定・ドキュメントのメタ変更を「新機能」と誤分類しないための安全弁。「データの修正・追加」は `data/**` の変更を独立に判定する（後述「変更ファイルパスベース」「コミット件名ベース」を参照）。
 
-   この大原則のもとで、各項目を独立に評価（複数該当可、大文字小文字無視・部分一致）。
+   この大原則のもとで、各項目を独立に評価（複数該当可、大文字小文字無視）。英字のトリガ語句は単語として一致したときだけ数える（`ci` / `cd` / `add` / `data` が `station_cd` や `line_cd` の一部に当たって誤判定しないように）。日本語のトリガ語句は部分一致でよい。
 
    **コード本体パス**（バグ修正 / 新機能 / リファクタリングのゲート）
 
+   - `src/**`（Worker 本体）
    - `stationapi/src/**`
-   - `stationapi/proto/**`
+   - `preprocessor/src/**`
    - `data_validator/src/**`
    - `tools/**`
-   - `docker/**`
+   - `build.rs`
+   - `schema/**`
    - `Cargo.toml` / `Cargo.lock`
    - `wrangler.jsonc`
 
@@ -183,7 +185,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    | 項目 | トリガ語句 |
    | ---- | ---- |
    | バグ修正 | `fix`, `Hotfix`, `バグ`, `修正`, `不具合` |
-   | 新機能 | `feat`, `add`, `新機能`, `追加`, `導入`, `対応`, `RPC` |
+   | 新機能 | `feat`, `add`, `新機能`, `追加`, `導入`, `対応` |
    | リファクタリング | `refactor`, `リファクタ`, `整理`, `clean`, `tidy` |
 
    **変更ファイルパスベース**（コード本体変更の有無に関わらず評価）
