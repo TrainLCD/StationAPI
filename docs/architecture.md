@@ -224,7 +224,9 @@ PostgreSQL のクエリは以下のように置き換えています。
 (例: 丸ノ内線の赤坂見附 → 半蔵門線の永田町)。
 
 ```graphql
-connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int): [ConnectedRoute!]!
+connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int, sortBy: ConnectedRouteSort): [ConnectedRoute!]!
+
+enum ConnectedRouteSort { Recommended  ArrivalTime  TransferCount }
 
 type ConnectedRoute { legs: [RouteLeg!] }
 type RouteLeg { trainTypes: [TrainType!]  fromStation: Station  toStation: Station  stationGroupIds: [Int!] }
@@ -251,6 +253,23 @@ type RouteLeg { trainTypes: [TrainType!]  fromStation: Station  toStation: Stati
 
 `viaLineId` は `routeTypes` と同じく検索結果でタップした駅の路線で、目的地に
 その路線の駅で着く経路 (最後の区間がその路線を走る経路) だけに絞ります。
+
+`sortBy` は経路の並び順です。推定所要時間と乗換回数を API で返さないので、
+並べ替えはサーバーで行います。どれを選んでも返す経路の集合は同じで、並びだけが
+変わります。
+
+| `sortBy` | 並び |
+|---|---|
+| `Recommended` (省略時) | おすすめ順。評価値 (最初の列車の待ち時間を含む所要時間の見込み) + 乗換 1 回あたり 5 分の小さい順 (後述) |
+| `ArrivalTime` | 到着の早い順。同じなら乗換の少ない順 |
+| `TransferCount` | 乗換の少ない順。同じなら到着の早い順 |
+
+到着の早い順は、`estimateArrivalTimes` と同じ定義の所要時間 (最初の列車の
+待ち時間を含まず、乗換ごとに徒歩と乗換先の待ち時間を加える) で並べます。
+ただし並べ替えに使うのは探索が選んだ代表の種別での見込みなので、アプリが区間
+ごとに別の種別 (既定の各停など) を選んで `estimateArrivalTimes` で求めた到着
+見込みとは、並びが一致しないことがあります。キーが同じ経路はおすすめ順を
+保ちます。
 
 ### 系統網
 

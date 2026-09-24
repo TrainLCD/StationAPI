@@ -7,6 +7,7 @@ use crate::{
             company::Company, gtfs::TransportTypeFilter, line::Line, line_symbol::LineSymbol,
             station::Station, station_number::StationNumber, train_type::TrainType,
         },
+        route_search::JourneySort,
     },
     model::{ConnectedRoute, Route, RouteLegRequest, TrainRouteSegment},
     use_case::error::UseCaseError,
@@ -118,11 +119,13 @@ pub trait QueryUseCase: Send + Sync + 'static {
         line_name: String,
         limit: Option<u32>,
     ) -> Result<Vec<Line>, UseCaseError>;
+    /// 乗換経路を `sort` の順に返す。どの並びでも返す経路の集合は同じ。
     async fn get_connected_routes(
         &self,
         from_station_group_id: u32,
         to_station_group_id: u32,
         via_line_id: Option<u32>,
+        sort: JourneySort,
     ) -> Result<Vec<ConnectedRoute>, UseCaseError>;
     /// 乗換経路 (`connectedRoutes` の区間の並び) の各駅の推定到着時間。
     /// 出発駅からの累積で、乗換ごとに徒歩と乗換先の待ち時間の見込みを加える。
