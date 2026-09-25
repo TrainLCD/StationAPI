@@ -1596,6 +1596,10 @@ mod tests {
         ))
         .unwrap();
 
+        // 空のリストでは all() が常に真になるので、小田原が含まれることも確かめる
+        assert!(stations
+            .iter()
+            .any(|s| s.station_cd == ODAWARA_SHINKANSEN as i32));
         assert!(stations
             .iter()
             .all(|s| s.type_name.as_deref() == Some("ひかり")));
