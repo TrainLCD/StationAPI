@@ -21,7 +21,7 @@ use stationapi::domain::repository::station_repository::StationRepository;
 use stationapi::domain::repository::train_type_repository::TrainTypeRepository;
 use stationapi::domain::route_search::RouteNetwork;
 use stationapi::domain::route_topology::{RouteStop, RouteTopology};
-use stationapi::model::StopCondition;
+use stationapi::model::{LineType, StopCondition};
 
 use crate::index;
 
@@ -443,7 +443,8 @@ impl StationRepository for MemStationRepository {
         Ok(out)
     }
 
-    /// 1. その路線 (station_id 指定時はその駅) に紐づく系統を priority 降順で 1 件選ぶ
+    /// 1. その路線 (station_id 指定時はその駅) に紐づく系統を priority 降順で 1 件選ぶ。
+    ///    候補の無い新幹線は、停車する種別のうち types.id が最も若いものの系統を選ぶ
     /// 2. その系統の停車駅を sst.id 順で返す
     /// 3. 空なら路線の全駅を e_sort, station_cd 順で返す
     ///
@@ -480,6 +481,37 @@ impl StationRepository for MemStationRepository {
         }
         // priority の降順
         candidates.sort_by_key(|(priority, _)| std::cmp::Reverse(*priority));
+
+        // 新幹線には各停にあたる種別が無く、特急系だけが停車する。種別の無い全駅を
+        // 返すとクライアントは trainRoute に渡す lineGroupId を得られないので、
+        // 停車する種別のうち id が最も若いもの (のぞみ・はやぶさ等) の系統を選ぶ
+        if candidates.is_empty()
+            && index::line_by_cd(line_id as i32)
+                .is_some_and(|line| line.line_type == Some(LineType::BulletTrain as i32))
+        {
+            let mut bullet_candidates: Vec<(i32, i32)> = Vec::new(); // (types.id, line_group_cd)
+            for seed in index::stations_by_line(line_id as i32) {
+                if let Some(target) = station_id {
+                    if seed.station_cd != target as i32 {
+                        continue;
+                    }
+                }
+                for sst in index::sst_by_station(seed.station_cd) {
+                    if sst.pass == Some(1) {
+                        continue;
+                    }
+                    let (Some(ty), Some(group)) =
+                        (index::type_by_cd(sst.type_cd), sst.line_group_cd)
+                    else {
+                        continue;
+                    };
+                    bullet_candidates.push((ty.id, group));
+                }
+            }
+            if let Some(&(_, group)) = bullet_candidates.iter().min() {
+                candidates.push((0, group));
+            }
+        }
 
         if let Some(&(_, target_group)) = candidates.first() {
             let mut typed: Vec<(i32, &index::StationRecord, &index::SstRecord)> = Vec::new();
@@ -1535,5 +1567,69 @@ mod tests {
                 );
             }
         }
+    }
+
+    const TOKAIDO_SHINKANSEN: u32 = 1002;
+    const ODAWARA_SHINKANSEN: u32 = 100204;
+
+    /// 新幹線には各停にあたる種別が無い。lineStations は種別の無い全駅ではなく、
+    /// id が最も若い種別 (東海道新幹線ならのぞみ) の系統の駅を返す
+    #[test]
+    fn bullet_train_line_stations_use_the_youngest_train_type() {
+        let stations =
+            block_on(MemStationRepository.get_by_line_id(TOKAIDO_SHINKANSEN, None, None)).unwrap();
+
+        assert!(!stations.is_empty());
+        assert!(stations
+            .iter()
+            .all(|s| s.line_group_cd == Some(1) && s.type_name.as_deref() == Some("のぞみ")));
+    }
+
+    /// 駅を指定したときは、その駅に停車する種別から選ぶ。
+    /// 小田原はのぞみが通過するので、次に若いひかりになる
+    #[test]
+    fn bullet_train_line_stations_skip_train_types_passing_the_station() {
+        let stations = block_on(MemStationRepository.get_by_line_id(
+            TOKAIDO_SHINKANSEN,
+            Some(ODAWARA_SHINKANSEN),
+            None,
+        ))
+        .unwrap();
+
+        assert!(stations
+            .iter()
+            .all(|s| s.type_name.as_deref() == Some("ひかり")));
+    }
+
+    /// 種別を選ばずに取った新幹線の駅リストでも、駅に付いた種別の系統で
+    /// trainRoute を引け、駅の並びが一致する
+    #[test]
+    fn bullet_train_line_stations_give_the_line_group_for_train_route() {
+        use stationapi::domain::entity::gtfs::TransportTypeFilter;
+        use stationapi::use_case::traits::query::QueryUseCase;
+        let interactor = crate::interactor();
+
+        let stations = block_on(interactor.get_stations_by_line_id(
+            TOKAIDO_SHINKANSEN,
+            None,
+            None,
+            TransportTypeFilter::RailAndBus,
+        ))
+        .unwrap();
+        let line_group_id = stations[0]
+            .train_type
+            .as_ref()
+            .and_then(|tt| tt.line_group_cd)
+            .expect("駅に種別が付いていない") as u32;
+        let ids: Vec<u32> = stations.iter().map(|s| s.station_cd as u32).collect();
+
+        let segments =
+            block_on(interactor.get_train_route(ids[0], *ids.last().unwrap(), Some(line_group_id)))
+                .unwrap();
+        let route_ids: Vec<u32> = segments
+            .iter()
+            .filter_map(|s| s.station.as_ref().map(|st| st.id))
+            .collect();
+        assert_eq!(route_ids, ids);
     }
 }
