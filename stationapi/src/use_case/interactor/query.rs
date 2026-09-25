@@ -186,13 +186,19 @@ where
             .get_by_line_id(line_id, station_id, direction_id)
             .await?;
 
-        let line_group_id = if let Some(sta) = stations
-            .iter()
-            .find(|sta| sta.station_cd == station_id.unwrap_or(0) as i32)
-        {
-            sta.line_group_cd
-        } else {
-            None
+        // 系統を選べた路線では、全駅がその系統の停車駅として返る (sst_id あり)。
+        // stationId が無くても系統は選ばれているので、その種別を付ける。付けないと
+        // クライアントは trainRoute に渡す lineGroupId を得られない。
+        // 系統を選べない路線では種別の無い全駅が返るので、種別は付けない
+        let line_group_id = match station_id {
+            Some(station_id) => stations
+                .iter()
+                .find(|sta| sta.station_cd == station_id as i32)
+                .and_then(|sta| sta.line_group_cd),
+            None => stations
+                .first()
+                .filter(|sta| sta.sst_id.is_some())
+                .and_then(|sta| sta.line_group_cd),
         };
 
         let stations = self
@@ -5667,6 +5673,8 @@ mod tests {
         /// 系統の停車駅を返し、付帯情報の付与で要求された駅グループ ID を記録する
         struct RecordingStationRepository {
             line_group_stations: Vec<Station>,
+            /// get_by_line_id (lineStations) が返す駅
+            line_stations: Vec<Station>,
             calls: Calls,
         }
 
@@ -5687,6 +5695,7 @@ mod tests {
                 Ok(self
                     .line_group_stations
                     .iter()
+                    .chain(self.line_stations.iter())
                     .filter(|s| ids.contains(&(s.station_g_cd as u32)))
                     .cloned()
                     .collect())
@@ -5717,7 +5726,7 @@ mod tests {
                 _: Option<u32>,
                 _: Option<u32>,
             ) -> Result<Vec<Station>, DomainError> {
-                Ok(vec![])
+                Ok(self.line_stations.clone())
             }
             async fn get_by_line_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
@@ -5937,6 +5946,7 @@ mod tests {
             let interactor = QueryInteractor {
                 station_repository: RecordingStationRepository {
                     line_group_stations: stations,
+                    line_stations: vec![],
                     calls: calls.clone(),
                 },
                 line_repository: StubLineRepository,
@@ -5944,6 +5954,76 @@ mod tests {
                 company_repository: StubCompanyRepository,
             };
             (interactor, calls)
+        }
+
+        /// lineStations (get_by_line_id) の駅を返す interactor
+        fn build_line_interactor(stations: Vec<Station>) -> TestInteractor {
+            QueryInteractor {
+                station_repository: RecordingStationRepository {
+                    line_group_stations: vec![],
+                    line_stations: stations,
+                    calls: Calls::default(),
+                },
+                line_repository: StubLineRepository,
+                train_type_repository: StubTrainTypeRepository,
+                company_repository: StubCompanyRepository,
+            }
+        }
+
+        /// get_by_line_id が系統を選べたときの駅 (系統の停車駅として sst_id が付く)
+        fn build_typed_line_stations(len: i32) -> Vec<Station> {
+            build_line_group(len)
+                .into_iter()
+                .map(|mut station| {
+                    station.sst_id = Some(station.station_cd);
+                    station
+                })
+                .collect()
+        }
+
+        /// 種別を選ばずに lineStations で駅を取るクライアントは、駅の種別から
+        /// trainRoute の lineGroupId を得る。stationId が無くても系統の種別を付ける
+        #[tokio::test]
+        async fn line_stations_carry_the_line_group_without_station_id() {
+            let interactor = build_line_interactor(build_typed_line_stations(4));
+
+            let stations = interactor
+                .get_stations_by_line_id(10, None, None, TransportTypeFilter::RailAndBus)
+                .await
+                .unwrap();
+
+            assert_eq!(stations.len(), 4);
+            for station in &stations {
+                let train_type = station.train_type.as_ref().expect("種別が付いていない");
+                assert_eq!(train_type.line_group_cd, Some(1000));
+            }
+        }
+
+        /// 系統を選べない路線では、駅が別の系統に属していても種別を付けない
+        #[tokio::test]
+        async fn typeless_line_stations_stay_typeless_without_station_id() {
+            // build_line_group の駅は line_group_cd を持つが、系統の停車駅ではない (sst_id なし)
+            let interactor = build_line_interactor(build_line_group(4));
+
+            let stations = interactor
+                .get_stations_by_line_id(10, None, None, TransportTypeFilter::RailAndBus)
+                .await
+                .unwrap();
+
+            assert_eq!(stations.len(), 4);
+            assert!(stations.iter().all(|s| s.train_type.is_none()));
+        }
+
+        #[tokio::test]
+        async fn line_stations_carry_the_line_group_of_the_station_id() {
+            let interactor = build_line_interactor(build_typed_line_stations(4));
+
+            let stations = interactor
+                .get_stations_by_line_id(10, Some(1001), None, TransportTypeFilter::RailAndBus)
+                .await
+                .unwrap();
+
+            assert!(stations.iter().all(|s| s.train_type.is_some()));
         }
 
         #[tokio::test]
