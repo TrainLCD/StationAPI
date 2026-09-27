@@ -49,7 +49,7 @@ make dev        # http://127.0.0.1:8787
 
 | 種類 | プレフィックス | 例 |
 |------|------------|-----|
-| 新機能 | `feature/` | `feature/add-new-rpc` |
+| 新機能 | `feature/` | `feature/add-route-sort` |
 | バグ修正 | `fix/` | `fix/station-query-error` |
 | データ変更 | `data/` | `data/update-numbering` |
 | 雑務 | `chore/` | `chore/update-deps` |
