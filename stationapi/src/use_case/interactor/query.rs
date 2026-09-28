@@ -90,15 +90,13 @@ where
         station_ids: &[u32],
         transport_type: TransportTypeFilter,
     ) -> Result<Vec<Station>, UseCaseError> {
-        let stations = self.station_repository.get_by_id_vec(station_ids).await?;
-        // Filter by transport_type
-        let stations: Vec<Station> = stations
-            .into_iter()
-            .filter(|s| matches_transport_filter(s.transport_type, transport_type))
-            .collect();
-        let stations = self
-            .update_station_vec_with_attributes(stations, None, transport_type, true)
+        let mut stations = self
+            .enriched_stations_by_id_vec(station_ids, transport_type)
             .await?;
+        // 並びは指定された ID の順 (repository がそう返し、付帯情報の付与も
+        // 並びを変えない)。ディープリンクで経路の駅を ID の順に渡すクライアントは、
+        // その順で隣り合う組の線路の長さを乗車距離に使う
+        self.attach_track_distances(&mut stations).await?;
 
         Ok(stations)
     }
@@ -1076,9 +1074,10 @@ where
             .into_iter()
             .collect();
 
-        // 乗降駅は stations クエリと同じ付帯情報を付ける
+        // 乗降駅は stations クエリと同じ付帯情報を付ける。ID の並びは HashSet 由来で
+        // 経路の順ではないため、線路の長さは付けない
         let stations: HashMap<i32, Station> = self
-            .get_stations_by_id_vec(&station_ids, TransportTypeFilter::Rail)
+            .enriched_stations_by_id_vec(&station_ids, TransportTypeFilter::Rail)
             .await?
             .into_iter()
             .map(|station| (station.station_cd, station))
@@ -1235,6 +1234,24 @@ where
             }
         }
         Ok(group_of)
+    }
+
+    /// 指定された ID の駅に、stations クエリと同じ付帯情報を付けて返す。並びは ID の順。
+    /// 線路の長さは付けない (ID の並びが経路の順とは限らない呼び出し元があるため)。
+    async fn enriched_stations_by_id_vec(
+        &self,
+        station_ids: &[u32],
+        transport_type: TransportTypeFilter,
+    ) -> Result<Vec<Station>, UseCaseError> {
+        let stations: Vec<Station> = self
+            .station_repository
+            .get_by_id_vec(station_ids)
+            .await?
+            .into_iter()
+            .filter(|s| matches_transport_filter(s.transport_type, transport_type))
+            .collect();
+        self.update_station_vec_with_attributes(stations, None, transport_type, true)
+            .await
     }
 
     /// 返す駅の並びで隣り合う 2 駅のあいだの線路の長さを、後ろの駅の
@@ -3656,6 +3673,8 @@ mod tests {
             stations_by_group: Vec<Station>,
             bus_stops: Vec<Station>,
             stations_by_line_group: Vec<Station>,
+            /// get_track_distances がどの組にも返す長さ
+            track_distance: Option<f64>,
         }
 
         impl ConfigurableMockStationRepository {
@@ -3664,11 +3683,17 @@ mod tests {
                     stations_by_group,
                     bus_stops,
                     stations_by_line_group: vec![],
+                    track_distance: None,
                 }
             }
 
             fn with_line_group_stations(mut self, stations: Vec<Station>) -> Self {
                 self.stations_by_line_group = stations;
+                self
+            }
+
+            fn with_track_distance(mut self, distance: f64) -> Self {
+                self.track_distance = Some(distance);
                 self
             }
         }
@@ -3689,6 +3714,12 @@ mod tests {
                     by_line_group.into_values(),
                     &EstimationParams::default(),
                 )))
+            }
+            async fn get_track_distances(
+                &self,
+                pairs: &[(u32, u32)],
+            ) -> Result<Vec<Option<f64>>, DomainError> {
+                Ok(vec![self.track_distance; pairs.len()])
             }
             async fn find_by_id(&self, _: u32) -> Result<Option<Station>, DomainError> {
                 Ok(None)
@@ -5044,6 +5075,25 @@ mod tests {
                 .collect()
         }
 
+        /// 乗降駅はまとめて引くが、その並びは経路の順ではない。どの組にも線路の
+        /// 長さがあるとしても、乗降駅には付けない
+        #[tokio::test]
+        async fn test_get_connected_routes_leaves_track_distances_unset() {
+            let mut interactor = create_connected_route_interactor();
+            interactor.station_repository = interactor.station_repository.with_track_distance(1.0);
+
+            let routes = interactor
+                .get_connected_routes(1, 4, None, JourneySort::Recommended)
+                .await
+                .unwrap();
+
+            assert!(!routes.is_empty());
+            for leg in routes.iter().flat_map(|route| route.legs.iter()) {
+                assert_eq!(leg.from_station.track_distance_from_previous, None);
+                assert_eq!(leg.to_station.track_distance_from_previous, None);
+            }
+        }
+
         #[tokio::test]
         async fn test_get_connected_routes_returns_legs_on_real_line_groups() {
             let interactor = create_connected_route_interactor();
@@ -5756,8 +5806,17 @@ mod tests {
             async fn find_by_id(&self, _: u32) -> Result<Option<Station>, DomainError> {
                 Ok(None)
             }
-            async fn get_by_id_vec(&self, _: &[u32]) -> Result<Vec<Station>, DomainError> {
-                Ok(vec![])
+            /// 本物と同じく、指定された ID の順に返す
+            async fn get_by_id_vec(&self, ids: &[u32]) -> Result<Vec<Station>, DomainError> {
+                Ok(ids
+                    .iter()
+                    .filter_map(|&id| {
+                        self.line_group_stations
+                            .iter()
+                            .find(|s| s.station_cd as u32 == id)
+                            .cloned()
+                    })
+                    .collect())
             }
             async fn get_by_line_id(
                 &self,
@@ -6108,6 +6167,29 @@ mod tests {
                 .map(|s| s.track_distance_from_previous)
                 .collect();
             assert_eq!(distances, vec![None, Some(100.0), Some(101.0)]);
+        }
+
+        /// stations(ids) は指定した ID の順で隣り合う組の長さを返す。逆向きの並びも
+        /// その向きで引き、途中の駅を省いた組とデータの無い組は None
+        #[tokio::test]
+        async fn stations_by_ids_carry_track_distances_in_the_requested_order() {
+            let (interactor, _) = build_interactor(build_line_group(7));
+
+            let stations = interactor
+                .get_stations_by_id_vec(
+                    &[1003, 1002, 1001, 1005, 1006],
+                    TransportTypeFilter::RailAndBus,
+                )
+                .await
+                .unwrap();
+
+            let ids: Vec<i32> = stations.iter().map(|s| s.station_cd).collect();
+            assert_eq!(ids, vec![1003, 1002, 1001, 1005, 1006]);
+            let distances: Vec<Option<f64>> = stations
+                .iter()
+                .map(|s| s.track_distance_from_previous)
+                .collect();
+            assert_eq!(distances, vec![None, Some(102.0), Some(101.0), None, None]);
         }
 
         /// 逆向きに切り出した区間では、進む向きで直前の駅からの長さになる

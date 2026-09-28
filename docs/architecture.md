@@ -222,8 +222,11 @@ preprocessor の実行は 1 秒ほどです。
 Worker では `build.rs` が 1 行 = `i32` 3 つの固定長バイナリ (`connections.bin`、
 約 130KB) に変換し、組の昇順に並べます。ランタイムは索引を作らずに二分探索で
 引くので、コールドスタートの費用は増えません。値を埋めるのは、並びを返す
-`lineStations`・`lineGroupStations`・`trainRoute` だけです (他の問い合わせでは
-直前の駅が無いので `null`)。`trainRoute` を `legs` で呼んだ場合は、各区間の
+`lineStations`・`lineGroupStations`・`trainRoute`・`stations(ids)` だけです
+(他の問い合わせでは直前の駅が無いので `null`)。`stations(ids)` は駅を指定した
+ID の順に返すので、経路の駅を順に渡すクライアント (MobileApp の `sids` 形式の
+ディープリンク) は、その順で隣り合う組の長さを受け取れます。途中の駅を省いた
+並びなど、線路のデータ上で隣り合わない組は `null` です。`trainRoute` を `legs` で呼んだ場合は、各区間の
 先頭の駅も `null` になります。
 
 N02 は `data/N02-25/` にキャッシュします (git 管理外。CI では `actions/cache` で
