@@ -199,6 +199,16 @@ impl StationRepository for MemStationRepository {
         Ok(Arc::clone(route_network()))
     }
 
+    async fn get_track_distances(
+        &self,
+        pairs: &[(u32, u32)],
+    ) -> Result<Vec<Option<f64>>, DomainError> {
+        Ok(pairs
+            .iter()
+            .map(|&(a, b)| index::track_distance(a as i32, b as i32))
+            .collect())
+    }
+
     async fn get_by_coordinates(
         &self,
         latitude: f64,

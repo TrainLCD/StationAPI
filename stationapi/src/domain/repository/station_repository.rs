@@ -74,6 +74,21 @@ pub trait StationRepository: Send + Sync + 'static {
             "route network is not supported by this repository".to_string(),
         ))
     }
+    /// 駅の組ごとの、2 駅のあいだの線路の長さ (メートル)。組の向きは問わず、
+    /// 結果は `pairs` と同じ並び。長さを持たない組は `None`。
+    ///
+    /// 長さを持つのは、API が返す駅の並び (路線・系統) で隣り合う組だけ。
+    ///
+    /// 既定はすべて `None`。線路の長さは駅に添える補足の値で、`None` は
+    /// 「データが無いので直線距離で代える」という正常な応答として決めてある
+    /// (`get_route_network` の既定がエラーなのは、空の網が「経路なし」という
+    /// 誤った答えになるため。こちらはそうならない)。
+    async fn get_track_distances(
+        &self,
+        pairs: &[(u32, u32)],
+    ) -> Result<Vec<Option<f64>>, DomainError> {
+        Ok(vec![None; pairs.len()])
+    }
     /// 各座標から `radius_meters` 以内のバス停を、近い順に最大
     /// `limit_per_station` 件返す。半径の外は呼び出し側でも採用されないため、
     /// ここで切っておく (全国の最寄り N 件を作ってから捨てると、駅数に比例して

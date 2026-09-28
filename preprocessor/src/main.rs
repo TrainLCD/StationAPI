@@ -6,9 +6,13 @@
 //!
 //! ```text
 //! data/*.csv ─┐
-//! GTFS zip   ─┼─> preprocessor ─> generated/*.csv ─> worker-build ─> WASM
-//! ODPT JSON  ─┘
+//! GTFS zip   ─┤
+//! ODPT JSON  ─┼─> preprocessor ─> generated/*.csv ─> worker-build ─> WASM
+//! N02 GeoJSON ┘
 //! ```
+//!
+//! 隣り合う駅のあいだの線路の長さ (`connections.csv`) は、国土数値情報の
+//! 鉄道データ (N02) の線路区間から求める。
 //!
 //! 使い方:
 //!
@@ -25,6 +29,7 @@ mod emit;
 mod gtfs;
 mod rail;
 mod table;
+mod track;
 
 use std::path::{Path, PathBuf};
 
@@ -58,6 +63,9 @@ fn main() -> Result<()> {
 
     let mut dataset = rail::Dataset::load(data_dir)?;
     dataset.generate_virtual_local_rail_services()?;
+    // 生成した各駅停車の系統の並びも使うので、その後に置く。バス停は測らない。
+    let network = track::load()?;
+    track::generate_connections(&mut dataset, &network)?;
 
     if bus_feature_disabled() {
         info!("DISABLE_BUS_FEATURE が立っているのでバスを取り込まない");

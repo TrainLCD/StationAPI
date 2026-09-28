@@ -123,10 +123,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("[INVALID] {message}");
     }
 
+    let mut rdr = ReaderBuilder::new().from_path(data_path.join("8!connections.csv"))?;
+    let connection_records: Vec<StringRecord> = rdr.records().collect::<Result<Vec<_>, _>>()?;
+    let invalid_connections = validate_connections(&connection_records, &station_ids);
+    for message in &invalid_connections {
+        println!("[INVALID] {message}");
+    }
+
     let has_err = !invalid_station_ids.is_empty()
         || !invalid_type_ids.is_empty()
         || !invalid_line_ids.is_empty()
-        || !invalid_station_orders.is_empty();
+        || !invalid_station_orders.is_empty()
+        || !invalid_connections.is_empty();
 
     if has_err {
         let report = build_markdown_report(
@@ -134,6 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &invalid_type_ids,
             &invalid_line_ids,
             &invalid_station_orders,
+            &invalid_connections,
         );
         let report_path =
             std::env::var("VALIDATION_REPORT_PATH").unwrap_or("/tmp/validation_report.md".into());
@@ -194,11 +203,57 @@ fn validate_station_orders(station_records: &[StringRecord]) -> Vec<String> {
     errors
 }
 
+/// `8!connections.csv` (手で直した駅間の線路の長さ) の各行について、両駅が
+/// `3!stations.csv` にあり、別の駅で、長さが 0 以上の数値で、同じ組
+/// (向きを問わない) が 2 行無いことを検証する。preprocessor はこの値を
+/// 国土数値情報から求めた値より優先する。
+fn validate_connections(records: &[StringRecord], station_ids: &HashSet<u32>) -> Vec<String> {
+    const COL_STATION_CD1: usize = 1;
+    const COL_STATION_CD2: usize = 2;
+    const COL_DISTANCE: usize = 3;
+
+    let mut errors: Vec<String> = Vec::new();
+    let mut seen: HashSet<(u32, u32)> = HashSet::new();
+    for record in records {
+        let line = record.iter().collect::<Vec<&str>>().join(",");
+        let station = |i: usize| record.get(i).and_then(|v| v.trim().parse::<u32>().ok());
+        let (Some(a), Some(b)) = (station(COL_STATION_CD1), station(COL_STATION_CD2)) else {
+            errors.push(format!("8!connections.csv: 駅コードを読めません: {line}"));
+            continue;
+        };
+        for cd in [a, b] {
+            if !station_ids.contains(&cd) {
+                errors.push(format!(
+                    "8!connections.csv: 存在しない station_cd {cd} を参照しています: {line}"
+                ));
+            }
+        }
+        if a == b {
+            errors.push(format!("8!connections.csv: 同じ駅どうしの行です: {line}"));
+        }
+        let distance = record
+            .get(COL_DISTANCE)
+            .and_then(|v| v.trim().parse::<f64>().ok());
+        if !distance.is_some_and(|d| d.is_finite() && d >= 0.0) {
+            errors.push(format!(
+                "8!connections.csv: distance が 0 以上の数値ではありません: {line}"
+            ));
+        }
+        if !seen.insert((a.min(b), a.max(b))) {
+            errors.push(format!(
+                "8!connections.csv: 同じ駅の組 (向きを問わない) が 2 行あります: {line}"
+            ));
+        }
+    }
+    errors
+}
+
 fn build_markdown_report(
     invalid_station_ids: &[String],
     invalid_type_ids: &[String],
     invalid_line_ids: &[String],
     invalid_station_orders: &[String],
+    invalid_connections: &[String],
 ) -> String {
     let mut md = String::new();
 
@@ -268,6 +323,18 @@ fn build_markdown_report(
             "`3!stations.csv` の `e_sort` 順(同値は `station_cd` 順)が期待する駅の並びと一致しません。\n\n",
         );
         for message in invalid_station_orders {
+            md.push_str(&format!("- {}\n", escape_markdown_cell(message)));
+        }
+        md.push('\n');
+    }
+
+    if !invalid_connections.is_empty() {
+        md.push_str(&format!(
+            "### 駅間の線路の長さのエラー ({} 件)\n\n",
+            invalid_connections.len()
+        ));
+        md.push_str("`8!connections.csv` の行が不正です。\n\n");
+        for message in invalid_connections {
             md.push_str(&format!("- {}\n", escape_markdown_cell(message)));
         }
         md.push('\n');

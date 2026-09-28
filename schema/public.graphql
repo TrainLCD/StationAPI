@@ -137,6 +137,7 @@ type Station {
 	stationNumbers: [StationNumber!]
 	stopCondition: StopCondition
 	distance: Float
+	trackDistanceFromPrevious: Float
 	hasTrainTypes: Boolean
 	trainType: TrainTypeNested
 	lines: [LineNested!]
@@ -167,6 +168,7 @@ type StationNested {
 	stationNumbers: [StationNumber!]
 	stopCondition: StopCondition
 	distance: Float
+	trackDistanceFromPrevious: Float
 	hasTrainTypes: Boolean
 	trainType: TrainTypeNested
 	lines: [LineNested!]

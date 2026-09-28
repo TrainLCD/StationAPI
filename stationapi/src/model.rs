@@ -292,6 +292,10 @@ pub struct Station {
     /// [`StopCondition`]
     pub stop_condition: i32,
     pub distance: Option<f64>,
+    /// 返す駅の並びで直前にある駅からの線路の長さ (メートル)。国土数値情報の
+    /// 線路から求めた値で、直線距離ではない。先頭の駅、線路のデータが無い区間、
+    /// 並びを返さない問い合わせでは `None`。
+    pub track_distance_from_previous: Option<f64>,
     pub has_train_types: Option<bool>,
     pub train_type: Option<Box<TrainType>>,
     /// [`TransportType`]
