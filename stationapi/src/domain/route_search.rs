@@ -818,6 +818,7 @@ mod tests {
             e_sort: sst_id,
             stop_condition: StopCondition::All,
             distance: None,
+            track_distance_from_previous: None,
             has_train_types: true,
             train_type: None,
             company_cd: Some(1),

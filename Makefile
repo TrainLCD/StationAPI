@@ -14,7 +14,7 @@ help:
 	@echo "  check            - Type-check every crate (worker targets wasm32)"
 	@echo "  fmt              - Check formatting"
 	@echo "  clippy           - Lint every crate"
-	@echo "  data             - Rebuild generated/*.csv from data/ and the GTFS feeds"
+	@echo "  data             - Rebuild generated/*.csv from data/, the GTFS feeds, and the MLIT railway data"
 	@echo "  build            - Build the Worker (wasm)"
 	@echo "  dev              - Run the Worker locally (wrangler dev)"
 	@echo "  deploy           - Deploy to staging (dev branch only)"
@@ -46,6 +46,7 @@ clippy:
 	cargo clippy --target wasm32-unknown-unknown -p stationapi-worker --all-targets -- -D warnings
 
 # Worker が読むデータを作り直す。data/*.csv や GTFS が変わったら実行する。
+# 駅間の線路の長さに使う国土数値情報 (N02) は data/N02-25/ にキャッシュする。
 data:
 	cargo run --profile tool -p stationapi-preprocessor
 

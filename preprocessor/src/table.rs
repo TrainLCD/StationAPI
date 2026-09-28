@@ -87,6 +87,12 @@ impl Table {
         true
     }
 
+    /// 全行を捨てる。列の定義は残す。
+    pub fn clear(&mut self) {
+        self.rows.clear();
+        self.by_pk.clear();
+    }
+
     /// 指定列で行を並べ替える。数値列として比較する。
     pub fn sort_by_int_col(&mut self, name: &str) {
         let idx = self.col(name);

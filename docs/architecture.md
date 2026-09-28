@@ -1,6 +1,6 @@
 # StationAPI アーキテクチャドキュメント
 
-> 最終更新: 2026年9月24日
+> 最終更新: 2026年9月29日
 
 ## 目次
 
@@ -48,21 +48,22 @@
 ## 全体構成
 
 ```txt
-  data/*.csv          GTFS (ZIP)        ODPT (JSON)
-  鉄道の正本データ      バス 6 フィード      東急バス
-      │                    │                 │
-      └────────────────────┴─────────────────┘
+  data/*.csv          GTFS (ZIP)        ODPT (JSON)      N02 (GeoJSON)
+  鉄道の正本データ      バス 6 フィード      東急バス          国土数値情報の線路
+      │                    │                 │                 │
+      └────────────────────┴─────────────────┴─────────────────┘
                            │
                  ┌─────────▼──────────┐
                  │   preprocessor     │  Rust のみで実装。各駅停車の
-                 │   (ビルド時ツール)  │  系統生成と GTFS の統合を行う
+                 │   (ビルド時ツール)  │  系統生成、駅間の線路の長さの
+                 │                    │  計算、GTFS の統合を行う
                  └─────────┬──────────┘
                            │
-                    generated/*.csv     7 テーブル
+                    generated/*.csv     8 テーブル
                            │
                  ┌─────────▼──────────┐
-                 │  build.rs          │  CSV を OUT_DIR に配置し、
-                 │                    │  sst を固定長バイナリに変換
+                 │  build.rs          │  CSV を OUT_DIR に配置し、sst と
+                 │                    │  connections を固定長バイナリに変換
                  └─────────┬──────────┘
                            │
                  ┌─────────▼──────────┐
@@ -148,6 +149,8 @@ UseCase 層からはデータベースを使っていた頃と同じインター
   いません
 - バス停・バス路線・バス系統は、GTFS と ODPT の JSON から生成する必要が
   あります
+- 隣り合う駅のあいだの線路の長さは、国土数値情報の鉄道データから求める必要が
+  あります
 
 これらを担うのが `preprocessor` crate です。
 
@@ -159,11 +162,13 @@ make data     # cargo run --profile tool -p stationapi-preprocessor
 
 1. `data/*.csv` を読み込む (`#` で始まる列は読み込まない)
 2. 各駅停車の系統を生成する (`generate_virtual_local_rail_services`)
-3. GTFS フィード 6 本を取得・展開して読み込む (都営バス・西武バス・京王バスと、
+3. 国土数値情報の鉄道データ (N02) を取得し、隣り合う駅のあいだの線路の長さを
+   求める (`track::generate_connections`。[駅間の線路の長さ](#駅間の線路の長さ))
+4. GTFS フィード 6 本を取得・展開して読み込む (都営バス・西武バス・京王バスと、
    東急バスが運行する大田区・品川区・目黒区のコミュニティバス)
-4. 東急バスの ODPT JSON を読み込む (7 日間キャッシュする)
-5. バスのデータを lines / stations / types / station_station_types に統合する
-6. `generated/*.csv` に書き出す (7 テーブル)
+5. 東急バスの ODPT JSON を読み込む (7 日間キャッシュする)
+6. バスのデータを lines / stations / types / station_station_types に統合する
+7. `generated/*.csv` に書き出す (8 テーブル)
 
 取得や読み込みに失敗したフィードは、警告を出して飛ばします。ただし、GTFS の
 路線を 1 つも取り込めなかった場合は、バスが丸ごと欠けたデータを出さないよう
@@ -172,6 +177,59 @@ make data     # cargo run --profile tool -p stationapi-preprocessor
 
 `station_station_types.id` はそのまま停車順として使われるため、行の順序に
 意味があります。書き出すときは必ず `id` の昇順に並べます。
+
+### 駅間の線路の長さ
+
+`Station.trackDistanceFromPrevious` は、返す駅の並びで直前にある駅からの
+線路の長さ (メートル) です。`trainRoute` の `distanceFromPrevious` は駅の座標
+どうしの直線距離なので、カーブの多い区間では実際より短く出ます。こちらはその
+代わりに、乗車距離を集計するクライアントが使います。
+
+値は、国土数値情報の鉄道データ (N02、国土交通省、CC BY 4.0) の線路区間
+(`RailroadSection`) から preprocessor で求め、`generated/connections.csv`
+(`station_cd1 < station_cd2`、整数メートル) に書き出します。
+
+1. **グラフ**: 線路区間の LineString を、頂点を座標 (小数第 5 位) で同一視した
+   無向グラフにする。N02-25 で頂点 約 38 万、辺 約 38 万
+2. **駅の組**: API が返す駅の並びで隣り合う鉄道駅の組を集める。並びは路線の
+   `(e_sort, station_cd)` 順と系統の `station_station_types.id` 順で、廃止駅を
+   除いた並びと除かない並びの両方を使う。環状運転の系統は、末尾駅と先頭駅が
+   3km 以内なら継ぎ目の組も含める (`trainRoute` は継ぎ目をまたいで切り出す
+   ため)。同じ駅グループの組 (直通運転の境界駅) は 0 にする
+3. **駅を線路へ寄せる**: 駅から 500m 以内の辺をすべて候補にし、
+   「寄せた距離 × 2 + 線路上の距離」が最小になる組を Dijkstra で探す。最も
+   近い線路だけに寄せると、大きな駅で同じ事業者の別路線 (本町の御堂筋線と
+   四つ橋線など) に寄って乗換駅をまわる遠回りが出るため
+4. **事業者で絞る**: まず両駅の路線の会社の線路だけで測る。N02 の事業者名と
+   会社名 (`company_name_h` から「株式会社」を除いたもの) が違う会社は
+   `OPERATOR_ALIASES` で対応させる。他社の線路を走る路線 (北陸新幹線の
+   上越妙高以西、相鉄・JR直通線など) はそれでは寄せられないので、全事業者の
+   線路で測り直す
+5. **打ち切りと下限**: 線路上の距離が直線距離の 3 倍と直線距離 + 5km の大きい方を
+   超えたら、線形が途切れて大回りしたものとみなして測れなかったことにする
+   (実在の最大は木次線の出雲坂根〜三井野原の約 3.6 倍)。線路の長さは直線距離より
+   短くならないので、駅の座標のずれで短く出た値は直線距離で抑える
+
+2026 年 9 月時点のデータでは、約 11,000 組のうち約 10,400 組を計算でき、
+測れなかった約 290 組のほとんどは N02 に線路が残っていない廃線の駅でした
+(営業中の駅どうしは 2 組)。実キロと比べると、東海道・山陽新幹線の東京〜博多が
+1,066km (実キロ 1,069km)、石勝線のトマム〜新得が 33.8km (営業キロ 33.8km) です。
+preprocessor の実行は 1 秒ほどです。
+
+`data/8!connections.csv` に書いた行は計算結果より優先します。N02 の線形や駅の
+座標のずれで値が実際と合わない区間は、ここで直します。
+
+Worker では `build.rs` が 1 行 = `i32` 3 つの固定長バイナリ (`connections.bin`、
+約 130KB) に変換し、組の昇順に並べます。ランタイムは索引を作らずに二分探索で
+引くので、コールドスタートの費用は増えません。値を埋めるのは、並びを返す
+`lineStations`・`lineGroupStations`・`trainRoute` だけです (他の問い合わせでは
+直前の駅が無いので `null`)。`trainRoute` を `legs` で呼んだ場合は、各区間の
+先頭の駅も `null` になります。
+
+N02 は `data/N02-25/` にキャッシュします (git 管理外。CI では `actions/cache` で
+保存します)。取得できなかった場合、preprocessor は失敗します。版を上げるときは
+`preprocessor/src/track/mod.rs` の URL とキャッシュ先、`.github/actions/build-worker/action.yml`
+のキャッシュを揃えて変え、測れなかった組の件数を確かめてください。
 
 ### バスのコード生成
 
@@ -210,6 +268,7 @@ PostgreSQL のクエリは、次のように置き換えています。
 | `point(lat,lon) <-> point()` | グリッド索引 (`Grid`) で探索半径の内側だけを調べ、haversine で距離を計算する |
 | `pg_trgm` の GIN インデックス | 全件走査と `contains()` |
 | `station_station_types` の JOIN | `HashMap` による索引 |
+| `connections` の参照 | 並べ済みの固定長バイナリを二分探索 ([駅間の線路の長さ](#駅間の線路の長さ)) |
 
 ### 座標による検索
 
@@ -474,8 +533,8 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
 | 大宮 → 新大阪 | 349ms | 31〜36ms |
 | 仙台 → 博多 | 693ms | 14〜20ms |
 
-時刻表、運転間隔、駅グループをまたぐ徒歩連絡のデータがない
-(`8!connections.csv` は空) ため、待ち時間は種別から見積もった値です。
+時刻表、運転間隔、駅グループをまたぐ徒歩連絡のデータがないため、待ち時間は
+種別から見積もった値です。
 季節運行の臨時列車も、通常の系統と同じように扱います。
 
 ---
@@ -642,7 +701,7 @@ repository の実装がないメソッドは、空の結果ではなく `DomainE
 .
 ├── Cargo.toml            # stationapi-worker (wasm32 専用) + workspace
 ├── wrangler.jsonc        # staging / production の設定
-├── build.rs              # CSV を OUT_DIR に配置し、sst.bin を生成
+├── build.rs              # CSV を OUT_DIR に配置し、sst.bin と connections.bin を生成
 ├── src/                  # Worker 本体
 │   ├── lib.rs            # エンドポイント
 │   ├── index.rs          # 埋め込みデータのパースと索引
@@ -679,12 +738,13 @@ repository の実装がないメソッドは、空の結果ではなく `DomainE
 │   └── src/
 │       ├── rail.rs       # data/*.csv の読み込みと各駅停車の系統生成
 │       ├── gtfs/         # GTFS / ODPT の取得・解析・統合
+│       ├── track/        # 国土数値情報からの駅間の線路の長さ
 │       ├── codes.rs      # バス用コードの生成
 │       ├── table.rs      # 出力テーブルの表現
 │       └── emit.rs       # CSV の書き出し
 │
 ├── data_validator/       # data/*.csv の整合性チェック
-├── data/                 # 鉄道の正本データ (CSV) と GTFS の展開先
+├── data/                 # 鉄道の正本データ (CSV) と GTFS・N02 の展開先
 ├── generated/            # preprocessor の出力 (git 管理外)
 ├── scripts/              # データ整備とスキーマ比較のスクリプト
 └── tools/                # IPA カバレッジの監査

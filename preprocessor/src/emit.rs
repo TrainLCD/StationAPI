@@ -22,6 +22,8 @@ const OUTPUTS: &[(&str, &str)] = &[
     ("station_station_types", "id"),
     ("aliases", "id"),
     ("line_aliases", "id"),
+    // track::generate_connections が (station_cd1, station_cd2) 順に採番している。
+    ("connections", "id"),
 ];
 
 pub fn write_all(dataset: &mut Dataset, out_dir: &Path) -> Result<()> {
@@ -37,6 +39,7 @@ pub fn write_all(dataset: &mut Dataset, out_dir: &Path) -> Result<()> {
             "station_station_types" => &mut dataset.sst,
             "aliases" => &mut dataset.aliases,
             "line_aliases" => &mut dataset.line_aliases,
+            "connections" => &mut dataset.connections,
             other => unreachable!("未知のテーブル {other}"),
         };
         table.sort_by_int_col(order_by);

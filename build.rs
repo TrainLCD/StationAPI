@@ -1,8 +1,11 @@
-//! station_station_types.csv を固定長バイナリへ事前変換する。
+//! station_station_types.csv と connections.csv を固定長バイナリへ事前変換する。
 //!
-//! この CSV は 41,250 行あり、isolate 起動時の CSV パースがコールドスタートの
-//! 大半を占める。全列が整数なので 1 行 = i32 x 4 の固定長にしておけば、
-//! ランタイムではスライスを読むだけで済む。
+//! station_station_types は 41,250 行あり、isolate 起動時の CSV パースが
+//! コールドスタートの大半を占める。全列が整数なので 1 行 = i32 x 4 の固定長に
+//! しておけば、ランタイムではスライスを読むだけで済む。
+//!
+//! connections (隣り合う駅のあいだの線路の長さ) は駅の組で並べた 1 行 = i32 x 3 に
+//! しておき、ランタイムは索引を作らずに二分探索で引く。
 
 use std::{env, fs, path::Path, path::PathBuf};
 
@@ -62,6 +65,7 @@ fn main() {
         stage_csv(&out_dir, "types.csv", "data/4!types.csv"),
         stage_csv(&out_dir, "aliases.csv", "data/6!aliases.csv"),
         stage_csv(&out_dir, "line_aliases.csv", "data/7!line_aliases.csv"),
+        stage_csv(&out_dir, "connections.csv", "data/8!connections.csv"),
         // station_station_types は下の sst 変換でも参照するが、
         // 混在判定に含めるためここでも存在を見る
         Path::new("generated/station_station_types.csv").is_file(),
@@ -140,4 +144,59 @@ fn main() {
 
     fs::write(out_dir.join("sst.bin"), &out).expect("sst.bin を書けない");
     println!("cargo:warning=sst.bin: {} 行", out.len() / 16);
+
+    write_connections(&out_dir);
+}
+
+/// connections.csv を (station_cd1, station_cd2, 整数メートル) の固定長バイナリへ
+/// 変換する。組は小さい station_cd を先にして昇順に並べる (ランタイムの二分探索用)。
+///
+/// data/8!connections.csv へフォールバックした場合は手入力の行だけになる。
+/// 並びや値の書式が生成物と違ってもよいよう、ここで正規化する。
+fn write_connections(out_dir: &Path) {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .from_path(out_dir.join("connections.csv"))
+        .expect("connections.csv を開けない");
+    let headers = reader.headers().expect("ヘッダを読めない").clone();
+    let col = |name: &str| {
+        headers
+            .iter()
+            .position(|h| h.trim() == name)
+            .unwrap_or_else(|| panic!("connections.csv に {name} 列が無い"))
+    };
+    let (i_a, i_b, i_distance) = (col("station_cd1"), col("station_cd2"), col("distance"));
+
+    let mut rows: Vec<(i32, i32, i32)> = Vec::new();
+    for record in reader.records() {
+        let record = record.expect("connections.csv の行を読めない");
+        let parse = |i: usize| record.get(i).map(str::trim).unwrap_or("");
+        let (Ok(a), Ok(b)) = (parse(i_a).parse::<i32>(), parse(i_b).parse::<i32>()) else {
+            panic!("connections.csv の駅コードが整数ではない: {record:?}");
+        };
+        let distance = parse(i_distance)
+            .parse::<f64>()
+            .ok()
+            .filter(|d| d.is_finite() && *d >= 0.0 && *d <= i32::MAX as f64)
+            .unwrap_or_else(|| panic!("connections.csv の distance が不正: {record:?}"));
+        rows.push((a.min(b), a.max(b), distance.round() as i32));
+    }
+    rows.sort_unstable();
+    for w in rows.windows(2) {
+        assert!(
+            (w[0].0, w[0].1) != (w[1].0, w[1].1),
+            "connections.csv に同じ駅の組が 2 行ある: {} - {}",
+            w[0].0,
+            w[0].1
+        );
+    }
+
+    let mut out: Vec<u8> = Vec::with_capacity(rows.len() * 12);
+    for (a, b, distance) in &rows {
+        for value in [*a, *b, *distance] {
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+    }
+    fs::write(out_dir.join("connections.bin"), &out).expect("connections.bin を書けない");
+    println!("cargo:warning=connections.bin: {} 行", rows.len());
 }
