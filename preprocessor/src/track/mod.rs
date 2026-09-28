@@ -14,6 +14,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{BufReader, Cursor, Read};
 use std::path::Path;
+use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
@@ -26,7 +27,8 @@ use crate::{info, warn};
 use network::{RailNetwork, Section};
 
 /// 国土数値情報 鉄道データ (令和 7 年度)。版を上げるときは [`CACHE_DIR`] と
-/// [`GEOJSON_NAME`] も揃えて変える。
+/// [`GEOJSON_NAME`]、CI のキャッシュ (`.github/actions/build-worker/action.yml`) も
+/// 揃えて変える。
 const N02_URL: &str = "https://nlftp.mlit.go.jp/ksj/gml/data/N02/N02-25/N02-25_GML.zip";
 const CACHE_DIR: &str = "data/N02-25";
 /// ZIP の中の線路区間。Shapefile と GeoJSON が Shift-JIS 版と UTF-8 版の両方で
@@ -126,7 +128,13 @@ pub fn load() -> Result<RailNetwork> {
 /// 置き換えるので、途中で落ちても壊れたキャッシュは残らない。
 fn download(path: &Path) -> Result<()> {
     info!("国土数値情報 (鉄道) を取得する");
-    let response = reqwest::blocking::get(N02_URL)?;
+    // blocking クライアントの既定は本文の受信まで含めて 30 秒。約 13MB の ZIP を
+    // 国の配信サーバーから落とすには短く、取得の失敗は preprocessor の失敗になる。
+    let client = reqwest::blocking::Client::builder()
+        .connect_timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(600))
+        .build()?;
+    let response = client.get(N02_URL).send()?;
     if !response.status().is_success() {
         bail!(
             "国土数値情報 (鉄道) の取得に失敗: HTTP {}",

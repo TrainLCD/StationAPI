@@ -226,9 +226,10 @@ Worker では `build.rs` が 1 行 = `i32` 3 つの固定長バイナリ (`conne
 直前の駅が無いので `null`)。`trainRoute` を `legs` で呼んだ場合は、各区間の
 先頭の駅も `null` になります。
 
-N02 は `data/N02-25/` にキャッシュします (git 管理外)。取得できなかった場合、
-preprocessor は失敗します。版を上げるときは `preprocessor/src/track/mod.rs` の
-URL とキャッシュ先を揃えて変え、測れなかった組の件数を確かめてください。
+N02 は `data/N02-25/` にキャッシュします (git 管理外。CI では `actions/cache` で
+保存します)。取得できなかった場合、preprocessor は失敗します。版を上げるときは
+`preprocessor/src/track/mod.rs` の URL とキャッシュ先、`.github/actions/build-worker/action.yml`
+のキャッシュを揃えて変え、測れなかった組の件数を確かめてください。
 
 ### バスのコード生成
 
