@@ -36,6 +36,9 @@ pub struct Station {
     pub e_sort: i32,
     pub stop_condition: StopCondition,
     pub distance: Option<f64>,
+    /// 返す駅の並びで直前にある駅からの線路の長さ (メートル)。`distance` と同じく
+    /// 問い合わせごとに決まる値で、並びを返す問い合わせだけが埋める。
+    pub track_distance_from_previous: Option<f64>,
     pub has_train_types: bool,
     pub train_type: Option<Box<TrainTypeEntity>>,
     // 路線から引く値
@@ -176,6 +179,7 @@ impl Station {
             e_sort,
             stop_condition,
             distance,
+            track_distance_from_previous: None,
             has_train_types,
             train_type,
             company_cd,

@@ -142,6 +142,7 @@ impl StationRecord {
             e_sort: self.e_sort,
             stop_condition: StopCondition::All,
             distance: None,
+            track_distance_from_previous: None,
             train_type: None,
             has_train_types: false,
             company_cd: line.map(|l| l.company_cd),
@@ -1035,6 +1036,31 @@ pub fn sst_by_group(line_group_cd: i32) -> impl Iterator<Item = &'static SstReco
         .map(|&i| &ssts()[i])
 }
 
+// ---------------------------------------------------------------- 線路の長さ
+
+/// build.rs が生成した固定長バイナリ (1 行 = i32 x 3, リトルエンディアン)。
+/// (station_cd1, station_cd2, 線路の長さ (整数メートル)) で、station_cd1 < station_cd2 の
+/// 組の昇順に並んでいる。
+const CONNECTIONS_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/connections.bin"));
+
+/// 2 駅のあいだの線路の長さ (メートル)。組は向きを問わない。
+///
+/// preprocessor が求めたのは、API が返す駅の並びで隣り合う組だけ。それ以外の組と、
+/// 線路のデータが無い組は `None`。
+///
+/// 並べ済みのバイナリを二分探索するので、索引を作る必要が無い
+/// (コールドスタートの費用が掛からない)。
+pub fn track_distance(a: i32, b: i32) -> Option<f64> {
+    let rows = CONNECTIONS_BIN.as_chunks::<12>().0;
+    let read = |row: &[u8; 12], i: usize| -> i32 {
+        i32::from_le_bytes([row[i * 4], row[i * 4 + 1], row[i * 4 + 2], row[i * 4 + 3]])
+    };
+    let key = (a.min(b), a.max(b));
+    rows.binary_search_by(|row| (read(row, 0), read(row, 1)).cmp(&key))
+        .ok()
+        .map(|i| read(&rows[i], 2) as f64)
+}
+
 /// line_cd -> line_name_rn。
 /// Line エンティティは line_name_rn を持たない (検索専用列) ため別に保持する。
 static LINE_NAME_RN: OnceLock<HashMap<i32, String>> = OnceLock::new();
@@ -1261,6 +1287,29 @@ mod tests {
                 a.1
             );
         }
+    }
+
+    /// 線路の長さのバイナリは (小さい駅, 大きい駅) の昇順で重複が無く、
+    /// どちらの向きで引いても同じ値になる。並びが崩れると二分探索が取りこぼす。
+    #[test]
+    fn track_distances_are_sorted_and_symmetric() {
+        let rows = CONNECTIONS_BIN.as_chunks::<12>();
+        assert!(
+            rows.1.is_empty(),
+            "connections.bin が 12 バイトの倍数ではない"
+        );
+        let read = |row: &[u8; 12], i: usize| {
+            i32::from_le_bytes(row[i * 4..i * 4 + 4].try_into().unwrap())
+        };
+        let keys: Vec<(i32, i32)> = rows.0.iter().map(|r| (read(r, 0), read(r, 1))).collect();
+        assert!(keys.iter().all(|(a, b)| a < b));
+        assert!(keys.windows(2).all(|w| w[0] < w[1]));
+        for row in rows.0 {
+            let (a, b, distance) = (read(row, 0), read(row, 1), read(row, 2) as f64);
+            assert_eq!(track_distance(a, b), Some(distance));
+            assert_eq!(track_distance(b, a), Some(distance));
+        }
+        assert_eq!(track_distance(-1, -2), None);
     }
 
     /// グリッド索引は全件走査と同じ結果を返す。

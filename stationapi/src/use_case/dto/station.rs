@@ -48,6 +48,7 @@ impl From<Station> for ModelStation {
                 .collect(),
             stop_condition: station.stop_condition.into(),
             distance: station.distance,
+            track_distance_from_previous: station.track_distance_from_previous,
             has_train_types: Some(station.has_train_types),
             train_type: station.train_type.map(|tt| Box::new((*tt).into())),
             transport_type: station.transport_type.into(),

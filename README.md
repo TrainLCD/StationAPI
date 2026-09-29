@@ -22,6 +22,16 @@ A GraphQL API that provides nearby Japanese train stations and bus stops, runnin
 
 This project includes a comprehensive dataset of Japanese railway information in the `data/` directory. The data is maintained in CSV format and contributions are primarily targeted at Japanese speakers. For detailed information about data structure and contribution guidelines, please refer to [data/README.md](data/README.md).
 
+## Data Sources
+
+- Track lengths between adjacent stations (`Station.trackDistanceFromPrevious`) are
+  derived from the MLIT National Land Numerical Information railway data (N02),
+  licensed under CC BY 4.0:
+  「国土数値情報（鉄道データ）」（国土交通省）
+  (https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-2025.html) を加工して作成
+- Bus stops and routes are derived from the GTFS and ODPT feeds listed in
+  `preprocessor/src/gtfs/feed.rs` and `preprocessor/src/gtfs/odpt.rs`.
+
 ## Contributors ✨
 
 Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
@@ -62,7 +72,7 @@ into the WASM binary at build time.
 rustup target add wasm32-unknown-unknown
 cargo install worker-build --locked
 
-make data     # build generated/*.csv from data/ and the GTFS feeds
+make data     # build generated/*.csv from data/, the GTFS feeds, and the MLIT railway data
 make build    # build the Worker (wasm)
 make dev      # run it locally on http://127.0.0.1:8787
 ```

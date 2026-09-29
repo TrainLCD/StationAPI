@@ -47,9 +47,21 @@ runs:
           target
         key: worker-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
+    # N02 の取得先は国の配信サーバーで、取得に失敗すると preprocessor が失敗する。
+    # サーバーの一時的な不調で検証やデプロイが止まらないよう、展開した GeoJSON を
+    # キャッシュする。中身は版で決まるので、キーは版だけにする
+    # (preprocessor/src/track/mod.rs の CACHE_DIR と揃えること)。
+    - name: Cache N02 railway data
+      uses: actions/cache@v4
+      with:
+        path: data/N02-25
+        key: n02-25
+
     # data/*.csv をそのまま Worker へ渡すと本番と挙動が変わる。列車種別を
     # 持たない路線には各駅停車の系統を補う必要があり (約2,400行)、バス停と
-    # バス路線は GTFS / ODPT から起こす必要があるため。
+    # バス路線は GTFS / ODPT から、駅間の線路の長さは国土数値情報 (N02) から
+    # 起こす必要があるため。N02 はトークン不要で、取得に失敗すると preprocessor
+    # 自体が失敗する。
     - name: Build generated data
       shell: bash
       env:
@@ -82,7 +94,7 @@ runs:
     - name: Verify generated data
       shell: bash
       run: |
-        for t in companies lines stations types station_station_types aliases line_aliases; do
+        for t in companies lines stations types station_station_types aliases line_aliases connections; do
           test -s "generated/$t.csv" || { echo "::error::$t.csv が空"; exit 1; }
           echo "$t: $(python3 -c "import csv,sys;print(sum(1 for _ in csv.reader(open(sys.argv[1]))) - 1)" "generated/$t.csv") rows"
         done

@@ -8,7 +8,7 @@ use anyhow::{bail, Context, Result};
 use crate::table::{cell_i32, int, Table};
 use crate::{info, warn};
 
-/// 出力する 7 テーブルの列。Worker 側 (`src/index.rs` と `build.rs`) が
+/// 出力する 8 テーブルの列。Worker 側 (`src/index.rs` と `build.rs`) が
 /// この並びを前提に読むので、順序を変えない。
 pub const COMPANY_COLUMNS: &[&str] = &[
     "company_cd",
@@ -111,6 +111,11 @@ pub const ALIAS_COLUMNS: &[&str] = &[
 
 pub const LINE_ALIAS_COLUMNS: &[&str] = &["id", "station_cd", "alias_cd"];
 
+/// 隣り合う駅のあいだの線路の長さ。`station_cd1 < station_cd2`、`distance` は
+/// 整数メートル。`data/8!connections.csv` の行 (手で直した値) に、国土数値情報から
+/// 求めた値を足して書き出す (`track::generate_connections`)。
+pub const CONNECTION_COLUMNS: &[&str] = &["id", "station_cd1", "station_cd2", "distance"];
+
 /// 種別を持たない路線へ補う各駅停車の既定種別。
 const DEFAULT_RAIL_TYPE_CD: i32 = 100;
 /// 「各駅停車」と呼ぶ路線に使う種別。
@@ -144,6 +149,7 @@ pub struct Dataset {
     pub sst: Table,
     pub aliases: Table,
     pub line_aliases: Table,
+    pub connections: Table,
 }
 
 impl Dataset {
@@ -160,6 +166,7 @@ impl Dataset {
             sst: Table::new(SST_COLUMNS, None),
             aliases: Table::new(ALIAS_COLUMNS, Some("id")),
             line_aliases: Table::new(LINE_ALIAS_COLUMNS, Some("id")),
+            connections: Table::new(CONNECTION_COLUMNS, None),
         };
 
         load_csv(&mut dataset.companies, &data_dir.join("1!companies.csv"))?;
@@ -175,6 +182,10 @@ impl Dataset {
             &mut dataset.line_aliases,
             &data_dir.join("7!line_aliases.csv"),
         )?;
+        load_csv(
+            &mut dataset.connections,
+            &data_dir.join("8!connections.csv"),
+        )?;
 
         // transport_type は CSV に無いので既定値を入れる (0 = 鉄道)。
         fill_default(&mut dataset.lines, "transport_type", "0");
@@ -187,7 +198,7 @@ impl Dataset {
         assign_serial(&mut dataset.sst, "id");
 
         info!(
-            "取り込み: companies={} lines={} stations={} types={} sst={} aliases={} line_aliases={}",
+            "取り込み: companies={} lines={} stations={} types={} sst={} aliases={} line_aliases={} connections={}",
             dataset.companies.len(),
             dataset.lines.len(),
             dataset.stations.len(),
@@ -195,6 +206,7 @@ impl Dataset {
             dataset.sst.len(),
             dataset.aliases.len(),
             dataset.line_aliases.len(),
+            dataset.connections.len(),
         );
 
         Ok(dataset)
