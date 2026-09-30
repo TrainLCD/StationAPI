@@ -1,7 +1,8 @@
 # travel_times/
 
-到着時間推定 (`stationapi/src/domain/arrival_estimation.rs`) の所要時間を、実際の
-列車の所要時間と比べるための基準を置く場所です。速度の較正テーブルや一般則は、
+`trainRoute` の `Estimated` (MobileApp の GPX の生成が使う到着時間推定) の所要時間を、
+実際の列車の所要時間と比べるための基準を置く場所です。`estimateArrivalTimes` と
+`connectedRoutes` は元の較正のままなので、ここでは測りません。速度の較正テーブルや一般則は、
 1 つの路線に合わせて変えると、同じ規則を使うほかの路線の推定も変わります。
 変更の前後で全体の誤差を測り、局所的な合わせ込みで全体が崩れないようにします。
 
@@ -50,7 +51,7 @@
 も表に出しますが、判定には使いません。記録にある基準を
 推定できなくなったとき (種別グループがデータから消えたときなど) も失敗します。
 
-比べるのは、本番と同じ生成データ (`generated/`) で動くときだけです。到着時間推定は、
+比べるのは、本番と同じ生成データ (`generated/`) で動くときだけです。`Estimated` は、
 生成データにしか無い線路の長さや種別グループを使うので、`data/*.csv` だけでは本番の
 推定を再現できません。CI では `build_worker.yml` が `generated/` を作ってから走らせ
 ます。`data/*.csv` で動くとき (`ci.yml` のテストなど) は、表を出すだけにします。
@@ -65,7 +66,7 @@ TRAVEL_TIMES_UPDATE_BASELINE=1 cargo test -p stationapi-worker travel_times
 
 ### レポート (本番と同じデータでの精度)
 
-動いている Worker に `estimateArrivalTimes` を問い合わせ、全件の誤差を Markdown で
+動いている Worker に `trainRoute` (`model: Estimated`) を問い合わせ、全件の誤差を Markdown で
 出します。`make data && make dev` で起動した Worker (既定) か、ステージングに
 向けます。
 

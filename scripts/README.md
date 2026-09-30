@@ -48,7 +48,9 @@ OSM データは [Open Database License (ODbL)](https://www.openstreetmap.org/co
 ## compute_speed_table.py
 
 公開 GTFS 時刻表から、到着時間推定(`arrival_estimation.rs`)の速度較正テーブル
-2 種類を再計算します。運動学モデルを Python で再現し、実ダイヤの所要時間を
+2 種類を再計算します。このテーブルを使うのは `trainRoute` の `Estimated` だけです
+(`estimateArrivalTimes` と `connectedRoutes` は `legacy_speed_table.rs` の元の較正を
+使います)。運動学モデルを Python で再現し、実ダイヤの所要時間を
 再現する実効最高速度を二分探索でフィッティングします。
 
 駅間の距離は、推定と同じく線路の長さ(`generated/connections.csv`)を使い、無い
