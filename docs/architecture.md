@@ -481,7 +481,9 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
 - `Legacy` (省略時): 追加した時点 (#1568) のモデルです。最高速度と加減速は
   `dto::simulation::resolve_speed_profile` が決め、到着・出発の見込み
   (`arrivalCumulativeMinutes` / `departureCumulativeMinutes`) は `null` です。
-  MobileApp のオートモードがこの値で走るので、値を変えません。
+  MobileApp のオートモードがこの値で走るので、値を変えません。速度の較正は、
+  到着時間推定の較正を求め直す前の表を `domain/legacy_speed_table.rs` に凍結して
+  使います。
 - `Estimated`: 到着時間推定 (`arrival_estimation`) のモデルです。速度の較正
   テーブルは、このモデルに当てはめて求めています。返す駅列に推定を掛け、停車・
   通過、最高速度、加減速を推定が使った値に置き換えて、到着・出発の見込みを入れ
@@ -489,8 +491,10 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
   `estimateArrivalTimes` と同じ値です。バスの駅を含む経路は推定のモデルの対象外
   なので、`Legacy` と同じ値を返します。
 
-2 つのモデルは、加減速、運転余裕率、停車時間、較正テーブルに無い路線・種別の
-速度が違います。`Legacy` の値で台形の速度プロファイルを作って走らせると、
+2 つのモデルは、加減速、運転余裕率、停車時間、較正テーブル、駅間の距離が違い
+ます。到着時間推定は、線路の長さ (`connections`) がある駅間ではそれを走行距離に
+使い、無い駅間だけ直線距離 × 迂回係数で見積もります。乗換経路探索
+(`connectedRoutes`) の所要時間も同じ距離で求めます。`Legacy` の値で台形の速度プロファイルを作って走らせると、
 `estimateArrivalTimes` より短い時間で走り切ります (#1709)。所要時間を推定に
 合わせたいクライアントは、`Estimated` の見込みを使います。
 
@@ -760,6 +764,7 @@ repository の実装がないメソッドは、空の結果ではなく `DomainE
 │       │   ├── entity/           # Station / Line / TrainType / Company ...
 │       │   ├── repository/       # 抽象インターフェース
 │       │   ├── arrival_estimation.rs
+│       │   ├── legacy_speed_table.rs # trainRoute の Legacy (オートモード) が使う凍結した較正
 │       │   ├── route_search.rs       # 乗換経路探索 (RAPTOR)
 │       │   ├── route_topology.rs     # 所要時間を持たない系統網 (stationsByName の到達判定)
 │       │   ├── segment_speed_table.rs

@@ -22,43 +22,46 @@
 use crate::model::TrainTypeKind;
 
 /// (line_cd, kind, 実効最高速度 km/h)。kind は `TrainTypeKind` の値。
-/// 較正ベンチマーク: 各行のコメントの実所要時間(日中標準)に対し誤差 ±10% 以内。
+///
+/// 距離に線路の長さを使い、GTFS の自動較正を同じ距離で求め直したうえで、それでも
+/// 実際の所要時間 (`travel_times/cases.csv` の典型値) から外れる路線・種別だけを
+/// 載せる。値は実際の最高速度を超えない範囲で求める。超えないと合わない路線は、
+/// 速度ではなく加減速などのモデル側の問題として扱う。追加・変更したら
+/// `make travel-time-report` で全体の誤差が悪くならないことを確かめる。
+///
+/// 距離が直線 × 迂回係数だった頃の値は、距離の水増しを速度で打ち消していたので、
+/// 線路の長さへ替えたときに求め直した。小田急線 (快速急行) は一般則で典型値に
+/// 近づいたので外した。つくばエクスプレスと都営大江戸線は GTFS の自動較正に任せる。
+/// オートモード (`trainRoute` の `Legacy`) は求め直す前の値を `legacy_speed_table`
+/// で使い続ける。
 const LINE_SPEED_OVERRIDES: &[(i32, TrainTypeKind, f64)] = &[
-    // 京急本線: 快特・特急 120km/h 運転。品川→横浜 快特 実17分。
+    // 総武快速線: 最高 130km/h の別線を走る。StationAPI の路線には快速の停車駅しか
+    // 無く、通過駅が無いので推定は各停 (Default) として扱う。一般則の 80km/h では
+    // 遅すぎる。千葉以東の総武本線の普通列車にもかかるが、その区間の基準は無い。
+    // travel_times: 錦糸町→津田沼・新小岩→津田沼 快速。
+    (11314, TrainTypeKind::Default, 100.0),
+    // 成田スカイアクセス線: スカイライナーは 160km/h 運転だが、実効値で較正。
+    // アクセス特急も同じ LimitedExpress で、京成高砂→成田空港は 39.4 分
+    // (実際 38〜52 分。ばらつきが大きく典型値が無いので travel_times には無い)。
+    // travel_times: 日暮里→空港第2ビル スカイライナー。
+    (23006, TrainTypeKind::LimitedExpress, 120.0),
+    // 京王井の頭線: 急行の実効速度。travel_times: 渋谷→吉祥寺 急行。
+    (24006, TrainTypeKind::Express, 80.0),
+    // 東急東横線: 特急は最高 110km/h だが過密ダイヤ・急曲線で実効は各停並み。
+    // travel_times: 渋谷→横浜 特急。
+    (26001, TrainTypeKind::LimitedExpress, 80.0),
+    // 京急本線: 快特 (kind は Express)・特急は最高 120km/h。最高速度で快特が
+    // 典型値 +3.5% (17.6 分) まで近づく。travel_times: 品川→横浜 快特。
     (27001, TrainTypeKind::Express, 120.0),
     (27001, TrainTypeKind::LimitedExpress, 120.0),
-    // 小田急線: 最高 110km/h。新宿→町田 快速急行 実34分。
-    (25001, TrainTypeKind::Express, 110.0),
-    // 東急東横線: 特急は最高 110km/h だが過密ダイヤ・急曲線で実効は各停並み。
-    // 渋谷→横浜 特急 実27分。
-    (26001, TrainTypeKind::LimitedExpress, 80.0),
-    // 京王井の頭線: 急行の実効速度。渋谷→吉祥寺 急行 実17分。
-    (24006, TrainTypeKind::Express, 80.0),
-    // 京成本線(都心側): スカイライナーの上野→高砂間の実効速度。
-    (23001, TrainTypeKind::LimitedExpress, 100.0),
-    // 成田スカイアクセス線: スカイライナー 160km/h 運転、アクセス特急 120km/h 運転。
-    // 日暮里→空港第2ビル スカイライナー 実36分。
-    (23006, TrainTypeKind::LimitedExpress, 160.0),
-    (23006, TrainTypeKind::Express, 120.0),
-    // つくばエクスプレス: 各停も 125km/h 運転(駅間が短いため実効値で較正)。
-    // 秋葉原→つくば 普通 実66分。快速(kind=HighSpeedRapid)は一般則 120km/h で十分。
-    (99309, TrainTypeKind::Default, 95.0),
-    // 阪急神戸本線: 特急 115km/h 運転。大阪梅田→神戸三宮 実27分。
-    (34001, TrainTypeKind::LimitedExpress, 110.0),
-    // 近鉄特急(名阪甲特急ひのとり): 大阪難波→近鉄名古屋 実125分。
-    // 難波線は地下線、大阪線は山間曲線区間を含むため実効値で較正。
+    // 近鉄特急(名阪甲特急ひのとり): 難波線は地下線、大阪線は山間曲線区間を含むため
+    // 実効値で較正。travel_times には、系統 335 の停車駅が実際の列車と一致しない
+    // ため入れていない。値は距離を線路の長さへ替える前に決めたもので、見直していない。
     (31001, TrainTypeKind::LimitedExpress, 80.0),
     (31005, TrainTypeKind::LimitedExpress, 115.0),
     (31027, TrainTypeKind::LimitedExpress, 120.0),
-    // 都営大江戸線: リニア地下鉄で公表最高速度 70km/h(地下鉄一般則 75km/h より低い)。
-    // 都営 GTFS の一様フィットは 60km/h だが、サンプルの大半が 6の字全区間直通
-    // (光が丘⇔都庁前 環状部経由・実83〜88分)で、急曲線の多い環状部に引きずられ
-    // 放射部(落合南長崎→光が丘 実11分)が +14% になるため採用しない。
-    // 公表最高速度 70km/h なら全ベンチマーク(放射部 実11分・新宿→光が丘 実24分・
-    // 光が丘→都庁前 実22分・清澄白河→赤羽橋 実16分・全区間 実85分)が ±9% 以内。
-    // 環状部南側(月島〜赤羽橋の河川横断・急曲線区間)の残差 -8% は路線一様速度では
-    // 解消できない(区間別較正が必要)。
-    (99301, TrainTypeKind::Default, 70.0),
+    // 阪急神戸本線: 特急の実効速度。travel_times: 大阪梅田→神戸三宮 特急。
+    (34001, TrainTypeKind::LimitedExpress, 110.0),
 ];
 
 /// 公開 GTFS 時刻表からの自動較正エントリ。`scripts/compute_speed_table.py --apply`
@@ -66,14 +69,16 @@ const LINE_SPEED_OVERRIDES: &[(i32, TrainTypeKind, f64)] = &[
 /// スクリプト側で除外される。手動編集しないこと。
 const LINE_SPEED_OVERRIDES_GTFS: &[(i32, TrainTypeKind, f64)] = &[
     // --- BEGIN GENERATED (scripts/compute_speed_table.py) ---
-    // 東京メトロ銀座線 Default: 東京メトロ GTFS 15本 中央値34分 (一般則 75km/h)
+    // 東京メトロ銀座線 Default: 東京メトロ GTFS 8本 中央値34分 (一般則 75km/h)
     (28001, TrainTypeKind::Default, 55.0),
-    // 東京メトロ丸ノ内線 Default: 東京メトロ GTFS 10本 中央値51分 (一般則 75km/h)
-    (28002, TrainTypeKind::Default, 65.0),
+    // 東京メトロ丸ノ内線 Default: 東京メトロ GTFS 12本 中央値52分 (一般則 75km/h)
+    (28002, TrainTypeKind::Default, 60.0),
     // 東京メトロ日比谷線 Default: 東京メトロ GTFS 7本 中央値45分 (一般則 75km/h)
-    (28003, TrainTypeKind::Default, 50.0),
+    (28003, TrainTypeKind::Default, 55.0),
     // 東京メトロ東西線 Default: 東京メトロ GTFS 20本 中央値54分 (一般則 75km/h)
     (28004, TrainTypeKind::Default, 60.0),
+    // 東京メトロ千代田線 Default: 東京メトロ GTFS 13本 中央値42分 (一般則 75km/h)
+    (28005, TrainTypeKind::Default, 65.0),
     // 東京メトロ有楽町線 Default: 東京メトロ GTFS 19本 中央値52分 (一般則 75km/h)
     (28006, TrainTypeKind::Default, 65.0),
     // 東京メトロ半蔵門線 Default: 東京メトロ GTFS 10本 中央値32分 (一般則 75km/h)
@@ -81,19 +86,25 @@ const LINE_SPEED_OVERRIDES_GTFS: &[(i32, TrainTypeKind, f64)] = &[
     // 東京メトロ南北線 Default: 東京メトロ GTFS 12本 中央値38分 (一般則 75km/h)
     (28009, TrainTypeKind::Default, 65.0),
     // 東京メトロ副都心線 Default: 東京メトロ GTFS 31本 中央値27分 (一般則 75km/h)
-    (28010, TrainTypeKind::Default, 55.0),
+    (28010, TrainTypeKind::Default, 60.0),
     // 東京メトロ副都心線 Express: 東京メトロ GTFS 15本 中央値28分 (一般則 86km/h)
-    (28010, TrainTypeKind::Express, 60.0),
+    (28010, TrainTypeKind::Express, 65.0),
     // 函館市電2系統 Default: 函館市電 GTFS 4本 中央値48分 (一般則 40km/h)
     (99105, TrainTypeKind::Default, 20.0),
     // 函館市電5系統 Default: 函館市電 GTFS 6本 中央値47分 (一般則 40km/h)
-    (99106, TrainTypeKind::Default, 25.0),
+    (99106, TrainTypeKind::Default, 20.0),
+    // 都営大江戸線 Default: 都営地下鉄 GTFS 11本 中央値84分 (一般則 75km/h)
+    (99301, TrainTypeKind::Default, 60.0),
     // 都営浅草線 Default: 都営地下鉄 GTFS 18本 中央値37分 (一般則 75km/h)
     (99302, TrainTypeKind::Default, 65.0),
     // 都営浅草線 LimitedExpress: 都営地下鉄 GTFS 5本 中央値21分 (一般則 90km/h)
     (99302, TrainTypeKind::LimitedExpress, 55.0),
+    // 都営新宿線 Default: 都営地下鉄 GTFS 10本 中央値42分 (一般則 75km/h)
+    (99304, TrainTypeKind::Default, 85.0),
     // 東京さくらトラム(都電荒川線) Default: 都営地下鉄 GTFS 13本 中央値56分 (一般則 40km/h)
     (99305, TrainTypeKind::Default, 25.0),
+    // つくばエクスプレス線 Default: つくばエクスプレス GTFS 11本 中央値46分 (一般則 80km/h)
+    (99309, TrainTypeKind::Default, 95.0),
     // 横浜市営地下鉄ブルーライン Rapid: 横浜市営地下鉄 GTFS 3本 中央値61分 (一般則 75km/h)
     (99316, TrainTypeKind::Rapid, 65.0),
     // 多摩モノレール Default: 多摩都市モノレール GTFS 6本 中央値38分 (一般則 60km/h)
@@ -123,19 +134,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn keikyu_express_kinds_are_overridden() {
+    fn manual_entry_overrides_only_its_kind() {
+        // 東急東横線の特急は手動の較正値が引ける。
         approx(
-            line_speed_override_kmh(27001, Some(TrainTypeKind::Express as i32)),
-            Some(120.0),
+            line_speed_override_kmh(26001, Some(TrainTypeKind::LimitedExpress as i32)),
+            Some(80.0),
         );
-        approx(
-            line_speed_override_kmh(27001, Some(TrainTypeKind::LimitedExpress as i32)),
-            Some(120.0),
-        );
-        // 京急でも各停・快速は一般則にフォールバック。
-        assert_eq!(line_speed_override_kmh(27001, None), None);
+        // 同じ路線でも、エントリの無い種別は一般則にフォールバック。
+        assert_eq!(line_speed_override_kmh(26001, None), None);
         assert_eq!(
-            line_speed_override_kmh(27001, Some(TrainTypeKind::Rapid as i32)),
+            line_speed_override_kmh(26001, Some(TrainTypeKind::Rapid as i32)),
             None
         );
     }
@@ -173,8 +181,8 @@ mod tests {
         // 手動テーブルと同じキーが仮に GTFS テーブルにも存在した場合でも、
         // lookup は手動テーブルを先に引くため手動の値が返ることを回帰検知する。
         approx(
-            line_speed_override_kmh(27001, Some(TrainTypeKind::Express as i32)),
-            Some(120.0),
+            line_speed_override_kmh(34001, Some(TrainTypeKind::LimitedExpress as i32)),
+            Some(110.0),
         );
     }
 
