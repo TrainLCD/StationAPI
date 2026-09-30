@@ -484,17 +484,20 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
   MobileApp のオートモードがこの値で走るので、値を変えません。速度の較正は、
   到着時間推定の較正を求め直す前の表を `domain/legacy_speed_table.rs` に凍結して
   使います。
-- `Estimated`: 到着時間推定 (`arrival_estimation`) のモデルです。速度の較正
-  テーブルは、このモデルに当てはめて求めています。返す駅列に推定を掛け、停車・
-  通過、最高速度、加減速を推定が使った値に置き換えて、到着・出発の見込みを入れ
-  ます。`legs` を渡したときの見込みは、同じ `legs` を渡した
-  `estimateArrivalTimes` と同じ値です。バスの駅を含む経路は推定のモデルの対象外
-  なので、`Legacy` と同じ値を返します。
+- `Estimated`: 到着時間推定 (`arrival_estimation`) のモデルで、MobileApp の GPX の
+  生成が使います。返す駅列に推定を掛け、停車・通過、最高速度、加減速を推定が
+  使った値に置き換えて、到着・出発の見込みを入れます。`legs` を渡したときの見込みは、
+  同じ `legs` を渡した `estimateArrivalTimes` と同じ組み立て方 (乗換の徒歩と待ち
+  時間) ですが、較正と駅間の距離が違うので値は一致しません (下記)。バスの駅を含む
+  経路は推定のモデルの対象外なので、`Legacy` と同じ値を返します。
 
 2 つのモデルは、加減速、運転余裕率、停車時間、較正テーブル、駅間の距離が違い
-ます。到着時間推定は、線路の長さ (`connections`) がある駅間ではそれを走行距離に
-使い、無い駅間だけ直線距離 × 迂回係数で見積もります。乗換経路探索
-(`connectedRoutes`) の所要時間も同じ距離で求めます。`Legacy` の値で台形の速度プロファイルを作って走らせると、
+ます。`Estimated` は、線路の長さ (`connections`) がある駅間ではそれを走行距離に
+使い、無い駅間だけ直線距離 × 迂回係数で見積もり、その距離で求め直した較正
+(`speed_table` / `segment_speed_table`) を使います。この求め直した計算を使うのは
+`Estimated` だけです。`estimateArrivalTimes` と乗換経路探索 (`connectedRoutes`) は、
+元の計算 (直線距離 × 迂回係数と、`domain/legacy_speed_table.rs` の元の較正) の
+ままで、ETA と経路検索の結果は変わりません。`Legacy` の値で台形の速度プロファイルを作って走らせると、
 `estimateArrivalTimes` より短い時間で走り切ります (#1709)。所要時間を推定に
 合わせたいクライアントは、`Estimated` の見込みを使います。
 
@@ -512,8 +515,8 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
 
 ### 所要時間のベンチマーク (`travel_times/`)
 
-到着時間推定の所要時間を、実際の列車の所要時間と比べる基準を `travel_times/cases.csv`
-に置いています。速度の較正テーブルや一般則は、1 つの路線に合わせて変えると、同じ
+`trainRoute` の `Estimated` の所要時間を、実際の列車の所要時間と比べる基準を
+`travel_times/cases.csv` に置いています。速度の較正テーブルや一般則は、1 つの路線に合わせて変えると、同じ
 規則を使うほかの路線の推定も変わります。変更の前後で全体の誤差を測るための仕組み
 です。
 
@@ -764,7 +767,7 @@ repository の実装がないメソッドは、空の結果ではなく `DomainE
 │       │   ├── entity/           # Station / Line / TrainType / Company ...
 │       │   ├── repository/       # 抽象インターフェース
 │       │   ├── arrival_estimation.rs
-│       │   ├── legacy_speed_table.rs # trainRoute の Legacy (オートモード) が使う凍結した較正
+│       │   ├── legacy_speed_table.rs # 元の較正 (Estimated 以外のすべてが使う)
 │       │   ├── route_search.rs       # 乗換経路探索 (RAPTOR)
 │       │   ├── route_topology.rs     # 所要時間を持たない系統網 (stationsByName の到達判定)
 │       │   ├── segment_speed_table.rs

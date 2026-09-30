@@ -42,6 +42,9 @@ use std::collections::HashMap;
 
 use crate::domain::entity::gtfs::TransportType;
 use crate::domain::entity::station::Station;
+use crate::domain::legacy_speed_table::{
+    legacy_line_speed_override_kmh, legacy_segment_speed_override_kmh,
+};
 use crate::domain::segment_speed_table::{
     segment_override_applies_to_kind, segment_speed_override_kmh,
 };
@@ -72,6 +75,19 @@ pub struct EstimatedStop {
     pub max_speed_kmh: f64,
 }
 
+/// 速度の較正にどの表を使うか。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SpeedCalibration {
+    /// 元の較正 (`legacy_speed_table`。#1712 で求め直す前の表)。`estimateArrivalTimes`、
+    /// `connectedRoutes` など、`trainRoute` の `Estimated` 以外はすべてこれを使う。
+    #[default]
+    Original,
+    /// 駅間の距離に線路の長さを使う前提で求め直した較正 (`speed_table` /
+    /// `segment_speed_table`)。`trainRoute` の `Estimated` (MobileApp の GPX の生成)
+    /// だけが使う。
+    Recalibrated,
+}
+
 /// 推定で使う調整可能なパラメータ。すべて「実距離・実速度・ダイヤが無い」前提の
 /// ヒューリスティックであり、後から較正・上書きできるよう一箇所に集約する。
 #[derive(Clone, Copy, Debug)]
@@ -93,6 +109,8 @@ pub struct EstimationParams {
     pub detour_min: f64,
     /// 迂回係数 `α` のクランプ上限。
     pub detour_max: f64,
+    /// 速度の較正にどの表を使うか。
+    pub speed_calibration: SpeedCalibration,
 }
 
 impl Default for EstimationParams {
@@ -105,6 +123,7 @@ impl Default for EstimationParams {
             pass_penalty_seconds: 3.0,
             detour_min: 1.0,
             detour_max: 1.6,
+            speed_calibration: SpeedCalibration::Original,
         }
     }
 }
@@ -367,11 +386,16 @@ fn max_speed_kmh(
     line_type: Option<i32>,
     kind: Option<i32>,
     transport_type: TransportType,
+    calibration: SpeedCalibration,
 ) -> f64 {
     if transport_type == TransportType::Bus {
         return BUS_MAX_SPEED_KMH;
     }
-    if let Some(v) = line_speed_override_kmh(line_cd, kind) {
+    let calibrated = match calibration {
+        SpeedCalibration::Original => legacy_line_speed_override_kmh(line_cd, kind),
+        SpeedCalibration::Recalibrated => line_speed_override_kmh(line_cd, kind),
+    };
+    if let Some(v) = calibrated {
         return v;
     }
     let base = base_speed_kmh(line_type);
@@ -658,19 +682,26 @@ pub fn estimate_arrival_minutes_with_track(
             stops[i].line_type,
             effective_kind,
             stops[i].transport_type,
+            params.speed_calibration,
         );
         // 隣接駅ペア単位の較正(GTFS 実ダイヤ由来)があれば路線単位の速度より
         // 優先する。急曲線・急勾配で路線平均より遅い区間(大江戸線 月島〜赤羽橋
         // など)の区間差を反映する。各停系種別の鉄道のみ。
-        if i > 0
-            && stops[i].transport_type != TransportType::Bus
-            && segment_override_applies_to_kind(effective_kind)
-        {
-            if let Some(v) = segment_speed_override_kmh(
+        if i > 0 && stops[i].transport_type != TransportType::Bus {
+            let (line_cd, a, b) = (
                 stops[i].line_cd,
                 stops[i - 1].station_cd,
                 stops[i].station_cd,
-            ) {
+            );
+            let calibrated = match params.speed_calibration {
+                SpeedCalibration::Original => {
+                    legacy_segment_speed_override_kmh(line_cd, a, b, effective_kind)
+                }
+                SpeedCalibration::Recalibrated => segment_override_applies_to_kind(effective_kind)
+                    .then(|| segment_speed_override_kmh(line_cd, a, b))
+                    .flatten(),
+            };
+            if let Some(v) = calibrated {
                 v_kmh = v;
             }
         }

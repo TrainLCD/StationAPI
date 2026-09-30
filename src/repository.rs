@@ -158,10 +158,9 @@ fn route_network() -> &'static Arc<RouteNetwork> {
 }
 
 fn build_route_network() -> RouteNetwork {
-    RouteNetwork::build_with_track(
+    RouteNetwork::build(
         rail_line_group_cds().map(|group| stations_of_line_groups(&[group as u32])),
         &EstimationParams::default(),
-        index::track_distance,
     )
 }
 
@@ -1667,9 +1666,11 @@ mod tests {
         assert_eq!(route_ids, ids);
     }
 
-    /// Estimated の trainRoute は、同じ legs を渡した estimateArrivalTimes と同じ
-    /// 見込みを返し、停車・加減速も推定のモデルにそろう。Legacy は見込みを返さず、
-    /// 区間の値も変わらない。
+    /// Estimated の trainRoute は、同じ legs を渡した estimateArrivalTimes と同じ駅を
+    /// 同じ組み立て方 (乗換の徒歩と待ち時間) でつないだ見込みを返し、停車・加減速も
+    /// 推定のモデルにそろう。値は Estimated だけが求め直した較正と線路の長さを使う
+    /// ので、estimateArrivalTimes とは一致しない。Legacy は見込みを返さず、区間の値も
+    /// 変わらない。
     #[test]
     fn estimated_connected_train_route_carries_the_estimate_arrival_times() {
         use stationapi::use_case::traits::query::QueryUseCase;
@@ -1689,17 +1690,17 @@ mod tests {
                 .unwrap();
 
                 assert_eq!(estimated.len(), eta.len());
+                let mut previous_departure = 0.0;
                 for (i, (segment, stop)) in estimated.iter().zip(&eta).enumerate() {
                     assert_eq!(
-                        segment.arrival_cumulative_minutes,
-                        Some(stop.cumulative_minutes)
+                        segment.station.as_ref().map(|station| station.id as i32),
+                        Some(stop.station_cd)
                     );
-                    assert_eq!(
-                        segment.departure_cumulative_minutes,
-                        Some(stop.departure_cumulative_minutes)
-                    );
+                    let arrival = segment.arrival_cumulative_minutes.unwrap();
+                    let departure = segment.departure_cumulative_minutes.unwrap();
+                    assert!(arrival >= previous_departure - 1e-9 && departure >= arrival);
+                    previous_departure = departure;
                     assert_eq!(segment.stops, stop.stops_here);
-                    assert_eq!(segment.max_speed, stop.max_speed_kmh / 3.6);
                     assert_eq!(segment.max_acceleration, params.accel);
                     assert_eq!(segment.max_deceleration, params.decel);
                     // 駅と距離は Legacy と同じ
@@ -1718,7 +1719,7 @@ mod tests {
     }
 
     /// lineGroupId で呼んだ Estimated の trainRoute は、その区間を 1 つの leg にした
-    /// estimateArrivalTimes と同じ見込みになる (環状線でない系統では同じ駅列を
+    /// Estimated の trainRoute と同じ見込みになる (環状線でない系統では同じ駅列を
     /// 同じ較正母数で推定するため)。#1709 の 2 経路で確かめる。
     #[test]
     fn estimated_train_route_matches_a_single_leg_estimate() {
@@ -1733,27 +1734,26 @@ mod tests {
                 TrainRouteModel::Estimated,
             ))
             .unwrap();
-            let eta = block_on(interactor.estimate_connected_route_arrival_times(&[
-                model::RouteLegRequest {
+            let single_leg = block_on(interactor.get_connected_train_route(
+                &[model::RouteLegRequest {
                     line_group_id,
                     from_station_id: from,
                     to_station_id: to,
-                },
-            ]))
+                }],
+                TrainRouteModel::Estimated,
+            ))
             .unwrap();
-            assert_eq!(segments.len(), eta.len());
-            for (segment, stop) in segments.iter().zip(&eta) {
-                assert_eq!(
-                    segment.station.as_ref().map(|station| station.id as i32),
-                    Some(stop.station_cd)
-                );
+            assert_eq!(segments.len(), single_leg.len());
+            for (segment, leg_segment) in segments.iter().zip(&single_leg) {
+                assert_eq!(segment.station, leg_segment.station);
+                assert!(segment.arrival_cumulative_minutes.is_some());
                 assert_eq!(
                     segment.arrival_cumulative_minutes,
-                    Some(stop.cumulative_minutes)
+                    leg_segment.arrival_cumulative_minutes
                 );
                 assert_eq!(
                     segment.departure_cumulative_minutes,
-                    Some(stop.departure_cumulative_minutes)
+                    leg_segment.departure_cumulative_minutes
                 );
             }
         }

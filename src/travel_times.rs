@@ -1,4 +1,6 @@
-//! 実際の所要時間 (`travel_times/cases.csv`) に対する到着時間推定の回帰の見張り。
+//! 実際の所要時間 (`travel_times/cases.csv`) に対する `trainRoute` の `Estimated`
+//! (MobileApp の GPX の生成が使う推定) の回帰の見張り。`estimateArrivalTimes` と
+//! `connectedRoutes` は元の較正のままなので、ここでは測らない。
 //!
 //! 基準ごとに推定の所要時間を出し、実際の典型的な所要時間 (平日日中の中央値) から
 //! のずれを求める。記録した推定 (`travel_times/baseline.csv`) より悪くなった基準が
@@ -21,7 +23,7 @@
 use std::collections::HashMap;
 
 use stationapi::domain::repository::station_repository::StationRepository;
-use stationapi::model::RouteLegRequest;
+use stationapi::model::{RouteLegRequest, TrainRouteModel};
 use stationapi::use_case::traits::query::QueryUseCase;
 
 use crate::repository::MemStationRepository;
@@ -154,17 +156,22 @@ fn estimate(case: &Case) -> Option<f64> {
         from_station_id: case.from_station_id,
         to_station_id: case.slice_end_station_id,
     }];
-    let stops = block_on(crate::interactor().estimate_connected_route_arrival_times(&legs))
-        .unwrap_or_else(|e| panic!("{}: 推定できない: {e}", case.label));
-    let stop = stops
+    // 見張るのは trainRoute の Estimated (GPX の生成が使う推定)。estimateArrivalTimes と
+    // connectedRoutes は元の較正のままで、推定の規則や較正を変えても動かない
+    let segments =
+        block_on(crate::interactor().get_connected_train_route(&legs, TrainRouteModel::Estimated))
+            .unwrap_or_else(|e| panic!("{}: 推定できない: {e}", case.label));
+    let segment = segments
         .iter()
         .skip(1)
-        .find(|stop| stop.station_cd as u32 == case.to_station_id)
+        .find(|segment| {
+            segment.station.as_ref().map(|station| station.id) == Some(case.to_station_id)
+        })
         .unwrap_or_else(|| panic!("{}: 推定の駅列に到着駅が無い", case.label));
-    Some(match case.measure {
-        Measure::Arrival => stop.cumulative_minutes,
-        Measure::Departure => stop.departure_cumulative_minutes,
-    })
+    match case.measure {
+        Measure::Arrival => segment.arrival_cumulative_minutes,
+        Measure::Departure => segment.departure_cumulative_minutes,
+    }
 }
 
 fn read_baseline() -> HashMap<String, f64> {

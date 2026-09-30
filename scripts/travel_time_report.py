@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""実際の所要時間 (travel_times/cases.csv) に対する到着時間推定の誤差を、動いている
-Worker に問い合わせて Markdown で出す。
+"""実際の所要時間 (travel_times/cases.csv) に対する trainRoute の Estimated (MobileApp の
+GPX の生成が使う推定) の誤差を、動いている Worker に問い合わせて Markdown で出す。
 
 CI の回帰テスト (src/travel_times.rs) は data/*.csv だけで動くので、生成データにしか
 無い種別グループを飛ばし、線路の長さも持たない。本番と同じ生成データでの精度は、
@@ -25,9 +25,9 @@ CASES = Path(__file__).resolve().parent.parent / "travel_times" / "cases.csv"
 # 既定の Python-urllib は配信側で弾かれるので、bench.py と同じく名乗る
 USER_AGENT = "stationapi-travel-time-report/1.0 (+https://github.com/TrainLCD/StationAPI)"
 QUERY = """query TravelTimeReport($from: Int!, $to: Int!, $group: Int!) {
-  estimateArrivalTimes(fromStationId: $from, toStationId: $to,
+  trainRoute(fromStationId: $from, toStationId: $to, model: Estimated,
     legs: [{ lineGroupId: $group, fromStationId: $from, toStationId: $to }]) {
-    routes { stops { stationId cumulativeMinutes departureCumulativeMinutes } }
+    segments { station { id } arrivalCumulativeMinutes departureCumulativeMinutes }
   }
 }"""
 
@@ -49,11 +49,15 @@ def estimate(api: str, case: dict) -> float:
         data = json.load(res)
     if data.get("errors"):
         raise RuntimeError("; ".join(e.get("message", "") for e in data["errors"]))
-    stops = data["data"]["estimateArrivalTimes"]["routes"][0]["stops"]
+    segments = data["data"]["trainRoute"]["segments"]
     target = int(case["to_station_id"])
-    stop = next(s for s in stops[1:] if s["stationId"] == target)
-    key = "cumulativeMinutes" if case["measure"] == "arrival" else "departureCumulativeMinutes"
-    return float(stop[key])
+    segment = next(s for s in segments[1:] if s["station"]["id"] == target)
+    key = (
+        "arrivalCumulativeMinutes"
+        if case["measure"] == "arrival"
+        else "departureCumulativeMinutes"
+    )
+    return float(segment[key])
 
 
 def range_error(est: float, lo: float, hi: float) -> float:
