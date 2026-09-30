@@ -538,14 +538,6 @@ pub fn estimate_arrival_minutes(
     estimate_arrival_minutes_calibrated(stops, stops, params)
 }
 
-/// 隣り合う 2 駅の線路の長さ (m)。キーは `(小さい station_cd, 大きい station_cd)`。
-pub type TrackDistances = HashMap<(i32, i32), f64>;
-
-/// [`TrackDistances`] のキー。向きを問わずに引けるよう小さい駅を先にする。
-pub fn track_distance_key(a: i32, b: i32) -> (i32, i32) {
-    (a.min(b), a.max(b))
-}
-
 /// [`estimate_arrival_minutes`] の較正母数指定版。
 ///
 /// `calibration_stops` には経路全体(部分区間へ切り出す前)の駅列を渡す。
@@ -557,19 +549,6 @@ pub fn estimate_arrival_minutes_calibrated(
     stops: &[&Station],
     calibration_stops: &[&Station],
     params: &EstimationParams,
-) -> Vec<EstimatedStop> {
-    estimate_arrival_minutes_with_track(stops, calibration_stops, params, None)
-}
-
-/// [`estimate_arrival_minutes_calibrated`] に、駅間の線路の長さを渡せる版。
-///
-/// `track` に隣り合う 2 駅の線路の長さがあれば、その駅間の走行距離は直線距離 ×
-/// 迂回係数ではなく線路の長さを使う。無い駅間は従来どおり迂回係数で見積もる。
-pub fn estimate_arrival_minutes_with_track(
-    stops: &[&Station],
-    calibration_stops: &[&Station],
-    params: &EstimationParams,
-    track: Option<&TrackDistances>,
 ) -> Vec<EstimatedStop> {
     let n = stops.len();
     if n == 0 {
@@ -697,16 +676,7 @@ pub fn estimate_arrival_minutes_with_track(
     let mut seg: Vec<(f64, f64, usize, bool)> = Vec::new();
 
     for i in 1..n {
-        let track_m = track
-            .and_then(|t| {
-                t.get(&track_distance_key(
-                    stops[i - 1].station_cd,
-                    stops[i].station_cd,
-                ))
-            })
-            .copied()
-            .filter(|d| *d > 0.0)
-            .unwrap_or_else(|| straight_km[i] * detour_of(stops[i]) * 1000.0);
+        let track_m = straight_km[i] * detour_of(stops[i]) * 1000.0;
         let v_kmh = speed_kmh_at(i);
 
         let idx = result.len();
@@ -1169,6 +1139,38 @@ mod tests {
         }
     }
 
+    #[test]
+    fn ginza_line_shibuya_to_shimbashi_matches_real_travel_time() {
+        let p = EstimationParams::default();
+        // 東京メトロ銀座線 渋谷→新橋。実座標・実データ値
+        // (average_distance = 780.46154m、地下鉄 line_type=3)。
+        // 実乗車時間は東京メトロ/乗換案内系の標準所要時間で約13分。
+        let data = [
+            (2800119, 35.659066, 139.701000), // 渋谷
+            (2800118, 35.665247, 139.712314), // 表参道
+            (2800117, 35.670527, 139.717857), // 外苑前
+            (2800116, 35.672765, 139.724159), // 青山一丁目
+            (2800115, 35.677021, 139.737047), // 赤坂見附
+            (2800114, 35.673621, 139.741419), // 溜池山王
+            (2800113, 35.670236, 139.749832), // 虎ノ門
+            (2800112, 35.667434, 139.758432), // 新橋
+        ];
+        let stations: Vec<Station> = data
+            .iter()
+            .map(|&(cd, lat, lon)| {
+                let mut s = station(cd, 28001, lat, lon, Some(780.46154));
+                s.line_type = Some(LINE_TYPE_SUBWAY);
+                s.line_group_cd = Some(28001);
+                s
+            })
+            .collect();
+        let refs: Vec<&Station> = stations.iter().collect();
+        let est = estimate_arrival_minutes(&refs, &p);
+
+        let total = est.last().unwrap().cumulative_minutes;
+        assert!((12.0..14.0).contains(&total), "got {total}");
+    }
+
     /// GTFS インポート後のバス停を再現する(line_type=3 は GTFS route_type のバス、
     /// kind=7 は TrainTypeKind::BusRoute、average_distance は無し)。
     fn bus_station(station_cd: i32, line_cd: i32, lat: f64, lon: f64) -> Station {
@@ -1454,8 +1456,8 @@ mod tests {
 
     #[test]
     fn speed_table_override_beats_general_rule() {
-        // 阪急神戸本線(34001)の特急(LimitedExpress)は較正テーブルの 110km/h が
-        // 適用され、一般則(80×1.2=96km/h)の路線より同一区間を速く走る。
+        // 京急本線(27001)の快特(Express)は較正テーブルの 120km/h が適用され、
+        // 一般則(80×1.15=92km/h)の路線より同一区間を速く走る。
         let p = EstimationParams::default();
         let time_on_line = |line_cd: i32| -> f64 {
             // 8km 区間(巡航支配)で比較する。0.072 度 ≈ 8km。
@@ -1470,21 +1472,21 @@ mod tests {
             ];
             stations[2].pass = Some(1);
             for s in stations.iter_mut() {
-                s.kind = Some(TrainTypeKind::LimitedExpress as i32);
+                s.kind = Some(TrainTypeKind::Express as i32);
             }
             let refs: Vec<&Station> = stations.iter().collect();
             estimate_arrival_minutes(&refs, &p)[1].cumulative_minutes
         };
-        let hankyu = time_on_line(34001);
+        let keikyu = time_on_line(27001);
         let generic = time_on_line(100);
         assert!(
-            hankyu < generic,
-            "hankyu {hankyu} should be < generic {generic}"
+            keikyu < generic,
+            "keikyu {keikyu} should be < generic {generic}"
         );
-        // テーブル値 110km/h での運動学モデルと厳密に一致する。
+        // テーブル値 120km/h での運動学モデルと厳密に一致する。
         let straight_m = haversine_distance(35.000, 139.0, 35.072, 139.0);
         // average_distance 無し → 在来線フォールバック α=1.30。
-        approx(hankyu, segment_run_minutes(straight_m * 1.30, 110.0, &p));
+        approx(keikyu, segment_run_minutes(straight_m * 1.30, 120.0, &p));
     }
 
     #[test]
@@ -1670,44 +1672,5 @@ mod tests {
             est[1].cumulative_minutes,
             segment_run_minutes(track_m, est[1].max_speed_kmh, &p),
         );
-    }
-
-    #[test]
-    fn track_distance_replaces_the_detour_estimate_where_known() {
-        let p = EstimationParams::default();
-        let stations = three_collinear_stations();
-        let refs: Vec<&Station> = stations.iter().collect();
-        let without = estimate_arrival_minutes(&refs, &p);
-
-        // 1→2 だけ線路の長さ (直線の 2 倍) を渡す。2→3 は迂回係数のまま
-        let straight_m = haversine_distance(35.000, 139.0, 35.016, 139.0);
-        let mut track = TrackDistances::new();
-        track.insert(track_distance_key(2, 1), straight_m * 2.0);
-        let with = estimate_arrival_minutes_with_track(&refs, &refs, &p, Some(&track));
-
-        approx(
-            with[1].cumulative_minutes,
-            segment_run_minutes(straight_m * 2.0, with[1].max_speed_kmh, &p),
-        );
-        // 線路の長さが無い駅間の走行時間は変わらない
-        approx(
-            with[2].cumulative_minutes - with[1].departure_cumulative_minutes,
-            without[2].cumulative_minutes - without[1].departure_cumulative_minutes,
-        );
-        // 表を渡さない (None) のは従来どおり
-        let none = estimate_arrival_minutes_with_track(&refs, &refs, &p, None);
-        approx(none[2].cumulative_minutes, without[2].cumulative_minutes);
-    }
-
-    #[test]
-    fn non_positive_track_distance_falls_back_to_the_detour_estimate() {
-        let p = EstimationParams::default();
-        let stations = three_collinear_stations();
-        let refs: Vec<&Station> = stations.iter().collect();
-        let without = estimate_arrival_minutes(&refs, &p);
-        let mut track = TrackDistances::new();
-        track.insert(track_distance_key(1, 2), 0.0);
-        let with = estimate_arrival_minutes_with_track(&refs, &refs, &p, Some(&track));
-        approx(with[1].cumulative_minutes, without[1].cumulative_minutes);
     }
 }

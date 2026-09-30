@@ -24,8 +24,8 @@ fn filter_to_db_type(filter: TransportTypeFilter) -> Option<TransportType> {
 use crate::{
     domain::{
         arrival_estimation::{
-            estimate_arrival_minutes_with_track, is_circular_route, select_circular_arc,
-            track_distance_key, EstimatedStop, EstimationParams, TrackDistances,
+            estimate_arrival_minutes_calibrated, is_circular_route, select_circular_arc,
+            EstimatedStop, EstimationParams,
         },
         entity::{
             company::Company,
@@ -36,13 +36,13 @@ use crate::{
             station_number::StationNumber,
             train_type::TrainType,
         },
-        legacy_speed_table::legacy_segment_speed_override_kmh,
         normalize::normalize_for_search,
         repository::{
             company_repository::CompanyRepository, line_repository::LineRepository,
             station_repository::StationRepository, train_type_repository::TrainTypeRepository,
         },
         route_search::{self, JourneySort},
+        segment_speed_table::{segment_override_applies_to_kind, segment_speed_override_kmh},
     },
     model::{self, ConnectedRoute, Route},
     use_case::{
@@ -930,11 +930,7 @@ where
         // 推定は付帯情報を付ける前の駅列で行う (estimateArrivalTimes と同じ入力)
         let estimated = match route_model {
             model::TrainRouteModel::Legacy => None,
-            model::TrainRouteModel::Estimated => {
-                let group: Vec<&Station> = stations.iter().collect();
-                let track = self.track_distances_of(&group).await?;
-                estimate_train_route_slice(&sliced, &stations, &track)
-            }
+            model::TrainRouteModel::Estimated => estimate_train_route_slice(&sliced, &stations),
         };
         let mut segments = self.train_route_segments(sliced, line_group_id).await?;
         if let Some(estimated) = estimated {
@@ -960,7 +956,6 @@ where
                 .get_by_line_group_id(leg.line_group_id)
                 .await?;
             let group_stops: Vec<&Station> = stations.iter().collect();
-            let track = self.track_distances_of(&group_stops).await?;
             let (from_group, to_group) =
                 (group_of[&leg.from_station_id], group_of[&leg.to_station_id]);
             let segment = estimate_group_segment(
@@ -972,7 +967,6 @@ where
                 },
                 false,
                 &params,
-                Some(&track),
             )
             .ok_or_else(|| leg_not_found(leg))?;
 
@@ -1189,13 +1183,11 @@ where
 
         let mut result: Vec<EstimatedStop> = Vec::new();
         for group_stops in route_row_tree_map.values() {
-            let track = self.track_distances_of(group_stops).await?;
             if let Some(segment) = estimate_group_segment(
                 group_stops,
                 SegmentEndpoints::exact(from_station_id, to_station_id),
                 direction_id.is_some(),
                 &params,
-                Some(&track),
             ) {
                 result.extend(segment);
             }
@@ -1282,27 +1274,6 @@ where
             .await
     }
 
-    /// 系統の駅列で隣り合う駅の組 (環状線の継ぎ目の組を含む) の線路の長さを引いて、
-    /// 到着時間推定に渡す表にする。推定が切り出す区間は、系統の駅列の連続した区間か
-    /// 継ぎ目を跨ぐ弧なので、この組だけで足りる。
-    async fn track_distances_of(&self, group: &[&Station]) -> Result<TrackDistances, UseCaseError> {
-        let mut pairs: Vec<(u32, u32)> = group
-            .windows(2)
-            .map(|w| (w[0].station_cd as u32, w[1].station_cd as u32))
-            .collect();
-        if let (Some(first), Some(last)) = (group.first(), group.last()) {
-            if group.len() > 2 {
-                pairs.push((last.station_cd as u32, first.station_cd as u32));
-            }
-        }
-        let distances = self.station_repository.get_track_distances(&pairs).await?;
-        Ok(pairs
-            .into_iter()
-            .zip(distances)
-            .filter_map(|((a, b), d)| d.map(|d| (track_distance_key(a as i32, b as i32), d)))
-            .collect())
-    }
-
     /// 返す駅の並びで隣り合う 2 駅のあいだの線路の長さを、後ろの駅の
     /// `track_distance_from_previous` に入れる。先頭の駅は `None` のまま。
     ///
@@ -1378,15 +1349,11 @@ where
                 resolve_speed_profile(station.line_cd, station.line_type, is_bus, effective_kind);
             // 隣接駅ペア単位の較正(GTFS 実ダイヤ由来)があれば、このセグメントの
             // 最高速度を路線単位のプロファイルより優先して上書きする(各停系のみ)。
-            // Legacy はオートモードの走り方を変えないよう、凍結した表を引く。
-            if !is_bus {
+            if !is_bus && segment_override_applies_to_kind(effective_kind) {
                 if let Some((_, _, prev_cd)) = prev_stop {
-                    if let Some(v_kmh) = legacy_segment_speed_override_kmh(
-                        station.line_cd,
-                        prev_cd,
-                        station.station_cd,
-                        effective_kind,
-                    ) {
+                    if let Some(v_kmh) =
+                        segment_speed_override_kmh(station.line_cd, prev_cd, station.station_cd)
+                    {
                         profile.max_speed = v_kmh / 3.6;
                     }
                 }
@@ -2013,7 +1980,6 @@ fn estimate_group_segment(
     endpoints: SegmentEndpoints,
     directed: bool,
     params: &EstimationParams,
-    track: Option<&TrackDistances>,
 ) -> Option<Vec<EstimatedStop>> {
     let mut route_stops: &[&Station] = group_stops;
     if route_stops.len() > 1
@@ -2024,13 +1990,13 @@ fn estimate_group_segment(
     let (from, to) = endpoints.positions(route_stops)?;
     Some(if is_circular_route(route_stops) {
         let arc = select_circular_arc(route_stops, from, to, directed);
-        estimate_arrival_minutes_with_track(&arc, route_stops, params, track)
+        estimate_arrival_minutes_calibrated(&arc, route_stops, params)
     } else if from < to {
-        estimate_arrival_minutes_with_track(&route_stops[from..=to], route_stops, params, track)
+        estimate_arrival_minutes_calibrated(&route_stops[from..=to], route_stops, params)
     } else {
         let mut segment: Vec<&Station> = route_stops[to..=from].to_vec();
         segment.reverse();
-        estimate_arrival_minutes_with_track(&segment, route_stops, params, track)
+        estimate_arrival_minutes_calibrated(&segment, route_stops, params)
     })
 }
 
@@ -2069,11 +2035,7 @@ fn is_bus_station(station: &Station) -> bool {
 /// 迂回係数の較正母数には、切り出す前の系統全体 `group` を渡す
 /// (`estimate_group_segment` と同じく、閉じた環状データの重複終端は除く)。
 /// バスの駅を含むときは推定のモデルの対象外として `None` を返す。
-fn estimate_train_route_slice(
-    sliced: &[Station],
-    group: &[Station],
-    track: &TrackDistances,
-) -> Option<Vec<EstimatedStop>> {
+fn estimate_train_route_slice(sliced: &[Station], group: &[Station]) -> Option<Vec<EstimatedStop>> {
     if sliced.iter().any(is_bus_station) {
         return None;
     }
@@ -2082,11 +2044,10 @@ fn estimate_train_route_slice(
     if route.len() > 1 && route[0].station_cd == route[route.len() - 1].station_cd {
         route.pop();
     }
-    Some(estimate_arrival_minutes_with_track(
+    Some(estimate_arrival_minutes_calibrated(
         &stops,
         &route,
         &EstimationParams::default(),
-        Some(track),
     ))
 }
 
@@ -3237,9 +3198,8 @@ mod tests {
 
         /// 直通急行の線内各駅停車の回帰テスト。
         /// 半蔵門線内は急行(Express)でも全駅に停車するため、経路スライス内に
-        /// 通過駅が無ければ各停と同じ推定になること。修正前は種別倍率(×1.15)が
-        /// 掛かり駅間別較正も外れて短く推定されていた。実際の所要時間との比較は
-        /// 本番と同じデータで測る所要時間のベンチマーク (travel_times/cases.csv) で行う。
+        /// 通過駅が無ければ各停と同じ推定になること(実所要 押上→神保町 約18分)。
+        /// 修正前は種別倍率(×1.15)が掛かり駅間別較正も外れて約15分に縮んでいた。
         #[tokio::test]
         async fn test_estimate_route_arrival_times_through_express_all_stops_matches_local() {
             let default_kind = Some(model::TrainTypeKind::Default as i32);
@@ -3266,6 +3226,9 @@ mod tests {
                     l.cumulative_minutes
                 );
             }
+            // 実所要 18 分に対し較正ポリシーの許容誤差 ±10%。
+            let total = express_est.last().unwrap().cumulative_minutes;
+            assert!((16.2..19.8).contains(&total), "got {total}");
         }
 
         /// 環状部南側(河川横断の急勾配・急曲線区間)の駅間別較正の回帰テスト。
@@ -3831,12 +3794,9 @@ mod tests {
                             .push(station.clone());
                     }
                 }
-                // get_track_distances と同じ長さで組み立て、見込みと探索の所要時間をそろえる
-                let distance = self.track_distance;
-                Ok(std::sync::Arc::new(RouteNetwork::build_with_track(
+                Ok(std::sync::Arc::new(RouteNetwork::build(
                     by_line_group.into_values(),
                     &EstimationParams::default(),
-                    move |_, _| distance,
                 )))
             }
             async fn get_track_distances(
@@ -4290,31 +4250,6 @@ mod tests {
                     .with_expected_line_group_id(expected_line_group_id),
                 company_repository: ConfigurableMockCompanyRepository::new(companies),
             }
-        }
-
-        /// 到着時間推定へ渡す線路の長さの表は、系統の隣り合う駅の組に加えて、
-        /// 環状線の継ぎ目の組 (末尾→先頭) も持つ。継ぎ目を跨ぐ弧を推定するため。
-        #[tokio::test]
-        async fn track_distances_cover_adjacent_pairs_and_the_seam() {
-            let stations: Vec<Station> = (0..4)
-                .map(|i| create_test_station(3000 + i, 30, 1, Some(3000)))
-                .collect();
-            let interactor = QueryInteractor {
-                station_repository: ConfigurableMockStationRepository::new(vec![], vec![])
-                    .with_track_distance(1234.0),
-                line_repository: ConfigurableMockLineRepository::new(vec![]),
-                train_type_repository: ConfigurableMockTrainTypeRepository::new(vec![]),
-                company_repository: ConfigurableMockCompanyRepository::new(vec![]),
-            };
-            let refs: Vec<&Station> = stations.iter().collect();
-            let track = interactor.track_distances_of(&refs).await.unwrap();
-            let mut keys: Vec<(i32, i32)> = track.keys().copied().collect();
-            keys.sort();
-            assert_eq!(
-                keys,
-                vec![(3000, 3001), (3000, 3003), (3001, 3002), (3002, 3003)]
-            );
-            assert!(track.values().all(|d| *d == 1234.0));
         }
 
         #[tokio::test]
@@ -6462,8 +6397,7 @@ mod tests {
                 .all(|s| s.max_acceleration == 0.83 && s.max_deceleration == 0.69));
         }
 
-        /// Estimated は、同じ駅列を系統全体で較正し、系統の線路の長さを渡した
-        /// 到着時間推定の値を返す。
+        /// Estimated は、同じ駅列を系統全体で較正した到着時間推定の値を返す。
         #[tokio::test]
         async fn estimated_model_follows_the_arrival_estimation() {
             let group = build_line_group(20);
@@ -6476,13 +6410,7 @@ mod tests {
             let slice: Vec<&Station> = group[2..=6].iter().collect();
             let whole: Vec<&Station> = group.iter().collect();
             let params = EstimationParams::default();
-            let track = interactor.track_distances_of(&whole).await.unwrap();
-            assert!(
-                !track.is_empty(),
-                "前提: テスト用の repository は線路の長さを返す"
-            );
-            let expected =
-                estimate_arrival_minutes_with_track(&slice, &whole, &params, Some(&track));
+            let expected = estimate_arrival_minutes_calibrated(&slice, &whole, &params);
 
             assert_eq!(segments.len(), expected.len());
             for (segment, stop) in segments.iter().zip(&expected) {

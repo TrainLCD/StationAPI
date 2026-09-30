@@ -49,10 +49,6 @@ STATIONS_CSV = os.path.join(ROOT, "data", "3!stations.csv")
 TYPES_CSV = os.path.join(ROOT, "data", "4!types.csv")
 SST_CSV = os.path.join(ROOT, "data", "5!station_station_types.csv")
 SPEED_TABLE_RS = os.path.join(ROOT, "stationapi", "src", "domain", "speed_table.rs")
-# 隣り合う駅の線路の長さ。preprocessor (make data) が N02 から求め、Worker に埋め込む
-# ものと同じ。到着時間推定はこれがある駅間では迂回係数ではなく線路の長さを使うので、
-# 較正も同じ距離で行う。
-CONNECTIONS_CSV = os.path.join(ROOT, "generated", "connections.csv")
 CACHE_DIR = os.path.join(HERE, ".gtfs_cache")
 
 HTTP_TIMEOUT = 120
@@ -75,7 +71,7 @@ FEEDS: list[Feed] = [
     Feed(
         key="hakodate_tram",
         name="函館市電",
-        url="https://api-public.odpt.org/api/v4/files/odpt/HakodateCity/Alllines.zip?date=20260815",
+        url="https://api-public.odpt.org/api/v4/files/odpt/HakodateCity/Alllines.zip?date=20260615",
         needs_token=False,
         license="公共交通オープンデータセンター(認証なし公開)",
     ),
@@ -311,32 +307,6 @@ def load_repo_data():
                 (int(r["station_cd"]), int(r["type_cd"]), int(r["pass"]) if r["pass"] else 0)
             )
     return lines, by_line, kinds, groups
-
-
-def load_track_distances() -> dict[tuple[int, int], float]:
-    """隣り合う 2 駅の線路の長さ(m)。キーは (小さい station_cd, 大きい station_cd)。"""
-    if not os.path.isfile(CONNECTIONS_CSV):
-        raise SystemExit(
-            f"{CONNECTIONS_CSV} がありません。make data で generated/ を作ってから実行してください"
-            "(到着時間推定は線路の長さを使うので、較正も同じ距離で行う)"
-        )
-    track: dict[tuple[int, int], float] = {}
-    with open(CONNECTIONS_CSV, newline="", encoding="utf-8") as f:
-        for r in csv.DictReader(f):
-            a, b = int(r["station_cd1"]), int(r["station_cd2"])
-            d = float(r["distance"])
-            if d > 0:
-                track[(min(a, b), max(a, b))] = d
-    return track
-
-
-def pair_distance(track: dict, a: dict, b: dict, alpha: float) -> float:
-    """駅 a→b の走行距離(m)。estimate_arrival_minutes_with_track と同じく、線路の長さが
-    あればそれを、無ければ直線距離 × 迂回係数を使う。"""
-    d = track.get((min(a["cd"], b["cd"]), max(a["cd"], b["cd"])))
-    if d:
-        return d
-    return haversine(a["lat"], a["lon"], b["lat"], b["lon"]) * alpha
 
 
 def line_detour(lines: dict, by_line: dict, line_cd: int) -> float:
@@ -710,7 +680,7 @@ def segment_sanity_upper_kmh(base: float, line_type: int | None) -> float:
 
 
 def calibrate_feed(
-    feed: Feed, zf: zipfile.ZipFile, lines, by_line, kinds, groups, track
+    feed: Feed, zf: zipfile.ZipFile, lines, by_line, kinds, groups
 ) -> tuple[list[Calibration], dict[tuple[int, int, int], list[tuple[float, str]]]]:
     stops_by_id = {
         s["stop_id"]: (norm_name(s["stop_name"]), float(s["stop_lat"]), float(s["stop_lon"]))
@@ -790,7 +760,8 @@ def calibrate_feed(
         alpha = line_detour(lines, by_line, line_cd)
         seq: list[tuple[float, bool]] = [(0.0, True)]
         for a, b in zip(span, span[1:]):
-            seq.append((pair_distance(track, a, b, alpha), b["cd"] in served))
+            d = haversine(a["lat"], a["lon"], b["lat"], b["lon"]) * alpha
+            seq.append((d, b["cd"] in served))
         obs = arr_last - dep0
 
         dedup_key = (tuple(s["cd"] for s in span), tuple(sorted(served)), round(obs, 1))
@@ -1018,7 +989,6 @@ def main() -> int:
 
     token = os.environ.get("ODPT_ACCESS_TOKEN")
     lines, by_line, kinds, groups = load_repo_data()
-    track = load_track_distances()
 
     all_results: list[Calibration] = []
     all_seg_samples: dict[tuple[int, int, int], list[tuple[float, str]]] = {}
@@ -1035,7 +1005,7 @@ def main() -> int:
         if zf is None:
             continue
         with zf:
-            results, seg_samples = calibrate_feed(feed, zf, lines, by_line, kinds, groups, track)
+            results, seg_samples = calibrate_feed(feed, zf, lines, by_line, kinds, groups)
         all_results.extend(results)
         for key, ts in seg_samples.items():
             all_seg_samples.setdefault(key, []).extend(ts)
@@ -1073,10 +1043,9 @@ def main() -> int:
         return general_rule_speed(lines[line_cd]["line_type"], 0)
 
     name_of = {s["cd"]: s["name"] for sts in by_line.values() for s in sts}
-    station_of = {s["cd"]: s for sts in by_line.values() for s in sts}
+    coord_of = {s["cd"]: (s["lat"], s["lon"]) for sts in by_line.values() for s in sts}
 
-    # ペアごとの平均ターゲットとみなし距離。距離は線路の長さ (無ければ路線較正済みの
-    # 迂回係数で見積もった直線距離) を使う。
+    # ペアごとの平均ターゲットとみなし距離。距離には路線較正済みの迂回係数を使う。
     mean_targets: dict[tuple[int, int, int], float] = {}
     pair_dist_m: dict[tuple[int, int, int], float] = {}
     # 出発間隔ベースでしか較正できなかったペア(繰り越し補正の対象)。
@@ -1087,6 +1056,7 @@ def main() -> int:
             continue
         if line_cd not in detour_cache:
             detour_cache[line_cd] = line_detour(lines, by_line, line_cd)
+        (lat1, lon1), (lat2, lon2) = coord_of[cd_lo], coord_of[cd_hi]
         key = (line_cd, cd_lo, cd_hi)
         # 到着時刻ベース(純走行時間)が十分あればそれだけを使う。無いフィード
         # (東京メトロは全駅 arr==dep)では出発間隔ベースの上側トリム平均で
@@ -1100,9 +1070,7 @@ def main() -> int:
             used = dep_ts[:keep]
             dep_only_keys.add(key)
         mean_targets[key] = sum(used) / len(used)
-        pair_dist_m[key] = pair_distance(
-            track, station_of[cd_lo], station_of[cd_hi], detour_cache[line_cd]
-        )
+        pair_dist_m[key] = haversine(lat1, lon1, lat2, lon2) * detour_cache[line_cd]
 
     raw_targets = dict(mean_targets)
     rebalance_line_targets(mean_targets, pair_dist_m, by_line, lines, dep_only_keys)

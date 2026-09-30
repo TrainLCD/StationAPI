@@ -2,7 +2,6 @@ pub mod arrival_estimation;
 pub mod entity;
 pub mod error;
 pub mod ipa;
-pub mod legacy_speed_table;
 pub mod normalize;
 pub mod repository;
 pub mod romaji;
