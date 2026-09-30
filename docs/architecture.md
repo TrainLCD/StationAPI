@@ -513,9 +513,10 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
 規則を使うほかの路線の推定も変わります。変更の前後で全体の誤差を測るための仕組み
 です。
 
-- `cargo test -p stationapi-worker` (`src/travel_times.rs`) は、基準ごとの「実際の範囲
-  からの外れ」を `travel_times/baseline.csv` の記録と比べ、悪くなると失敗します。
-  記録は本番と同じ生成データで作るので、比べるのは `generated/` で動くときだけです。
+- `cargo test -p stationapi-worker` (`src/travel_times.rs`) は、基準ごとの「実際の
+  典型的な所要時間からのずれ」を `travel_times/baseline.csv` の記録と比べ、悪くなる
+  と失敗します。記録は本番と同じ生成データで作るので、比べるのは `generated/` で
+  動くときだけです。
   CI では `build_worker.yml` が生成データを作ってから走らせます。
 - `make travel-time-report` は、生成データで動く Worker に問い合わせて全件の誤差を
   出します。推定の規則や較正を変える PR には、変更前と変更後のレポートを載せます。

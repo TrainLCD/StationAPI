@@ -72,35 +72,37 @@ def main() -> int:
     with CASES.open(encoding="utf-8") as f:
         cases = list(csv.DictReader(f))
 
-    rows, range_errors, mid_errors, failed = [], [], [], []
+    rows, range_errors, typical_errors, failed = [], [], [], []
     for case in cases:
         lo, hi = float(case["real_min_minutes"]), float(case["real_max_minutes"])
+        typical = float(case["real_typical_minutes"])
         try:
             est = estimate(args.api, case)
         except Exception as e:  # noqa: BLE001 - 1 件の失敗で全体を止めない
             failed.append(f"{case['label']}: {e}")
             continue
-        mid = (lo + hi) / 2
-        r, m = range_error(est, lo, hi), (est - mid) / mid
+        t, r = (est - typical) / typical, range_error(est, lo, hi)
+        typical_errors.append(abs(t))
         range_errors.append(r)
-        mid_errors.append(abs(m))
         rows.append(
-            f"| {case['label']} | {lo:g}〜{hi:g}分 | {est:.1f}分 | {r * 100:.1f}% | {m * 100:+.1f}% |"
+            f"| {case['label']} | {typical:g}分 ({lo:g}〜{hi:g}分) | {est:.1f}分 "
+            f"| {t * 100:+.1f}% | {r * 100:.1f}% |"
         )
 
     print(f"# 到着時間推定の誤差 ({args.api})\n")
-    print("| 基準 | 実際 | 推定 | 範囲からの外れ | 範囲の中央からのずれ |")
+    print("| 基準 | 実際の典型 (範囲) | 推定 | 典型からのずれ | 範囲からの外れ |")
     print("| --- | --- | --- | --- | --- |")
     print("\n".join(rows))
-    if range_errors:
+    if typical_errors:
         print(
-            f"\n{len(range_errors)} 件: 範囲からの外れの平均 {statistics.mean(range_errors) * 100:.2f}%、"
-            f"範囲の中央からのずれ (絶対値) の平均 {statistics.mean(mid_errors) * 100:.2f}%"
+            f"\n{len(typical_errors)} 件: 典型からのずれ (絶対値) の平均 "
+            f"{statistics.mean(typical_errors) * 100:.2f}%、"
+            f"範囲からの外れの平均 {statistics.mean(range_errors) * 100:.2f}%"
         )
     if failed:
         print("\n推定できなかった基準:\n")
         print("\n".join(f"- {line}" for line in failed))
-    return 0 if range_errors else 1
+    return 0 if typical_errors else 1
 
 
 if __name__ == "__main__":

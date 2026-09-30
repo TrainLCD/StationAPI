@@ -1,9 +1,13 @@
 //! 実際の所要時間 (`travel_times/cases.csv`) に対する到着時間推定の回帰の見張り。
 //!
-//! 基準ごとに推定の所要時間を出し、実際の範囲からの外れ (範囲内なら 0、外れたら
-//! 近い端からの割合) を求める。記録した推定 (`travel_times/baseline.csv`) より
-//! 悪くなった基準があるか、平均が悪くなったら失敗にする。速度の較正や一般則を
-//! 1 つの路線に合わせて変えたときに、ほかの路線がどれだけ崩れたかをここで見る。
+//! 基準ごとに推定の所要時間を出し、実際の典型的な所要時間 (平日日中の中央値) から
+//! のずれを求める。記録した推定 (`travel_times/baseline.csv`) より悪くなった基準が
+//! あるか、平均が悪くなったら失敗にする。速度の較正や一般則を 1 つの路線に合わせて
+//! 変えたときに、ほかの路線がどれだけ崩れたかをここで見る。
+//!
+//! 実際の所要時間の範囲 (最小〜最大) からの外れも表に出すが、判定には使わない。
+//! 待ち合わせなどで範囲に外れ値の列車が入ると幅が広がり、範囲内なら誤差 0 と
+//! 数える物差しでは、典型的な値から大きく離れても見逃すため。
 //!
 //! 記録は、本番と同じ生成データ (`make data` で作る `generated/`) で出した推定で、
 //! 比べるのも生成データのときだけにする。到着時間推定は、生成データにしか無い
@@ -24,7 +28,7 @@ use crate::repository::MemStationRepository;
 
 const CASES: &str = include_str!("../travel_times/cases.csv");
 const BASELINE_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/travel_times/baseline.csv");
-/// 1 基準あたり、範囲からの外れがこれだけ増えたら失敗にする (割合)
+/// 1 基準あたり、典型的な値からのずれがこれだけ増えたら失敗にする (割合)
 const CASE_TOLERANCE: f64 = 0.01;
 /// 平均の比較の許容幅 (割合)。記録は推定の分を小数 4 桁に丸めて書くので、その丸めで
 /// 平均がわずかに動くぶんを吸収する
@@ -50,9 +54,16 @@ struct Case {
     measure: Measure,
     real_min: f64,
     real_max: f64,
+    /// 典型的な所要時間 (平日日中の中央値。分からないときは範囲の中央)
+    real_typical: f64,
 }
 
 impl Case {
+    /// 典型的な所要時間からのずれ (絶対値の割合)。判定に使う指標
+    fn typical_error(&self, estimated: f64) -> f64 {
+        (estimated - self.real_typical).abs() / self.real_typical
+    }
+
     /// 実際の範囲からの外れ。範囲内なら 0、外れたら近い端に対する割合
     fn range_error(&self, estimated: f64) -> f64 {
         if estimated < self.real_min {
@@ -74,7 +85,7 @@ fn parse_cases() -> Vec<Case> {
             .position(|h| *h == name)
             .unwrap_or_else(|| panic!("列 {name} が無い"))
     };
-    let (label, group, from, to, end, measure, min, max) = (
+    let (label, group, from, to, end, measure, min, max, typical) = (
         col("label"),
         col("line_group_id"),
         col("from_station_id"),
@@ -83,6 +94,7 @@ fn parse_cases() -> Vec<Case> {
         col("measure"),
         col("real_min_minutes"),
         col("real_max_minutes"),
+        col("real_typical_minutes"),
     );
     lines
         .filter(|line| !line.trim().is_empty())
@@ -116,6 +128,7 @@ fn parse_cases() -> Vec<Case> {
                 measure,
                 real_min: minutes(min),
                 real_max: minutes(max),
+                real_typical: minutes(typical),
             }
         })
         .collect()
@@ -177,7 +190,9 @@ fn cases_are_well_formed() {
     for case in &cases {
         assert!(labels.insert(&case.label), "label が重複: {}", case.label);
         assert!(
-            case.real_min > 0.0 && case.real_min <= case.real_max,
+            case.real_min > 0.0
+                && case.real_min <= case.real_typical
+                && case.real_typical <= case.real_max,
             "{}",
             case.label
         );
@@ -196,17 +211,23 @@ fn estimates_do_not_drift_away_from_real_travel_times() {
     let cases = parse_cases();
     let estimated: Vec<(&Case, Option<f64>)> = cases.iter().map(|c| (c, estimate(c))).collect();
 
-    let mut report = vec![String::from("\n基準 | 実際 | 推定 | 範囲からの外れ")];
+    let mut report = vec![String::from(
+        "\n基準 | 実際 (典型) | 推定 | 典型からのずれ | 範囲からの外れ",
+    )];
     for (case, est) in &estimated {
-        let real = format!("{}〜{}分", case.real_min, case.real_max);
+        let real = format!(
+            "{}〜{}分 ({}分)",
+            case.real_min, case.real_max, case.real_typical
+        );
         report.push(match est {
             Some(est) => format!(
-                "{} | {real} | {est:.1}分 | {:.1}%",
+                "{} | {real} | {est:.1}分 | {:.1}% | {:.1}%",
                 case.label,
+                case.typical_error(*est) * 100.0,
                 case.range_error(*est) * 100.0
             ),
             None => format!(
-                "{} | {real} | (このデータに種別グループが無い) | -",
+                "{} | {real} | (このデータに種別グループが無い) | - | -",
                 case.label
             ),
         });
@@ -261,10 +282,10 @@ fn estimates_do_not_drift_away_from_real_travel_times() {
                 case.label
             )
         });
-        let (now_err, base_err) = (case.range_error(*est), case.range_error(*base));
+        let (now_err, base_err) = (case.typical_error(*est), case.typical_error(*base));
         if now_err > base_err + CASE_TOLERANCE {
             worse.push(format!(
-                "{}: 範囲からの外れが {:.1}% → {:.1}% (推定 {base:.1}分 → {est:.1}分)",
+                "{}: 典型的な所要時間からのずれが {:.1}% → {:.1}% (推定 {base:.1}分 → {est:.1}分)",
                 case.label,
                 base_err * 100.0,
                 now_err * 100.0
@@ -283,7 +304,7 @@ fn estimates_do_not_drift_away_from_real_travel_times() {
     let (now_mean, base_mean) = (now_sum / n as f64, base_sum / n as f64);
     assert!(
         now_mean <= base_mean + MEAN_TOLERANCE,
-        "範囲からの外れの平均が {:.2}% → {:.2}% に悪化した",
+        "典型的な所要時間からのずれの平均が {:.2}% → {:.2}% に悪化した",
         base_mean * 100.0,
         now_mean * 100.0
     );
