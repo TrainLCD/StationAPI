@@ -506,6 +506,23 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
 - 両端の駅が `fromStationId` / `toStationId` と一致しない
 - `viaLineIds`・`directionId`・`lineGroupId` と同時に指定されている
 
+### 所要時間のベンチマーク (`travel_times/`)
+
+到着時間推定の所要時間を、実際の列車の所要時間と比べる基準を `travel_times/cases.csv`
+に置いています。速度の較正テーブルや一般則は、1 つの路線に合わせて変えると、同じ
+規則を使うほかの路線の推定も変わります。変更の前後で全体の誤差を測るための仕組み
+です。
+
+- `cargo test -p stationapi-worker` (`src/travel_times.rs`) は、基準ごとの「実際の
+  典型的な所要時間からのずれ」を `travel_times/baseline.csv` の記録と比べ、悪くなる
+  と失敗します。記録は本番と同じ生成データで作るので、比べるのは `generated/` で
+  動くときだけです。
+  CI では `build_worker.yml` が生成データを作ってから走らせます。
+- `make travel-time-report` は、生成データで動く Worker に問い合わせて全件の誤差を
+  出します。推定の規則や較正を変える PR には、変更前と変更後のレポートを載せます。
+
+基準の決め方と記録の更新方法は `travel_times/README.md` にあります。
+
 ### 行き先の検索 (`stationsByName`)
 
 `stationsByName` に `fromStationGroupId` を指定すると、その駅から行ける駅だけに
