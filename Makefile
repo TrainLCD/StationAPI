@@ -1,7 +1,7 @@
 # StationAPI Makefile
 # よく使うタスクの定義
 
-.PHONY: help test check fmt clippy data build dev deploy deploy-production schema ipa-audit bench clean
+.PHONY: help test check fmt clippy data build dev deploy deploy-production schema ipa-audit bench travel-time-report clean
 
 # CI (.github/workflows/build_worker.yml) と同じ版を使う。グローバルへ入れて
 # いなくても npx が取ってくるので、版ずれでビルド結果が変わらない。
@@ -22,6 +22,7 @@ help:
 	@echo "  schema           - Diff the running Worker's SDL against schema/public.graphql"
 	@echo "  ipa-audit        - Print IPA coverage report for English/romanized CSV names"
 	@echo "  bench            - Compare production vs staging GraphQL performance (sends live traffic to both)"
+	@echo "  travel-time-report - Compare estimated travel times with travel_times/cases.csv (TRAVEL_TIME_API, default http://127.0.0.1:8787/)"
 	@echo "  clean            - Clean build artifacts"
 	@echo ""
 	@echo "Environment variables:"
@@ -84,6 +85,13 @@ ipa-audit:
 # 実在のエンドポイントへ数百リクエスト投げるので、気軽に回すものではない。
 # CPU Time の収集には wrangler の workers_tail (read) 権限が要る。
 # 追加の引数は BENCH_ARGS で渡す (例: make bench BENCH_ARGS="--repeat 30")。
+# 到着時間推定の所要時間を、実際の所要時間 (travel_times/cases.csv) と比べる。
+# 本番と同じ生成データで測るため、`make data && make dev` で起動した Worker か
+# ステージングに向ける (TRAVEL_TIME_API)。
+TRAVEL_TIME_API ?= http://127.0.0.1:8787/
+travel-time-report:
+	python3 scripts/travel_time_report.py --api $(TRAVEL_TIME_API)
+
 bench:
 	@echo "警告: 本番 (gql.trainlcd.app) とステージングへ実リクエストを送ります。" >&2
 	@echo "      既定で 1 環境あたり 400 件超、うち数十件は Worker の CPU を 500ms 以上使います。" >&2

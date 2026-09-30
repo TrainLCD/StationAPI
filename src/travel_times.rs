@@ -1,0 +1,262 @@
+//! 実際の所要時間 (`travel_times/cases.csv`) に対する到着時間推定の回帰の見張り。
+//!
+//! 基準ごとに推定の所要時間を出し、実際の範囲からの外れ (範囲内なら 0、外れたら
+//! 近い端からの割合) を求める。記録した推定 (`travel_times/baseline.csv`) より
+//! 悪くなった基準があるか、平均が悪くなったら失敗にする。速度の較正や一般則を
+//! 1 つの路線に合わせて変えたときに、ほかの路線がどれだけ崩れたかをここで見る。
+//!
+//! CI は `generated/` を作らずに `data/*.csv` で動くので、生成データにしか無い
+//! 種別グループ (各駅停車を補う系統など) の基準は飛ばす。本番と同じデータでの
+//! 精度は `make travel-time-report` で測る。
+//!
+//! 推定を意図して変えたときは、次で記録を更新する。
+//! `TRAVEL_TIMES_UPDATE_BASELINE=1 cargo test -p stationapi-worker travel_times`
+
+use std::collections::HashMap;
+
+use stationapi::domain::repository::station_repository::StationRepository;
+use stationapi::model::RouteLegRequest;
+use stationapi::use_case::traits::query::QueryUseCase;
+
+use crate::repository::MemStationRepository;
+
+const CASES: &str = include_str!("../travel_times/cases.csv");
+const BASELINE_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/travel_times/baseline.csv");
+/// 1 基準あたり、範囲からの外れがこれだけ増えたら失敗にする (割合)
+const CASE_TOLERANCE: f64 = 0.01;
+/// 平均の比較の許容幅 (割合)。記録は推定の分を小数 4 桁に丸めて書くので、その丸めで
+/// 平均がわずかに動くぶんを吸収する
+const MEAN_TOLERANCE: f64 = 1e-4;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Measure {
+    /// 出発駅の発車から到着駅の到着まで
+    Arrival,
+    /// 出発駅の発車から到着駅の発車まで (到着時刻を載せない時刻表向け)
+    Departure,
+}
+
+#[derive(Debug)]
+struct Case {
+    label: String,
+    line_group_id: u32,
+    from_station_id: u32,
+    to_station_id: u32,
+    /// 推定する区間の終わり。`Departure` では到着駅の先まで推定しないと
+    /// 到着駅が終点になり、停車時間が付かない
+    slice_end_station_id: u32,
+    measure: Measure,
+    real_min: f64,
+    real_max: f64,
+}
+
+impl Case {
+    /// 実際の範囲からの外れ。範囲内なら 0、外れたら近い端に対する割合
+    fn range_error(&self, estimated: f64) -> f64 {
+        if estimated < self.real_min {
+            (self.real_min - estimated) / self.real_min
+        } else if estimated > self.real_max {
+            (estimated - self.real_max) / self.real_max
+        } else {
+            0.0
+        }
+    }
+}
+
+fn parse_cases() -> Vec<Case> {
+    let mut lines = CASES.lines();
+    let header: Vec<&str> = lines.next().expect("見出しの行が無い").split(',').collect();
+    let col = |name: &str| {
+        header
+            .iter()
+            .position(|h| *h == name)
+            .unwrap_or_else(|| panic!("列 {name} が無い"))
+    };
+    let (label, group, from, to, end, measure, min, max) = (
+        col("label"),
+        col("line_group_id"),
+        col("from_station_id"),
+        col("to_station_id"),
+        col("slice_end_station_id"),
+        col("measure"),
+        col("real_min_minutes"),
+        col("real_max_minutes"),
+    );
+    lines
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let f: Vec<&str> = line.split(',').collect();
+            assert_eq!(f.len(), header.len(), "列の数が見出しと違う: {line}");
+            let num = |i: usize| -> u32 {
+                f[i].parse()
+                    .unwrap_or_else(|_| panic!("数値ではない: {line}"))
+            };
+            let minutes = |i: usize| -> f64 {
+                f[i].parse()
+                    .unwrap_or_else(|_| panic!("数値ではない: {line}"))
+            };
+            let measure = match f[measure] {
+                "arrival" => Measure::Arrival,
+                "departure" => Measure::Departure,
+                other => panic!("measure は arrival / departure のどちらか: {other}"),
+            };
+            let to_station_id = num(to);
+            Case {
+                label: f[label].to_string(),
+                line_group_id: num(group),
+                from_station_id: num(from),
+                to_station_id,
+                slice_end_station_id: if f[end].is_empty() {
+                    to_station_id
+                } else {
+                    num(end)
+                },
+                measure,
+                real_min: minutes(min),
+                real_max: minutes(max),
+            }
+        })
+        .collect()
+}
+
+/// repository の実装は await しない (索引を引くだけ) ので、1 回 poll すれば終わる
+fn block_on<F: std::future::Future>(future: F) -> F::Output {
+    let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+    match std::pin::pin!(future).poll(&mut context) {
+        std::task::Poll::Ready(value) => value,
+        std::task::Poll::Pending => panic!("repository futures complete without waiting"),
+    }
+}
+
+/// 推定の所要時間 (分)。種別グループがこのデータに無ければ `None`
+fn estimate(case: &Case) -> Option<f64> {
+    let group = block_on(MemStationRepository.get_by_line_group_id(case.line_group_id)).ok()?;
+    if group.is_empty() {
+        return None;
+    }
+    let legs = [RouteLegRequest {
+        line_group_id: case.line_group_id,
+        from_station_id: case.from_station_id,
+        to_station_id: case.slice_end_station_id,
+    }];
+    let stops = block_on(crate::interactor().estimate_connected_route_arrival_times(&legs))
+        .unwrap_or_else(|e| panic!("{}: 推定できない: {e}", case.label));
+    let stop = stops
+        .iter()
+        .skip(1)
+        .find(|stop| stop.station_cd as u32 == case.to_station_id)
+        .unwrap_or_else(|| panic!("{}: 推定の駅列に到着駅が無い", case.label));
+    Some(match case.measure {
+        Measure::Arrival => stop.cumulative_minutes,
+        Measure::Departure => stop.departure_cumulative_minutes,
+    })
+}
+
+fn read_baseline() -> HashMap<String, f64> {
+    let text = std::fs::read_to_string(BASELINE_PATH).unwrap_or_default();
+    text.lines()
+        .skip(1)
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let (label, minutes) = line.rsplit_once(',').expect("label,estimated_minutes の形");
+            (
+                label.to_string(),
+                minutes.parse().expect("推定の分が数値ではない"),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn cases_are_well_formed() {
+    let cases = parse_cases();
+    assert!(!cases.is_empty());
+    let mut labels = std::collections::HashSet::new();
+    for case in &cases {
+        assert!(labels.insert(&case.label), "label が重複: {}", case.label);
+        assert!(
+            case.real_min > 0.0 && case.real_min <= case.real_max,
+            "{}",
+            case.label
+        );
+        if case.measure == Measure::Departure {
+            assert_ne!(
+                case.slice_end_station_id, case.to_station_id,
+                "{}: departure は到着駅の先まで推定する (slice_end_station_id)",
+                case.label
+            );
+        }
+    }
+}
+
+#[test]
+fn estimates_do_not_drift_away_from_real_travel_times() {
+    let cases = parse_cases();
+    let estimated: Vec<(&Case, Option<f64>)> = cases.iter().map(|c| (c, estimate(c))).collect();
+
+    let mut report = vec![String::from("\n基準 | 実際 | 推定 | 範囲からの外れ")];
+    for (case, est) in &estimated {
+        let real = format!("{}〜{}分", case.real_min, case.real_max);
+        report.push(match est {
+            Some(est) => format!(
+                "{} | {real} | {est:.1}分 | {:.1}%",
+                case.label,
+                case.range_error(*est) * 100.0
+            ),
+            None => format!(
+                "{} | {real} | (このデータに種別グループが無い) | -",
+                case.label
+            ),
+        });
+    }
+    println!("{}", report.join("\n"));
+
+    if std::env::var("TRAVEL_TIMES_UPDATE_BASELINE").as_deref() == Ok("1") {
+        let mut out = String::from("label,estimated_minutes\n");
+        for (case, est) in &estimated {
+            if let Some(est) = est {
+                out.push_str(&format!("{},{est:.4}\n", case.label));
+            }
+        }
+        std::fs::write(BASELINE_PATH, out).expect("記録を書き込めない");
+        return;
+    }
+
+    let baseline = read_baseline();
+    let (mut now_sum, mut base_sum, mut n) = (0.0, 0.0, 0);
+    let mut worse = Vec::new();
+    for (case, est) in &estimated {
+        let Some(est) = est else { continue };
+        let base = baseline.get(&case.label).unwrap_or_else(|| {
+            panic!(
+                "{}: 記録が無い。TRAVEL_TIMES_UPDATE_BASELINE=1 で記録を更新する",
+                case.label
+            )
+        });
+        let (now_err, base_err) = (case.range_error(*est), case.range_error(*base));
+        if now_err > base_err + CASE_TOLERANCE {
+            worse.push(format!(
+                "{}: 範囲からの外れが {:.1}% → {:.1}% (推定 {base:.1}分 → {est:.1}分)",
+                case.label,
+                base_err * 100.0,
+                now_err * 100.0
+            ));
+        }
+        now_sum += now_err;
+        base_sum += base_err;
+        n += 1;
+    }
+    assert!(n > 0, "このデータで推定できる基準が 1 つも無い");
+    assert!(
+        worse.is_empty(),
+        "実際の所要時間から離れた基準がある:\n{}",
+        worse.join("\n")
+    );
+    let (now_mean, base_mean) = (now_sum / n as f64, base_sum / n as f64);
+    assert!(
+        now_mean <= base_mean + MEAN_TOLERANCE,
+        "範囲からの外れの平均が {:.2}% → {:.2}% に悪化した",
+        base_mean * 100.0,
+        now_mean * 100.0
+    );
+}

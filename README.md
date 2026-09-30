@@ -31,6 +31,11 @@ This project includes a comprehensive dataset of Japanese railway information in
   (https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-2025.html) を加工して作成
 - Bus stops and routes are derived from the GTFS and ODPT feeds listed in
   `preprocessor/src/gtfs/feed.rs` and `preprocessor/src/gtfs/odpt.rs`.
+- Some of the reference travel times in `travel_times/cases.csv` are derived from
+  the Toei Subway GTFS (Bureau of Transportation, Tokyo Metropolitan Government,
+  CC BY 4.0) and from the Tokyo Metro and Metropolitan Intercity Railway
+  (Tsukuba Express) GTFS feeds published by the Public Transportation Open Data
+  Center under the Public Transportation Open Data Basic License.
 
 ## Contributors ✨
 

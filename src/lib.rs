@@ -13,6 +13,8 @@
 mod graphql;
 mod index;
 mod repository;
+#[cfg(test)]
+mod travel_times;
 
 use async_graphql::http::GraphiQLSource;
 use async_graphql::Request as GqlRequest;
