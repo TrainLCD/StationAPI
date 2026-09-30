@@ -10,7 +10,7 @@ use stationapi::domain::route_search;
 use stationapi::model;
 use stationapi::use_case::traits::query::QueryUseCase;
 
-use super::enums::{ConnectedRouteSort, TransportType as GqlTransportType};
+use super::enums::{ConnectedRouteSort, TrainRouteModel, TransportType as GqlTransportType};
 use super::scalar::UInt32;
 use super::types::*;
 use crate::Interactor;
@@ -473,7 +473,9 @@ impl QueryRoot {
         to_station_id: i32,
         line_group_id: Option<i32>,
         legs: Option<Vec<RouteLegInput>>,
+        model: Option<TrainRouteModel>,
     ) -> GqlResult<TrainRouteResponse> {
+        let route_model = model.map(Into::into).unwrap_or_default();
         // 乗換経路: 区間ごとの走行区間を順につなげる。系統は区間ごとに決まるので
         // lineGroupId とは併用しない
         if let Some(legs) = legs {
@@ -487,7 +489,9 @@ impl QueryRoot {
                 to_id(from_station_id, "fromStationId")?,
                 to_id(to_station_id, "toStationId")?,
             )?;
-            let segments = use_case(ctx).get_connected_train_route(&legs).await?;
+            let segments = use_case(ctx)
+                .get_connected_train_route(&legs, route_model)
+                .await?;
             return Ok(TrainRouteResponse {
                 segments: Some(segments.into_iter().map(Into::into).collect()),
             });
@@ -497,6 +501,7 @@ impl QueryRoot {
                 to_id(from_station_id, "fromStationId")?,
                 to_id(to_station_id, "toStationId")?,
                 to_opt_id(line_group_id, "lineGroupId")?,
+                route_model,
             )
             .await?;
         Ok(TrainRouteResponse {

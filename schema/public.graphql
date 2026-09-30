@@ -66,6 +66,11 @@ enum ConnectedRouteSort {
 	TransferCount
 }
 
+enum TrainRouteModel {
+	Legacy
+	Estimated
+}
+
 enum TtsAlphabet {
 	TtsAlphabetUnspecified
 	Ipa
@@ -100,7 +105,7 @@ type Query {
 	routeTypes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int, pageSize: Int, pageToken: String): RouteTypePage!
 	connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int, sortBy: ConnectedRouteSort): [ConnectedRoute!]!
 	estimateArrivalTimes(fromStationId: Int!, toStationId: Int!, viaLineIds: [Int!], directionId: Int, legs: [RouteLegInput!]): EstimatedArrivalPage!
-	trainRoute(fromStationId: Int!, toStationId: Int!, lineGroupId: Int, legs: [RouteLegInput!]): TrainRouteResponse!
+	trainRoute(fromStationId: Int!, toStationId: Int!, lineGroupId: Int, legs: [RouteLegInput!], model: TrainRouteModel): TrainRouteResponse!
 }
 
 type ConnectedRoute {
@@ -330,6 +335,8 @@ type TrainRouteSegment {
 	maxSpeed: Float
 	maxAcceleration: Float
 	maxDeceleration: Float
+	arrivalCumulativeMinutes: Float
+	departureCumulativeMinutes: Float
 }
 
 type TrainRouteResponse {

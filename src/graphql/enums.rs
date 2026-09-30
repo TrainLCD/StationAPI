@@ -7,6 +7,7 @@
 
 use async_graphql::Enum;
 use stationapi::domain::route_search::JourneySort;
+use stationapi::model;
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 #[graphql(rename_items = "PascalCase", name = "LineType")]
@@ -107,6 +108,26 @@ impl From<ConnectedRouteSort> for JourneySort {
             ConnectedRouteSort::Recommended => JourneySort::Recommended,
             ConnectedRouteSort::ArrivalTime => JourneySort::ArrivalTime,
             ConnectedRouteSort::TransferCount => JourneySort::TransferCount,
+        }
+    }
+}
+
+// trainRoute が区間の値をどのモデルで出すか
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[graphql(rename_items = "PascalCase", name = "TrainRouteModel")]
+pub enum TrainRouteModel {
+    // 追加した時点のモデル。到着・出発の見込みは返さない (null)。既定
+    Legacy,
+    // estimateArrivalTimes と同じ到着時間推定のモデル。到着・出発の見込みと、
+    // 推定が使った最高速度・加減速を返す。バスの駅を含む経路は Legacy と同じ値
+    Estimated,
+}
+
+impl From<TrainRouteModel> for model::TrainRouteModel {
+    fn from(value: TrainRouteModel) -> Self {
+        match value {
+            TrainRouteModel::Legacy => model::TrainRouteModel::Legacy,
+            TrainRouteModel::Estimated => model::TrainRouteModel::Estimated,
         }
     }
 }
