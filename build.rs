@@ -85,6 +85,16 @@ fn main() {
             staged.len()
         );
     }
+    // どちらのデータを埋め込んだか。所要時間のベンチマーク (src/travel_times.rs) の
+    // 記録は data/*.csv で作るので、生成データのときは記録と比べない
+    println!(
+        "cargo:rustc-env=STATIONAPI_EMBEDDED_DATA={}",
+        if generated_count == 0 {
+            "data"
+        } else {
+            "generated"
+        }
+    );
     if generated_count == 0 {
         println!(
             "cargo:warning=generated が無いため data/*.csv を使用します。\

@@ -211,7 +211,15 @@ fn estimates_do_not_drift_away_from_real_travel_times() {
     }
     println!("{}", report.join("\n"));
 
+    // 記録は CI と同じ data/*.csv で作る。`make data` で生成データを置いた手元では
+    // 推定できる基準も推定の値も変わるので、記録とは比べない
+    let embedded_data_only = env!("STATIONAPI_EMBEDDED_DATA") == "data";
+
     if std::env::var("TRAVEL_TIMES_UPDATE_BASELINE").as_deref() == Ok("1") {
+        assert!(
+            embedded_data_only,
+            "記録は data/*.csv で作る。generated/ を退けてから更新する"
+        );
         let mut out = String::from("label,estimated_minutes\n");
         for (case, est) in &estimated {
             if let Some(est) = est {
@@ -222,11 +230,29 @@ fn estimates_do_not_drift_away_from_real_travel_times() {
         return;
     }
 
+    if !embedded_data_only {
+        println!(
+            "generated/ のデータで動いているので記録とは比べない。\
+             本番と同じデータでの精度は make travel-time-report で測る"
+        );
+        return;
+    }
+
     let baseline = read_baseline();
     let (mut now_sum, mut base_sum, mut n) = (0.0, 0.0, 0);
     let mut worse = Vec::new();
     for (case, est) in &estimated {
-        let Some(est) = est else { continue };
+        // 生成データにしか無い種別グループの基準は記録に入らないので飛ばしてよい。
+        // 記録済みの基準を推定できなくなったのは、データの変更で種別グループが
+        // 消えたなどの異常なので、黙って比較から外さずに止める
+        let Some(est) = est else {
+            assert!(
+                !baseline.contains_key(&case.label),
+                "{}: 記録済みの基準を推定できない (種別グループがデータから消えた可能性)",
+                case.label
+            );
+            continue;
+        };
         let base = baseline.get(&case.label).unwrap_or_else(|| {
             panic!(
                 "{}: 記録が無い。TRAVEL_TIMES_UPDATE_BASELINE=1 で記録を更新する",

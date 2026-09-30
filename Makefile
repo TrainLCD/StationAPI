@@ -90,7 +90,7 @@ ipa-audit:
 # ステージングに向ける (TRAVEL_TIME_API)。
 TRAVEL_TIME_API ?= http://127.0.0.1:8787/
 travel-time-report:
-	python3 scripts/travel_time_report.py --api $(TRAVEL_TIME_API)
+	python3 scripts/travel_time_report.py --api "$(TRAVEL_TIME_API)"
 
 bench:
 	@echo "警告: 本番 (gql.trainlcd.app) とステージングへ実リクエストを送ります。" >&2
