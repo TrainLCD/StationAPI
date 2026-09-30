@@ -515,7 +515,8 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
 
 - `cargo test -p stationapi-worker` (`src/travel_times.rs`) は、基準ごとの「実際の範囲
   からの外れ」を `travel_times/baseline.csv` の記録と比べ、悪くなると失敗します。
-  CI は `data/*.csv` で動くので、生成データにしか無い種別グループの基準は飛ばします。
+  記録は本番と同じ生成データで作るので、比べるのは `generated/` で動くときだけです。
+  CI では `build_worker.yml` が生成データを作ってから走らせます。
 - `make travel-time-report` は、生成データで動く Worker に問い合わせて全件の誤差を
   出します。推定の規則や較正を変える PR には、変更前と変更後のレポートを載せます。
 

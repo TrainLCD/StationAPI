@@ -5,11 +5,13 @@
 //! 悪くなった基準があるか、平均が悪くなったら失敗にする。速度の較正や一般則を
 //! 1 つの路線に合わせて変えたときに、ほかの路線がどれだけ崩れたかをここで見る。
 //!
-//! CI は `generated/` を作らずに `data/*.csv` で動くので、生成データにしか無い
-//! 種別グループ (各駅停車を補う系統など) の基準は飛ばす。本番と同じデータでの
-//! 精度は `make travel-time-report` で測る。
+//! 記録は、本番と同じ生成データ (`make data` で作る `generated/`) で出した推定で、
+//! 比べるのも生成データのときだけにする。到着時間推定は、生成データにしか無い
+//! 線路の長さや種別グループを使うので、`data/*.csv` だけでは本番の推定を再現
+//! できない。CI では `build_worker.yml` が `generated/` を作ってからこれを走らせる。
+//! `data/*.csv` で動くとき (`ci.yml` のテストなど) は、表を出すだけにする。
 //!
-//! 推定を意図して変えたときは、次で記録を更新する。
+//! 推定を意図して変えたときは、`make data` のあとに次で記録を更新する。
 //! `TRAVEL_TIMES_UPDATE_BASELINE=1 cargo test -p stationapi-worker travel_times`
 
 use std::collections::HashMap;
@@ -211,14 +213,14 @@ fn estimates_do_not_drift_away_from_real_travel_times() {
     }
     println!("{}", report.join("\n"));
 
-    // 記録は CI と同じ data/*.csv で作る。`make data` で生成データを置いた手元では
-    // 推定できる基準も推定の値も変わるので、記録とは比べない
-    let embedded_data_only = env!("STATIONAPI_EMBEDDED_DATA") == "data";
+    // 記録は本番と同じ生成データで作る。data/*.csv では線路の長さや生成された
+    // 種別グループが無く、推定が本番と違うので、記録とは比べない
+    let embedded_generated = env!("STATIONAPI_EMBEDDED_DATA") == "generated";
 
     if std::env::var("TRAVEL_TIMES_UPDATE_BASELINE").as_deref() == Ok("1") {
         assert!(
-            embedded_data_only,
-            "記録は data/*.csv で作る。generated/ を退けてから更新する"
+            embedded_generated,
+            "記録は生成データで作る。make data で generated/ を作ってから更新する"
         );
         let mut out = String::from("label,estimated_minutes\n");
         for (case, est) in &estimated {
@@ -230,10 +232,10 @@ fn estimates_do_not_drift_away_from_real_travel_times() {
         return;
     }
 
-    if !embedded_data_only {
+    if !embedded_generated {
         println!(
-            "generated/ のデータで動いているので記録とは比べない。\
-             本番と同じデータでの精度は make travel-time-report で測る"
+            "data/*.csv で動いているので記録とは比べない。\
+             make data で generated/ を作ると記録と比べる"
         );
         return;
     }
@@ -242,9 +244,9 @@ fn estimates_do_not_drift_away_from_real_travel_times() {
     let (mut now_sum, mut base_sum, mut n) = (0.0, 0.0, 0);
     let mut worse = Vec::new();
     for (case, est) in &estimated {
-        // 生成データにしか無い種別グループの基準は記録に入らないので飛ばしてよい。
-        // 記録済みの基準を推定できなくなったのは、データの変更で種別グループが
-        // 消えたなどの異常なので、黙って比較から外さずに止める
+        // 推定できない基準は記録にも入らないので飛ばしてよい。記録済みの基準を
+        // 推定できなくなったのは、データの変更で種別グループが消えたなどの異常
+        // なので、黙って比較から外さずに止める
         let Some(est) = est else {
             assert!(
                 !baseline.contains_key(&case.label),
