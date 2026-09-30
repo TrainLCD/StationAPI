@@ -9,7 +9,7 @@ use crate::{
         },
         route_search::JourneySort,
     },
-    model::{ConnectedRoute, Route, RouteLegRequest, TrainRouteSegment},
+    model::{ConnectedRoute, Route, RouteLegRequest, TrainRouteModel, TrainRouteSegment},
     use_case::error::UseCaseError,
 };
 
@@ -111,6 +111,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
         from_station_id: u32,
         to_station_id: u32,
         line_group_id: Option<u32>,
+        model: TrainRouteModel,
     ) -> Result<Vec<TrainRouteSegment>, UseCaseError>;
     async fn find_line_by_id(&self, line_id: u32) -> Result<Option<Line>, UseCaseError>;
     async fn get_lines_by_id_vec(&self, line_ids: &[u32]) -> Result<Vec<Line>, UseCaseError>;
@@ -137,6 +138,7 @@ pub trait QueryUseCase: Send + Sync + 'static {
     async fn get_connected_train_route(
         &self,
         legs: &[RouteLegRequest],
+        model: TrainRouteModel,
     ) -> Result<Vec<TrainRouteSegment>, UseCaseError>;
     async fn estimate_route_arrival_times(
         &self,

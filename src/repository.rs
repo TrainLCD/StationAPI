@@ -1249,7 +1249,7 @@ impl TrainTypeRepository for MemTrainTypeRepository {
 mod tests {
     use super::*;
     use stationapi::domain::route_search::{self, Journey, JourneySort};
-    use stationapi::model;
+    use stationapi::model::{self, TrainRouteModel};
 
     const TOKYO: u32 = 1130101;
     const SHIBUYA: u32 = 1130205;
@@ -1304,7 +1304,9 @@ mod tests {
                 let legs = journey_legs(journey);
                 let eta =
                     block_on(interactor.estimate_connected_route_arrival_times(&legs)).unwrap();
-                let train_route = block_on(interactor.get_connected_train_route(&legs)).unwrap();
+                let train_route =
+                    block_on(interactor.get_connected_train_route(&legs, TrainRouteModel::Legacy))
+                        .unwrap();
 
                 // 同じ区間を同じ弧で切り出す
                 let eta_ids = station_ids_of(&eta);
@@ -1364,7 +1366,8 @@ mod tests {
             first != 1131220 && last != 1131211,
             "the local's own stations"
         );
-        let train_route = block_on(interactor.get_connected_train_route(&legs)).unwrap();
+        let train_route =
+            block_on(interactor.get_connected_train_route(&legs, TrainRouteModel::Legacy)).unwrap();
         assert_eq!(train_route.len(), eta.len());
 
         // connectedRoutes の区間の trainTypes は、どれを選んでも区間の乗降駅で使える
@@ -1409,7 +1412,9 @@ mod tests {
                     .collect();
                 let eta =
                     block_on(interactor.estimate_connected_route_arrival_times(&legs)).unwrap();
-                let train_route = block_on(interactor.get_connected_train_route(&legs)).unwrap();
+                let train_route =
+                    block_on(interactor.get_connected_train_route(&legs, TrainRouteModel::Legacy))
+                        .unwrap();
                 assert_eq!(eta.len(), train_route.len());
             }
         }
@@ -1480,8 +1485,12 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("区間がつながっていません"), "{error}");
-        assert!(block_on(interactor.get_connected_train_route(&legs)).is_err());
-        assert!(block_on(interactor.get_connected_train_route(&[])).is_err());
+        assert!(
+            block_on(interactor.get_connected_train_route(&legs, TrainRouteModel::Legacy)).is_err()
+        );
+        assert!(
+            block_on(interactor.get_connected_train_route(&[], TrainRouteModel::Legacy)).is_err()
+        );
 
         // connectedRoutes が返しうる乗車回数 (MAX_RIDES) を超える区間は断る。
         // つながった区間 (三鷹と新宿を中央線快速で往復) でも受け付けない
@@ -1503,10 +1512,16 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("区間までにしてください"), "{error}");
-        assert!(block_on(interactor.get_connected_train_route(&back_and_forth)).is_err());
+        assert!(block_on(
+            interactor.get_connected_train_route(&back_and_forth, TrainRouteModel::Legacy)
+        )
+        .is_err());
         // 上限ちょうどは受け付ける
         let at_limit = &back_and_forth[..route_search::MAX_RIDES];
-        assert!(block_on(interactor.get_connected_train_route(at_limit)).is_ok());
+        assert!(
+            block_on(interactor.get_connected_train_route(at_limit, TrainRouteModel::Legacy))
+                .is_ok()
+        );
     }
 
     #[test]
@@ -1637,13 +1652,109 @@ mod tests {
             .expect("駅に種別が付いていない") as u32;
         let ids: Vec<u32> = stations.iter().map(|s| s.station_cd as u32).collect();
 
-        let segments =
-            block_on(interactor.get_train_route(ids[0], *ids.last().unwrap(), Some(line_group_id)))
-                .unwrap();
+        let segments = block_on(interactor.get_train_route(
+            ids[0],
+            *ids.last().unwrap(),
+            Some(line_group_id),
+            TrainRouteModel::Legacy,
+        ))
+        .unwrap();
         let route_ids: Vec<u32> = segments
             .iter()
             .filter_map(|s| s.station.as_ref().map(|st| st.id))
             .collect();
         assert_eq!(route_ids, ids);
+    }
+
+    /// Estimated の trainRoute は、同じ legs を渡した estimateArrivalTimes と同じ
+    /// 見込みを返し、停車・加減速も推定のモデルにそろう。Legacy は見込みを返さず、
+    /// 区間の値も変わらない。
+    #[test]
+    fn estimated_connected_train_route_carries_the_estimate_arrival_times() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+        let interactor = crate::interactor();
+        let params = EstimationParams::default();
+        for (from, to) in [(1131906, 1160213), (TOKYO, SHIBUYA)] {
+            for journey in &route_network().search(from, to, None) {
+                let legs = journey_legs(journey);
+                let eta =
+                    block_on(interactor.estimate_connected_route_arrival_times(&legs)).unwrap();
+                let legacy =
+                    block_on(interactor.get_connected_train_route(&legs, TrainRouteModel::Legacy))
+                        .unwrap();
+                let estimated = block_on(
+                    interactor.get_connected_train_route(&legs, TrainRouteModel::Estimated),
+                )
+                .unwrap();
+
+                assert_eq!(estimated.len(), eta.len());
+                for (i, (segment, stop)) in estimated.iter().zip(&eta).enumerate() {
+                    assert_eq!(
+                        segment.arrival_cumulative_minutes,
+                        Some(stop.cumulative_minutes)
+                    );
+                    assert_eq!(
+                        segment.departure_cumulative_minutes,
+                        Some(stop.departure_cumulative_minutes)
+                    );
+                    assert_eq!(segment.stops, stop.stops_here);
+                    assert_eq!(segment.max_speed, stop.max_speed_kmh / 3.6);
+                    assert_eq!(segment.max_acceleration, params.accel);
+                    assert_eq!(segment.max_deceleration, params.decel);
+                    // 駅と距離は Legacy と同じ
+                    assert_eq!(segment.station, legacy[i].station);
+                    assert_eq!(
+                        segment.distance_from_previous,
+                        legacy[i].distance_from_previous
+                    );
+                }
+                assert!(legacy.iter().all(|segment| {
+                    segment.arrival_cumulative_minutes.is_none()
+                        && segment.departure_cumulative_minutes.is_none()
+                }));
+            }
+        }
+    }
+
+    /// lineGroupId で呼んだ Estimated の trainRoute は、その区間を 1 つの leg にした
+    /// estimateArrivalTimes と同じ見込みになる (環状線でない系統では同じ駅列を
+    /// 同じ較正母数で推定するため)。#1709 の 2 経路で確かめる。
+    #[test]
+    fn estimated_train_route_matches_a_single_leg_estimate() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+        let interactor = crate::interactor();
+        // 東急東横線 特急 渋谷→横浜、京王線 特急 新宿→京王八王子
+        for (line_group_id, from, to) in [(161, 2600101, 2600121), (71, 2400101, 2400134)] {
+            let segments = block_on(interactor.get_train_route(
+                from,
+                to,
+                Some(line_group_id),
+                TrainRouteModel::Estimated,
+            ))
+            .unwrap();
+            let eta = block_on(interactor.estimate_connected_route_arrival_times(&[
+                model::RouteLegRequest {
+                    line_group_id,
+                    from_station_id: from,
+                    to_station_id: to,
+                },
+            ]))
+            .unwrap();
+            assert_eq!(segments.len(), eta.len());
+            for (segment, stop) in segments.iter().zip(&eta) {
+                assert_eq!(
+                    segment.station.as_ref().map(|station| station.id as i32),
+                    Some(stop.station_cd)
+                );
+                assert_eq!(
+                    segment.arrival_cumulative_minutes,
+                    Some(stop.cumulative_minutes)
+                );
+                assert_eq!(
+                    segment.departure_cumulative_minutes,
+                    Some(stop.departure_cumulative_minutes)
+                );
+            }
+        }
     }
 }

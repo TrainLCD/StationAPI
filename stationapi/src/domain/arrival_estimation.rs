@@ -66,6 +66,10 @@ pub struct EstimatedStop {
     pub departure_cumulative_minutes: f64,
     /// その駅に停車するか(false = 通過)。
     pub stops_here: bool,
+    /// 直前の駅からこの駅までを走るときの最高速度(km/h)。推定が走行時間の計算に
+    /// 使った値そのもの。始点は、始点の駅に対して同じ規則で決めた速度
+    /// (直前の駅が無いので駅間別の較正は掛からない)。
+    pub max_speed_kmh: f64,
 }
 
 /// 推定で使う調整可能なパラメータ。すべて「実距離・実速度・ダイヤが無い」前提の
@@ -615,26 +619,8 @@ pub fn estimate_arrival_minutes_calibrated(
     let line_group_of =
         |station: &Station| -> Option<i32> { station.line_group_cd.or(Some(station.line_cd)) };
 
-    let mut result: Vec<EstimatedStop> = Vec::with_capacity(n);
-
-    // 始点。即時出発とみなすので到着・出発とも 0 分。
-    result.push(EstimatedStop {
-        station_cd: stops[0].station_cd,
-        station_g_cd: stops[0].station_g_cd,
-        line_group_cd: line_group_of(stops[0]),
-        cumulative_minutes: 0.0,
-        departure_cumulative_minutes: 0.0,
-        stops_here: stops_here[0],
-    });
-
-    // 直前の停車駅を出発した時刻(分)。始点は即時出発なので 0。
-    let mut last_departure = 0.0_f64;
-    // 現在の停車間セグメントに溜めるサブ区間。
-    // (みなし走行距離 m, 最高速度 km/h, result index, 停車駅か)
-    let mut seg: Vec<(f64, f64, usize, bool)> = Vec::new();
-
-    for i in 1..n {
-        let track_m = straight_km[i] * detour_of(stops[i]) * 1000.0;
+    // 直前の駅から i 番目の駅までを走るときの最高速度(km/h)。
+    let speed_kmh_at = |i: usize| -> f64 {
         // この路線に通過駅が無ければ各駅停車として振る舞う(種別倍率なし・
         // Default の速度較正を使用)。
         let effective_kind = if line_has_pass
@@ -655,7 +641,8 @@ pub fn estimate_arrival_minutes_calibrated(
         // 隣接駅ペア単位の較正(GTFS 実ダイヤ由来)があれば路線単位の速度より
         // 優先する。急曲線・急勾配で路線平均より遅い区間(大江戸線 月島〜赤羽橋
         // など)の区間差を反映する。各停系種別の鉄道のみ。
-        if stops[i].transport_type != TransportType::Bus
+        if i > 0
+            && stops[i].transport_type != TransportType::Bus
             && segment_override_applies_to_kind(effective_kind)
         {
             if let Some(v) = segment_speed_override_kmh(
@@ -666,6 +653,31 @@ pub fn estimate_arrival_minutes_calibrated(
                 v_kmh = v;
             }
         }
+        v_kmh
+    };
+
+    let mut result: Vec<EstimatedStop> = Vec::with_capacity(n);
+
+    // 始点。即時出発とみなすので到着・出発とも 0 分。
+    result.push(EstimatedStop {
+        station_cd: stops[0].station_cd,
+        station_g_cd: stops[0].station_g_cd,
+        line_group_cd: line_group_of(stops[0]),
+        cumulative_minutes: 0.0,
+        departure_cumulative_minutes: 0.0,
+        stops_here: stops_here[0],
+        max_speed_kmh: speed_kmh_at(0),
+    });
+
+    // 直前の停車駅を出発した時刻(分)。始点は即時出発なので 0。
+    let mut last_departure = 0.0_f64;
+    // 現在の停車間セグメントに溜めるサブ区間。
+    // (みなし走行距離 m, 最高速度 km/h, result index, 停車駅か)
+    let mut seg: Vec<(f64, f64, usize, bool)> = Vec::new();
+
+    for i in 1..n {
+        let track_m = straight_km[i] * detour_of(stops[i]) * 1000.0;
+        let v_kmh = speed_kmh_at(i);
 
         let idx = result.len();
         result.push(EstimatedStop {
@@ -675,6 +687,7 @@ pub fn estimate_arrival_minutes_calibrated(
             cumulative_minutes: 0.0,
             departure_cumulative_minutes: 0.0,
             stops_here: stops_here[i],
+            max_speed_kmh: v_kmh,
         });
         seg.push((track_m, v_kmh, idx, stops_here[i]));
 
@@ -1640,5 +1653,24 @@ mod tests {
         // 在来線・kind=None → 80km/h。みなし走行距離は直線 × 1.06。
         let expected = segment_run_minutes(straight_m * 1.06, 80.0, &p);
         approx(est[1].cumulative_minutes, expected);
+    }
+
+    #[test]
+    fn estimated_stops_carry_the_speed_used_for_the_run() {
+        let p = EstimationParams::default();
+        // 在来線・種別なしは 80km/h。2 駅だけなら走行時間はその速度の台形そのもの。
+        // みなし走行距離は直線 × 1.06 (西武池袋線の迂回係数の較正値)。
+        let a = station(1, 22001, 35.743563, 139.606981, Some(2041.41825));
+        let b = station(2, 22001, 35.749406, 139.586732, Some(2041.41825));
+        let stations = [a, b];
+        let refs: Vec<&Station> = stations.iter().collect();
+        let est = estimate_arrival_minutes(&refs, &p);
+        approx(est[0].max_speed_kmh, 80.0);
+        approx(est[1].max_speed_kmh, 80.0);
+        let track_m = haversine_distance(35.743563, 139.606981, 35.749406, 139.586732) * 1.06;
+        approx(
+            est[1].cumulative_minutes,
+            segment_run_minutes(track_m, est[1].max_speed_kmh, &p),
+        );
     }
 }

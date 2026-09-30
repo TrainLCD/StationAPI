@@ -418,6 +418,8 @@ pub struct TrainRouteSegment {
     pub max_speed: Option<f64>,
     pub max_acceleration: Option<f64>,
     pub max_deceleration: Option<f64>,
+    pub arrival_cumulative_minutes: Option<f64>,
+    pub departure_cumulative_minutes: Option<f64>,
 }
 
 impl From<model::TrainRouteSegment> for TrainRouteSegment {
@@ -429,6 +431,8 @@ impl From<model::TrainRouteSegment> for TrainRouteSegment {
             max_speed: Some(v.max_speed),
             max_acceleration: Some(v.max_acceleration),
             max_deceleration: Some(v.max_deceleration),
+            arrival_cumulative_minutes: v.arrival_cumulative_minutes,
+            departure_cumulative_minutes: v.departure_cumulative_minutes,
         }
     }
 }

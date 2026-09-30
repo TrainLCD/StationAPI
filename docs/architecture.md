@@ -475,6 +475,25 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
   なので、各区間の最初の駅の `distanceFromPrevious` は 0 になり、通過駅が
   あるか (優等種別の速度を使うか) も区間ごとに判定します。
 
+`trainRoute` は、区間の値をどのモデルで出すかを `model: TrainRouteModel` で
+選べます。
+
+- `Legacy` (省略時): 追加した時点 (#1568) のモデルです。最高速度と加減速は
+  `dto::simulation::resolve_speed_profile` が決め、到着・出発の見込み
+  (`arrivalCumulativeMinutes` / `departureCumulativeMinutes`) は `null` です。
+  MobileApp のオートモードがこの値で走るので、値を変えません。
+- `Estimated`: 到着時間推定 (`arrival_estimation`) のモデルです。速度の較正
+  テーブルは、このモデルに当てはめて求めています。返す駅列に推定を掛け、停車・
+  通過、最高速度、加減速を推定が使った値に置き換えて、到着・出発の見込みを入れ
+  ます。`legs` を渡したときの見込みは、同じ `legs` を渡した
+  `estimateArrivalTimes` と同じ値です。バスの駅を含む経路は推定のモデルの対象外
+  なので、`Legacy` と同じ値を返します。
+
+2 つのモデルは、加減速、運転余裕率、停車時間、較正テーブルに無い路線・種別の
+速度が違います。`Legacy` の値で台形の速度プロファイルを作って走らせると、
+`estimateArrivalTimes` より短い時間で走り切ります (#1709)。所要時間を推定に
+合わせたいクライアントは、`Estimated` の見込みを使います。
+
 区間の切り出しには両者で同じ関数を使い、環状線では継ぎ目をまたぐ短いほうの
 弧を選ぶので、両者の駅の並びは一致します (`lineGroupId` を指定した
 `trainRoute` は、従来どおり格納順で切り出します)。次のいずれかに当てはまる
