@@ -158,9 +158,10 @@ fn route_network() -> &'static Arc<RouteNetwork> {
 }
 
 fn build_route_network() -> RouteNetwork {
-    RouteNetwork::build(
+    RouteNetwork::build_with_track(
         rail_line_group_cds().map(|group| stations_of_line_groups(&[group as u32])),
         &EstimationParams::default(),
+        index::track_distance,
     )
 }
 
