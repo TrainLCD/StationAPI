@@ -78,13 +78,13 @@ pub struct EstimatedStop {
 /// 速度の較正にどの表を使うか。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SpeedCalibration {
-    /// 元の較正 (`legacy_speed_table`。#1712 で求め直す前の表)。`estimateArrivalTimes`、
-    /// `connectedRoutes` など、`trainRoute` の `Estimated` 以外はすべてこれを使う。
+    /// 元の較正 (`legacy_speed_table`。#1712 で求め直す前の表)。`connectedRoutes` の
+    /// 所要時間が使う。
     #[default]
     Original,
     /// 駅間の距離に線路の長さを使う前提で求め直した較正 (`speed_table` /
-    /// `segment_speed_table`)。`trainRoute` の `Estimated` (MobileApp の GPX の生成)
-    /// だけが使う。
+    /// `segment_speed_table`)。到着見込み (`estimateArrivalTimes` と `trainRoute` の
+    /// `Estimated`) が使う。
     Recalibrated,
 }
 

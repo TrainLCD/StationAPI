@@ -96,7 +96,8 @@ pub enum ConnectedRouteSort {
     // おすすめ順 (評価値 = 最初の列車の待ち時間を含む所要時間の見込み、に乗換 1 回あたり
     // 5 分を足した値の小さい順)。既定
     Recommended,
-    // 到着の早い順 (estimateArrivalTimes の見込みと同じ所要時間)。同じなら乗換の少ない順
+    // 到着の早い順 (探索の所要時間。元の較正で見積もるので estimateArrivalTimes の
+    // 見込みとは一致しない)。同じなら乗換の少ない順
     ArrivalTime,
     // 乗換の少ない順。同じなら到着の早い順
     TransferCount,

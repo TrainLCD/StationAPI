@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""実際の所要時間 (travel_times/cases.csv) に対する trainRoute の Estimated (MobileApp の
-GPX の生成が使う推定) の誤差を、動いている Worker に問い合わせて Markdown で出す。
+"""実際の所要時間 (travel_times/cases.csv) に対する 到着時間推定 (trainRoute の
+Estimated。estimateArrivalTimes と同じ値) の誤差を、動いている Worker に問い合わせて Markdown で出す。
 
 CI の回帰テスト (src/travel_times.rs) は data/*.csv だけで動くので、生成データにしか
 無い種別グループを飛ばし、線路の長さも持たない。本番と同じ生成データでの精度は、
