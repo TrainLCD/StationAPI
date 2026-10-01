@@ -7,6 +7,7 @@
 
 use async_graphql::Enum;
 use stationapi::domain::route_search::JourneySort;
+use stationapi::model;
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 #[graphql(rename_items = "PascalCase", name = "LineType")]
@@ -95,7 +96,8 @@ pub enum ConnectedRouteSort {
     // おすすめ順 (評価値 = 最初の列車の待ち時間を含む所要時間の見込み、に乗換 1 回あたり
     // 5 分を足した値の小さい順)。既定
     Recommended,
-    // 到着の早い順 (estimateArrivalTimes の見込みと同じ所要時間)。同じなら乗換の少ない順
+    // 到着の早い順 (探索の所要時間。元の較正で見積もるので estimateArrivalTimes の
+    // 見込みとは一致しない)。同じなら乗換の少ない順
     ArrivalTime,
     // 乗換の少ない順。同じなら到着の早い順
     TransferCount,
@@ -107,6 +109,26 @@ impl From<ConnectedRouteSort> for JourneySort {
             ConnectedRouteSort::Recommended => JourneySort::Recommended,
             ConnectedRouteSort::ArrivalTime => JourneySort::ArrivalTime,
             ConnectedRouteSort::TransferCount => JourneySort::TransferCount,
+        }
+    }
+}
+
+// trainRoute が区間の値をどのモデルで出すか
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[graphql(rename_items = "PascalCase", name = "TrainRouteModel")]
+pub enum TrainRouteModel {
+    // 追加した時点のモデル。到着・出発の見込みは返さない (null)。既定
+    Legacy,
+    // estimateArrivalTimes と同じ到着時間推定のモデル。到着・出発の見込みと、
+    // 推定が使った最高速度・加減速を返す。バスの駅を含む経路は Legacy と同じ値
+    Estimated,
+}
+
+impl From<TrainRouteModel> for model::TrainRouteModel {
+    fn from(value: TrainRouteModel) -> Self {
+        match value {
+            TrainRouteModel::Legacy => model::TrainRouteModel::Legacy,
+            TrainRouteModel::Estimated => model::TrainRouteModel::Estimated,
         }
     }
 }

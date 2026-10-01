@@ -1,4 +1,4 @@
-use crate::domain::speed_table::line_speed_override_kmh;
+use crate::domain::legacy_speed_table::legacy_line_speed_override_kmh;
 use crate::model::{LineType, TrainTypeKind};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -44,8 +44,9 @@ pub fn resolve_speed_profile(
 
     // 路線 × 種別の較正テーブル(実路線の時刻表と公表運転速度に基づく実効値)が
     // あれば最優先で使う。スカイライナー 160km/h のような路線種別・種別の
-    // 一般則では表現できない実勢速度をここで反映する。
-    if let Some(v_kmh) = line_speed_override_kmh(line_cd, kind) {
+    // 一般則では表現できない実勢速度をここで反映する。オートモードの走り方を
+    // 変えないよう、到着時間推定とは別に凍結した表 (legacy_speed_table) を引く。
+    if let Some(v_kmh) = legacy_line_speed_override_kmh(line_cd, kind) {
         return SpeedProfile {
             max_speed: v_kmh / 3.6,
             max_acceleration: accel,

@@ -27,7 +27,8 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::domain::arrival_estimation::{
-    estimate_arrival_minutes_calibrated, is_circular_route, EstimationParams,
+    estimate_arrival_minutes_with_track, is_circular_route, track_distance_key, EstimationParams,
+    TrackDistances,
 };
 use crate::domain::entity::station::Station;
 use crate::domain::route_topology::{trim_pattern, RouteStop, RouteTopology};
@@ -144,8 +145,9 @@ pub enum JourneySort {
     /// [`RouteNetwork::search`] が返す順そのもの。
     #[default]
     Recommended,
-    /// 到着の早い順。[`Journey::total_seconds`] (`estimateArrivalTimes` の見込みと
-    /// 同じく、最初の列車の待ち時間を含まない) の小さい順で、同じなら乗換の少ない順。
+    /// 到着の早い順。[`Journey::total_seconds`] (最初の列車の待ち時間を含まない) の
+    /// 小さい順で、同じなら乗換の少ない順。所要時間は元の較正で見積もるので、
+    /// `estimateArrivalTimes` の見込みとは一致しない。
     ArrivalTime,
     /// 乗換の少ない順。同じなら到着の早い順。
     TransferCount,
@@ -192,9 +194,20 @@ impl RouteNetwork {
     where
         I: IntoIterator<Item = Vec<Station>>,
     {
+        Self::build_with_track(line_groups, params, |_, _| None)
+    }
+
+    /// [`RouteNetwork::build`] に、隣り合う 2 駅の線路の長さ (m) を引く関数を渡す版。
+    /// 乗車の所要時間は `estimateArrivalTimes` と同じく、線路の長さがある駅間では
+    /// それを使って推定する (到着の早い順の並べ替えを見込みと一致させるため)。
+    pub fn build_with_track<I, F>(line_groups: I, params: &EstimationParams, track: F) -> Self
+    where
+        I: IntoIterator<Item = Vec<Station>>,
+        F: Fn(i32, i32) -> Option<f64>,
+    {
         let mut network = RouteNetwork::default();
         for stations in line_groups {
-            network.add_pattern(stations, params);
+            network.add_pattern(stations, params, &track);
         }
         network.topology.finish();
         network
@@ -219,7 +232,12 @@ impl RouteNetwork {
         node
     }
 
-    fn add_pattern(&mut self, stations: Vec<Station>, params: &EstimationParams) {
+    fn add_pattern(
+        &mut self,
+        stations: Vec<Station>,
+        params: &EstimationParams,
+        track: &dyn Fn(i32, i32) -> Option<f64>,
+    ) {
         let mut stations: Vec<Station> = stations
             .into_iter()
             .filter(|s| s.sst_id.is_some() && s.line_group_cd.is_some())
@@ -248,15 +266,23 @@ impl RouteNetwork {
 
         let refs: Vec<&Station> = stations.iter().collect();
         let circular = is_circular_route(&refs);
+        // 系統の隣り合う駅の組 (環状線は継ぎ目の組も) の線路の長さ
+        let mut distances = TrackDistances::new();
+        let seam = circular.then(|| (refs[refs.len() - 1], refs[0]));
+        for (a, b) in refs.windows(2).map(|w| (w[0], w[1])).chain(seam) {
+            if let Some(d) = track(a.station_cd, b.station_cd) {
+                distances.insert(track_distance_key(a.station_cd, b.station_cd), d);
+            }
+        }
         let estimated = if circular {
             // 二周ぶん + 始点に戻る 1 駅を並べ、継ぎ目を跨ぐ乗車も同じ配列で引く。
             let mut unrolled: Vec<&Station> = Vec::with_capacity(refs.len() * 2 + 1);
             unrolled.extend(refs.iter().copied());
             unrolled.extend(refs.iter().copied());
             unrolled.push(refs[0]);
-            estimate_arrival_minutes_calibrated(&unrolled, &refs, params)
+            estimate_arrival_minutes_with_track(&unrolled, &refs, params, Some(&distances))
         } else {
-            estimate_arrival_minutes_calibrated(&refs, &refs, params)
+            estimate_arrival_minutes_with_track(&refs, &refs, params, Some(&distances))
         };
         let to_seconds = |minutes: f64| -> i32 {
             if minutes.is_finite() {
@@ -906,6 +932,29 @@ mod tests {
         let backward = network.search(4, 1, None);
         assert_eq!(backward[0].legs[0].station_group_ids, vec![4, 3, 2, 1]);
         assert_eq!(forward[0].total_seconds, backward[0].total_seconds);
+    }
+
+    #[test]
+    fn ride_times_use_track_distances_when_given() {
+        let line = || {
+            [straight(
+                100,
+                &[(1, 0.0, 0.0), (2, 1.0, 0.0), (3, 2.0, 0.0), (4, 3.0, 0.0)],
+            )]
+        };
+        let plain = RouteNetwork::build(line(), &EstimationParams::default());
+        // 線路の長さを直線より長く渡すと、乗車の所要時間が延びる
+        let tracked =
+            RouteNetwork::build_with_track(line(), &EstimationParams::default(), |a, b| {
+                let straight_m = 111_000.0 * f64::from((a - b).abs());
+                Some(straight_m * 1.5)
+            });
+        let plain_seconds = plain.search(1, 4, None)[0].total_seconds;
+        let tracked_seconds = tracked.search(1, 4, None)[0].total_seconds;
+        assert!(
+            tracked_seconds > plain_seconds,
+            "{tracked_seconds} > {plain_seconds}"
+        );
     }
 
     #[test]

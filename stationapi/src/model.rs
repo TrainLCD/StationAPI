@@ -343,6 +343,19 @@ pub struct RouteLeg {
     pub station_group_ids: Vec<u32>,
 }
 
+/// `trainRoute` がどのモデルで区間の値を出すか。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TrainRouteModel {
+    /// 追加した時点 (#1568) のモデル。`dto::simulation::resolve_speed_profile` の
+    /// 最高速度・加減速を返し、到着・出発の見込みは返さない。配布済みの MobileApp の
+    /// オートモードが使う。既定。
+    #[default]
+    Legacy,
+    /// 到着時間推定 (`arrival_estimation`) のモデル。`estimateArrivalTimes` と同じ
+    /// 到着・出発の見込みと、推定が使った最高速度・加減速を返す。
+    Estimated,
+}
+
 /// 走行シミュレーション用の 1 区間。
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TrainRouteSegment {
@@ -358,6 +371,11 @@ pub struct TrainRouteSegment {
     pub max_acceleration: f64,
     /// 最大減速度 (m/s^2)。正値 (絶対値として持つ)。
     pub max_deceleration: f64,
+    /// 始点からの累積到着時刻 (分)。`TrainRouteModel::Estimated` のときだけ入る。
+    pub arrival_cumulative_minutes: Option<f64>,
+    /// 始点からの累積出発時刻 (分)。途中の停車駅では到着に停車時間を足した値、
+    /// 通過駅と終点では到着と同じ。`TrainRouteModel::Estimated` のときだけ入る。
+    pub departure_cumulative_minutes: Option<f64>,
 }
 
 #[cfg(test)]

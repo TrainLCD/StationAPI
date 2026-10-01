@@ -24,8 +24,8 @@ fn filter_to_db_type(filter: TransportTypeFilter) -> Option<TransportType> {
 use crate::{
     domain::{
         arrival_estimation::{
-            estimate_arrival_minutes_calibrated, is_circular_route, select_circular_arc,
-            EstimatedStop, EstimationParams,
+            estimate_arrival_minutes_with_track, is_circular_route, select_circular_arc,
+            track_distance_key, EstimatedStop, EstimationParams, SpeedCalibration, TrackDistances,
         },
         entity::{
             company::Company,
@@ -36,13 +36,13 @@ use crate::{
             station_number::StationNumber,
             train_type::TrainType,
         },
+        legacy_speed_table::legacy_segment_speed_override_kmh,
         normalize::normalize_for_search,
         repository::{
             company_repository::CompanyRepository, line_repository::LineRepository,
             station_repository::StationRepository, train_type_repository::TrainTypeRepository,
         },
         route_search::{self, JourneySort},
-        segment_speed_table::{segment_override_applies_to_kind, segment_speed_override_kmh},
     },
     model::{self, ConnectedRoute, Route},
     use_case::{
@@ -889,6 +889,7 @@ where
         from_station_id: u32,
         to_station_id: u32,
         line_group_id: Option<u32>,
+        route_model: model::TrainRouteModel,
     ) -> Result<Vec<model::TrainRouteSegment>, UseCaseError> {
         let line_group_id = line_group_id.ok_or_else(|| UseCaseError::NotFound {
             entity_type: "line group",
@@ -926,73 +927,38 @@ where
             v.reverse();
             v
         };
-        self.train_route_segments(sliced, line_group_id).await
+        // 推定は付帯情報を付ける前の駅列で行う (estimateArrivalTimes と同じ入力)
+        let estimated = match route_model {
+            model::TrainRouteModel::Legacy => None,
+            model::TrainRouteModel::Estimated => {
+                let group: Vec<&Station> = stations.iter().collect();
+                let track = self.track_distances_of(&group).await?;
+                estimate_train_route_slice(&sliced, &stations, &track)
+            }
+        };
+        let mut segments = self.train_route_segments(sliced, line_group_id).await?;
+        if let Some(estimated) = estimated {
+            apply_estimated_model(&mut segments, &estimated)?;
+        }
+        Ok(segments)
     }
 
     async fn estimate_connected_route_arrival_times(
         &self,
         legs: &[model::RouteLegRequest],
     ) -> Result<Vec<EstimatedStop>, UseCaseError> {
-        let group_of = self.validate_route_legs(legs).await?;
-        let params = EstimationParams::default();
-        let walk_minutes = f64::from(route_search::TRANSFER_WALK_SECONDS) / 60.0;
-
-        let mut result: Vec<EstimatedStop> = Vec::new();
-        for (index, leg) in legs.iter().enumerate() {
-            // trainRoute と同じく系統の駅列から切り出す。系統に無い乗降駅は駅グループで
-            // 引き当てるので、区間の trainTypes のどの種別を lineGroupId にしてもよい
-            let stations = self
-                .station_repository
-                .get_by_line_group_id(leg.line_group_id)
-                .await?;
-            let group_stops: Vec<&Station> = stations.iter().collect();
-            let (from_group, to_group) =
-                (group_of[&leg.from_station_id], group_of[&leg.to_station_id]);
-            let segment = estimate_group_segment(
-                &group_stops,
-                SegmentEndpoints {
-                    from_station_cd: leg.from_station_id,
-                    to_station_cd: leg.to_station_id,
-                    groups: Some((from_group, to_group)),
-                },
-                false,
-                &params,
-            )
-            .ok_or_else(|| leg_not_found(leg))?;
-
-            // 乗換では、乗換駅に歩いて着いた時刻を到着、乗換先の列車を待った後を
-            // 出発とする。見込みは connectedRoutes の所要時間と同じ (最初の列車の
-            // 待ち時間は含めない)
-            let (board_arrival, board_departure) = match result.last() {
-                Some(previous) if index > 0 => {
-                    let wait_minutes = f64::from(route_search::boarding_wait_seconds(
-                        group_stops.first().and_then(|s| s.kind),
-                    )) / 60.0;
-                    let arrival = previous.cumulative_minutes + walk_minutes;
-                    (arrival, arrival + wait_minutes)
-                }
-                _ => (0.0, 0.0),
-            };
-            for (position, mut stop) in segment.into_iter().enumerate() {
-                if position == 0 {
-                    stop.cumulative_minutes = board_arrival;
-                    stop.departure_cumulative_minutes = board_departure;
-                } else {
-                    stop.cumulative_minutes += board_departure;
-                    stop.departure_cumulative_minutes += board_departure;
-                }
-                result.push(stop);
-            }
-        }
-        Ok(result)
+        self.estimate_legs(legs).await
     }
 
     async fn get_connected_train_route(
         &self,
         legs: &[model::RouteLegRequest],
+        route_model: model::TrainRouteModel,
     ) -> Result<Vec<model::TrainRouteSegment>, UseCaseError> {
         let group_of = self.validate_route_legs(legs).await?;
+        let estimated_model = route_model == model::TrainRouteModel::Estimated;
         let mut segments = Vec::new();
+        let mut has_bus = false;
         for leg in legs {
             let stations = self
                 .station_repository
@@ -1012,8 +978,15 @@ where
                 },
             )
             .ok_or_else(|| leg_not_found(leg))?;
+            has_bus = has_bus || (estimated_model && sliced.iter().any(is_bus_station));
             // 区間ごとに別の列車なので、通過駅の有無や距離の起点も区間ごとに数える
             segments.extend(self.train_route_segments(sliced, leg.line_group_id).await?);
+        }
+        // 見込みは estimateArrivalTimes に同じ legs を渡したときと同じ値にする
+        // (乗換の徒歩と待ち時間の見込みも含む)。バスは推定のモデルの対象外
+        if estimated_model && !has_bus {
+            let estimated = self.estimate_legs(legs).await?;
+            apply_estimated_model(&mut segments, &estimated)?;
         }
         Ok(segments)
     }
@@ -1159,15 +1132,17 @@ where
             .await?;
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
-        let params = EstimationParams::default();
+        let params = arrival_estimation_params();
 
         let mut result: Vec<EstimatedStop> = Vec::new();
         for group_stops in route_row_tree_map.values() {
+            let track = self.track_distances_of(group_stops).await?;
             if let Some(segment) = estimate_group_segment(
                 group_stops,
                 SegmentEndpoints::exact(from_station_id, to_station_id),
                 direction_id.is_some(),
                 &params,
+                Some(&track),
             ) {
                 result.extend(segment);
             }
@@ -1184,6 +1159,69 @@ where
     TR: TrainTypeRepository,
     CR: CompanyRepository,
 {
+    /// 区間 (`legs`) をつないだ経路の到着見込み。`estimateArrivalTimes` と
+    /// `trainRoute` の `Estimated` が使い、求め直した較正と線路の長さで推定する。
+    /// `connectedRoutes` の所要時間は元の較正で見積もるので、この値とは一致しない。
+    async fn estimate_legs(
+        &self,
+        legs: &[model::RouteLegRequest],
+    ) -> Result<Vec<EstimatedStop>, UseCaseError> {
+        let group_of = self.validate_route_legs(legs).await?;
+        let params = arrival_estimation_params();
+        let walk_minutes = f64::from(route_search::TRANSFER_WALK_SECONDS) / 60.0;
+
+        let mut result: Vec<EstimatedStop> = Vec::new();
+        for (index, leg) in legs.iter().enumerate() {
+            // trainRoute と同じく系統の駅列から切り出す。系統に無い乗降駅は駅グループで
+            // 引き当てるので、区間の trainTypes のどの種別を lineGroupId にしてもよい
+            let stations = self
+                .station_repository
+                .get_by_line_group_id(leg.line_group_id)
+                .await?;
+            let group_stops: Vec<&Station> = stations.iter().collect();
+            let track = self.track_distances_of(&group_stops).await?;
+            let (from_group, to_group) =
+                (group_of[&leg.from_station_id], group_of[&leg.to_station_id]);
+            let segment = estimate_group_segment(
+                &group_stops,
+                SegmentEndpoints {
+                    from_station_cd: leg.from_station_id,
+                    to_station_cd: leg.to_station_id,
+                    groups: Some((from_group, to_group)),
+                },
+                false,
+                &params,
+                Some(&track),
+            )
+            .ok_or_else(|| leg_not_found(leg))?;
+
+            // 乗換では、乗換駅に歩いて着いた時刻を到着、乗換先の列車を待った後を
+            // 出発とする。徒歩と待ち時間の見込みは connectedRoutes と同じ (最初の列車の
+            // 待ち時間は含めない)
+            let (board_arrival, board_departure) = match result.last() {
+                Some(previous) if index > 0 => {
+                    let wait_minutes = f64::from(route_search::boarding_wait_seconds(
+                        group_stops.first().and_then(|s| s.kind),
+                    )) / 60.0;
+                    let arrival = previous.cumulative_minutes + walk_minutes;
+                    (arrival, arrival + wait_minutes)
+                }
+                _ => (0.0, 0.0),
+            };
+            for (position, mut stop) in segment.into_iter().enumerate() {
+                if position == 0 {
+                    stop.cumulative_minutes = board_arrival;
+                    stop.departure_cumulative_minutes = board_departure;
+                } else {
+                    stop.cumulative_minutes += board_departure;
+                    stop.departure_cumulative_minutes += board_departure;
+                }
+                result.push(stop);
+            }
+        }
+        Ok(result)
+    }
+
     /// 乗換経路の区間の並びが 1 本の経路としてつながっているか確かめる。
     /// 前の区間の降車駅と次の区間の乗車駅は同じ駅グループでなければならない。
     /// 返り値は、区間の乗降駅の `station_cd` -> 駅グループ。
@@ -1252,6 +1290,27 @@ where
             .collect();
         self.update_station_vec_with_attributes(stations, None, transport_type, true)
             .await
+    }
+
+    /// 系統の駅列で隣り合う駅の組 (環状線の継ぎ目の組を含む) の線路の長さを引いて、
+    /// 到着時間推定に渡す表にする。推定が切り出す区間は、系統の駅列の連続した区間か
+    /// 継ぎ目を跨ぐ弧なので、この組だけで足りる。
+    async fn track_distances_of(&self, group: &[&Station]) -> Result<TrackDistances, UseCaseError> {
+        let mut pairs: Vec<(u32, u32)> = group
+            .windows(2)
+            .map(|w| (w[0].station_cd as u32, w[1].station_cd as u32))
+            .collect();
+        if let (Some(first), Some(last)) = (group.first(), group.last()) {
+            if group.len() > 2 {
+                pairs.push((last.station_cd as u32, first.station_cd as u32));
+            }
+        }
+        let distances = self.station_repository.get_track_distances(&pairs).await?;
+        Ok(pairs
+            .into_iter()
+            .zip(distances)
+            .filter_map(|((a, b), d)| d.map(|d| (track_distance_key(a as i32, b as i32), d)))
+            .collect())
     }
 
     /// 返す駅の並びで隣り合う 2 駅のあいだの線路の長さを、後ろの駅の
@@ -1329,11 +1388,15 @@ where
                 resolve_speed_profile(station.line_cd, station.line_type, is_bus, effective_kind);
             // 隣接駅ペア単位の較正(GTFS 実ダイヤ由来)があれば、このセグメントの
             // 最高速度を路線単位のプロファイルより優先して上書きする(各停系のみ)。
-            if !is_bus && segment_override_applies_to_kind(effective_kind) {
+            // Legacy はオートモードの走り方を変えないよう、凍結した表を引く。
+            if !is_bus {
                 if let Some((_, _, prev_cd)) = prev_stop {
-                    if let Some(v_kmh) =
-                        segment_speed_override_kmh(station.line_cd, prev_cd, station.station_cd)
-                    {
+                    if let Some(v_kmh) = legacy_segment_speed_override_kmh(
+                        station.line_cd,
+                        prev_cd,
+                        station.station_cd,
+                        effective_kind,
+                    ) {
                         profile.max_speed = v_kmh / 3.6;
                     }
                 }
@@ -1348,6 +1411,8 @@ where
                 max_speed: profile.max_speed,
                 max_acceleration: profile.max_acceleration,
                 max_deceleration: profile.max_deceleration,
+                arrival_cumulative_minutes: None,
+                departure_cumulative_minutes: None,
             });
         }
 
@@ -1958,6 +2023,7 @@ fn estimate_group_segment(
     endpoints: SegmentEndpoints,
     directed: bool,
     params: &EstimationParams,
+    track: Option<&TrackDistances>,
 ) -> Option<Vec<EstimatedStop>> {
     let mut route_stops: &[&Station] = group_stops;
     if route_stops.len() > 1
@@ -1968,13 +2034,13 @@ fn estimate_group_segment(
     let (from, to) = endpoints.positions(route_stops)?;
     Some(if is_circular_route(route_stops) {
         let arc = select_circular_arc(route_stops, from, to, directed);
-        estimate_arrival_minutes_calibrated(&arc, route_stops, params)
+        estimate_arrival_minutes_with_track(&arc, route_stops, params, track)
     } else if from < to {
-        estimate_arrival_minutes_calibrated(&route_stops[from..=to], route_stops, params)
+        estimate_arrival_minutes_with_track(&route_stops[from..=to], route_stops, params, track)
     } else {
         let mut segment: Vec<&Station> = route_stops[to..=from].to_vec();
         segment.reverse();
-        estimate_arrival_minutes_calibrated(&segment, route_stops, params)
+        estimate_arrival_minutes_with_track(&segment, route_stops, params, track)
     })
 }
 
@@ -2002,6 +2068,83 @@ fn slice_group_stations(
         segment.reverse();
         segment
     })
+}
+
+fn is_bus_station(station: &Station) -> bool {
+    station.transport_type == TransportType::Bus
+}
+
+/// `trainRoute` (lineGroupId 指定) が返す駅列 `sliced` の到着見込み。
+///
+/// 迂回係数の較正母数には、切り出す前の系統全体 `group` を渡す
+/// (`estimate_group_segment` と同じく、閉じた環状データの重複終端は除く)。
+/// バスの駅を含むときは推定のモデルの対象外として `None` を返す。
+fn estimate_train_route_slice(
+    sliced: &[Station],
+    group: &[Station],
+    track: &TrackDistances,
+) -> Option<Vec<EstimatedStop>> {
+    if sliced.iter().any(is_bus_station) {
+        return None;
+    }
+    let stops: Vec<&Station> = sliced.iter().collect();
+    let mut route: Vec<&Station> = group.iter().collect();
+    if route.len() > 1 && route[0].station_cd == route[route.len() - 1].station_cd {
+        route.pop();
+    }
+    Some(estimate_arrival_minutes_with_track(
+        &stops,
+        &route,
+        &arrival_estimation_params(),
+        Some(track),
+    ))
+}
+
+/// 到着見込み (`estimateArrivalTimes` と `trainRoute` の `Estimated`) の推定の
+/// パラメータ。駅間の距離に線路の長さを使う前提で求め直した較正を使う。
+/// `connectedRoutes` の所要時間は元の較正 ([`EstimationParams::default`]) のまま。
+fn arrival_estimation_params() -> EstimationParams {
+    EstimationParams {
+        speed_calibration: SpeedCalibration::Recalibrated,
+        ..EstimationParams::default()
+    }
+}
+
+/// `trainRoute` の区間の値を、到着見込み `estimated` のモデルの値に置き換える
+/// (`TrainRouteModel::Estimated`)。
+///
+/// 停車・通過、最高速度、加減速、到着・出発の見込みを、すべて推定が使った値に
+/// そろえる。停車の判定もそろえるのは、クライアントが停車駅で区切った区間と、
+/// 見込みの付いた停車駅がずれないようにするため。`estimated` は `segments` と
+/// 同じ駅列に対するもので、並びがずれていれば別の駅の値を返すことになるので
+/// エラーにする。
+fn apply_estimated_model(
+    segments: &mut [model::TrainRouteSegment],
+    estimated: &[EstimatedStop],
+) -> Result<(), UseCaseError> {
+    let aligned = segments.len() == estimated.len()
+        && segments.iter().zip(estimated).all(|(segment, stop)| {
+            segment
+                .station
+                .as_ref()
+                .map(|station| i64::from(station.id))
+                == Some(i64::from(stop.station_cd))
+        });
+    if !aligned {
+        return Err(UseCaseError::Unexpected(
+            "trainRoute の駅列と到着見込みの駅列が一致しません".to_string(),
+        ));
+    }
+    let params = EstimationParams::default();
+    for (segment, stop) in segments.iter_mut().zip(estimated) {
+        segment.stops = stop.stops_here;
+        segment.max_speed = stop.max_speed_kmh / 3.6;
+        segment.max_acceleration = params.accel;
+        segment.max_deceleration = params.decel;
+        segment.arrival_cumulative_minutes = Some(stop.cumulative_minutes);
+        segment.departure_cumulative_minutes = Some(stop.departure_cumulative_minutes);
+    }
+    Ok(())
 }
 
 /// 区間の乗降駅が指定された系統に見つからないときのエラー。
@@ -3114,8 +3257,9 @@ mod tests {
 
         /// 直通急行の線内各駅停車の回帰テスト。
         /// 半蔵門線内は急行(Express)でも全駅に停車するため、経路スライス内に
-        /// 通過駅が無ければ各停と同じ推定になること(実所要 押上→神保町 約18分)。
-        /// 修正前は種別倍率(×1.15)が掛かり駅間別較正も外れて約15分に縮んでいた。
+        /// 通過駅が無ければ各停と同じ推定になること。修正前は種別倍率(×1.15)が
+        /// 掛かり駅間別較正も外れて短く推定されていた。実際の所要時間との比較は
+        /// 本番と同じデータで測る所要時間のベンチマーク (travel_times/cases.csv) で行う。
         #[tokio::test]
         async fn test_estimate_route_arrival_times_through_express_all_stops_matches_local() {
             let default_kind = Some(model::TrainTypeKind::Default as i32);
@@ -3142,9 +3286,6 @@ mod tests {
                     l.cumulative_minutes
                 );
             }
-            // 実所要 18 分に対し較正ポリシーの許容誤差 ±10%。
-            let total = express_est.last().unwrap().cumulative_minutes;
-            assert!((16.2..19.8).contains(&total), "got {total}");
         }
 
         /// 環状部南側(河川横断の急勾配・急曲線区間)の駅間別較正の回帰テスト。
@@ -4166,6 +4307,31 @@ mod tests {
                     .with_expected_line_group_id(expected_line_group_id),
                 company_repository: ConfigurableMockCompanyRepository::new(companies),
             }
+        }
+
+        /// 到着時間推定へ渡す線路の長さの表は、系統の隣り合う駅の組に加えて、
+        /// 環状線の継ぎ目の組 (末尾→先頭) も持つ。継ぎ目を跨ぐ弧を推定するため。
+        #[tokio::test]
+        async fn track_distances_cover_adjacent_pairs_and_the_seam() {
+            let stations: Vec<Station> = (0..4)
+                .map(|i| create_test_station(3000 + i, 30, 1, Some(3000)))
+                .collect();
+            let interactor = QueryInteractor {
+                station_repository: ConfigurableMockStationRepository::new(vec![], vec![])
+                    .with_track_distance(1234.0),
+                line_repository: ConfigurableMockLineRepository::new(vec![]),
+                train_type_repository: ConfigurableMockTrainTypeRepository::new(vec![]),
+                company_repository: ConfigurableMockCompanyRepository::new(vec![]),
+            };
+            let refs: Vec<&Station> = stations.iter().collect();
+            let track = interactor.track_distances_of(&refs).await.unwrap();
+            let mut keys: Vec<(i32, i32)> = track.keys().copied().collect();
+            keys.sort();
+            assert_eq!(
+                keys,
+                vec![(3000, 3001), (3000, 3003), (3001, 3002), (3002, 3003)]
+            );
+            assert!(track.values().all(|d| *d == 1234.0));
         }
 
         #[tokio::test]
@@ -6198,7 +6364,7 @@ mod tests {
             let (interactor, _) = build_interactor(build_line_group(20));
 
             let segments = interactor
-                .get_train_route(1004, 1002, Some(1000))
+                .get_train_route(1004, 1002, Some(1000), model::TrainRouteModel::Legacy)
                 .await
                 .unwrap();
 
@@ -6214,7 +6380,7 @@ mod tests {
             let (interactor, calls) = build_interactor(build_line_group(20));
 
             let segments = interactor
-                .get_train_route(1002, 1004, Some(1000))
+                .get_train_route(1002, 1004, Some(1000), model::TrainRouteModel::Legacy)
                 .await
                 .unwrap();
 
@@ -6232,7 +6398,7 @@ mod tests {
             let (interactor, calls) = build_interactor(build_line_group(20));
 
             let segments = interactor
-                .get_train_route(1004, 1002, Some(1000))
+                .get_train_route(1004, 1002, Some(1000), model::TrainRouteModel::Legacy)
                 .await
                 .unwrap();
 
@@ -6254,7 +6420,7 @@ mod tests {
             let (interactor, _) = build_interactor(build_line_group(20));
 
             let segments = interactor
-                .get_train_route(1002, 1006, Some(1000))
+                .get_train_route(1002, 1006, Some(1000), model::TrainRouteModel::Legacy)
                 .await
                 .unwrap();
 
@@ -6277,7 +6443,7 @@ mod tests {
             }
             let (local_interactor, _) = build_interactor(all_stops);
             let local_segments = local_interactor
-                .get_train_route(1002, 1006, Some(1000))
+                .get_train_route(1002, 1006, Some(1000), model::TrainRouteModel::Legacy)
                 .await
                 .unwrap();
 
@@ -6293,6 +6459,87 @@ mod tests {
                 top(&segments),
                 top(&local_segments)
             );
+        }
+
+        /// Legacy は到着・出発の見込みを返さない。区間の値は追加前と同じ規則
+        /// (resolve_speed_profile) のまま。
+        #[tokio::test]
+        async fn legacy_model_returns_no_estimate() {
+            let (interactor, _) = build_interactor(build_line_group(20));
+            let segments = interactor
+                .get_train_route(1002, 1006, Some(1000), model::TrainRouteModel::Legacy)
+                .await
+                .unwrap();
+            assert!(segments.iter().all(|s| {
+                s.arrival_cumulative_minutes.is_none() && s.departure_cumulative_minutes.is_none()
+            }));
+            // 加減速は追加時点 (#1568) の在来線の値
+            assert!(segments
+                .iter()
+                .all(|s| s.max_acceleration == 0.83 && s.max_deceleration == 0.69));
+        }
+
+        /// Estimated は、同じ駅列を系統全体で較正し、系統の線路の長さと求め直した
+        /// 較正 (`SpeedCalibration::Recalibrated`) を渡した到着時間推定の値を返す。
+        #[tokio::test]
+        async fn estimated_model_follows_the_arrival_estimation() {
+            let group = build_line_group(20);
+            let (interactor, _) = build_interactor(group.clone());
+            let segments = interactor
+                .get_train_route(1002, 1006, Some(1000), model::TrainRouteModel::Estimated)
+                .await
+                .unwrap();
+
+            let slice: Vec<&Station> = group[2..=6].iter().collect();
+            let whole: Vec<&Station> = group.iter().collect();
+            let params = arrival_estimation_params();
+            let track = interactor.track_distances_of(&whole).await.unwrap();
+            assert!(
+                !track.is_empty(),
+                "前提: テスト用の repository は線路の長さを返す"
+            );
+            let expected =
+                estimate_arrival_minutes_with_track(&slice, &whole, &params, Some(&track));
+
+            assert_eq!(segments.len(), expected.len());
+            for (segment, stop) in segments.iter().zip(&expected) {
+                assert_eq!(segment.stops, stop.stops_here);
+                assert_eq!(
+                    segment.arrival_cumulative_minutes,
+                    Some(stop.cumulative_minutes)
+                );
+                assert_eq!(
+                    segment.departure_cumulative_minutes,
+                    Some(stop.departure_cumulative_minutes)
+                );
+                assert_eq!(segment.max_speed, stop.max_speed_kmh / 3.6);
+                assert_eq!(segment.max_acceleration, params.accel);
+                assert_eq!(segment.max_deceleration, params.decel);
+            }
+            // 通過駅があり、終点の到着は 0 より後
+            assert!(segments.iter().any(|s| !s.stops));
+            assert!(segments.last().unwrap().arrival_cumulative_minutes.unwrap() > 0.0);
+        }
+
+        /// バスの駅を含む経路は推定のモデルの対象外なので、Estimated でも
+        /// Legacy と同じ値を返す。
+        #[tokio::test]
+        async fn estimated_model_leaves_bus_routes_as_legacy() {
+            let mut group = build_line_group(8);
+            for station in group.iter_mut() {
+                station.transport_type = TransportType::Bus;
+            }
+            let (interactor, _) = build_interactor(group.clone());
+            let legacy = interactor
+                .get_train_route(1001, 1005, Some(1000), model::TrainRouteModel::Legacy)
+                .await
+                .unwrap();
+            let (interactor, _) = build_interactor(group);
+            let estimated = interactor
+                .get_train_route(1001, 1005, Some(1000), model::TrainRouteModel::Estimated)
+                .await
+                .unwrap();
+            assert_eq!(estimated, legacy);
         }
 
         /// 近傍バス停の探索半径には、駅グループの代表座標と各駅の座標の隔たりを
@@ -6315,7 +6562,7 @@ mod tests {
             let (interactor, calls) = build_interactor(stations);
 
             interactor
-                .get_train_route(1000, 1003, Some(1000))
+                .get_train_route(1000, 1003, Some(1000), model::TrainRouteModel::Legacy)
                 .await
                 .unwrap();
 
@@ -6333,7 +6580,7 @@ mod tests {
             let (interactor, _) = build_interactor(build_line_group(20));
 
             let err = interactor
-                .get_train_route(1002, 9999, Some(1000))
+                .get_train_route(1002, 9999, Some(1000), model::TrainRouteModel::Legacy)
                 .await
                 .unwrap_err();
 
@@ -6345,7 +6592,7 @@ mod tests {
             let (interactor, _) = build_interactor(build_line_group(20));
 
             let err = interactor
-                .get_train_route(1002, 1004, None)
+                .get_train_route(1002, 1004, None, model::TrainRouteModel::Legacy)
                 .await
                 .unwrap_err();
 

@@ -23,6 +23,7 @@ on:
       - "Cargo.toml"
       - ".github/actions/build-worker/action.yml"
       - ".github/workflows/build_worker.yml"
+      - "travel_times/**"
   push:
     # dev / master は deploy_staging.yml / deploy_production.yml が同じ
     # composite action で検証してからデプロイするため、ここでは走らせない。
@@ -42,6 +43,7 @@ on:
       - "Cargo.toml"
       - ".github/actions/build-worker/action.yml"
       - ".github/workflows/build_worker.yml"
+      - "travel_times/**"
   workflow_dispatch:
 
 name: Build Cloudflare Worker
@@ -69,6 +71,13 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/build-worker
+
+      # 到着時間推定の所要時間の見張り (src/travel_times.rs)。記録
+      # (travel_times/baseline.csv) は本番と同じ生成データで作るので、上の
+      # action が generated/ を作ったこのジョブで比べる。バスのフィードが
+      # 欠けても鉄道の推定は変わらない。
+      - name: Check travel times against the benchmark
+        run: cargo test -p stationapi-worker travel_times
 
       - uses: actions/upload-artifact@v4
         with:

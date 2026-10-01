@@ -475,6 +475,32 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
   なので、各区間の最初の駅の `distanceFromPrevious` は 0 になり、通過駅が
   あるか (優等種別の速度を使うか) も区間ごとに判定します。
 
+`trainRoute` は、区間の値をどのモデルで出すかを `model: TrainRouteModel` で
+選べます。
+
+- `Legacy` (省略時): 追加した時点 (#1568) のモデルです。最高速度と加減速は
+  `dto::simulation::resolve_speed_profile` が決め、到着・出発の見込み
+  (`arrivalCumulativeMinutes` / `departureCumulativeMinutes`) は `null` です。
+  配布済みの MobileApp のオートモードがこの値で走るので、値を変えません。速度の較正は、
+  到着時間推定の較正を求め直す前の表を `domain/legacy_speed_table.rs` に凍結して
+  使います。
+- `Estimated`: 到着時間推定 (`arrival_estimation`) のモデルで、MobileApp の
+  オートモードと GPX の生成が使います。返す駅列に推定を掛け、停車・通過、最高速度、
+  加減速を推定が使った値に置き換えて、到着・出発の見込みを入れます。見込みは、
+  同じ区間の `estimateArrivalTimes` と同じ値です (`legs` を渡したときは、同じ
+  `legs` を渡した `estimateArrivalTimes` と同じ値)。バスの駅を含む経路は推定の
+  モデルの対象外なので、`Legacy` と同じ値を返します。
+
+2 つのモデルは、加減速、運転余裕率、停車時間、較正テーブル、駅間の距離が違い
+ます。`Estimated` は、線路の長さ (`connections`) がある駅間ではそれを走行距離に
+使い、無い駅間だけ直線距離 × 迂回係数で見積もり、その距離で求め直した較正
+(`speed_table` / `segment_speed_table`) を使います。`estimateArrivalTimes` も同じ
+計算です。乗換経路探索 (`connectedRoutes`) の所要時間だけは、元の計算 (直線距離 ×
+迂回係数と、`domain/legacy_speed_table.rs` の元の較正) のままです。そのため、
+経路検索の所要時間と ETA は一致しません。`Legacy` の値で台形の速度プロファイルを作って走らせると、
+`estimateArrivalTimes` より短い時間で走り切ります (#1709)。所要時間を推定に
+合わせたいクライアントは、`Estimated` の見込みを使います。
+
 区間の切り出しには両者で同じ関数を使い、環状線では継ぎ目をまたぐ短いほうの
 弧を選ぶので、両者の駅の並びは一致します (`lineGroupId` を指定した
 `trainRoute` は、従来どおり格納順で切り出します)。次のいずれかに当てはまる
@@ -486,6 +512,23 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
   超える
 - 両端の駅が `fromStationId` / `toStationId` と一致しない
 - `viaLineIds`・`directionId`・`lineGroupId` と同時に指定されている
+
+### 所要時間のベンチマーク (`travel_times/`)
+
+到着時間推定 (`estimateArrivalTimes` と `trainRoute` の `Estimated`) の所要時間を、実際の列車の所要時間と比べる基準を
+`travel_times/cases.csv` に置いています。速度の較正テーブルや一般則は、1 つの路線に合わせて変えると、同じ
+規則を使うほかの路線の推定も変わります。変更の前後で全体の誤差を測るための仕組み
+です。
+
+- `cargo test -p stationapi-worker` (`src/travel_times.rs`) は、基準ごとの「実際の
+  典型的な所要時間からのずれ」を `travel_times/baseline.csv` の記録と比べ、悪くなる
+  と失敗します。記録は本番と同じ生成データで作るので、比べるのは `generated/` で
+  動くときだけです。
+  CI では `build_worker.yml` が生成データを作ってから走らせます。
+- `make travel-time-report` は、生成データで動く Worker に問い合わせて全件の誤差を
+  出します。推定の規則や較正を変える PR には、変更前と変更後のレポートを載せます。
+
+基準の決め方と記録の更新方法は `travel_times/README.md` にあります。
 
 ### 行き先の検索 (`stationsByName`)
 
@@ -724,6 +767,7 @@ repository の実装がないメソッドは、空の結果ではなく `DomainE
 │       │   ├── entity/           # Station / Line / TrainType / Company ...
 │       │   ├── repository/       # 抽象インターフェース
 │       │   ├── arrival_estimation.rs
+│       │   ├── legacy_speed_table.rs # 元の較正 (connectedRoutes と trainRoute の Legacy が使う)
 │       │   ├── route_search.rs       # 乗換経路探索 (RAPTOR)
 │       │   ├── route_topology.rs     # 所要時間を持たない系統網 (stationsByName の到達判定)
 │       │   ├── segment_speed_table.rs
