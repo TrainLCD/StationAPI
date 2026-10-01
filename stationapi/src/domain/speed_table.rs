@@ -9,9 +9,9 @@
 //!
 //! 値の意味は「その路線・種別での実効巡航速度(km/h)」。理論上の車両性能では
 //! なく、時刻表所要時間を運動学モデルで再現する値として較正している。
-//! `trainRoute` の `Estimated` の推定 (`SpeedCalibration::Recalibrated`) だけが
-//! 参照する。`estimateArrivalTimes`・`connectedRoutes`・`trainRoute` の `Legacy` は、
-//! 求め直す前の表 (`legacy_speed_table`) を使う。
+//! `estimateArrivalTimes` と `trainRoute` の `Estimated` の推定
+//! (`SpeedCalibration::Recalibrated`) が参照する。`connectedRoutes`・`trainRoute` の
+//! `Legacy` は、求め直す前の表 (`legacy_speed_table`) を使う。
 //!
 //! エントリ追加の指針:
 //! - 公表運転速度(例: 京急快特 120km/h、スカイライナー 160km/h)を起点にし、
@@ -33,8 +33,8 @@ use crate::model::TrainTypeKind;
 /// 距離が直線 × 迂回係数だった頃の値は、距離の水増しを速度で打ち消していたので、
 /// 線路の長さへ替えたときに求め直した。小田急線 (快速急行) は一般則で典型値に
 /// 近づいたので外した。つくばエクスプレスと都営大江戸線は GTFS の自動較正に任せる。
-/// `estimateArrivalTimes`・`connectedRoutes`・`trainRoute` の `Legacy` は、求め直す前の
-/// 値を `legacy_speed_table` で使い続ける。
+/// `connectedRoutes`・`trainRoute` の `Legacy` は、求め直す前の値を
+/// `legacy_speed_table` で使い続ける。
 const LINE_SPEED_OVERRIDES: &[(i32, TrainTypeKind, f64)] = &[
     // 総武快速線: 最高 130km/h の別線を走る。StationAPI の路線には快速の停車駅しか
     // 無く、通過駅が無いので推定は各停 (Default) として扱う。一般則の 80km/h では

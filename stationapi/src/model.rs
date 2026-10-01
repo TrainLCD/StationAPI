@@ -347,7 +347,7 @@ pub struct RouteLeg {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TrainRouteModel {
     /// 追加した時点 (#1568) のモデル。`dto::simulation::resolve_speed_profile` の
-    /// 最高速度・加減速を返し、到着・出発の見込みは返さない。MobileApp の
+    /// 最高速度・加減速を返し、到着・出発の見込みは返さない。配布済みの MobileApp の
     /// オートモードが使う。既定。
     #[default]
     Legacy,

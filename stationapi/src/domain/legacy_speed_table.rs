@@ -1,13 +1,12 @@
-//! 元の速度の較正テーブル。`trainRoute` の `Estimated` 以外のすべて
-//! (`estimateArrivalTimes`、`connectedRoutes`、`trainRoute` の `Legacy` = MobileApp の
-//! オートモード) が使う。
+//! 元の速度の較正テーブル。`connectedRoutes` の所要時間と `trainRoute` の `Legacy`
+//! が使う。
 //!
 //! `speed_table` / `segment_speed_table` は、駅間の距離に線路の長さを使う前提で
-//! 求め直した (#1712)。求め直した較正は `trainRoute` の `Estimated` (MobileApp の GPX の
-//! 生成) だけが使い、ほかの推定の値が変わらないよう、求め直す前の表
+//! 求め直した (#1712)。求め直した較正は到着見込み (`estimateArrivalTimes` と
+//! `trainRoute` の `Estimated`) が使う。経路検索の結果が変わらないよう、求め直す前の表
 //! (TrainLCD/StationAPI の `dev`、#1711 の時点) をここに凍結して持つ。
 //! `scripts/compute_speed_table.py` はこのファイルを書き換えない。値を変えると
-//! ETA・経路検索・オートモードが変わるので、変えないこと。
+//! 経路検索の結果が変わるので、変えないこと。
 
 use crate::domain::segment_speed_table::segment_override_applies_to_kind;
 use crate::model::TrainTypeKind;

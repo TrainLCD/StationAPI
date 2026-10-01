@@ -1,6 +1,6 @@
-//! 実際の所要時間 (`travel_times/cases.csv`) に対する `trainRoute` の `Estimated`
-//! (MobileApp の GPX の生成が使う推定) の回帰の見張り。`estimateArrivalTimes` と
-//! `connectedRoutes` は元の較正のままなので、ここでは測らない。
+//! 実際の所要時間 (`travel_times/cases.csv`) に対する到着時間推定 (`trainRoute` の
+//! `Estimated`。`estimateArrivalTimes` と同じ値) の回帰の見張り。`connectedRoutes` の
+//! 所要時間は元の較正のままなので、ここでは測らない。
 //!
 //! 基準ごとに推定の所要時間を出し、実際の典型的な所要時間 (平日日中の中央値) から
 //! のずれを求める。記録した推定 (`travel_times/baseline.csv`) より悪くなった基準が
@@ -156,8 +156,8 @@ fn estimate(case: &Case) -> Option<f64> {
         from_station_id: case.from_station_id,
         to_station_id: case.slice_end_station_id,
     }];
-    // 見張るのは trainRoute の Estimated (GPX の生成が使う推定)。estimateArrivalTimes と
-    // connectedRoutes は元の較正のままで、推定の規則や較正を変えても動かない
+    // 見張るのは trainRoute の Estimated (estimateArrivalTimes と同じ値)。connectedRoutes の
+    // 所要時間は元の較正のままで、推定の規則や較正を変えても動かない
     let segments =
         block_on(crate::interactor().get_connected_train_route(&legs, TrainRouteModel::Estimated))
             .unwrap_or_else(|e| panic!("{}: 推定できない: {e}", case.label));

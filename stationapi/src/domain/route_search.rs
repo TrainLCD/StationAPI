@@ -145,8 +145,9 @@ pub enum JourneySort {
     /// [`RouteNetwork::search`] が返す順そのもの。
     #[default]
     Recommended,
-    /// 到着の早い順。[`Journey::total_seconds`] (`estimateArrivalTimes` の見込みと
-    /// 同じく、最初の列車の待ち時間を含まない) の小さい順で、同じなら乗換の少ない順。
+    /// 到着の早い順。[`Journey::total_seconds`] (最初の列車の待ち時間を含まない) の
+    /// 小さい順で、同じなら乗換の少ない順。所要時間は元の較正で見積もるので、
+    /// `estimateArrivalTimes` の見込みとは一致しない。
     ArrivalTime,
     /// 乗換の少ない順。同じなら到着の早い順。
     TransferCount,

@@ -947,7 +947,7 @@ where
         &self,
         legs: &[model::RouteLegRequest],
     ) -> Result<Vec<EstimatedStop>, UseCaseError> {
-        self.estimate_legs(legs, false).await
+        self.estimate_legs(legs).await
     }
 
     async fn get_connected_train_route(
@@ -982,11 +982,10 @@ where
             // 区間ごとに別の列車なので、通過駅の有無や距離の起点も区間ごとに数える
             segments.extend(self.train_route_segments(sliced, leg.line_group_id).await?);
         }
-        // 見込みは estimateArrivalTimes に同じ legs を渡したときと同じ組み立て方
-        // (乗換の徒歩と待ち時間の見込みも含む) で、較正と駅間の距離だけを Estimated の
-        // もの (求め直した較正と線路の長さ) にする。バスは推定のモデルの対象外
+        // 見込みは estimateArrivalTimes に同じ legs を渡したときと同じ値にする
+        // (乗換の徒歩と待ち時間の見込みも含む)。バスは推定のモデルの対象外
         if estimated_model && !has_bus {
-            let estimated = self.estimate_legs(legs, true).await?;
+            let estimated = self.estimate_legs(legs).await?;
             apply_estimated_model(&mut segments, &estimated)?;
         }
         Ok(segments)
@@ -1133,16 +1132,17 @@ where
             .await?;
 
         let route_row_tree_map = self.build_route_tree_map(&stops);
-        let params = EstimationParams::default();
+        let params = arrival_estimation_params();
 
         let mut result: Vec<EstimatedStop> = Vec::new();
         for group_stops in route_row_tree_map.values() {
+            let track = self.track_distances_of(group_stops).await?;
             if let Some(segment) = estimate_group_segment(
                 group_stops,
                 SegmentEndpoints::exact(from_station_id, to_station_id),
                 direction_id.is_some(),
                 &params,
-                None,
+                Some(&track),
             ) {
                 result.extend(segment);
             }
@@ -1159,21 +1159,15 @@ where
     TR: TrainTypeRepository,
     CR: CompanyRepository,
 {
-    /// 区間 (`legs`) をつないだ経路の到着見込み。`estimated_model` が真なら
-    /// `trainRoute` の `Estimated` 用で、求め直した較正と線路の長さで推定する。
-    /// 偽なら `estimateArrivalTimes` 用で、元の較正と直線距離 × 迂回係数で推定する
-    /// (`connectedRoutes` の所要時間と同じ見積もり)。
+    /// 区間 (`legs`) をつないだ経路の到着見込み。`estimateArrivalTimes` と
+    /// `trainRoute` の `Estimated` が使い、求め直した較正と線路の長さで推定する。
+    /// `connectedRoutes` の所要時間は元の較正で見積もるので、この値とは一致しない。
     async fn estimate_legs(
         &self,
         legs: &[model::RouteLegRequest],
-        estimated_model: bool,
     ) -> Result<Vec<EstimatedStop>, UseCaseError> {
         let group_of = self.validate_route_legs(legs).await?;
-        let params = if estimated_model {
-            estimated_model_params()
-        } else {
-            EstimationParams::default()
-        };
+        let params = arrival_estimation_params();
         let walk_minutes = f64::from(route_search::TRANSFER_WALK_SECONDS) / 60.0;
 
         let mut result: Vec<EstimatedStop> = Vec::new();
@@ -1185,11 +1179,7 @@ where
                 .get_by_line_group_id(leg.line_group_id)
                 .await?;
             let group_stops: Vec<&Station> = stations.iter().collect();
-            let track = if estimated_model {
-                Some(self.track_distances_of(&group_stops).await?)
-            } else {
-                None
-            };
+            let track = self.track_distances_of(&group_stops).await?;
             let (from_group, to_group) =
                 (group_of[&leg.from_station_id], group_of[&leg.to_station_id]);
             let segment = estimate_group_segment(
@@ -1201,12 +1191,12 @@ where
                 },
                 false,
                 &params,
-                track.as_ref(),
+                Some(&track),
             )
             .ok_or_else(|| leg_not_found(leg))?;
 
             // 乗換では、乗換駅に歩いて着いた時刻を到着、乗換先の列車を待った後を
-            // 出発とする。見込みは connectedRoutes の所要時間と同じ (最初の列車の
+            // 出発とする。徒歩と待ち時間の見込みは connectedRoutes と同じ (最初の列車の
             // 待ち時間は含めない)
             let (board_arrival, board_departure) = match result.last() {
                 Some(previous) if index > 0 => {
@@ -2105,15 +2095,15 @@ fn estimate_train_route_slice(
     Some(estimate_arrival_minutes_with_track(
         &stops,
         &route,
-        &estimated_model_params(),
+        &arrival_estimation_params(),
         Some(track),
     ))
 }
 
-/// `trainRoute` の `Estimated` だけが使う推定のパラメータ。駅間の距離に線路の長さを
-/// 使う前提で求め直した較正を使う。ほかの推定 (`estimateArrivalTimes`、
-/// `connectedRoutes`) は元の較正 ([`EstimationParams::default`]) のまま。
-fn estimated_model_params() -> EstimationParams {
+/// 到着見込み (`estimateArrivalTimes` と `trainRoute` の `Estimated`) の推定の
+/// パラメータ。駅間の距離に線路の長さを使う前提で求め直した較正を使う。
+/// `connectedRoutes` の所要時間は元の較正 ([`EstimationParams::default`]) のまま。
+fn arrival_estimation_params() -> EstimationParams {
     EstimationParams {
         speed_calibration: SpeedCalibration::Recalibrated,
         ..EstimationParams::default()
@@ -6502,7 +6492,7 @@ mod tests {
 
             let slice: Vec<&Station> = group[2..=6].iter().collect();
             let whole: Vec<&Station> = group.iter().collect();
-            let params = estimated_model_params();
+            let params = arrival_estimation_params();
             let track = interactor.track_distances_of(&whole).await.unwrap();
             assert!(
                 !track.is_empty(),

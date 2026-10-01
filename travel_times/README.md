@@ -1,8 +1,8 @@
 # travel_times/
 
-`trainRoute` の `Estimated` (MobileApp の GPX の生成が使う到着時間推定) の所要時間を、
-実際の列車の所要時間と比べるための基準を置く場所です。`estimateArrivalTimes` と
-`connectedRoutes` は元の較正のままなので、ここでは測りません。速度の較正テーブルや一般則は、
+到着時間推定 (`estimateArrivalTimes` と、同じ値を返す `trainRoute` の `Estimated`) の
+所要時間を、実際の列車の所要時間と比べるための基準を置く場所です。`connectedRoutes` の
+所要時間は元の較正のままなので、ここでは測りません。速度の較正テーブルや一般則は、
 1 つの路線に合わせて変えると、同じ規則を使うほかの路線の推定も変わります。
 変更の前後で全体の誤差を測り、局所的な合わせ込みで全体が崩れないようにします。
 
