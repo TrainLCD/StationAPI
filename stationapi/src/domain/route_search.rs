@@ -15,7 +15,7 @@
 //!   徒歩 [`TRANSFER_WALK_SECONDS`] を加える。同じ駅グループ内でのみ乗り換え、
 //!   駅グループを跨ぐ徒歩連絡は扱わない。
 //! - 1 回の探索で走査するのは「前ラウンドで到着が改善した駅を通るパターン」
-//!   だけで、計算量は O(乗車回数 × 触れたパターンの駅数)。駅と路線の全組み合わせを
+//!   だけ。通常・単一通過路線は O(n)、複数通過路線は O(n²) の区間走査を行う。駅と路線の全組み合わせを
 //!   列挙しない。
 //!
 //! パレート解は最短と最少乗換しか含まないため、代替経路は「見つかった経路の
@@ -77,6 +77,23 @@ fn rank_score(cost: i64, legs: &[LegRef]) -> i64 {
     cost + TRANSFER_RANK_SECONDS * legs.len().saturating_sub(1) as i64
 }
 
+/// The frequent special case: interval speed depends on one line's passed stops.
+#[derive(Clone, Debug)]
+struct SinglePassTimes {
+    arrival: Vec<f64>,
+    departure: Vec<f64>,
+    reverse_arrival: Vec<f64>,
+    reverse_departure: Vec<f64>,
+    pass_prefix: Vec<usize>,
+}
+
+fn push_board(queue: &mut VecDeque<(f64, usize)>, base: f64, board: usize) {
+    while queue.back().is_some_and(|&(old, _)| base <= old) {
+        queue.pop_back();
+    }
+    queue.push_back((base, board));
+}
+
 /// 1 系統(列車種別の停車パターン)。
 #[derive(Clone, Debug)]
 struct Pattern {
@@ -96,6 +113,7 @@ struct Pattern {
     reverse_arrival: Vec<f64>,
     reverse_departure: Vec<f64>,
     interval_seconds: Option<Vec<i32>>,
+    single_pass: Option<SinglePassTimes>,
     circular: bool,
     /// 乗車時に評価値へ加える平均待ち時間(秒)。
     boarding_wait: Vec<i32>,
@@ -114,6 +132,19 @@ impl Pattern {
     fn ride_seconds(&self, board: usize, alight: usize) -> i32 {
         if let Some(times) = &self.interval_seconds {
             return times[board * self.span() + alight];
+        }
+        if let Some(times) = &self.single_pass {
+            let passing =
+                times.pass_prefix[board.max(alight)] > times.pass_prefix[board.min(alight)];
+            if passing {
+                return (if board < alight {
+                    times.arrival[alight] - times.departure[board]
+                } else {
+                    let end = self.span() - 1;
+                    times.reverse_arrival[end - alight] - times.reverse_departure[end - board]
+                })
+                .round() as i32;
+            }
         }
         let seconds = if board < alight {
             self.arrival[alight] - self.departure[board]
@@ -402,9 +433,31 @@ impl RouteNetwork {
         let local = HashMap::new();
         let (arrival, departure) = cumulative(&unrolled, &local);
         let (reverse_arrival, reverse_departure) = cumulative(&reverse, &local);
+        let single_pass = if variable_lines.len() == 1 {
+            let line = *variable_lines.iter().next().unwrap();
+            let profile = HashMap::from([(line, true)]);
+            let (arrival, departure) = cumulative(&unrolled, &profile);
+            let (reverse_arrival, reverse_departure) = cumulative(&reverse, &profile);
+            let mut pass_prefix = vec![0];
+            for station in &unrolled {
+                pass_prefix.push(
+                    pass_prefix.last().unwrap()
+                        + usize::from(station.line_cd == line && !is_stoppable(station)),
+                );
+            }
+            Some(SinglePassTimes {
+                arrival,
+                departure,
+                reverse_arrival,
+                reverse_departure,
+                pass_prefix,
+            })
+        } else {
+            None
+        };
         // Only services whose speed depends on the selected interval need a dense
         // table. Compile each distinct pass-line profile once, never during search.
-        let interval_seconds = if variable_lines.is_empty() {
+        let interval_seconds = if variable_lines.len() <= 1 {
             None
         } else {
             let mut profiles = HashMap::new();
@@ -471,6 +524,7 @@ impl RouteNetwork {
             reverse_arrival,
             reverse_departure,
             interval_seconds,
+            single_pass,
             circular,
             boarding_wait: stations.iter().map(service_rules::boarding_wait).collect(),
         });
@@ -901,7 +955,7 @@ impl RoundState<'_> {
     ///
     /// 乗車中は「基準値 + 降車キー」で各駅の到着を求める。前向きなら
     /// 到着 = 前ラウンドの評価値 + 徒歩 + 待ち − 出発(乗車駅) + 到着(降車駅)、
-    /// 後ろ向きは所要時間が対称であることを使い 出発と到着の役割を入れ替える。
+    /// 後ろ向きは逆方向の累積時分を使う。区間依存の速度は別の乗車ラベルで評価する。
     fn scan<I: Iterator<Item = usize>>(
         &mut self,
         pattern_index: u32,
@@ -913,6 +967,8 @@ impl RoundState<'_> {
         let end = pattern.span() - 1;
         let mut boarded: VecDeque<(f64, usize)> = VecDeque::new();
         let mut candidates: Vec<(i64, usize)> = Vec::new();
+        let mut passing: VecDeque<(f64, usize)> = VecDeque::new();
+        let mut pending: VecDeque<(f64, usize)> = VecDeque::new();
         for q in positions {
             let stop = q % len;
             if pattern.circular {
@@ -923,12 +979,30 @@ impl RoundState<'_> {
                     boarded.pop_front();
                 }
                 candidates.retain(|&(_, board)| q.abs_diff(board) < len);
+                for queue in [&mut passing, &mut pending] {
+                    while queue
+                        .front()
+                        .is_some_and(|&(_, board)| q.abs_diff(board) >= len)
+                    {
+                        queue.pop_front();
+                    }
+                }
+            }
+            if pattern
+                .single_pass
+                .as_ref()
+                .is_some_and(|times| times.pass_prefix[q + 1] > times.pass_prefix[q])
+            {
+                for (base, board) in pending.drain(..) {
+                    push_board(&mut passing, base, board);
+                }
+                boarded.clear();
             }
             if !pattern.stoppable[stop] {
                 continue;
             }
             let node = pattern.nodes[stop] as usize;
-            let best_board = if pattern.interval_seconds.is_some() {
+            let mut best_board = if pattern.interval_seconds.is_some() {
                 candidates
                     .iter()
                     .map(|&(base, board)| (base + i64::from(pattern.ride_seconds(board, q)), board))
@@ -943,6 +1017,18 @@ impl RoundState<'_> {
                     ((base + arrival).round() as i64, board)
                 })
             };
+            if let (Some(times), Some(&(base, board))) = (&pattern.single_pass, passing.front()) {
+                let value = base
+                    + if forward {
+                        times.arrival[q]
+                    } else {
+                        times.reverse_arrival[end - q]
+                    };
+                let candidate = (value.round() as i64, board);
+                if best_board.is_none_or(|old| candidate.0 < old.0) {
+                    best_board = Some(candidate);
+                }
+            }
             if let Some((arrival, board)) =
                 best_board.filter(|_| pattern.dropoff[usize::from(forward)][stop])
             {
@@ -979,10 +1065,15 @@ impl RoundState<'_> {
                     pattern.reverse_departure[end - q]
                 };
                 let base = cost as f64 - departure;
-                while boarded.back().is_some_and(|&(old, _)| base <= old) {
-                    boarded.pop_back();
+                push_board(&mut boarded, base, q);
+                if let Some(times) = &pattern.single_pass {
+                    let departure = if forward {
+                        times.departure[q]
+                    } else {
+                        times.reverse_departure[end - q]
+                    };
+                    push_board(&mut pending, cost as f64 - departure, q);
                 }
-                boarded.push_back((base, q));
             }
         }
     }
@@ -1032,6 +1123,54 @@ mod tests {
                     pattern.ride_seconds(board, alight),
                     (expected * 60.0).round() as i32,
                     "{board}->{alight}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn multiple_pass_lines_keep_each_interval_profile() {
+        let mut stations: Vec<_> = (0..7)
+            .map(|i| stop(100, 10000 + i, i + 1, f64::from(i) * 0.01, 0.0))
+            .collect();
+        for (i, station) in stations.iter_mut().enumerate() {
+            station.kind = Some(3);
+            station.line_cd = if i < 3 { 100 } else { 200 };
+        }
+        for i in [1, 4] {
+            stations[i].pass = Some(1);
+            stations[i].stop_condition = StopCondition::Not;
+        }
+        let params = crate::domain::arrival_estimation::routing_estimation_params();
+        let network = RouteNetwork::build(vec![stations.clone()], &params);
+        assert!(network.patterns[0].interval_seconds.is_some());
+        let calibration: Vec<_> = stations.iter().collect();
+        for a in 0..stations.len() {
+            for b in 0..stations.len() {
+                if a == b || stations[a].pass == Some(1) || stations[b].pass == Some(1) {
+                    continue;
+                }
+                let mut slice: Vec<_> = stations[a.min(b)..=a.max(b)].iter().collect();
+                if a > b {
+                    slice.reverse();
+                }
+                let expected =
+                    (estimate_arrival_minutes_with_track(&slice, &calibration, &params, None)
+                        .last()
+                        .unwrap()
+                        .cumulative_minutes
+                        * 60.0)
+                        .round() as i32;
+                assert_eq!(network.patterns[0].ride_seconds(a, b), expected, "{a}->{b}");
+                assert_eq!(
+                    network.search(
+                        stations[a].station_g_cd as u32,
+                        stations[b].station_g_cd as u32,
+                        None
+                    )[0]
+                    .total_seconds,
+                    expected,
+                    "scan {a}->{b}"
                 );
             }
         }
