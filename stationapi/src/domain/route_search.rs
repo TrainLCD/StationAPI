@@ -222,6 +222,66 @@ impl RouteNetwork {
         self.patterns.len()
     }
 
+    /// 既定で選ぶ種別の乗車時間と待ち時間 (秒)。探索で選んだ快速などの値を
+    /// 各停の候補に流用しないため、構築済みの時分を乗降駅で引き直す。
+    /// 駅 ID が系統に無ければ同じ駅グループで引き当て、環状線では短い弧を使う。
+    pub fn ride_seconds(
+        &self,
+        line_group_id: u32,
+        from_station_cd: i32,
+        from_group: u32,
+        to_station_cd: i32,
+        to_group: u32,
+    ) -> Option<(i32, i32)> {
+        let from = *self.node_by_group.get(&from_group)?;
+        let to = *self.node_by_group.get(&to_group)?;
+        let mut best = None;
+        for &(pattern_id, _) in &self.stop_patterns[from as usize] {
+            let pattern = &self.patterns[pattern_id as usize];
+            if pattern.line_group_id != line_group_id {
+                continue;
+            }
+            let positions = |node: u32, cd: i32| {
+                let exact = self.stop_patterns[node as usize]
+                    .iter()
+                    .any(|&(id, pos)| id == pattern_id && pattern.station_cds[pos as usize] == cd);
+                self.stop_patterns[node as usize]
+                    .iter()
+                    .filter(move |&&(id, pos)| {
+                        id == pattern_id && (!exact || pattern.station_cds[pos as usize] == cd)
+                    })
+                    .map(|&(_, pos)| pos as usize)
+            };
+            for board in positions(from, from_station_cd) {
+                for alight in positions(to, to_station_cd) {
+                    let direct = board.abs_diff(alight);
+                    if direct == 0 {
+                        continue;
+                    }
+                    let wraps = pattern.circular && pattern.len() - direct < direct;
+                    let (board, alight, length) = if wraps && board < alight {
+                        (board + pattern.len(), alight, pattern.len() - direct)
+                    } else if wraps {
+                        (board, alight + pattern.len(), pattern.len() - direct)
+                    } else {
+                        (board, alight, direct)
+                    };
+                    let seconds = if board < alight {
+                        pattern.arrival[alight] - pattern.departure[board]
+                    } else {
+                        pattern.arrival[board] - pattern.departure[alight]
+                    };
+                    // 同じグループが複数回出る系統も、ETA の切り出しと同じく
+                    // 駅数が最も少ない区間を使う。同点は格納順を保つ。
+                    if best.is_none_or(|(len, _, _)| length < len) {
+                        best = Some((length, seconds, pattern.boarding_wait));
+                    }
+                }
+            }
+        }
+        best.map(|(_, seconds, wait)| (seconds, wait))
+    }
+
     fn node_of(&mut self, station_group_id: u32) -> u32 {
         let next = self.node_by_group.len() as u32;
         let node = *self.node_by_group.entry(station_group_id).or_insert(next);
@@ -897,6 +957,68 @@ mod tests {
 
     fn line_groups(journey: &Journey) -> Vec<u32> {
         journey.legs.iter().map(|leg| leg.line_group_id).collect()
+    }
+
+    #[test]
+    fn ride_seconds_matches_search_and_rejects_passed_endpoints() {
+        let mut stops = straight(100, &[(1, 0.0, 0.0), (2, 1.0, 0.0), (3, 2.0, 0.0)]);
+        stops[1].pass = Some(1);
+        let network = RouteNetwork::build([stops], &EstimationParams::default());
+        for (from, to, from_cd, to_cd) in [(1, 3, 10000, 10002), (3, 1, 10002, 10000)] {
+            let journey = &network.search(from, to, None)[0];
+            assert_eq!(
+                network.ride_seconds(100, from_cd, from, to_cd, to),
+                Some((journey.total_seconds, 180))
+            );
+            // 別路線の駅 ID でも駅グループで引き当てる。
+            assert_eq!(
+                network.ride_seconds(100, -1, from, -2, to),
+                Some((journey.total_seconds, 180))
+            );
+        }
+        assert_eq!(network.ride_seconds(100, 10000, 1, 10001, 2), None);
+        assert_eq!(network.ride_seconds(999, 10000, 1, 10002, 3), None);
+    }
+
+    #[test]
+    fn ride_seconds_preserves_exact_occurrences_and_circular_seams() {
+        let branch = straight(
+            100,
+            &[
+                (1, 0.0, 0.0),
+                (2, 1.0, 0.0),
+                (3, 1.0, 1.0),
+                (1, 0.0, 0.0),
+                (4, -1.0, 0.0),
+            ],
+        );
+        let network = RouteNetwork::build([branch], &EstimationParams::default());
+        let first = network.ride_seconds(100, 10000, 1, 10004, 4).unwrap().0;
+        let second = network.ride_seconds(100, 10003, 1, 10004, 4).unwrap().0;
+        assert!(
+            first > second,
+            "exact station IDs distinguish the two junction occurrences"
+        );
+        assert_eq!(
+            network.ride_seconds(100, -1, 1, 10004, 4).unwrap().0,
+            second
+        );
+
+        let ring = straight(
+            200,
+            &[(1, 0.0, 0.0), (2, 1.0, 0.0), (3, 1.0, 1.0), (4, 0.0, 1.0)],
+        );
+        let network = RouteNetwork::build([ring], &EstimationParams::default());
+        for (from, to, from_cd, to_cd) in [(1, 4, 20000, 20003), (4, 1, 20003, 20000)] {
+            let journey = &network.search(from, to, None)[0];
+            assert_eq!(
+                network
+                    .ride_seconds(200, from_cd, from, to_cd, to)
+                    .unwrap()
+                    .0,
+                journey.total_seconds
+            );
+        }
     }
 
     /// 1 -2 -3 -4 の東西線 (100) と、3 から北へ 5 -6 の南北線 (200)。

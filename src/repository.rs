@@ -1256,6 +1256,41 @@ mod tests {
     const MITAKA: u32 = 1131105;
     const NAKA_MEGURO: u32 = 2600103;
 
+    /// S-TRAIN や快速で探索した時分を、アプリが既定で選ぶ各停の時分として
+    /// 順位付けしない。都庁前で 1 回乗り換える経路を先頭にする。
+    #[test]
+    fn recommends_tochomae_transfer_between_ueno_okachimachi_and_hikarigaoka() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+        if index::sst_by_group(1_000_099_301).next().is_none() {
+            // 大江戸線の各停は preprocessor が生成するため、data/ だけでは検索できない。
+            return;
+        }
+        let interactor = crate::interactor();
+        for (from, to) in [(1130221, 9930138), (9930138, 1130221)] {
+            let routes = block_on(interactor.get_connected_routes(
+                from,
+                to,
+                Some(99301),
+                JourneySort::Recommended,
+            ))
+            .unwrap();
+            let first = &routes[0];
+            assert_eq!(first.legs.len(), 2, "{routes:?}");
+            assert_eq!(first.legs[0].to_station.group_id, 9930100);
+            assert_eq!(first.legs[1].from_station.group_id, 9930100);
+            assert!(first.legs.iter().all(|leg| leg
+                .train_types
+                .iter()
+                .any(|tt| tt.group_id == 1_000_099_301)));
+            for sort in [JourneySort::ArrivalTime, JourneySort::TransferCount] {
+                let sorted =
+                    block_on(interactor.get_connected_routes(from, to, Some(99301), sort)).unwrap();
+                assert_eq!(sorted.len(), routes.len());
+                assert!(sorted.iter().all(|route| routes.contains(route)));
+            }
+        }
+    }
+
     /// repository の実装は await しない (索引を引くだけ) ので、1 回 poll すれば終わる
     fn block_on<F: std::future::Future>(future: F) -> F::Output {
         let mut context = std::task::Context::from_waker(std::task::Waker::noop());

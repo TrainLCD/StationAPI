@@ -1025,7 +1025,7 @@ where
         }
 
         let network = self.station_repository.get_route_network().await?;
-        let mut journeys = network.search(
+        let journeys = network.search(
             from_station_group_id,
             to_station_group_id,
             via_line_id.map(|id| id as i32),
@@ -1033,9 +1033,6 @@ where
         if journeys.is_empty() {
             return Ok(vec![]);
         }
-        // 所要時間と乗換回数は API で返さないので、並べ替えはここで済ませる
-        route_search::sort_journeys(&mut journeys, sort);
-
         // 探索は ID だけを扱うので、乗降駅と種別は経路が確定してからまとめて取得する
         let station_ids: Vec<u32> = journeys
             .iter()
@@ -1082,7 +1079,7 @@ where
             leg_train_types.insert(key, train_types);
         }
 
-        let routes = journeys
+        let mut routes: Vec<_> = journeys
             .into_iter()
             .filter_map(|journey| {
                 let legs = journey
@@ -1105,10 +1102,51 @@ where
                     })
                     // 駅か種別を引けない区間があれば、その経路は返さない
                     .collect::<Option<Vec<_>>>()?;
-                Some(ConnectedRoute { legs })
+                // MobileApp は各停 (kind Default) を優先し、無ければ先頭の種別を
+                // 選ぶ。探索した快速・特急の時分で各停の候補を上位にしない。
+                let mut cost = 0_i64;
+                let mut first_wait = 0_i64;
+                for (index, leg) in legs.iter().enumerate() {
+                    let train_type = leg
+                        .train_types
+                        .iter()
+                        .find(|tt| tt.kind == model::TrainTypeKind::Default as i32)
+                        .or_else(|| leg.train_types.first())?;
+                    let (ride, wait) = network.ride_seconds(
+                        train_type.group_id,
+                        leg.from_station.id as i32,
+                        leg.from_station.group_id,
+                        leg.to_station.id as i32,
+                        leg.to_station.group_id,
+                    )?;
+                    cost += i64::from(ride) + i64::from(wait);
+                    if index == 0 {
+                        first_wait = i64::from(wait);
+                    } else {
+                        cost += i64::from(route_search::TRANSFER_WALK_SECONDS);
+                    }
+                }
+                let transfers = legs.len().saturating_sub(1);
+                Some((ConnectedRoute { legs }, cost, cost - first_wait, transfers))
             })
             .collect();
-        Ok(routes)
+        // 既定の種別で評価し直したおすすめ順を、他の並び方の同点時にも保つ。
+        routes.sort_by_key(|(_, cost, _, transfers)| {
+            (
+                cost + route_search::TRANSFER_RANK_SECONDS * *transfers as i64,
+                *transfers,
+            )
+        });
+        match sort {
+            JourneySort::Recommended => {}
+            JourneySort::ArrivalTime => {
+                routes.sort_by_key(|(_, _, time, transfers)| (*time, *transfers))
+            }
+            JourneySort::TransferCount => {
+                routes.sort_by_key(|(_, _, time, transfers)| (*transfers, *time))
+            }
+        }
+        Ok(routes.into_iter().map(|(route, _, _, _)| route).collect())
     }
 
     /// `from_station_id` から `to_station_id` までの区間の各駅について、始点からの
