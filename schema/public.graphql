@@ -109,6 +109,7 @@ type Query {
 }
 
 type ConnectedRoute {
+	totalSeconds: Int!
 	legs: [RouteLeg!]
 }
 
@@ -305,6 +306,7 @@ input RouteLegInput {
 }
 
 type RouteLeg {
+	recommendedGroupId: Int!
 	trainTypes: [TrainType!]
 	fromStation: Station
 	toStation: Station

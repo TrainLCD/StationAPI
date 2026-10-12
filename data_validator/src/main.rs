@@ -62,9 +62,63 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|row| row.get(1).unwrap().parse::<u32>().unwrap())
         .collect();
 
+    let station_groups: HashSet<i32> = station_records
+        .iter()
+        .map(|r| r[1].parse().unwrap())
+        .collect();
+    let mut seen = HashSet::new();
+    for rule in stationapi::domain::service_rules::parse_service_rules(&std::fs::read_to_string(
+        data_path.join("route_service_rules.csv"),
+    )?)? {
+        assert!(
+            type_ids.contains(&(rule.type_cd as u32)),
+            "unknown rule type"
+        );
+        assert!(
+            seen.insert((rule.type_cd, rule.line_group_id)),
+            "duplicate service rule"
+        );
+        assert!(
+            rule.boarding_wait_seconds.is_none_or(|s| s >= 0),
+            "negative wait"
+        );
+    }
+    let mut seen = HashSet::new();
+    for rule in stationapi::domain::service_rules::parse_stop_rules(&std::fs::read_to_string(
+        data_path.join("route_stop_rules.csv"),
+    )?)? {
+        assert!(
+            type_ids.contains(&(rule.type_cd as u32)),
+            "unknown stop rule type"
+        );
+        assert!(
+            station_groups.contains(&rule.station_group_id),
+            "unknown stop rule group"
+        );
+        assert!(
+            seen.insert((rule.type_cd, rule.station_group_id)),
+            "duplicate stop rule"
+        );
+    }
+
     let mut rdr = ReaderBuilder::new().from_path(data_path.join("5!station_station_types.csv"))?;
     let records: Vec<StringRecord> = rdr.records().collect::<Result<Vec<_>, _>>()?;
 
+    for rule in stationapi::domain::service_rules::parse_service_rules(&std::fs::read_to_string(
+        data_path.join("route_service_rules.csv"),
+    )?)? {
+        if let Some(group) = rule.line_group_id {
+            assert!(
+                records
+                    .iter()
+                    .any(
+                        |r| r.get(2).and_then(|v| v.parse::<i32>().ok()) == Some(rule.type_cd)
+                            && r.get(3).and_then(|v| v.parse::<i32>().ok()) == Some(group)
+                    ),
+                "unknown service rule group"
+            );
+        }
+    }
     for record in &records {
         let line = || record.iter().collect::<Vec<&str>>().join(",");
 

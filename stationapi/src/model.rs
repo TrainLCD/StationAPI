@@ -315,6 +315,7 @@ pub struct Route {
 /// 乗換経路探索 (`connectedRoutes`) の経路 1 本。
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ConnectedRoute {
+    pub total_seconds: i32,
     pub legs: Vec<RouteLeg>,
 }
 
@@ -331,6 +332,7 @@ pub struct RouteLegRequest {
 /// 乗換経路の 1 区間 (1 本の列車)。
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct RouteLeg {
+    pub recommended_group_id: u32,
     /// この区間で乗れる列車種別すべて。`routeTypes(乗車駅グループ, 降車駅グループ,
     /// 降車駅の路線)` と同じ結果・同じ並び。
     pub train_types: Vec<TrainType>,

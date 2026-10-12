@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, OnceLock};
 
+#[cfg(test)]
 use stationapi::domain::arrival_estimation::EstimationParams;
 use stationapi::domain::entity::company::Company;
 use stationapi::domain::entity::gtfs::TransportType;
@@ -158,9 +159,10 @@ fn route_network() -> &'static Arc<RouteNetwork> {
 }
 
 fn build_route_network() -> RouteNetwork {
-    RouteNetwork::build(
+    RouteNetwork::build_with_track(
         rail_line_group_cds().map(|group| stations_of_line_groups(&[group as u32])),
-        &EstimationParams::default(),
+        &stationapi::domain::arrival_estimation::routing_estimation_params(),
+        index::track_distance,
     )
 }
 
@@ -174,18 +176,27 @@ fn route_topology() -> &'static RouteTopology {
 }
 
 fn build_route_topology() -> RouteTopology {
-    RouteTopology::build(rail_line_group_cds().map(|group| {
-        line_group_rows(group)
-            .map(|(sst, record, _, _)| RouteStop {
-                station_cd: record.station_cd,
-                station_group_id: record.station_g_cd as u32,
-                line_cd: record.line_cd,
-                // RouteNetwork は pass と stop_condition で判定する。apply_train_type は
-                // pass == 1 のときだけ stop_condition を Not にするので同じ結果になる
-                stoppable: sst.pass != Some(1),
+    RouteTopology::build(
+        rail_line_group_cds()
+            .filter(|&group| {
+                !index::sst_by_group(group).next().is_some_and(|sst| {
+                    stationapi::domain::service_rules::service_rule(Some(sst.type_cd), Some(group))
+                        .is_some_and(|r| r.requires_timetable)
+                })
             })
-            .collect()
-    }))
+            .map(|group| {
+                line_group_rows(group)
+                    .map(|(sst, record, _, _)| RouteStop {
+                        station_cd: record.station_cd,
+                        station_group_id: record.station_g_cd as u32,
+                        line_cd: record.line_cd,
+                        // RouteNetwork は pass と stop_condition で判定する。apply_train_type は
+                        // pass == 1 のときだけ stop_condition を Not にするので同じ結果になる
+                        stoppable: sst.pass != Some(1),
+                    })
+                    .collect()
+            }),
+    )
 }
 
 // ---------------------------------------------------------------- 駅
@@ -1289,6 +1300,80 @@ mod tests {
                 assert!(sorted.iter().all(|route| routes.contains(route)));
             }
         }
+    }
+
+    #[test]
+    fn recommended_services_and_durations_match_eta() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+        if index::sst_by_group(1_000_099_301).next().is_none() {
+            return;
+        }
+        let interactor = crate::interactor();
+        for (from, to) in [
+            (1130221, 9930138),
+            (9930138, 1130221),
+            (1130101, 1130205),
+            (1131105, 2600103),
+            (1131906, 1160155),
+        ] {
+            let routes =
+                block_on(interactor.get_connected_routes(from, to, None, JourneySort::Recommended))
+                    .unwrap();
+            for route in routes {
+                let legs: Vec<_> = route
+                    .legs
+                    .iter()
+                    .map(|leg| {
+                        assert!(leg
+                            .train_types
+                            .iter()
+                            .any(|tt| tt.group_id == leg.recommended_group_id));
+                        model::RouteLegRequest {
+                            line_group_id: leg.recommended_group_id,
+                            from_station_id: leg.from_station.id,
+                            to_station_id: leg.to_station.id,
+                        }
+                    })
+                    .collect();
+                let estimates =
+                    block_on(interactor.estimate_connected_route_arrival_times(&legs)).unwrap();
+                let expected = estimates.last().unwrap().cumulative_minutes * 60.0;
+                assert!(
+                    (f64::from(route.total_seconds) - expected).abs() <= route.legs.len() as f64,
+                    "{from}->{to}: {} / {expected}",
+                    route.total_seconds
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "manual performance comparison; run with --ignored --nocapture"]
+    fn route_network_performance_report() {
+        let started = std::time::Instant::now();
+        let network = build_route_network();
+        let build = started.elapsed();
+        let mut samples = Vec::new();
+        for _ in 0..10 {
+            for (from, to) in [
+                (1130221, 9930138),
+                (9930138, 1130221),
+                (1130101, 1130205),
+                (1131105, 2600103),
+                (1131906, 1160155),
+            ] {
+                let started = std::time::Instant::now();
+                std::hint::black_box(network.search(from, to, None));
+                samples.push(started.elapsed());
+            }
+        }
+        samples.sort_unstable();
+        eprintln!(
+            "PERF patterns={} build={build:?} median={:?} p95={:?}",
+            network.pattern_count(),
+            samples[25],
+            samples[47]
+        );
     }
 
     /// repository の実装は await しない (索引を引くだけ) ので、1 回 poll すれば終わる

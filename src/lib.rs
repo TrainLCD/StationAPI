@@ -122,3 +122,33 @@ fn with_cors(response: Response) -> Result<Response> {
     headers.set("content-type", "text/plain; charset=utf-8")?;
     Ok(response.with_headers(headers))
 }
+
+#[cfg(test)]
+mod route_metadata_tests {
+    use std::future::Future;
+    #[test]
+    fn schema_and_response_expose_the_evaluated_service() {
+        let schema = crate::graphql::build_schema(crate::interactor());
+        if let Ok(path) = std::env::var("STATIONAPI_SCHEMA_OUT") {
+            std::fs::write(path, schema.sdl()).unwrap();
+        }
+        let future = schema.execute("{ connectedRoutes(fromStationGroupId: 1130221, toStationGroupId: 9930138) { totalSeconds legs { recommendedGroupId trainTypes { groupId } } } }");
+        let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+        let result = match std::pin::pin!(future).poll(&mut context) {
+            std::task::Poll::Ready(value) => value,
+            _ => panic!("in-memory execution must complete"),
+        };
+        assert!(result.errors.is_empty(), "{:?}", result.errors);
+        let data = result.data.into_json().unwrap();
+        for route in data["connectedRoutes"].as_array().unwrap() {
+            assert!(route["totalSeconds"].as_i64().unwrap() > 0);
+            for leg in route["legs"].as_array().unwrap() {
+                assert!(leg["trainTypes"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|tt| tt["groupId"] == leg["recommendedGroupId"]));
+            }
+        }
+    }
+}

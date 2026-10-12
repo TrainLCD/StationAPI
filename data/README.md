@@ -307,3 +307,15 @@ preprocessor が国土数値情報の鉄道データ（N02）から自動で求�
 ---
 
 **注意**: データの品質は最終的な API の品質に直結します。正確で一貫性のあるデータ入力にご協力ください。なお、データの変更は Pull Request のマージ後に開発環境での動作確認を経て本番環境に反映されます。
+
+## 経路探索の運行制約
+
+`route_service_rules.csv` には `type_cd`、任意の `line_group_id`、
+`requires_timetable`、任意の `boarding_wait_seconds`、根拠の `source` を記載します。
+時刻表を入力しない経路探索では `requires_timetable` の系統を除きます。
+系統を指定した規則を種別全体の規則より優先します。
+
+`route_stop_rules.csv` には種別と駅グループ、格納順・逆順の乗車・降車許可を
+記載します。通過駅を停車駅へ変更する規則ではありません。
+両ファイルを変更した場合は `cargo run -p data_validator` で参照 ID と重複を検査し、
+Worker を再ビルドしてください。根拠は各行の `source` に記載します。

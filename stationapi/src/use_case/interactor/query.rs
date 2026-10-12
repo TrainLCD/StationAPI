@@ -25,7 +25,7 @@ use crate::{
     domain::{
         arrival_estimation::{
             estimate_arrival_minutes_with_track, is_circular_route, select_circular_arc,
-            track_distance_key, EstimatedStop, EstimationParams, SpeedCalibration, TrackDistances,
+            track_distance_key, EstimatedStop, EstimationParams, TrackDistances,
         },
         entity::{
             company::Company,
@@ -1025,11 +1025,12 @@ where
         }
 
         let network = self.station_repository.get_route_network().await?;
-        let journeys = network.search(
+        let mut journeys = network.search(
             from_station_group_id,
             to_station_group_id,
             via_line_id.map(|id| id as i32),
         );
+        route_search::sort_journeys(&mut journeys, sort);
         if journeys.is_empty() {
             return Ok(vec![]);
         }
@@ -1079,7 +1080,33 @@ where
             leg_train_types.insert(key, train_types);
         }
 
-        let mut routes: Vec<_> = journeys
+        // routeTypes deduplicates equivalent services. Keep the actual evaluated
+        // group available even when that presentation dedup omitted it.
+        for leg in journeys.iter().flat_map(|journey| &journey.legs) {
+            let Some(to_station) = leg.station_cds.last().and_then(|cd| stations.get(cd)) else {
+                continue;
+            };
+            let key = (
+                *leg.station_group_ids.first().unwrap(),
+                *leg.station_group_ids.last().unwrap(),
+                to_station.line_cd as u32,
+            );
+            let Some(types) = leg_train_types.get_mut(&key) else {
+                continue;
+            };
+            if !types.iter().any(|tt| tt.group_id == leg.line_group_id) {
+                if let Some(preferred) = self
+                    .get_train_types_by_station_id(leg.station_cds[0] as u32)
+                    .await?
+                    .into_iter()
+                    .find(|tt| tt.line_group_cd == Some(leg.line_group_id as i32))
+                {
+                    types.push(model::TrainType::from(preferred));
+                }
+            }
+        }
+
+        let routes: Vec<_> = journeys
             .into_iter()
             .filter_map(|journey| {
                 let legs = journey
@@ -1093,7 +1120,15 @@ where
                             *leg.station_group_ids.last()?,
                             to_station.line_cd as u32,
                         );
+                        if !leg_train_types
+                            .get(&key)?
+                            .iter()
+                            .any(|tt| tt.group_id == leg.line_group_id)
+                        {
+                            return None;
+                        }
                         Some(model::RouteLeg {
+                            recommended_group_id: leg.line_group_id,
                             train_types: leg_train_types.get(&key)?.clone(),
                             from_station: model::Station::from(from_station.clone()),
                             to_station: model::Station::from(to_station.clone()),
@@ -1102,51 +1137,13 @@ where
                     })
                     // 駅か種別を引けない区間があれば、その経路は返さない
                     .collect::<Option<Vec<_>>>()?;
-                // MobileApp は各停 (kind Default) を優先し、無ければ先頭の種別を
-                // 選ぶ。探索した快速・特急の時分で各停の候補を上位にしない。
-                let mut cost = 0_i64;
-                let mut first_wait = 0_i64;
-                for (index, leg) in legs.iter().enumerate() {
-                    let train_type = leg
-                        .train_types
-                        .iter()
-                        .find(|tt| tt.kind == model::TrainTypeKind::Default as i32)
-                        .or_else(|| leg.train_types.first())?;
-                    let (ride, wait) = network.ride_seconds(
-                        train_type.group_id,
-                        leg.from_station.id as i32,
-                        leg.from_station.group_id,
-                        leg.to_station.id as i32,
-                        leg.to_station.group_id,
-                    )?;
-                    cost += i64::from(ride) + i64::from(wait);
-                    if index == 0 {
-                        first_wait = i64::from(wait);
-                    } else {
-                        cost += i64::from(route_search::TRANSFER_WALK_SECONDS);
-                    }
-                }
-                let transfers = legs.len().saturating_sub(1);
-                Some((ConnectedRoute { legs }, cost, cost - first_wait, transfers))
+                Some(ConnectedRoute {
+                    legs,
+                    total_seconds: journey.total_seconds,
+                })
             })
             .collect();
-        // 既定の種別で評価し直したおすすめ順を、他の並び方の同点時にも保つ。
-        routes.sort_by_key(|(_, cost, _, transfers)| {
-            (
-                cost + route_search::TRANSFER_RANK_SECONDS * *transfers as i64,
-                *transfers,
-            )
-        });
-        match sort {
-            JourneySort::Recommended => {}
-            JourneySort::ArrivalTime => {
-                routes.sort_by_key(|(_, _, time, transfers)| (*time, *transfers))
-            }
-            JourneySort::TransferCount => {
-                routes.sort_by_key(|(_, _, time, transfers)| (*transfers, *time))
-            }
-        }
-        Ok(routes.into_iter().map(|(route, _, _, _)| route).collect())
+        Ok(routes)
     }
 
     /// `from_station_id` から `to_station_id` までの区間の各駅について、始点からの
@@ -1238,9 +1235,13 @@ where
             // 待ち時間は含めない)
             let (board_arrival, board_departure) = match result.last() {
                 Some(previous) if index > 0 => {
-                    let wait_minutes = f64::from(route_search::boarding_wait_seconds(
-                        group_stops.first().and_then(|s| s.kind),
-                    )) / 60.0;
+                    let wait_minutes = f64::from(
+                        segment
+                            .first()
+                            .and_then(|e| group_stops.iter().find(|s| s.station_cd == e.station_cd))
+                            .map(|s| crate::domain::service_rules::boarding_wait(s))
+                            .unwrap_or(0),
+                    ) / 60.0;
                     let arrival = previous.cumulative_minutes + walk_minutes;
                     (arrival, arrival + wait_minutes)
                 }
@@ -2140,12 +2141,9 @@ fn estimate_train_route_slice(
 
 /// 到着見込み (`estimateArrivalTimes` と `trainRoute` の `Estimated`) の推定の
 /// パラメータ。駅間の距離に線路の長さを使う前提で求め直した較正を使う。
-/// `connectedRoutes` の所要時間は元の較正 ([`EstimationParams::default`]) のまま。
+/// `connectedRoutes` も同じパラメータを使う。
 fn arrival_estimation_params() -> EstimationParams {
-    EstimationParams {
-        speed_calibration: SpeedCalibration::Recalibrated,
-        ..EstimationParams::default()
-    }
+    crate::domain::arrival_estimation::routing_estimation_params()
 }
 
 /// `trainRoute` の区間の値を、到着見込み `estimated` のモデルの値に置き換える

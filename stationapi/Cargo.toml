@@ -9,6 +9,7 @@ edition = "2021"
 # I/O を伴う依存は入れない。
 
 [dependencies]
+csv = "1"
 async-trait = "0.1.68"
 serde = { version = "1.0.189", features = ["derive"] }
 anyhow = "1.0.71"
