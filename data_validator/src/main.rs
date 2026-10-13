@@ -62,6 +62,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|row| row.get(1).unwrap().parse::<u32>().unwrap())
         .collect();
 
+    // Keep the evidence attached to its actual canonical type, rather than a
+    // silently mistyped numeric ID (e.g. commuter express vs holiday S-TRAIN).
+    let type_names: std::collections::HashMap<i32, &str> = records
+        .iter()
+        .map(|row| (row[1].parse().unwrap(), &row[2]))
+        .collect();
+    let mut rules_reader =
+        ReaderBuilder::new().from_path(data_path.join("route_service_rules.csv"))?;
+    let headers = rules_reader.headers()?.clone();
+    let column = |name| headers.iter().position(|h| h == name).expect(name);
+    for row in rules_reader.records() {
+        let row = row?;
+        let type_cd = row[column("type_cd")].parse()?;
+        assert_eq!(
+            type_names.get(&type_cd).copied(),
+            Some(&row[column("type_name")]),
+            "service rule name does not match canonical type {type_cd}"
+        );
+        assert!(
+            row[column("source")].starts_with("https://"),
+            "missing rule source"
+        );
+        assert!(
+            !row[column("reason")].trim().is_empty(),
+            "missing rule reason"
+        );
+        assert!(
+            !row[column("checked_on")].trim().is_empty(),
+            "missing rule verification date"
+        );
+    }
+
     let station_groups: HashSet<i32> = station_records
         .iter()
         .map(|r| r[1].parse().unwrap())

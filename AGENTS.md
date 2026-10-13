@@ -126,5 +126,7 @@ Commands this guide and `.claude/skills/create-pr` rely on:
 - When modifying `QueryInteractor`, ensure the enrichment steps (companies, train types, line symbols) still behave as expected. Double-check helper methods such as `update_station_vec_with_attributes` and `build_route_tree_map`.
 - Introducing new tables, endpoints, or feature flags must come with matching updates to this document and any other affected guidance.
 
+Service-rule evidence must include the canonical `type_name`, `reason`, `checked_on`, and `source` in `data/route_service_rules.csv`. The validator checks names against IDs to prevent a numeric-ID typo from excluding unrelated services. Confirm restricted operation from a primary source and scope shared type IDs to the relevant line groups. See `docs/route-service-audit.md`; do not infer operating availability from calibration-only GTFS samples or a service name alone.
+
 ## Maintenance
 Keep this guide aligned with the repository. If a workflow, environment requirement, or endpoint changes, update AGENTS.md in the same pull request so automation agents and contributors work from current instructions.

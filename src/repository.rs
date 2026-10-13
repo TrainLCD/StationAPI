@@ -1647,6 +1647,57 @@ mod tests {
     }
 
     #[test]
+    fn timetable_required_services_stay_selectable_but_do_not_create_routes() {
+        use stationapi::domain::service_rules::service_rule;
+        let params = stationapi::domain::arrival_estimation::routing_estimation_params();
+        let mut excluded = 0;
+        for group in rail_line_group_cds() {
+            let stations = stations_of_line_groups(&[group as u32]);
+            let first = stations.first().expect("canonical service has stations");
+            if !service_rule(first.type_cd, Some(group)).is_some_and(|r| r.requires_timetable) {
+                continue;
+            }
+            let selectable =
+                block_on(MemTrainTypeRepository.get_by_line_group_id(group as u32)).unwrap();
+            assert!(
+                !selectable.is_empty(),
+                "manual selection lost group {group}"
+            );
+            let from = stations.iter().find(|s| s.pass != Some(1)).unwrap();
+            let to = stations.iter().rev().find(|s| s.pass != Some(1)).unwrap();
+            let network = RouteNetwork::build([stations.clone()], &params);
+            assert_eq!(network.pattern_count(), 0, "admitted group {group}");
+            assert!(network
+                .search(from.station_cd as u32, to.station_cd as u32, None)
+                .is_empty());
+            assert!(network
+                .search(to.station_cd as u32, from.station_cd as u32, None)
+                .is_empty());
+            excluded += 1;
+        }
+        assert!(
+            excluded > 20,
+            "operating audit must cover more than the original services"
+        );
+    }
+
+    #[test]
+    fn regular_rapid_and_commuter_services_are_not_excluded_by_their_names() {
+        let params = stationapi::domain::arrival_estimation::routing_estimation_params();
+        // Tobu rapid express, Tokyu/MM commuter limited express, Seibu rapid:
+        // shared kind/name/ID ranges must not spread a service-specific rule.
+        for group in [239, 184, 420, 1174] {
+            let stations = stations_of_line_groups(&[group]);
+            assert!(!stations.is_empty());
+            let network = RouteNetwork::build([stations], &params);
+            assert!(
+                network.pattern_count() > 0,
+                "regular group {group} excluded"
+            );
+        }
+    }
+
+    #[test]
     fn stations_by_name_includes_stations_reached_by_transfer() {
         // 三鷹から中目黒へは直通の系統が無いが、乗り換えれば東横線でも日比谷線でも着く
         let found = names_by_line(MITAKA, "中目黒");
