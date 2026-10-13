@@ -1,5 +1,5 @@
 type_cd,line_group_id,requires_timetable,boarding_wait_seconds,source
 316,,true,,https://www.seiburailway.jp/railway/reservedtrain/s-train/
-317,,true,,https://www.seiburailway.jp/railway/reservedtrain/s-train/
+339,,true,,https://www.seiburailway.jp/railway/reservedtrain/s-train/
 379,188,true,,https://seibu.ekitan.com/norikae/timetable/station/235-0/d1
 379,620,true,,https://seibu.ekitan.com/norikae/timetable/station/235-0/d1

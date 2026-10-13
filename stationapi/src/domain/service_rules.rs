@@ -89,6 +89,30 @@ pub fn boarding_wait(station: &Station) -> i32 {
 mod tests {
     use super::*;
     #[test]
+    fn s_train_rules_cover_the_canonical_weekday_and_holiday_types() {
+        let mut reader =
+            csv::Reader::from_reader(include_str!("../../../data/4!types.csv").as_bytes());
+        let headers = reader.headers().unwrap().clone();
+        let type_column = headers.iter().position(|h| h == "type_cd").unwrap();
+        let name_column = headers.iter().position(|h| h == "type_name").unwrap();
+        let mut names = Vec::new();
+        for record in reader.records() {
+            let record = record.unwrap();
+            let name = &record[name_column];
+            if name.starts_with("S-TRAIN") {
+                let type_cd = record[type_column].parse().unwrap();
+                assert!(
+                    service_rule(Some(type_cd), None).is_some_and(|r| r.requires_timetable),
+                    "{name} must require timetable data"
+                );
+                names.push(name.to_owned());
+            }
+        }
+        assert!(names.iter().any(|name| name.contains("平日")));
+        assert!(names.iter().any(|name| name.contains("土休日")));
+    }
+
+    #[test]
     fn admission_is_specific_to_the_declared_service() {
         assert!(
             service_rule(Some(316), Some(406))
@@ -100,6 +124,14 @@ mod tests {
                 .unwrap()
                 .requires_timetable
         );
+        assert!(
+            service_rule(Some(339), Some(92))
+                .unwrap()
+                .requires_timetable
+        );
+        // 317 is commuter express, not holiday S-TRAIN. The service name alone
+        // does not justify excluding every commuter express nationwide.
+        assert!(service_rule(Some(317), None).is_none());
         assert!(service_rule(Some(379), Some(184)).is_none());
         let rule = parse_stop_rules(include_str!("../../../data/route_stop_rules.csv"))
             .unwrap()
