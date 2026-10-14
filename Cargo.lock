@@ -474,6 +474,7 @@ name = "data_validator"
 version = "0.1.0"
 dependencies = [
  "csv",
+ "stationapi",
 ]
 
 [[package]]
@@ -1690,6 +1691,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "csv",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

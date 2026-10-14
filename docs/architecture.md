@@ -305,6 +305,10 @@ SQL (`ORDER BY transport_type, distance`) と同じく、鉄道駅を先に、�
 `LIKE '%...%'` を高速化するためのインデックスで、類似度検索に使っていた
 わけではありません。そのため `contains()` でも論理的に同じ結果になります。
 正規化には domain 層の `normalize_for_search` をそのまま使います。
+各検索対象での完全一致・前方一致・部分一致のうち最も強い一致を順位に使い、
+同順位では駅グループID・駅名・駅ID順に並べます。一致度は候補ごとに一度だけ
+計算します。到達可能性による絞り込みと件数上限は呼び出し側で適用するため、
+「原」のような短い完全一致の駅名も部分一致の候補に押し出されません。
 
 ### 停車駅 (`station_station_types`)
 
@@ -342,36 +346,32 @@ connectedRoutes(fromStationGroupId: Int!, toStationGroupId: Int!, viaLineId: Int
 
 enum ConnectedRouteSort { Recommended  ArrivalTime  TransferCount }
 
-type ConnectedRoute { legs: [RouteLeg!] }
-type RouteLeg { trainTypes: [TrainType!]  fromStation: Station  toStation: Station  stationGroupIds: [Int!] }
+type ConnectedRoute { totalSeconds: Int!  legs: [RouteLeg!] }
+type RouteLeg { recommendedGroupId: Int!  trainTypes: [TrainType!]  fromStation: Station  toStation: Station  stationGroupIds: [Int!] }
 ```
 
 `stationGroupIds` は、乗車駅から降車駅までの駅グループ ID を進行順に並べた
 もの (通過駅を含む) で、探索で使った系統の駅の並びをそのまま返します。
 駅 ID ではなく駅グループ ID にしているのは、アプリが区間ごとに選ぶ種別
-(既定は各駅停車) が、探索で使った系統とは別の路線を走ることがあるためです。
+(手動で変更した場合) が、探索で使った系統とは別の路線を走ることがあるためです。
 駅 ID は路線ごとに異なりますが、駅グループ ID ならどの種別の駅リストとも
 照合できます。アプリはこの並びに沿って、選んだ種別の駅リストから駅を
 取り出すので、環状線でどちら回りにするかをアプリ側で判断する必要は
 ありません。同じ駅グループが 2 回現れる系統 (大江戸線の都庁前) では、
 直前に取り出した駅に隣接するほうを選びます。
 
-探索では、停車駅が同じ並行種別 (中央線の快速と通勤快速など) を 1 つの経路に
-まとめ、代替経路を再探索するときもそれらをまとめて除外します。そのままでは
-並行種別がレスポンスに一度も現れず、種別一覧 (TrainTypeListModal) を表示して
-各駅停車を既定で選ぶという、現在のアプリの挙動を維持できません。そこで
-`trainTypes` には、その区間で乗車できる種別をすべて返します。中身は
-`routeTypes(乗車駅グループ, 降車駅グループ, 降車駅の路線)` の結果と同一で、
-停車駅が同じ種別の集約、路線の付与、並び順も `routeTypes` と同じです (同じ
-関数を呼び出しています)。探索が選んだ代表の種別、推定所要時間、乗換回数は
-並べ替えにだけ使います。アプリでは使わないため、API では返しません。
+探索では、停車駅が同じ並行種別を一つの経路にまとめます。
+`trainTypes` は手動で変更できる種別一覧です。`routeTypes` と同じ取得処理を使い、
+探索した系統が集約で省かれた場合はその系統も加えます。
+`recommendedGroupId` は探索で評価した系統です。アプリは既定選択にこの ID を
+使います。`totalSeconds` は最初の待ち時間を除いた、乗換の徒歩と待ち時間を
+含む秒数です。既定の各停に置き換えて順位を付け直す処理はありません。
 
 `viaLineId` は `routeTypes` と同様に、検索結果でタップした駅の路線を指します。
 指定すると、目的地にその路線の駅で到着する経路 (最後の区間がその路線を走る
 経路) だけに絞り込みます。
 
-`sortBy` は経路の並び順です。推定所要時間と乗換回数は API で返さないので、
-並べ替えはサーバー側で行います。どれを選んでも返す経路の集合は変わらず、
+`sortBy` は経路の並び順です。並べ替えはサーバー側で行います。どれを選んでも返す経路の集合は変わらず、
 並びだけが変わります。
 
 | `sortBy` | 並び |
@@ -382,10 +382,9 @@ type RouteLeg { trainTypes: [TrainType!]  fromStation: Station  toStation: Stati
 
 到着の早い順は、`estimateArrivalTimes` と同じ定義の所要時間 (最初の列車の
 待ち時間は含めず、乗換ごとに徒歩時間と乗換先の待ち時間を加える) で並べます。
-ただし、並べ替えに使うのは探索が選んだ代表の種別での見込みです。アプリが
-区間ごとに別の種別 (既定の各駅停車など) を選んで `estimateArrivalTimes` で
-求めた到着見込みとは、並びが一致しないことがあります。キーが同じ経路同士は、
-おすすめ順のまま並びます。
+探索で選んだ `recommendedGroupId` の系統で見積もります。
+ユーザーが別の種別へ変更した場合は、その種別の ETA を求め直します。
+キーが同じ経路同士は、おすすめ順のまま並びます。
 
 ### 系統網
 
@@ -395,9 +394,7 @@ type RouteLeg { trainTypes: [TrainType!]  fromStation: Station  toStation: Stati
 またぐ乗車も同じ配列で計算できるようにしています。対象は鉄道だけで、バスは
 含みません。
 
-網の構築には全系統の駅と所要時間の推定が必要で、ネイティブ環境で約 190ms
-かかります (`data/*.csv` の 1,185 系統・41,706 行。時間の半分が `Station` の
-組み立て、残り半分が推定)。そのため起動時には構築せず、最初に
+網は全系統の駅と区間時分表から構築します。最初に
 `connectedRoutes` が呼ばれたときに `OnceLock` に構築し、isolate が生きている
 間は使い回します。
 
@@ -495,9 +492,8 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
 ます。`Estimated` は、線路の長さ (`connections`) がある駅間ではそれを走行距離に
 使い、無い駅間だけ直線距離 × 迂回係数で見積もり、その距離で求め直した較正
 (`speed_table` / `segment_speed_table`) を使います。`estimateArrivalTimes` も同じ
-計算です。乗換経路探索 (`connectedRoutes`) の所要時間だけは、元の計算 (直線距離 ×
-迂回係数と、`domain/legacy_speed_table.rs` の元の較正) のままです。そのため、
-経路検索の所要時間と ETA は一致しません。`Legacy` の値で台形の速度プロファイルを作って走らせると、
+計算です。乗換経路探索 (`connectedRoutes`) も同じ距離と較正で評価します。
+`Legacy` の値で台形の速度プロファイルを作って走らせると、
 `estimateArrivalTimes` より短い時間で走り切ります (#1709)。所要時間を推定に
 合わせたいクライアントは、`Estimated` の見込みを使います。
 
@@ -567,7 +563,8 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
 
 ### 計算量
 
-1 回の探索の計算量は O(乗車回数 × 走査したパターンの駅数) です。旧実装
+通常系統と通過路線が一つの系統の走査は O(n)、通過路線が複数の系統は O(n²) です。
+各走査を乗車回数ぶん行います。旧実装
 (列車種別と降車駅のすべての組み合わせを、乗換回数の分だけ列挙する深さ制限
 つきの BFS) との比較は次のとおりです (ネイティブの release ビルド、
 `data/*.csv` を使用)。
@@ -767,7 +764,7 @@ repository の実装がないメソッドは、空の結果ではなく `DomainE
 │       │   ├── entity/           # Station / Line / TrainType / Company ...
 │       │   ├── repository/       # 抽象インターフェース
 │       │   ├── arrival_estimation.rs
-│       │   ├── legacy_speed_table.rs # 元の較正 (connectedRoutes と trainRoute の Legacy が使う)
+│       │   ├── legacy_speed_table.rs # 元の較正 (trainRoute の Legacy が使う)
 │       │   ├── route_search.rs       # 乗換経路探索 (RAPTOR)
 │       │   ├── route_topology.rs     # 所要時間を持たない系統網 (stationsByName の到達判定)
 │       │   ├── segment_speed_table.rs
