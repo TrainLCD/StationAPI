@@ -595,6 +595,18 @@ pub fn estimate_arrival_minutes_with_track(
     params: &EstimationParams,
     track: Option<&TrackDistances>,
 ) -> Vec<EstimatedStop> {
+    estimate_arrival_minutes_with_profile(stops, calibration_stops, params, track, None)
+}
+
+/// Compile cumulative estimates with a fixed interval's pass-line profile.
+/// The normal public estimator still derives the profile from its requested slice.
+pub fn estimate_arrival_minutes_with_profile(
+    stops: &[&Station],
+    calibration_stops: &[&Station],
+    params: &EstimationParams,
+    track: Option<&TrackDistances>,
+    profile: Option<&HashMap<i32, bool>>,
+) -> Vec<EstimatedStop> {
     let n = stops.len();
     if n == 0 {
         return Vec::new();
@@ -659,6 +671,10 @@ pub fn estimate_arrival_minutes_with_track(
     for (i, s) in stops.iter().enumerate() {
         let entry = line_has_pass.entry(s.line_cd).or_insert(false);
         *entry = *entry || !stops_here[i];
+    }
+
+    if let Some(profile) = profile {
+        line_has_pass.clone_from(profile);
     }
 
     let line_group_of =
@@ -771,6 +787,14 @@ pub fn estimate_arrival_minutes_with_track(
     }
 
     result
+}
+
+/// Shared time model for route search and the arrival-time API; Legacy is unchanged.
+pub fn routing_estimation_params() -> EstimationParams {
+    EstimationParams {
+        speed_calibration: SpeedCalibration::Recalibrated,
+        ..EstimationParams::default()
+    }
 }
 
 #[cfg(test)]
