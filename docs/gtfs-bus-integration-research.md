@@ -563,4 +563,4 @@ distance     -- 駅間距離（メートル）
 
 ### 国土交通省
 
-- [静的バス情報フォーマット（GTFS-JP）仕様書](https://www.mlit.go.jp/sogoseisaku/transport/content/001981081.pdf)
+- [公共交通運行情報標準データ仕様（GTFS-JP）v4](https://www.mlit.go.jp/commmmons/document/007/commmmons_doc_007-02_ver01.pdf)
