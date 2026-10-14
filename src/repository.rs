@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, OnceLock};
 
+#[cfg(test)]
 use stationapi::domain::arrival_estimation::EstimationParams;
 use stationapi::domain::entity::company::Company;
 use stationapi::domain::entity::gtfs::TransportType;
@@ -158,9 +159,10 @@ fn route_network() -> &'static Arc<RouteNetwork> {
 }
 
 fn build_route_network() -> RouteNetwork {
-    RouteNetwork::build(
+    RouteNetwork::build_with_track(
         rail_line_group_cds().map(|group| stations_of_line_groups(&[group as u32])),
-        &EstimationParams::default(),
+        &stationapi::domain::arrival_estimation::routing_estimation_params(),
+        index::track_distance,
     )
 }
 
@@ -174,18 +176,27 @@ fn route_topology() -> &'static RouteTopology {
 }
 
 fn build_route_topology() -> RouteTopology {
-    RouteTopology::build(rail_line_group_cds().map(|group| {
-        line_group_rows(group)
-            .map(|(sst, record, _, _)| RouteStop {
-                station_cd: record.station_cd,
-                station_group_id: record.station_g_cd as u32,
-                line_cd: record.line_cd,
-                // RouteNetwork は pass と stop_condition で判定する。apply_train_type は
-                // pass == 1 のときだけ stop_condition を Not にするので同じ結果になる
-                stoppable: sst.pass != Some(1),
+    RouteTopology::build(
+        rail_line_group_cds()
+            .filter(|&group| {
+                !line_group_rows(group).next().is_some_and(|(sst, _, _, _)| {
+                    stationapi::domain::service_rules::service_rule(Some(sst.type_cd), Some(group))
+                        .is_some_and(|r| r.requires_timetable)
+                })
             })
-            .collect()
-    }))
+            .map(|group| {
+                line_group_rows(group)
+                    .map(|(sst, record, _, _)| RouteStop {
+                        station_cd: record.station_cd,
+                        station_group_id: record.station_g_cd as u32,
+                        line_cd: record.line_cd,
+                        // RouteNetwork は pass と stop_condition で判定する。apply_train_type は
+                        // pass == 1 のときだけ stop_condition を Not にするので同じ結果になる
+                        stoppable: sst.pass != Some(1),
+                    })
+                    .collect()
+            }),
+    )
 }
 
 // ---------------------------------------------------------------- 駅
@@ -1256,6 +1267,115 @@ mod tests {
     const MITAKA: u32 = 1131105;
     const NAKA_MEGURO: u32 = 2600103;
 
+    /// S-TRAIN や快速で探索した時分を、アプリが既定で選ぶ各停の時分として
+    /// 順位付けしない。都庁前で 1 回乗り換える経路を先頭にする。
+    #[test]
+    fn recommends_tochomae_transfer_between_ueno_okachimachi_and_hikarigaoka() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+        if index::sst_by_group(1_000_099_301).next().is_none() {
+            // 大江戸線の各停は preprocessor が生成するため、data/ だけでは検索できない。
+            return;
+        }
+        let interactor = crate::interactor();
+        for (from, to) in [(1130221, 9930138), (9930138, 1130221)] {
+            let routes = block_on(interactor.get_connected_routes(
+                from,
+                to,
+                Some(99301),
+                JourneySort::Recommended,
+            ))
+            .unwrap();
+            let first = &routes[0];
+            assert_eq!(first.legs.len(), 2, "{routes:?}");
+            assert_eq!(first.legs[0].to_station.group_id, 9930100);
+            assert_eq!(first.legs[1].from_station.group_id, 9930100);
+            assert!(first.legs.iter().all(|leg| leg
+                .train_types
+                .iter()
+                .any(|tt| tt.group_id == 1_000_099_301)));
+            for sort in [JourneySort::ArrivalTime, JourneySort::TransferCount] {
+                let sorted =
+                    block_on(interactor.get_connected_routes(from, to, Some(99301), sort)).unwrap();
+                assert_eq!(sorted.len(), routes.len());
+                assert!(sorted.iter().all(|route| routes.contains(route)));
+            }
+        }
+    }
+
+    #[test]
+    fn recommended_services_and_durations_match_eta() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+        if index::sst_by_group(1_000_099_301).next().is_none() {
+            return;
+        }
+        let interactor = crate::interactor();
+        for (from, to) in [
+            (1130221, 9930138),
+            (9930138, 1130221),
+            (1130101, 1130205),
+            (1131105, 2600103),
+            (1131906, 1160155),
+        ] {
+            let routes =
+                block_on(interactor.get_connected_routes(from, to, None, JourneySort::Recommended))
+                    .unwrap();
+            for route in routes {
+                let legs: Vec<_> = route
+                    .legs
+                    .iter()
+                    .map(|leg| {
+                        assert!(leg
+                            .train_types
+                            .iter()
+                            .any(|tt| tt.group_id == leg.recommended_group_id));
+                        model::RouteLegRequest {
+                            line_group_id: leg.recommended_group_id,
+                            from_station_id: leg.from_station.id,
+                            to_station_id: leg.to_station.id,
+                        }
+                    })
+                    .collect();
+                let estimates =
+                    block_on(interactor.estimate_connected_route_arrival_times(&legs)).unwrap();
+                let expected = estimates.last().unwrap().cumulative_minutes * 60.0;
+                assert!(
+                    (f64::from(route.total_seconds) - expected).abs() <= route.legs.len() as f64,
+                    "{from}->{to}: {} / {expected}",
+                    route.total_seconds
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "manual performance comparison; run with --ignored --nocapture"]
+    fn route_network_performance_report() {
+        let started = std::time::Instant::now();
+        let network = build_route_network();
+        let build = started.elapsed();
+        let mut samples = Vec::new();
+        for _ in 0..10 {
+            for (from, to) in [
+                (1130221, 9930138),
+                (9930138, 1130221),
+                (1130101, 1130205),
+                (1131105, 2600103),
+                (1131906, 1160155),
+            ] {
+                let started = std::time::Instant::now();
+                std::hint::black_box(network.search(from, to, None));
+                samples.push(started.elapsed());
+            }
+        }
+        samples.sort_unstable();
+        eprintln!(
+            "PERF patterns={} build={build:?} median={:?} p95={:?}",
+            network.pattern_count(),
+            samples[25],
+            samples[47]
+        );
+    }
+
     /// repository の実装は await しない (索引を引くだけ) ので、1 回 poll すれば終わる
     fn block_on<F: std::future::Future>(future: F) -> F::Output {
         let mut context = std::task::Context::from_waker(std::task::Waker::noop());
@@ -1263,6 +1383,42 @@ mod tests {
             std::task::Poll::Ready(value) => value,
             std::task::Poll::Pending => panic!("repository futures complete without waiting"),
         }
+    }
+
+    #[test]
+    fn name_search_limit_keeps_nagoya_hara() {
+        let hits = block_on(MemStationRepository.get_by_name(
+            "原".to_string(),
+            Some(10),
+            None,
+            Some(TransportType::Rail),
+        ))
+        .unwrap();
+        assert_eq!(hits.len(), 10);
+        assert!(hits.iter().any(|s| s.station_cd == 9951618));
+        assert_eq!(hits[0].station_name, "原");
+    }
+
+    #[test]
+    fn name_search_limit_preserves_ranking_after_reachability_filtering() {
+        let all = block_on(MemStationRepository.get_by_name(
+            "原".to_string(),
+            None,
+            Some(9951617),
+            Some(TransportType::Rail),
+        ))
+        .unwrap();
+        assert!(all.iter().any(|s| s.station_cd == 9951618));
+        assert_eq!(all[0].station_name, "原");
+        let limited = block_on(MemStationRepository.get_by_name(
+            "原".to_string(),
+            Some(1),
+            Some(9951617),
+            Some(TransportType::Rail),
+        ))
+        .unwrap();
+        assert_eq!(limited.len(), 1);
+        assert_eq!(limited[0].station_cd, all[0].station_cd);
     }
 
     fn names_by_line(from: u32, name: &str) -> Vec<(String, i32, bool)> {
@@ -1524,6 +1680,57 @@ mod tests {
         // 行き先の検索は軽い網、connectedRoutes は所要時間つきの網を使う。
         // 両者がずれると「行ける」と返した駅で経路が出なくなる
         assert_eq!(route_topology(), route_network().topology());
+    }
+
+    #[test]
+    fn timetable_required_services_stay_selectable_but_do_not_create_routes() {
+        use stationapi::domain::service_rules::service_rule;
+        let params = stationapi::domain::arrival_estimation::routing_estimation_params();
+        let mut excluded = 0;
+        for group in rail_line_group_cds() {
+            let stations = stations_of_line_groups(&[group as u32]);
+            let first = stations.first().expect("canonical service has stations");
+            if !service_rule(first.type_cd, Some(group)).is_some_and(|r| r.requires_timetable) {
+                continue;
+            }
+            let selectable =
+                block_on(MemTrainTypeRepository.get_by_line_group_id(group as u32)).unwrap();
+            assert!(
+                !selectable.is_empty(),
+                "manual selection lost group {group}"
+            );
+            let from = stations.iter().find(|s| s.pass != Some(1)).unwrap();
+            let to = stations.iter().rev().find(|s| s.pass != Some(1)).unwrap();
+            let network = RouteNetwork::build([stations.clone()], &params);
+            assert_eq!(network.pattern_count(), 0, "admitted group {group}");
+            assert!(network
+                .search(from.station_cd as u32, to.station_cd as u32, None)
+                .is_empty());
+            assert!(network
+                .search(to.station_cd as u32, from.station_cd as u32, None)
+                .is_empty());
+            excluded += 1;
+        }
+        assert!(
+            excluded > 20,
+            "operating audit must cover more than the original services"
+        );
+    }
+
+    #[test]
+    fn regular_rapid_and_commuter_services_are_not_excluded_by_their_names() {
+        let params = stationapi::domain::arrival_estimation::routing_estimation_params();
+        // Tobu rapid express, Tokyu/MM commuter limited express, Seibu rapid:
+        // shared kind/name/ID ranges must not spread a service-specific rule.
+        for group in [239, 184, 420, 1174] {
+            let stations = stations_of_line_groups(&[group]);
+            assert!(!stations.is_empty());
+            let network = RouteNetwork::build([stations], &params);
+            assert!(
+                network.pattern_count() > 0,
+                "regular group {group} excluded"
+            );
+        }
     }
 
     #[test]

@@ -93,10 +93,11 @@ pub enum TtsAlphabet {
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 #[graphql(rename_items = "PascalCase", name = "ConnectedRouteSort")]
 pub enum ConnectedRouteSort {
+    // 各区間の既定種別 (各停を優先、無ければ先頭) で評価して並べる。
     // おすすめ順 (評価値 = 最初の列車の待ち時間を含む所要時間の見込み、に乗換 1 回あたり
     // 5 分を足した値の小さい順)。既定
     Recommended,
-    // 到着の早い順 (探索の所要時間。元の較正で見積もるので estimateArrivalTimes の
+    // 到着の早い順 (既定種別の所要時間。元の較正で見積もるので estimateArrivalTimes の
     // 見込みとは一致しない)。同じなら乗換の少ない順
     ArrivalTime,
     // 乗換の少ない順。同じなら到着の早い順

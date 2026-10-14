@@ -320,12 +320,14 @@ impl From<model::Route> for Route {
 #[derive(SimpleObject)]
 #[graphql(name = "ConnectedRoute")]
 pub struct ConnectedRoute {
+    pub total_seconds: i32,
     pub legs: Option<Vec<RouteLeg>>,
 }
 
 impl From<model::ConnectedRoute> for ConnectedRoute {
     fn from(v: model::ConnectedRoute) -> Self {
         Self {
+            total_seconds: v.total_seconds,
             legs: Some(v.legs.into_iter().map(Into::into).collect()),
         }
     }
@@ -345,6 +347,7 @@ pub struct RouteLegInput {
 #[derive(SimpleObject)]
 #[graphql(name = "RouteLeg")]
 pub struct RouteLeg {
+    pub recommended_group_id: i32,
     // この区間で乗れる種別すべて。routeTypes(乗車駅グループ, 降車駅グループ,
     // 降車駅の路線) と同じ結果・同じ並び
     pub train_types: Option<Vec<TrainType>>,
@@ -359,6 +362,7 @@ pub struct RouteLeg {
 impl From<model::RouteLeg> for RouteLeg {
     fn from(v: model::RouteLeg) -> Self {
         Self {
+            recommended_group_id: v.recommended_group_id as i32,
             train_types: Some(v.train_types.into_iter().map(Into::into).collect()),
             from_station: Some(v.from_station.into()),
             to_station: Some(v.to_station.into()),

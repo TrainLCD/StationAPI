@@ -62,9 +62,95 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|row| row.get(1).unwrap().parse::<u32>().unwrap())
         .collect();
 
+    // Keep the evidence attached to its actual canonical type, rather than a
+    // silently mistyped numeric ID (e.g. commuter express vs holiday S-TRAIN).
+    let type_names: std::collections::HashMap<i32, &str> = records
+        .iter()
+        .map(|row| (row[1].parse().unwrap(), &row[2]))
+        .collect();
+    let mut rules_reader =
+        ReaderBuilder::new().from_path(data_path.join("route_service_rules.csv"))?;
+    let headers = rules_reader.headers()?.clone();
+    let column = |name| headers.iter().position(|h| h == name).expect(name);
+    for row in rules_reader.records() {
+        let row = row?;
+        let type_cd = row[column("type_cd")].parse()?;
+        assert_eq!(
+            type_names.get(&type_cd).copied(),
+            Some(&row[column("type_name")]),
+            "service rule name does not match canonical type {type_cd}"
+        );
+        assert!(
+            row[column("source")].starts_with("https://"),
+            "missing rule source"
+        );
+        assert!(
+            !row[column("reason")].trim().is_empty(),
+            "missing rule reason"
+        );
+        assert!(
+            !row[column("checked_on")].trim().is_empty(),
+            "missing rule verification date"
+        );
+    }
+
+    let station_groups: HashSet<i32> = station_records
+        .iter()
+        .map(|r| r[1].parse().unwrap())
+        .collect();
+    let mut seen = HashSet::new();
+    for rule in stationapi::domain::service_rules::parse_service_rules(&std::fs::read_to_string(
+        data_path.join("route_service_rules.csv"),
+    )?)? {
+        assert!(
+            type_ids.contains(&(rule.type_cd as u32)),
+            "unknown rule type"
+        );
+        assert!(
+            seen.insert((rule.type_cd, rule.line_group_id)),
+            "duplicate service rule"
+        );
+        assert!(
+            rule.boarding_wait_seconds.is_none_or(|s| s >= 0),
+            "negative wait"
+        );
+    }
+    let mut seen = HashSet::new();
+    for rule in stationapi::domain::service_rules::parse_stop_rules(&std::fs::read_to_string(
+        data_path.join("route_stop_rules.csv"),
+    )?)? {
+        assert!(
+            type_ids.contains(&(rule.type_cd as u32)),
+            "unknown stop rule type"
+        );
+        assert!(
+            station_groups.contains(&rule.station_group_id),
+            "unknown stop rule group"
+        );
+        assert!(
+            seen.insert((rule.type_cd, rule.station_group_id)),
+            "duplicate stop rule"
+        );
+    }
+
     let mut rdr = ReaderBuilder::new().from_path(data_path.join("5!station_station_types.csv"))?;
     let records: Vec<StringRecord> = rdr.records().collect::<Result<Vec<_>, _>>()?;
 
+    for rule in stationapi::domain::service_rules::parse_service_rules(&std::fs::read_to_string(
+        data_path.join("route_service_rules.csv"),
+    )?)? {
+        if let Some(group) = rule.line_group_id {
+            assert!(
+                records
+                    .iter()
+                    .any(
+                        |r| r.get(2).and_then(|v| v.parse::<i32>().ok()) == Some(rule.type_cd)
+                            && r.get(3).and_then(|v| v.parse::<i32>().ok()) == Some(group)
+                    ),
+                "unknown service rule group"
+            );
+        }
+    }
     for record in &records {
         let line = || record.iter().collect::<Vec<&str>>().join(",");
 

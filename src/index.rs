@@ -823,28 +823,54 @@ pub fn search_by_name(query: &str, want: Option<i32>) -> Vec<&'static StationRec
     // s.station_name_rn ILIKE $3 用
     let lowered = query.to_lowercase();
 
-    let mut hits: Vec<&'static StationRecord> = stations()
+    let mut hits: Vec<(&'static StationRecord, u8)> = stations()
         .iter()
         .filter(|s| s.e_status == 0)
         .filter(|s| joins_active_line(s))
         .filter(|s| want.is_none_or(|w| s.transport_type as i32 == w))
-        .filter(|s| {
-            s.name.contains(query)
-                || s.name_roman_lower
+        .filter_map(|s| {
+            let rank = [
+                name_match_rank(&s.name, query),
+                s.name_roman_lower
                     .as_deref()
-                    .is_some_and(|v| v.contains(&lowered))
-                || s.name_katakana.contains(&katakana)
-                || s.name_chinese.as_deref().is_some_and(|v| v.contains(query))
-                || s.name_korean.as_deref().is_some_and(|v| v.contains(query))
+                    .and_then(|v| name_match_rank(v, &lowered)),
+                name_match_rank(&s.name_katakana, &katakana),
+                s.name_chinese
+                    .as_deref()
+                    .and_then(|v| name_match_rank(v, query)),
+                s.name_korean
+                    .as_deref()
+                    .and_then(|v| name_match_rank(v, query)),
+            ]
+            .into_iter()
+            .flatten()
+            .min()?;
+            Some((s, rank))
         })
         .collect();
 
-    hits.sort_unstable_by(|a, b| {
-        a.station_g_cd
-            .cmp(&b.station_g_cd)
+    // 一致度を一度だけ計算し、取得上限を掛ける前に完全一致を先頭にする。
+    hits.sort_unstable_by(|(a, a_rank), (b, b_rank)| {
+        a_rank
+            .cmp(b_rank)
+            .then_with(|| a.station_g_cd.cmp(&b.station_g_cd))
             .then_with(|| a.name.cmp(&b.name))
+            .then_with(|| a.station_cd.cmp(&b.station_cd))
     });
-    hits
+    hits.into_iter().map(|(station, _)| station).collect()
+}
+
+/// 完全一致、前方一致、部分一致の順。検索対象と正規化は従来どおり。
+fn name_match_rank(name: &str, query: &str) -> Option<u8> {
+    if name == query {
+        Some(0)
+    } else if name.starts_with(query) {
+        Some(1)
+    } else if name.contains(query) {
+        Some(2)
+    } else {
+        None
+    }
 }
 
 // ---------------------------------------------------------------- 列車種別
@@ -1231,6 +1257,32 @@ pub fn apply_line_alias(line: &mut Line, station_cd: i32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn name_search_keeps_hara_exact_matches_before_partial_matches() {
+        let hits = search_by_name("原", Some(TransportType::Rail as i32));
+        let exact_count = hits.iter().take_while(|s| s.name == "原").count();
+        assert!(exact_count > 0);
+        assert!(hits[..exact_count].iter().any(|s| s.line_cd == 99516));
+        assert!(hits[exact_count..].iter().any(|s| s.name == "秋葉原"));
+        let prefix_end = hits.iter().take_while(|s| s.name.starts_with("原")).count();
+        assert!(prefix_end > exact_count);
+        assert!(hits[prefix_end..].iter().all(|s| !s.name.starts_with("原")));
+    }
+
+    #[test]
+    fn name_search_ranks_normalized_readings_and_roman_names() {
+        for query in ["はら", "ハラ", "HARA"] {
+            let hits = search_by_name(query, Some(TransportType::Rail as i32));
+            assert!(!hits.is_empty(), "query={query}");
+            assert_eq!(hits[0].name, "原", "query={query}");
+        }
+        assert!(search_by_name("", None).is_empty());
+        assert_eq!(name_match_rank("原", "原"), Some(0));
+        assert_eq!(name_match_rank("原宿", "原"), Some(1));
+        assert_eq!(name_match_rank("秋葉原", "原"), Some(2));
+        assert_eq!(name_match_rank("東京", "原"), None);
+    }
 
     /// グリッド索引の正解となる全件走査。索引を入れる前の実装そのもの。
     fn nearest_by_full_scan(
