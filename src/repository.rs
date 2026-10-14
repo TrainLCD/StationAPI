@@ -179,7 +179,7 @@ fn build_route_topology() -> RouteTopology {
     RouteTopology::build(
         rail_line_group_cds()
             .filter(|&group| {
-                !index::sst_by_group(group).next().is_some_and(|sst| {
+                !line_group_rows(group).next().is_some_and(|(sst, _, _, _)| {
                     stationapi::domain::service_rules::service_rule(Some(sst.type_cd), Some(group))
                         .is_some_and(|r| r.requires_timetable)
                 })
