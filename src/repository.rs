@@ -1385,6 +1385,42 @@ mod tests {
         }
     }
 
+    #[test]
+    fn name_search_limit_keeps_nagoya_hara() {
+        let hits = block_on(MemStationRepository.get_by_name(
+            "原".to_string(),
+            Some(10),
+            None,
+            Some(TransportType::Rail),
+        ))
+        .unwrap();
+        assert_eq!(hits.len(), 10);
+        assert!(hits.iter().any(|s| s.station_cd == 9951618));
+        assert_eq!(hits[0].station_name, "原");
+    }
+
+    #[test]
+    fn name_search_limit_preserves_ranking_after_reachability_filtering() {
+        let all = block_on(MemStationRepository.get_by_name(
+            "原".to_string(),
+            None,
+            Some(9951617),
+            Some(TransportType::Rail),
+        ))
+        .unwrap();
+        assert!(all.iter().any(|s| s.station_cd == 9951618));
+        assert_eq!(all[0].station_name, "原");
+        let limited = block_on(MemStationRepository.get_by_name(
+            "原".to_string(),
+            Some(1),
+            Some(9951617),
+            Some(TransportType::Rail),
+        ))
+        .unwrap();
+        assert_eq!(limited.len(), 1);
+        assert_eq!(limited[0].station_cd, all[0].station_cd);
+    }
+
     fn names_by_line(from: u32, name: &str) -> Vec<(String, i32, bool)> {
         block_on(MemStationRepository.get_by_name(name.to_string(), Some(100), Some(from), None))
             .unwrap()
