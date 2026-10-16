@@ -35,8 +35,7 @@ fn existing_keio_patterns_match_official_stops_and_complete_station_sequences() 
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let data = root.join("data");
     let stations = records(&data.join("3!stations.csv"));
-    let station_by_id: HashMap<&str, &StringRecord> =
-        stations.iter().map(|r| (&r[0], r)).collect();
+    let station_by_id: HashMap<&str, &StringRecord> = stations.iter().map(|r| (&r[0], r)).collect();
     let types = records(&data.join("4!types.csv"));
     let type_names: HashMap<&str, &str> = types.iter().map(|r| (&r[1], &r[2])).collect();
     let fixture = records(&root.join("data_validator/tests/fixtures/keio_stops.csv"));
@@ -84,8 +83,8 @@ fn existing_keio_patterns_match_official_stops_and_complete_station_sequences() 
     }
 
     let audited: BTreeSet<u32> = [
-        65, 66, 67, 68, 69, 70, 71, 252, 253, 254, 255, 285, 286, 287, 412, 413, 414,
-        415, 416, 756, 757, 758, 759, 760, 761, 762, 763, 764, 765, 766, 767,
+        65, 66, 67, 68, 69, 70, 71, 252, 253, 254, 255, 285, 286, 287, 412, 413, 414, 415, 416,
+        756, 757, 758, 759, 760, 761, 762, 763, 764, 765, 766, 767,
     ]
     .into_iter()
     .collect();
@@ -104,6 +103,9 @@ fn existing_keio_patterns_match_official_stops_and_complete_station_sequences() 
             section.sort_by_key(|r| (r[22].parse::<u32>().unwrap(), r[0].to_owned()));
             expected.extend(section.into_iter().map(|r| r[0].to_owned()));
         }
-        assert_eq!(station_ids, expected, "incomplete/out-of-order group {group}");
+        assert_eq!(
+            station_ids, expected,
+            "incomplete/out-of-order group {group}"
+        );
     }
 }
