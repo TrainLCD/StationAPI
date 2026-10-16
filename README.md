@@ -15,6 +15,7 @@ A GraphQL API that provides nearby Japanese train stations and bus stops, runnin
 - For system architecture and design decisions, see [docs/architecture.md](docs/architecture.md).
 - For the design of the transfer route search (`connectedRoutes`, RAPTOR), see [docs/route-search.md](docs/route-search.md).
 - For the source-backed operating constraints used by timetable-free search, see [docs/route-service-audit.md](docs/route-service-audit.md).
+- For the Keio stopping-pattern audit and regression checks, see [docs/keio-stopping-pattern-audit.md](docs/keio-stopping-pattern-audit.md).
 - For technical debt analysis and architectural concerns, see [docs/technical_debt.md](docs/technical_debt.md).
 - For the record of the Cloudflare Workers migration, see [docs/cloudflare-workers-migration.md](docs/cloudflare-workers-migration.md).
 - For the published GraphQL schema, see [schema/public.graphql](schema/public.graphql).
@@ -41,7 +42,7 @@ This project includes a comprehensive dataset of Japanese railway information in
 
 ## Contributors ✨
 
-Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/emoji-key)):
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
@@ -109,3 +110,4 @@ make deploy-production  # production -> stationapi
 
 The data lives inside the WASM binary, so **a data change needs a rebuild and a
 redeploy**; it is not picked up at runtime.
+
