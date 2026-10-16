@@ -21,7 +21,7 @@ S-TRAINだけでなく、登録済みの全国の種別・系統を対象に、�
 | --- | --- | --- |
 | S-TRAIN | 316・339 | [西武鉄道](https://www.seiburailway.jp/railway/reservedtrain/s-train/): 平日・土休日の別、限定時間帯、方向別乗降条件 |
 | 池袋発着の西武快速 | 379 / 188・620 | [公式池袋時刻表](https://seibu.ekitan.com/norikae/timetable/station/235-0/d1): 該当系統の限定便。他の快速系統は対象外 |
-| 京王ライナー | 400・401 | [京王電鉄](https://www.keio.co.jp/zasekishitei/): 限定時間帯、上りの途中駅の乗降制限 |
+| 京王ライナー | 400・401・413 | [京王電鉄](https://www.keio.co.jp/zasekishitei/): 限定時間帯、上りの途中駅の乗降制限 |
 | モーニング・イブニングウィング | 402・403 | [京急電鉄](https://www.keikyu.co.jp/ride/train/wing_detail.html): 平日朝・夕夜の片方向運転。ウィング・シート付き一般列車は対象外 |
 | 拝島ライナー | 405 | [西武鉄道](https://www.seiburailway.jp/railway/reservedtrain/haijimaliner/): 朝夕の限定便、方向別乗降条件 |
 | TJライナー | 406・407 | [東武鉄道](https://www.tobu.co.jp/railway/tj/timetable/): 上り朝、下り夕夜。快速急行341とは別種別 |
@@ -55,3 +55,13 @@ S-TRAINだけでなく、登録済みの全国の種別・系統を対象に、�
   手動選択用の一覧には残ることを検証します。
 - 通常の快速・快速急行・通勤特急が巻き込まれないことと、到達判定と探索の網が
   一致することを検証します。
+
+## 高尾線の京王ライナー（2026-10-16確認）
+
+種別413「京王ライナー(高尾山口方面)」・路線グループ1188として、新宿～高尾山口の両方向の停車パターンを登録する。
+[上りの公式停車駅・時刻表](https://www.keio.co.jp/zasekishitei/)と[下りの公式停車駅・時刻表](https://www.keio.co.jp/zasekishitei/index_n.html)を照合した。
+停車駅は新宿・明大前・府中・分倍河原・聖蹟桜ヶ丘・高幡不動・北野・めじろ台・高尾・高尾山口。北野は京王線2400133・高尾線2400301の両IDを保持する。京王片倉・山田・狭間は通過する。
+
+既存の京王八王子・橋本系統と同様に方向0・kind=2を使用する。「方面」は系統を表し、下り限定ではない。Mt.TAKAO号とは独立した種別とする。上りは途中駅からの降車が明大前に限られ、運行時間帯も限定されるため、requires_timetable=trueを登録し、時刻を扱わないconnectedRoutes・到達可能性検索には採用しない。手動の種別選択・経路表示用の停車パターンとして提供する。
+
+`cargo test -p data_validator --test keio_takao_liner` は種別メタデータ・全38行の駅順・全停車/通過・北野両ID・時刻表必須ルールを検査する。
