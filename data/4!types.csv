@@ -318,3 +318,14 @@ DEFAULT,541,GRAN 天空,グランテンクウ,GRAN Tenkū,GRAN 天空,GRAN 텐�
 DEFAULT,542,みすず,ミスズ,Misuzu,水篶,미스즈,#DC143C,2,2,0,長野方面,COMPLETE
 DEFAULT,543,みすず,ミスズ,Misuzu,水篶,미스즈,#DC143C,1,2,0,飯田方面,COMPLETE
 DEFAULT,544,-急行-,キュウコウ,Express,-特快-,-급행-,#F7931D,2,3,0,南海電車用（白線急行）,COMPLETE
+DEFAULT,545,区間快速(福間～博多間快速),クカンカイソク,Regional Rapid(Fukuma–Hakata),区间快速(福间～博多间快速),구간쾌속(후쿠마～하카타 구간 쾌속),#DC143C,1,2,0,鹿児島本線,COMPLETE
+DEFAULT,546,区間快速(福間～二日市間快速),クカンカイソク,Regional Rapid(Fukuma–Futsukaichi),区间快速(福间～二日市间快速),구간쾌속(후쿠마～후쓰카이치 구간 쾌속),#DC143C,0,2,0,鹿児島本線,COMPLETE
+DEFAULT,547,区間快速(福間～鳥栖間快速),クカンカイソク,Regional Rapid(Fukuma–Tosu),区间快速(福间～鸟栖间快速),구간쾌속(후쿠마～도스 구간 쾌속),#DC143C,0,2,0,鹿児島本線,COMPLETE
+DEFAULT,548,区間快速(福間～鳥栖間快速・南福岡～博多間各駅停車),クカンカイソク,Regional Rapid(Fukuma–Tosu; local Minami-Fukuoka–Hakata),区间快速(福间～鸟栖间快速・南福冈～博多间各站停车),구간쾌속(후쿠마～도스 구간 쾌속・미나미후쿠오카～하카타 각역정차),#DC143C,0,2,0,鹿児島本線,COMPLETE
+DEFAULT,549,区間快速(折尾～鳥栖間快速),クカンカイソク,Regional Rapid(Orio–Tosu),区间快速(折尾～鸟栖间快速),구간쾌속(오리오～도스 구간 쾌속),#DC143C,1,2,0,鹿児島本線,COMPLETE
+DEFAULT,550,区間快速(折尾～羽犬塚間快速),クカンカイソク,Regional Rapid(Orio–Hainuzuka),区间快速(折尾～羽犬塚间快速),구간쾌속(오리오～하이누즈카 구간 쾌속),#DC143C,1,2,0,鹿児島本線,COMPLETE
+DEFAULT,551,区間快速(福間～羽犬塚間快速),クカンカイソク,Regional Rapid(Fukuma–Hainuzuka),区间快速(福间～羽犬塚间快速),구간쾌속(후쿠마～하이누즈카 구간 쾌속),#DC143C,1,2,0,鹿児島本線,COMPLETE
+DEFAULT,552,A列車で行こう(三角方面),エーレッシャデイコウ,A-Train (Misumi),A列车(三角方向),A열차(미스미 방면),#C71585,2,4,0,鹿児島本線直通・運転日限定,COMPLETE
+DEFAULT,553,A列車で行こう(熊本方面),エーレッシャデイコウ,A-Train (Kumamoto),A列车(熊本方向),A열차(구마모토 방면),#C71585,1,4,0,鹿児島本線直通・運転日限定,COMPLETE
+DEFAULT,554,かんぱち,カンパチ,Kanpachi,Kanpachi,칸파치,#C71585,2,4,0,鹿児島本線直通・運転日限定,COMPLETE
+DEFAULT,555,いちろく,イチロク,Ichiroku,Ichiroku,이치로쿠,#C71585,1,4,0,鹿児島本線直通・運転日限定,COMPLETE
