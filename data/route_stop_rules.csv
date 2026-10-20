@@ -1,2 +1,15 @@
 type_cd,station_group_id,forward_board,forward_alight,reverse_board,reverse_alight,source
 316,2200106,false,true,false,false,https://www.seiburailway.jp/railway/station/nerima/
+554,1190101,true,false,false,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
+554,1191307,false,false,false,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
+554,1191320,false,false,false,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
+554,1191324,false,true,false,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
+554,1190643,false,true,false,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
+554,1190640,false,true,false,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
+555,1190101,false,false,false,true,https://www.jrkyushu-kanpachiichiroku.jp/faq/
+555,1190318,false,false,false,true,https://www.jrkyushu-kanpachiichiroku.jp/faq/
+555,1191309,false,false,false,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
+555,1191316,false,false,false,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
+555,1191324,false,false,true,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
+555,1190643,false,false,true,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
+555,1190640,false,false,true,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
