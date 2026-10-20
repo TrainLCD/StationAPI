@@ -25,3 +25,7 @@ type_cd,line_group_id,requires_timetable,boarding_wait_seconds,source,type_name,
 510,,true,,https://www.keio.co.jp/zasekishitei/index_mt.html,Mt.TAKAO,土休日・少数便・方向別乗降制限,2026-10-13
 519,,true,,https://www.tobu.co.jp/railway/th/timetable/,THライナー,朝夕夜限定・方向別乗降制限,2026-10-13
 413,,true,,https://www.keio.co.jp/zasekishitei/index_n.html,京王ライナー(高尾山口方面),時間帯限定・方向別乗降制限,2026-10-16
+552,1196,true,,https://www.jrkyushu.co.jp/trains/atrain/,A列車で行こう(三角方面),公式運行カレンダーに限定（毎日運転ではない）,2026-10-21
+553,1197,true,,https://www.jrkyushu.co.jp/trains/atrain/,A列車で行こう(熊本方面),公式運行カレンダーに限定（毎日運転ではない）,2026-10-21
+554,1198,true,,https://www.jrkyushu-kanpachiichiroku.jp/info/,かんぱち,公式運行カレンダーに限定（毎日運転ではない）,2026-10-21
+555,1199,true,,https://www.jrkyushu-kanpachiichiroku.jp/info/,いちろく,公式運行カレンダーに限定（毎日運転ではない）,2026-10-21

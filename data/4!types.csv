@@ -325,3 +325,7 @@ DEFAULT,548,区間快速(福間～鳥栖間快速・南福岡～博多間各駅�
 DEFAULT,549,区間快速(折尾～鳥栖間快速),クカンカイソク,Regional Rapid(Orio–Tosu),区间快速(折尾～鸟栖间快速),구간쾌속(오리오～도스 구간 쾌속),#DC143C,1,2,0,鹿児島本線,COMPLETE
 DEFAULT,550,区間快速(折尾～羽犬塚間快速),クカンカイソク,Regional Rapid(Orio–Hainuzuka),区间快速(折尾～羽犬塚间快速),구간쾌속(오리오～하이누즈카 구간 쾌속),#DC143C,1,2,0,鹿児島本線,COMPLETE
 DEFAULT,551,区間快速(福間～羽犬塚間快速),クカンカイソク,Regional Rapid(Fukuma–Hainuzuka),区间快速(福间～羽犬塚间快速),구간쾌속(후쿠마～하이누즈카 구간 쾌속),#DC143C,1,2,0,鹿児島本線,COMPLETE
+DEFAULT,552,A列車で行こう(三角方面),エーレッシャデイコウ,A-Train (Misumi),A列车(三角方向),A열차(미스미 방면),#C71585,2,4,0,鹿児島本線直通・運転日限定,COMPLETE
+DEFAULT,553,A列車で行こう(熊本方面),エーレッシャデイコウ,A-Train (Kumamoto),A列车(熊本方向),A열차(구마모토 방면),#C71585,1,4,0,鹿児島本線直通・運転日限定,COMPLETE
+DEFAULT,554,かんぱち,カンパチ,Kanpachi,Kanpachi,칸파치,#C71585,2,4,0,鹿児島本線直通・運転日限定,COMPLETE
+DEFAULT,555,いちろく,イチロク,Ichiroku,Ichiroku,이치로쿠,#C71585,1,4,0,鹿児島本線直通・運転日限定,COMPLETE
