@@ -1024,6 +1024,53 @@ mod tests {
     }
 
     #[test]
+    fn sobu_rapid_borrowed_pass_station_uses_recalibrated_rapid_speed() {
+        let mut stations = three_collinear_stations();
+        for s in &mut stations {
+            s.line_cd = 11314;
+            s.kind = Some(TrainTypeKind::Rapid as i32);
+        }
+        stations[1].line_cd = 11313;
+        stations[1].pass = Some(1);
+        let refs: Vec<&Station> = stations.iter().collect();
+        let params = EstimationParams {
+            speed_calibration: SpeedCalibration::Recalibrated,
+            ..EstimationParams::default()
+        };
+        let estimated = estimate_arrival_minutes(&refs, &params);
+        approx(estimated[1].max_speed_kmh, 105.0);
+        approx(estimated[2].max_speed_kmh, 100.0);
+        assert!(!estimated[1].stops_here);
+        approx(
+            estimated[1].cumulative_minutes,
+            estimated[1].departure_cumulative_minutes,
+        );
+
+        // Legacy の凍結済み較正には影響させない。
+        let legacy = estimate_arrival_minutes(&refs, &EstimationParams::default());
+        approx(legacy[1].max_speed_kmh, 80.0);
+    }
+
+    #[test]
+    fn sobu_all_stop_through_rapid_keeps_local_speed() {
+        let mut stations = three_collinear_stations();
+        for s in &mut stations {
+            s.line_cd = 11313;
+            s.kind = Some(TrainTypeKind::Rapid as i32);
+        }
+        let refs: Vec<&Station> = stations.iter().collect();
+        let params = EstimationParams {
+            speed_calibration: SpeedCalibration::Recalibrated,
+            ..EstimationParams::default()
+        };
+        let estimated = estimate_arrival_minutes(&refs, &params);
+        for stop in estimated {
+            approx(stop.max_speed_kmh, 80.0);
+            assert!(stop.stops_here);
+        }
+    }
+
+    #[test]
     fn departure_minutes_equal_pass_time_at_passed_stations() {
         let p = EstimationParams::default();
         let mut stations = three_collinear_stations();

@@ -36,11 +36,16 @@ use crate::model::TrainTypeKind;
 /// `connectedRoutes`・`trainRoute` の `Legacy` は、求め直す前の値を
 /// `legacy_speed_table` で使い続ける。
 const LINE_SPEED_OVERRIDES: &[(i32, TrainTypeKind, f64)] = &[
-    // 総武快速線: 最高 130km/h の別線を走る。StationAPI の路線には快速の停車駅しか
-    // 無く、通過駅が無いので推定は各停 (Default) として扱う。一般則の 80km/h では
+    // 総武快速線: 最高 130km/h の別線を走る。11314 の駅IDは快速の停車駅なので
+    // この路線IDでは推定は各停 (Default) として扱う。一般則の 80km/h では
     // 遅すぎる。千葉以東の総武本線の普通列車にもかかるが、その区間の基準は無い。
     // travel_times: 錦糸町→津田沼・新小岩→津田沼 快速。
     (11314, TrainTypeKind::Default, 100.0),
+    // 総武快速線の通過駅は中央・総武線の駅IDを共有する。快速の通過区間にも
+    // 快速別線の実効速度を適用する。通過駅のペナルティと N02 の分割距離を含め、
+    // travel_times の錦糸町→津田沼 (典型20分) に較正。中央・総武線内で各停となる
+    // 東西線直通は arrival_estimation が Default に補正するため、この値の対象外。
+    (11313, TrainTypeKind::Rapid, 105.0),
     // 成田スカイアクセス線: スカイライナーは 160km/h 運転だが、実効値で較正。
     // アクセス特急も同じ LimitedExpress で、京成高砂→成田空港は 39.4 分
     // (実際 38〜52 分。ばらつきが大きく典型値が無いので travel_times には無い)。
