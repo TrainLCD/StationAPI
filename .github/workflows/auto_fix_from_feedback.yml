@@ -25,6 +25,8 @@ on:
         type: string
 
 permissions:
+  # Claude Code Action が GitHub App 認証に使う OIDC トークンを取得するために必要。
+  id-token: write
   contents: write
   # prepare がスタブ issue を GITHUB_TOKEN で取得する。permissions を書いた
   # 時点で挙げなかった権限は none になるので、これを省くとそこで止まる。
