@@ -1023,7 +1023,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn departure_minutes_equal_pass_time_at_passed_stations() {
         let p = EstimationParams::default();
