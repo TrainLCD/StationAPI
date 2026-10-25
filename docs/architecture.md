@@ -525,8 +525,7 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
   出します。推定の規則や較正を変える PR には、変更前と変更後のレポートを載せます。
 
 基準の決め方と記録の更新方法は `travel_times/README.md` にあります。
-総武快速線の通過駅補完に伴う較正と全ケースの比較は
-[総武快速線の通過駅補完とETA較正](sobu-rapid-pass-eta.md) を参照してください。
+
 
 ### 行き先の検索 (`stationsByName`)
 
