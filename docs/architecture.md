@@ -526,6 +526,7 @@ input RouteLegInput { lineGroupId: Int!  fromStationId: Int!  toStationId: Int! 
 
 基準の決め方と記録の更新方法は `travel_times/README.md` にあります。
 
+
 ### 行き先の検索 (`stationsByName`)
 
 `stationsByName` に `fromStationGroupId` を指定すると、その駅から行ける駅だけに

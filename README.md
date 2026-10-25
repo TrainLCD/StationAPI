@@ -13,6 +13,7 @@ A GraphQL API that provides nearby Japanese train stations and bus stops, runnin
 - For automation agent and contributor workflows, see [AGENTS.md](AGENTS.md).
 - For contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 - For system architecture and design decisions, see [docs/architecture.md](docs/architecture.md).
+
 - For the design of the transfer route search (`connectedRoutes`, RAPTOR), see [docs/route-search.md](docs/route-search.md).
 - For the source-backed operating constraints used by timetable-free search, see [docs/route-service-audit.md](docs/route-service-audit.md).
 - For the Keio stopping-pattern audit and regression checks, see [docs/keio-stopping-pattern-audit.md](docs/keio-stopping-pattern-audit.md).
