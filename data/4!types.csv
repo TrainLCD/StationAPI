@@ -26,7 +26,7 @@ DEFAULT,104,通勤快速,ツウキンカイソク,Commuter Rapid,通勤快车,�
 DEFAULT,108,区間快速,クカンカイソク,Regional Rapid,区域快车,구간쾌속,#DC143C,0,2,0,,PARTIAL
 DEFAULT,109,快速みえ,カイソクミエ,Rapid Mie,快速三重,쾌속미에,#DC143C,0,2,0,,COMPLETE
 DEFAULT,110,新快速,シンカイソク,Special Rapid,新快速,새쾌속,#0071BE,0,5,0,JR西日本用,COMPLETE
-DEFAULT,111,直通快速,チョクツウカイソク,Direct Rapid,直接快速,직통쾌속,#F5A200,0,2,0,,COMPLETE
+DEFAULT,111,直通快速,チョクツウカイソク,Direct Rapid,直通快速,직통쾌속,#F5A200,0,2,0,,COMPLETE
 DEFAULT,113,おくたま号,オクタマゴウ,Okutama,奧多摩号,오쿠타마호,#F15A22,0,2,0,,COMPLETE
 DEFAULT,114,大和路快速,ヤマトジカイソク,Yamatoji Rapid,大和路快速,야마토지 쾌속,#02AD73,0,2,0,,COMPLETE
 DEFAULT,115,丹波路快速,タンバジカイソク,Tambaji Rapid,坦巴路快速,단바로 쾌속,#FEC210,0,2,0,,COMPLETE
@@ -221,7 +221,7 @@ DEFAULT,345,急行,キュウコウ,Express,特快,급행,#00BEFE,0,3,0,名鉄用
 DEFAULT,346,準急,ジュンキュウ,Semi Express,准急,준급,#009945,0,3,0,名鉄用,COMPLETE
 DEFAULT,347,普通,フツウ,Local,慢车,보통,#333333,0,0,0,名鉄用,COMPLETE
 DEFAULT,348,空港急行,クウコウキュウコウ,Airport Express,机场快速,공항급행,#FF7F27,0,3,0,南海電車用,COMPLETE
-DEFAULT,349,区間特急,クカントッキュウ,Limited Express,直通特急,구간특급,#A349A4,0,4,0,阪神電車,COMPLETE
+DEFAULT,349,区間特急,クカントッキュウ,Limited Express,区间特急,구간특급,#A349A4,0,4,0,阪神電車,COMPLETE
 DEFAULT,350,S特急,エストッキュウ,Limited Express,S特急,S특급,#22B14C,0,4,0,山陽電車,COMPLETE
 DEFAULT,351,快速急行(新松田より急行),カイソクキュウコウ,Rapid Express(Express from Shin-Matsuda),快速急行,쾌속급행,#F7931D,0,3,0,,COMPLETE
 DEFAULT,352,急行(新松田より各駅停車),キュウコウ,Express(Local from Shin-Matsuda),特快,급행,#DC143C,0,3,0,,COMPLETE
@@ -297,7 +297,7 @@ DEFAULT,520,けごん・きぬ,ケゴン・キヌ,Kegon/Kinu,华严・绢,케곤
 DEFAULT,521,きぬがわ,キヌガワ,Kinugawa,鬼怒川,기누가와,#378640,0,4,0,,COMPLETE
 DEFAULT,522,会津,アイヅ,Aizu,会津,아이즈,#009F49,0,4,0,,COMPLETE
 DEFAULT,523,スペーシアX(7号・8号),スペーシアX(7ゴウ・8ゴウ),SPACIA X(No.7/No.8),SPACIA X(7号/8号),SPACIA X(7호/8호),#221614,0,4,0,,COMPLETE
-DEFAULT,524,スペーシアX(1号〜6号),スペーシアX(1ゴウ〜6ゴウ),SPACIA X(No.1 through No.6),SPACIA X(1号~6号),SPACIA X(7호~8호),#221614,0,4,0,,COMPLETE
+DEFAULT,524,スペーシアX(1号〜6号),スペーシアX(1ゴウ〜6ゴウ),SPACIA X(No.1 through No.6),SPACIA X(1号~6号),SPACIA X(1호~6호),#221614,0,4,0,,COMPLETE
 DEFAULT,525,日光,ニッコウ,Nikkō,日光,햇빛,#378640,0,4,0,,COMPLETE
 DEFAULT,526,さがみ,サガミ,Sagami,相模,사가미,#2288CC,0,4,0,,COMPLETE
 DEFAULT,527,モーニングウェイ,モーニングウェイ,Morning Way,早晨的方式,모닝웨이,#2288CC,0,4,0,,COMPLETE
@@ -329,3 +329,6 @@ DEFAULT,552,A列車で行こう(三角方面),エーレッシャデイコウ,A-T
 DEFAULT,553,A列車で行こう(熊本方面),エーレッシャデイコウ,A-Train (Kumamoto),A列车(熊本方向),A열차(구마모토 방면),#C71585,1,4,0,鹿児島本線直通・運転日限定,COMPLETE
 DEFAULT,554,かんぱち,カンパチ,Kanpachi,Kanpachi,칸파치,#C71585,2,4,0,鹿児島本線直通・運転日限定,COMPLETE
 DEFAULT,555,いちろく,イチロク,Ichiroku,Ichiroku,이치로쿠,#C71585,1,4,0,鹿児島本線直通・運転日限定,COMPLETE
+DEFAULT,556,SL大樹(鬼怒川温泉方面),エスエルタイジュ,SL Taiju (Kinugawa-Onsen),SL大树(鬼怒川温泉方向),SL타이주(기누가와온센 방면),#0D0C09,0,4,0,東武鬼怒川線・運転日限定,COMPLETE
+DEFAULT,557,SL大樹ふたら,エスエルタイジュフタラ,SL Taiju Futara,SL大树Futara,SL타이주후타라,#0D0C09,0,4,0,東武日光線 下今市～東武日光・運転日限定,COMPLETE
+DEFAULT,558,普通(出町柳～鞍馬),フツウ,Local(Demachiyanagi–Kurama),慢车(出町柳～鞍马),보통(데마치야나기～구라마),#FF0000,0,0,0,叡山電鉄 宝ヶ池直通,COMPLETE

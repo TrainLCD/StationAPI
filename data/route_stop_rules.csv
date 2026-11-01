@@ -13,3 +13,6 @@ type_cd,station_group_id,forward_board,forward_alight,reverse_board,reverse_alig
 555,1191324,false,false,true,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
 555,1190643,false,false,true,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
 555,1190640,false,false,true,false,https://www.jrkyushu-kanpachiichiroku.jp/faq/
+403,2700112,true,false,false,false,https://www.keikyu.co.jp/ride/train/wing_detail.html
+403,1130104,true,false,false,false,https://www.keikyu.co.jp/ride/train/wing_detail.html
+403,1130105,true,false,false,false,https://www.keikyu.co.jp/ride/train/wing_detail.html
