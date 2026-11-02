@@ -4,11 +4,15 @@ use csv::StringRecord;
 use stationapi::domain::service_rules::service_rule;
 
 fn records(filename: &str) -> Vec<StringRecord> {
-    csv::Reader::from_path(Path::new(env!("CARGO_MANIFEST_DIR")).join("../data").join(filename))
-        .unwrap()
-        .records()
-        .collect::<Result<_, _>>()
-        .unwrap()
+    csv::Reader::from_path(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../data")
+            .join(filename),
+    )
+    .unwrap()
+    .records()
+    .collect::<Result<_, _>>()
+    .unwrap()
 }
 
 // Official 2026-11-21 revision: docs/noda-20261121.md.
@@ -41,9 +45,11 @@ fn weekday_morning_direction_and_timetable_rule_do_not_affect_shared_type() {
     assert_eq!(&matches[0][2], "区間急行(船橋方面)");
     assert_eq!(&matches[0][8], "2");
     assert_eq!(&matches[0][9], "3");
-    assert!(service_rule(Some(559), Some(1205))
-        .unwrap()
-        .requires_timetable);
+    assert!(
+        service_rule(Some(559), Some(1205))
+            .unwrap()
+            .requires_timetable
+    );
     let shared = types.iter().find(|r| &r[1] == "319").unwrap();
     assert_eq!(&shared[8], "0");
     assert!(service_rule(Some(319), Some(333)).is_none());
