@@ -396,12 +396,7 @@ where
                     nested_station.train_type = if nested_station.station_cd == station.station_cd {
                         station.train_type.clone()
                     } else {
-                        train_type_map
-                            .by_station
-                            .get(&nested_station.station_cd)
-                            .copied()
-                            .cloned()
-                            .map(Box::new)
+                        train_type_map.get(nested_station).cloned().map(Box::new)
                     };
                 }
             }
@@ -410,12 +405,7 @@ where
                     nested_station.train_type = if nested_station.station_cd == station.station_cd {
                         station.train_type.clone()
                     } else {
-                        train_type_map
-                            .by_station
-                            .get(&nested_station.station_cd)
-                            .copied()
-                            .cloned()
-                            .map(Box::new)
+                        train_type_map.get(nested_station).cloned().map(Box::new)
                     };
                 }
             }
@@ -1857,12 +1847,8 @@ where
                     station_copy.station_numbers = station_numbers;
                     if station_copy.station_cd == station.station_cd {
                         station_copy.train_type = station.train_type.clone();
-                    } else if let Some(tt) = train_type_map
-                        .by_station
-                        .get(&station_copy.station_cd)
-                        .copied()
-                        .cloned()
-                        .map(Box::new)
+                    } else if let Some(tt) =
+                        train_type_map.get(&station_copy).cloned().map(Box::new)
                     {
                         station_copy.train_type = Some(tt);
                     }
@@ -4589,6 +4575,53 @@ mod tests {
                         assert_eq!(nested.line_group_cd, station.line_group_cd);
                     }
                 }
+            }
+        }
+
+        #[tokio::test]
+        async fn other_line_nested_station_uses_its_sst_row() {
+            for (sst_id, expected_id) in [(Some(1), Some(1)), (Some(99), None), (None, Some(2))] {
+                let parent = create_test_station(101, 1001, 100, Some(1000));
+                let mut other = create_test_station(201, 1001, 200, Some(1000));
+                other.sst_id = sst_id;
+                let mut first = create_test_train_type_for_station(201, "急行");
+                first.id = Some(1);
+                let mut last = first.clone();
+                last.id = Some(2);
+                last.type_name = "特急".to_string();
+                let interactor = QueryInteractor {
+                    station_repository: ConfigurableMockStationRepository::new(
+                        vec![parent.clone(), other],
+                        vec![],
+                    ),
+                    line_repository: ConfigurableMockLineRepository::new(vec![
+                        create_test_line_for_station_group(100, 1001),
+                        create_test_line_for_station_group(200, 1001),
+                    ]),
+                    train_type_repository: ConfigurableMockTrainTypeRepository::new(vec![
+                        first, last,
+                    ]),
+                    company_repository: ConfigurableMockCompanyRepository::new(vec![]),
+                };
+                let result = interactor
+                    .update_station_vec_with_attributes(
+                        vec![parent],
+                        Some(1000),
+                        TransportTypeFilter::Rail,
+                        false,
+                    )
+                    .await
+                    .unwrap();
+                let nested = result[0]
+                    .lines
+                    .iter()
+                    .find(|line| line.line_cd == 200)
+                    .unwrap()
+                    .station
+                    .as_ref()
+                    .unwrap();
+                assert_eq!(nested.sst_id, sst_id);
+                assert_eq!(nested.train_type.as_ref().and_then(|tt| tt.id), expected_id);
             }
         }
 
