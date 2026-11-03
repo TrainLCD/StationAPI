@@ -4520,12 +4520,8 @@ mod tests {
                     let mut stations: Vec<Station> = types
                         .iter()
                         .map(|tt| {
-                            let mut station = create_test_station(
-                                2700102,
-                                1130103,
-                                27001,
-                                tt.line_group_cd,
-                            );
+                            let mut station =
+                                create_test_station(2700102, 1130103, 27001, tt.line_group_cd);
                             station.station_name = "品川".to_string();
                             station.sst_id = tt.id;
                             station.type_cd = tt.type_cd;
@@ -6763,4 +6759,3 @@ mod tests {
         }
     }
 }
-
