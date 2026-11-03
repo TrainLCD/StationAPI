@@ -1842,9 +1842,16 @@ where
             for line in station_lines.iter_mut() {
                 line.company = company_map.get(&line.company_cd).cloned();
                 line.line_symbols = self.get_line_symbols(line);
-                if let Some(station_ref) = station_lookup.get(&(line.line_cd, station.station_g_cd))
-                {
-                    let mut station_copy = (*station_ref).clone();
+                // SST 行を持つ自路線の駅は親駅と揃える。行を持たない駅と他路線は従来の索引で引く。
+                let station_ref = if line.line_cd == station.line_cd && station.sst_id.is_some() {
+                    station.line.as_ref().and_then(|line| line.station.as_ref())
+                } else {
+                    station_lookup
+                        .get(&(line.line_cd, station.station_g_cd))
+                        .copied()
+                };
+                if let Some(station_ref) = station_ref {
+                    let mut station_copy = station_ref.clone();
                     let station_numbers: Vec<StationNumber> =
                         self.get_station_numbers(&station_copy);
                     station_copy.station_numbers = station_numbers;
@@ -4572,8 +4579,14 @@ mod tests {
                         );
                         let nested = station.line.as_ref().unwrap().station.as_ref().unwrap();
                         assert_eq!(nested.train_type.as_ref().unwrap().id, id);
+                        assert_eq!(nested.sst_id, station.sst_id);
+                        assert_eq!(nested.type_cd, station.type_cd);
+                        assert_eq!(nested.line_group_cd, station.line_group_cd);
                         let nested = station.lines[0].station.as_ref().unwrap();
                         assert_eq!(nested.train_type.as_ref().unwrap().id, id);
+                        assert_eq!(nested.sst_id, station.sst_id);
+                        assert_eq!(nested.type_cd, station.type_cd);
+                        assert_eq!(nested.line_group_cd, station.line_group_cd);
                     }
                 }
             }
