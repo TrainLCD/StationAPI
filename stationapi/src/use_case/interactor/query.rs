@@ -51,6 +51,36 @@ use crate::{
 };
 use async_trait::async_trait;
 
+/// 同じ駅でも種別変更の前後は別の SST 行。駅 ID だけで引くと片側の種別を失う。
+struct StationTrainTypes<'a> {
+    by_row: HashMap<i32, &'a TrainType>,
+    by_station: HashMap<i32, &'a TrainType>,
+}
+
+impl<'a> StationTrainTypes<'a> {
+    fn new(types: &'a [TrainType]) -> Self {
+        Self {
+            by_row: types
+                .iter()
+                .filter_map(|tt| tt.id.map(|id| (id, tt)))
+                .collect(),
+            by_station: types
+                .iter()
+                .filter_map(|tt| tt.station_cd.map(|id| (id, tt)))
+                .collect(),
+        }
+    }
+
+    fn get(&self, station: &Station) -> Option<&'a TrainType> {
+        match station.sst_id {
+            // 通過行などが取得対象外なら、同じ駅の別の停車行へ置き換えない。
+            Some(id) => self.by_row.get(&id),
+            None => self.by_station.get(&station.station_cd),
+        }
+        .copied()
+    }
+}
+
 #[derive(Clone)]
 pub struct QueryInteractor<SR, LR, TR, CR> {
     pub station_repository: SR,
@@ -357,33 +387,36 @@ where
             .train_type_repository
             .get_by_line_group_id_vec(line_group_ids)
             .await?;
-        let train_type_map: std::collections::HashMap<i32, &TrainType> = train_types
-            .iter()
-            .filter_map(|tt| tt.station_cd.map(|cd| (cd, tt)))
-            .collect();
+        let train_type_map = StationTrainTypes::new(&train_types);
 
         for station in stations.iter_mut() {
-            station.train_type = train_type_map
-                .get(&station.station_cd)
-                .copied()
-                .cloned()
-                .map(Box::new);
+            station.train_type = train_type_map.get(station).cloned().map(Box::new);
             if let Some(ref mut line) = station.line {
                 if let Some(ref mut nested_station) = line.station {
-                    nested_station.train_type = train_type_map
-                        .get(&nested_station.station_cd)
-                        .copied()
-                        .cloned()
-                        .map(Box::new);
+                    nested_station.train_type = if nested_station.station_cd == station.station_cd {
+                        station.train_type.clone()
+                    } else {
+                        train_type_map
+                            .by_station
+                            .get(&nested_station.station_cd)
+                            .copied()
+                            .cloned()
+                            .map(Box::new)
+                    };
                 }
             }
             for line in station.lines.iter_mut() {
                 if let Some(ref mut nested_station) = line.station {
-                    nested_station.train_type = train_type_map
-                        .get(&nested_station.station_cd)
-                        .copied()
-                        .cloned()
-                        .map(Box::new);
+                    nested_station.train_type = if nested_station.station_cd == station.station_cd {
+                        station.train_type.clone()
+                    } else {
+                        train_type_map
+                            .by_station
+                            .get(&nested_station.station_cd)
+                            .copied()
+                            .cloned()
+                            .map(Box::new)
+                    };
                 }
             }
         }
@@ -1689,11 +1722,8 @@ where
             }
         }
 
-        // Build HashMap for O(1) train_type lookup by station_cd
-        let train_type_map: std::collections::HashMap<i32, &TrainType> = train_types
-            .iter()
-            .filter_map(|tt| tt.station_cd.map(|cd| (cd, tt)))
-            .collect();
+        // SST 行を優先して O(1) で種別を取得する。
+        let train_type_map = StationTrainTypes::new(&train_types);
 
         // Build lookup map for stations_by_group_ids: (line_cd, station_g_cd) -> Station
         let station_lookup: std::collections::HashMap<(i32, i32), &Station> = stations_by_group_ids
@@ -1717,12 +1747,7 @@ where
 
             let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
             station.station_numbers = station_numbers;
-            if let Some(tt) = train_type_map
-                .get(&station.station_cd)
-                .copied()
-                .cloned()
-                .map(Box::new)
-            {
+            if let Some(tt) = train_type_map.get(station).cloned().map(Box::new) {
                 station.train_type = Some(tt);
             }
 
@@ -1823,14 +1848,17 @@ where
                     let station_numbers: Vec<StationNumber> =
                         self.get_station_numbers(&station_copy);
                     station_copy.station_numbers = station_numbers;
-                    if let Some(tt) = train_type_map
+                    if station_copy.station_cd == station.station_cd {
+                        station_copy.train_type = station.train_type.clone();
+                    } else if let Some(tt) = train_type_map
+                        .by_station
                         .get(&station_copy.station_cd)
                         .copied()
                         .cloned()
                         .map(Box::new)
                     {
                         station_copy.train_type = Some(tt);
-                    };
+                    }
                     line.station = Some(station_copy);
                 }
             }
@@ -4468,6 +4496,105 @@ mod tests {
             assert_eq!(train_type_result.station_cd, Some(101));
         }
 
+        // 系統1035の品川は同一station_cdで急行→特急の2行を持つ。
+        // 並びを逆転して羽田空港方面へ走っても両側の種別を失わないこと。
+        #[tokio::test]
+        async fn junction_train_types_preserve_each_occurrence() {
+            for multiple_groups in [false, true] {
+                for reverse in [false, true] {
+                    let mut express = create_test_train_type_for_station(2700102, "急行");
+                    express.id = Some(1);
+                    express.type_cd = Some(310);
+                    express.line_group_cd = Some(1035);
+                    let mut limited = express.clone();
+                    limited.id = Some(2);
+                    limited.type_cd = Some(306);
+                    limited.type_name = "特急".to_string();
+                    let mut other_group = express.clone();
+                    other_group.id = Some(3);
+                    other_group.line_group_cd = Some(2000);
+                    let mut types = vec![express, limited];
+                    if multiple_groups {
+                        types.push(other_group);
+                    }
+                    let mut stations: Vec<Station> = types
+                        .iter()
+                        .map(|tt| {
+                            let mut station = create_test_station(
+                                2700102,
+                                1130103,
+                                27001,
+                                tt.line_group_cd,
+                            );
+                            station.station_name = "品川".to_string();
+                            station.sst_id = tt.id;
+                            station.type_cd = tt.type_cd;
+                            station
+                        })
+                        .collect();
+                    if reverse {
+                        stations.reverse();
+                    }
+                    let expected: Vec<_> = stations.iter().map(|s| s.sst_id).collect();
+                    let interactor = QueryInteractor {
+                        station_repository: ConfigurableMockStationRepository::new(
+                            stations.clone(),
+                            vec![],
+                        )
+                        .with_line_group_stations(stations.clone()),
+                        line_repository: ConfigurableMockLineRepository::new(vec![
+                            create_test_line_for_station_group(27001, 1130103),
+                        ]),
+                        train_type_repository: ConfigurableMockTrainTypeRepository::new(types),
+                        company_repository: ConfigurableMockCompanyRepository::new(vec![]),
+                    };
+                    let result = if multiple_groups {
+                        interactor
+                            .get_stations_by_line_group_id_vec(
+                                &[1035, 2000],
+                                TransportTypeFilter::Rail,
+                            )
+                            .await
+                            .unwrap()
+                    } else {
+                        interactor
+                            .update_station_vec_with_attributes(
+                                stations,
+                                Some(1035),
+                                TransportTypeFilter::Rail,
+                                false,
+                            )
+                            .await
+                            .unwrap()
+                    };
+                    assert_eq!(result.len(), expected.len());
+                    for (station, id) in result.iter().zip(expected) {
+                        assert_eq!(station.train_type.as_ref().unwrap().id, id);
+                        assert_eq!(
+                            station.train_type.as_ref().unwrap().type_cd,
+                            station.type_cd
+                        );
+                        let nested = station.line.as_ref().unwrap().station.as_ref().unwrap();
+                        assert_eq!(nested.train_type.as_ref().unwrap().id, id);
+                        let nested = station.lines[0].station.as_ref().unwrap();
+                        assert_eq!(nested.train_type.as_ref().unwrap().id, id);
+                    }
+                }
+            }
+        }
+
+        #[test]
+        fn train_type_lookup_does_not_replace_a_missing_row_with_another_occurrence() {
+            let tt = create_test_train_type_for_station(101, "急行");
+            let types = vec![tt];
+            let lookup = StationTrainTypes::new(&types);
+            let mut station = create_test_station(101, 1001, 100, Some(1000));
+            // 行IDのない従来の駅データでは駅IDによる補完を維持する。
+            assert!(lookup.get(&station).is_some());
+            station.sst_id = Some(-1);
+            assert!(lookup.get(&station).is_none());
+        }
+
         #[tokio::test]
         async fn test_update_station_vec_with_attributes_adds_line_symbols() {
             let company = create_test_company(1, "JR東日本");
@@ -6636,3 +6763,4 @@ mod tests {
         }
     }
 }
+
