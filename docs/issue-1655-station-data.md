@@ -29,5 +29,12 @@
 - 駅前大橋ルート: https://www.hiroden.co.jp/topics/2025/pdf/0708_tramdia/tramdia1.pdf
 - 循環線の開業日・経路: https://www.hiroden.co.jp/topics/2026/pdf/0328-loopline/0212_release.pdf
 
-CSV変更はWorkerの再ビルド後に反映される。データ検証の連続駅順チェックで
-上記経路と信号場の順序の退行を検出する。
+`data/*.csv` の変更後は、`make data` で `generated/` を更新し、
+`cargo run -p data_validator` で検証してから `make build` でWorkerを再ビルドする。
+既存の `generated/` がある場合、Workerはそちらを優先するため、再生成が必要になる。
+
+連続駅順チェックは、`data_validator/src/main.rs` の
+`EXPECTED_CONSECUTIVE_STATION_ORDERS` に登録した区間について、
+`3!stations.csv` の有効駅を `e_sort`・`station_cd` 順に並べて検査する。
+`5!station_station_types.csv` の系統所属 (`line_group_cd`)・系統内の駅順・
+停車フラグ (`pass`) の退行は、このチェックの対象外である。
