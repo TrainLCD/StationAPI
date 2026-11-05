@@ -43,6 +43,7 @@ const EXPECTED_CONSECUTIVE_STATION_ORDERS: &[(u32, &[u32])] = &[
     (99719, &[9971921, 9971922]),
 ];
 
+/// 正規CSVの参照・駅順・運行規則を検証し、不正時はレポートを出力して失敗する。
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut invalid_station_ids: Vec<String> = Vec::new();
     let mut invalid_type_ids: Vec<String> = Vec::new();
@@ -332,25 +333,33 @@ fn validate_hakone_service_order(
         .filter(|row| row.get(STATIONS_COL_E_STATUS) == Some("0"))
         .filter_map(|row| row.get(STATIONS_COL_STATION_CD))
         .collect();
-    let ordered: Vec<&str> = records
+    let service_rows: Vec<&StringRecord> = records
         .iter()
-        .filter(|row| row.get(3) == Some("975") && row.get(2) == Some("101"))
-        .filter_map(|row| row.get(1))
-        .filter(|id| active_ids.contains(id))
+        .filter(|row| row.get(3) == Some("975"))
+        .filter(|row| row.get(1).is_some_and(|id| active_ids.contains(id)))
         .collect();
+    let mut errors = Vec::new();
+    for row in &service_rows {
+        if row.get(2) != Some("101") {
+            errors.push(format!(
+                "line_group_cd 975: station_cd {} の type_cd は101である必要があります",
+                row.get(1).unwrap_or("")
+            ));
+        }
+    }
+    let ordered: Vec<&str> = service_rows.iter().filter_map(|row| row.get(1)).collect();
     let expected = [
         "9933906", "9933912", "9933907", "9933913", "9933914", "9933908",
     ];
-    if ordered
+    if !ordered
         .windows(expected.len())
         .any(|window| window == expected)
     {
-        Vec::new()
-    } else {
-        vec![format!(
+        errors.push(format!(
             "line_group_cd 975: CSV行順に {expected:?} の連続した並びが必要です"
-        )]
+        ));
     }
+    errors
 }
 
 /// `8!connections.csv` (手で直した駅間の線路の長さ) の各行について、両駅が
@@ -398,6 +407,7 @@ fn validate_connections(records: &[StringRecord], station_ids: &HashSet<u32>) ->
     errors
 }
 
+/// 参照・駅順・駅間距離の検証エラーをレビュー用のMarkdownへまとめる。
 fn build_markdown_report(
     invalid_station_ids: &[String],
     invalid_type_ids: &[String],
@@ -510,8 +520,8 @@ mod tests {
             .unwrap()
     }
 
-    #[test]
     /// 循環線の駅順が正しくても両端の駅グループ不一致を検出する。
+    #[test]
     fn loop_endpoints_must_share_a_station_group() {
         let mut stations = records(include_str!("../../data/3!stations.csv"));
         assert!(validate_station_orders(&stations).is_empty());
@@ -527,8 +537,8 @@ mod tests {
             .any(|error| error.contains("同じ駅グループ")));
     }
 
-    #[test]
     /// 路線の駅順とは独立して系統内の欠落・入れ替え・種別変更を検出する。
+    #[test]
     fn hakone_service_order_is_independent_of_station_sort_order() {
         let stations = records(include_str!("../../data/3!stations.csv"));
         let mut services = records(include_str!("../../data/5!station_station_types.csv"));
@@ -547,6 +557,12 @@ mod tests {
         services[a] = StringRecord::from(fields);
         assert!(!validate_hakone_service_order(&services, &stations).is_empty());
         services[a] = original;
+        let mut extra: Vec<String> = services[a].iter().map(str::to_owned).collect();
+        extra[2] = "100".to_owned();
+        // 正しい駅列を残したまま異なる種別の行を末尾へ追加しても失敗する。
+        services.push(StringRecord::from(extra));
+        assert!(!validate_hakone_service_order(&services, &stations).is_empty());
+        services.pop();
         services.swap(a, b);
         assert!(validate_station_orders(&stations).is_empty());
         assert!(!validate_hakone_service_order(&services, &stations).is_empty());
