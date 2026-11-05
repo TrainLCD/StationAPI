@@ -31,3 +31,4 @@ type_cd,line_group_id,requires_timetable,boarding_wait_seconds,source,type_name,
 555,1199,true,,https://www.jrkyushu-kanpachiichiroku.jp/info/,いちろく,公式運行カレンダーに限定（毎日運転ではない）,2026-10-21
 556,1203,true,,https://www.tobu.co.jp/sl/guide/,SL大樹(鬼怒川温泉方面),運転日と行先パターンが日によって変わる,2026-11-01
 557,1204,true,,https://www.tobu.co.jp/sl/guide/,SL大樹ふたら,運転日と行先パターンが日によって変わる,2026-11-01
+100,1000099719,true,,https://www.hiroden.co.jp/topics/2026/pdf/0328-loopline/0212_release.pdf,普通,循環線は日中時間帯限定（10時～16時）,2026-11-05
