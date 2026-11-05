@@ -334,7 +334,7 @@ fn validate_hakone_service_order(
         .collect();
     let ordered: Vec<&str> = records
         .iter()
-        .filter(|row| row.get(3) == Some("975"))
+        .filter(|row| row.get(3) == Some("975") && row.get(2) == Some("101"))
         .filter_map(|row| row.get(1))
         .filter(|id| active_ids.contains(id))
         .collect();
@@ -501,6 +501,7 @@ fn escape_markdown_cell(s: &str) -> String {
 mod tests {
     use super::*;
 
+    /// ヘッダー付きCSVをテスト用レコード列へ読み込む。
     fn records(text: &str) -> Vec<StringRecord> {
         ReaderBuilder::new()
             .from_reader(text.as_bytes())
@@ -510,6 +511,7 @@ mod tests {
     }
 
     #[test]
+    /// 循環線の駅順が正しくても両端の駅グループ不一致を検出する。
     fn loop_endpoints_must_share_a_station_group() {
         let mut stations = records(include_str!("../../data/3!stations.csv"));
         assert!(validate_station_orders(&stations).is_empty());
@@ -526,6 +528,7 @@ mod tests {
     }
 
     #[test]
+    /// 路線の駅順とは独立して系統内の欠落・入れ替え・種別変更を検出する。
     fn hakone_service_order_is_independent_of_station_sort_order() {
         let stations = records(include_str!("../../data/3!stations.csv"));
         let mut services = records(include_str!("../../data/5!station_station_types.csv"));
@@ -538,6 +541,12 @@ mod tests {
         };
         let a = position("9933912");
         let b = position("9933907");
+        let original = services[a].clone();
+        let mut fields: Vec<String> = original.iter().map(str::to_owned).collect();
+        fields[2] = "100".to_owned();
+        services[a] = StringRecord::from(fields);
+        assert!(!validate_hakone_service_order(&services, &stations).is_empty());
+        services[a] = original;
         services.swap(a, b);
         assert!(validate_station_orders(&stations).is_empty());
         assert!(!validate_hakone_service_order(&services, &stations).is_empty());
