@@ -313,7 +313,7 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 30013,20,名鉄津島線,メイテツツシマセン,名鉄津島線,Tsushima Line,Tsushima Line,津岛线,쓰시마 선,#E85624,2,TB,NH,,,#E85624,#D12027,,,HALF_SQUARE,HALF_SQUARE,,,0,30013,1669.75524
 30014,20,名鉄尾西線,メイテツビサイセン,名鉄尾西線,Bisai Line,Bisai Line,尾西线,비사이 선,#E85624,2,TB,BS,NH,,#E85624,#E85624,#D12027,,HALF_SQUARE,HALF_SQUARE,HALF_SQUARE,,0,30014,1451.99735
 30015,20,名鉄犬山線,メイテツイヌヤマセン,名鉄犬山線,Inuyama Line,Inuyama Line,犬山线,이누야마 선,#018B44,2,IY,NH,,,#018B44,#D12027,,,HALF_SQUARE,HALF_SQUARE,,,0,30015,1777.76181
-30016,20,名鉄各務原線,メイテツカカミガハラセン,名鉄各務原線,Kakamigahara Line,Kakamigahara Line,各务原线,가카미가하라 선,#018B44,2,KG,IY,,,#018B44,#018B44,,,HALF_SQUARE,HALF_SQUARE,,,0,30016,1021.66184
+30016,20,名鉄各務原線,メイテツカカミガハラセン,名鉄各務原線,Kakamigahara Line,Kakamigahara Line,各务原线,가카미가하라 선,#018B44,2,KG,IY,NH,,#018B44,#018B44,#D12027,,HALF_SQUARE,HALF_SQUARE,HALF_SQUARE,,0,30016,1021.66184
 30017,20,名鉄広見線,メイテツヒロミセン,名鉄広見線,Hiromi Line,Hiromi Line,广见线,히로미 선,#018B44,2,HM,IY,,,#018B44,#018B44,,,HALF_SQUARE,HALF_SQUARE,,,0,30017,2136.41769
 30018,20,名鉄小牧線,メイテツコマキセン,名鉄小牧線,Komaki Line,Komaki Line,小牧线,고마키 선,#DA5290,2,KM,IY,,,#DA5290,#018B44,,,HALF_SQUARE,HALF_SQUARE,,,0,30018,1558.11789
 30019,20,犬山モノレール,イヌヤマモノレール,名鉄モンキーパークモノレール線,Inuyama Monorail,Inuyama Monorail,犬山单轨电车,이누야마 모노레일,#808080,5,,,,,,,,,,,,,2,30019,617.56367

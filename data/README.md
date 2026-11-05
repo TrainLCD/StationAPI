@@ -326,3 +326,7 @@ Worker を再ビルドしてください。根拠は各行の `source` に記載
 
 快速運転区間ごとの系統と停車駅の出典は [鹿児島本線の区間快速](../docs/kagoshima-sectional-rapid.md) を参照してください。
 観光特急の追加、快速の補正、未対応列車の制約は [鹿児島本線の追加種別監査](../docs/kagoshima-services-audit.md) を参照してください。
+
+## 路線記号・駅番号の監査
+
+Issue #1654 の現行値・補正・検証状況は [路線記号の監査](../docs/line-symbols-audit.md) を参照してください。
