@@ -459,7 +459,7 @@ where
                     return Some(StationNumber {
                         line_symbol: String::new(),
                         line_symbol_color: sym_color.to_string(),
-                        line_symbol_shape: "NUMBER_ONLY".to_string(),
+                        line_symbol_shape: sym_shape.to_string(),
                         station_number: station_number.to_string(),
                     });
                 }
@@ -3706,22 +3706,34 @@ mod tests {
             fn records(data: &str) -> Vec<std::collections::HashMap<String, String>> {
                 let mut reader = csv::Reader::from_reader(data.as_bytes());
                 let headers = reader.headers().unwrap().clone();
-                reader.records().map(|row| {
-                    let row = row.unwrap();
-                    headers.iter().zip(row.iter())
-                        .map(|(key, value)| (key.to_string(), value.to_string())).collect()
-                }).collect()
+                reader
+                    .records()
+                    .map(|row| {
+                        let row = row.unwrap();
+                        headers
+                            .iter()
+                            .zip(row.iter())
+                            .map(|(key, value)| (key.to_string(), value.to_string()))
+                            .collect()
+                    })
+                    .collect()
             }
             let lines = records(include_str!("../../../../data/2!lines.csv"));
             let stations = records(include_str!("../../../../data/3!stations.csv"));
             let interactor = create_interactor();
             for (line_cd, expected_symbol, expected_shape) in [
-                (30016, "KG", "HALF_SQUARE"), (28010, "F", "ROUND"),
-                (99303, "I", "ROUND"), (11320, "JJ", "SQUARE"),
-                (99907, "N", "ROUND"), (23001, "KS", "KEISEI"),
+                (30016, "KG", "HALF_SQUARE"),
+                (28010, "F", "ROUND"),
+                (99303, "I", "ROUND"),
+                (11320, "JJ", "SQUARE"),
+                (99907, "N", "ROUND"),
+                (23001, "KS", "KEISEI"),
                 (11313, "JB", "SQUARE"),
             ] {
-                let row = lines.iter().find(|r| r["line_cd"] == line_cd.to_string()).unwrap();
+                let row = lines
+                    .iter()
+                    .find(|r| r["line_cd"] == line_cd.to_string())
+                    .unwrap();
                 let mut line = create_test_line(line_cd);
                 line.line_symbol1 = Some(row["line_symbol1"].clone());
                 line.line_symbol1_color = Some(row["line_symbol1_color"].clone());
@@ -3731,14 +3743,28 @@ mod tests {
                 assert_eq!(symbols[0].shape, expected_shape, "line {line_cd}");
             }
             for (station_cd, expected) in [
-                (3001601, "IY-17"), (3001602, "KG-01"), (3001618, "NH-60"),
-                (1132004, "JJ-04"), (1132005, "JJ-05"),
-                (9990718, "N-18"), (9990503, "K-11"),
-                (1190231, "00"), (1190301, "00"), (1190812, "00"),
-                (1190230, "JA-01"), (1190302, "JB-01"), (1190811, "JC-01"),
+                (3001601, "IY-17"),
+                (3001602, "KG-01"),
+                (3001618, "NH-60"),
+                (1132004, "JJ-04"),
+                (1132005, "JJ-05"),
+                (9990718, "N-18"),
+                (9990503, "K-11"),
+                (1190231, "00"),
+                (1190301, "00"),
+                (1190812, "00"),
+                (1190230, "JA-01"),
+                (1190302, "JB-01"),
+                (1190811, "JC-01"),
             ] {
-                let row = stations.iter().find(|r| r["station_cd"] == station_cd.to_string()).unwrap();
-                let line = lines.iter().find(|l| l["line_cd"] == row["line_cd"]).unwrap();
+                let row = stations
+                    .iter()
+                    .find(|r| r["station_cd"] == station_cd.to_string())
+                    .unwrap();
+                let line = lines
+                    .iter()
+                    .find(|l| l["line_cd"] == row["line_cd"])
+                    .unwrap();
                 let mut station = create_test_station(
                     station_cd,
                     row["station_g_cd"].parse().unwrap(),
@@ -3757,12 +3783,15 @@ mod tests {
                 station.line_symbol2 = optional(line, "line_symbol2");
                 station.line_symbol3 = optional(line, "line_symbol3");
                 station.line_symbol4 = optional(line, "line_symbol4");
+                station.line_symbol1_color = optional(line, "line_symbol1_color");
+                station.line_symbol1_shape = optional(line, "line_symbol1_shape");
                 let numbers = interactor.get_station_numbers(&station);
                 assert_eq!(numbers.len(), 1, "station {station_cd}");
                 assert_eq!(numbers[0].station_number, expected, "station {station_cd}");
                 if expected == "00" {
                     assert!(numbers[0].line_symbol.is_empty());
-                    assert_eq!(numbers[0].line_symbol_shape, "NUMBER_ONLY");
+                    assert_eq!(numbers[0].line_symbol_shape, line["line_symbol1_shape"]);
+                    assert_eq!(numbers[0].line_symbol_color, line["line_symbol1_color"]);
                 }
             }
         }

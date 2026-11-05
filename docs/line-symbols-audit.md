@@ -5,7 +5,7 @@
 ## 修正
 
 - 各務原線 (30016): 第1記号 KG、第2記号 IY は既存の正しい設定。新鵜沼 IY-17 のため IY は残す。名鉄岐阜は station_number3=60 が既存だが対応する第3記号がなかったため NH と色・形状を追加し、NH-60 を返す。
-- JR博多: 1190231 / 1190301 / 1190812 は公式表記が記号なしの 00。get_station_numbers でこの3駅IDの第1番号のみ NUMBER_ONLY にする。路線自体の JA/JB/JC は維持し、地下鉄博多 (K-11 / N-18) は対象外。計算量は既存どおり駅ごと O(1)。
+- JR博多: 1190231 / 1190301 / 1190812 は公式表記が記号なしの 00。get_station_numbers でこの3駅IDの第1番号のみ路線記号なしで返し、形状・色は元の路線設定を維持する（鹿児島本線: HALF_SQUARE、福北ゆたか線: HALF_SQUARE_DARK_TEXT）。路線自体の JA/JB/JC は維持し、地下鉄博多 (K-11 / N-18) は対象外。計算量は既存どおり駅ごと O(1)。
 
 ## 現行実装で確認した項目
 
@@ -27,6 +27,10 @@
 ## 検証
 
 正規CSVの13駅について、記号スロットと駅番号の対応および博多の00を照合済み。git diff --check 成功。
-Rustの回帰テストを追加。実行環境に cargo がなく cargo test -p stationapi test_issue_1654 は実行できなかった。CIではこのテストと cargo run -p data_validator、cargo fmt --all -- --check を実行する必要がある。
+Rustの回帰テストを追加。作業フォルダー内にRustを用意し、cargo fmt --all と cargo fmt --all -- --check に成功。cargo test -p stationapi test_issue_1654 は Windows の link.exe 不在でビルドできなかったため、更新後のCIで確認する。初回コミットのCIではTest Suite・Clippy・Checkとデータ整合性検証は成功、Rustfmtは失敗していた。
 
 データはビルド時に埋め込まれるため、反映には Worker の再ビルド・再デプロイが必要。
+
+## レビュー後の補正
+
+NUMBER_ONLY はアプリの NumberingIcon に描画分岐がなく、表示が消えるため不適切だった。路線記号なしという番号表記とアイコン形状を混同せず、元の形状と色を維持する。アプリ画面での表示確認は未実施。
