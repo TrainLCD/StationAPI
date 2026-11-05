@@ -77,9 +77,7 @@ jobs:
       # action が generated/ を作ったこのジョブで比べる。バスのフィードが
       # 欠けても鉄道の推定は変わらない。
       - name: Check travel times against the benchmark
-        run: |
-          TRAVEL_TIMES_UPDATE_BASELINE=1 cargo test -p stationapi-worker travel_times
-          cat travel_times/baseline.csv
+        run: cargo test -p stationapi-worker travel_times
 
       - uses: actions/upload-artifact@v4
         with:
