@@ -11,6 +11,13 @@
 信号場と旅客駅を区別する属性を追加するものではない。
 駅番号は付与しない。開設日は今回の確認対象としないため未設定。
 
+停車フラグは3か所とも `pass=0` とする。出山・上大平台の停止は公式の
+スイッチバック案内に基づく。仙人台は下記二次資料の「列車交換を行わない
+列車も必ず一旦停車する」という記述に基づく。仙人台の全列車停止について
+公式資料での確認はできておらず、根拠の確度は同一ではない。
+
+- 仙人台の運転停車（二次資料）: https://w.atwiki.jp/kantoushitetsu/pages/318.html
+
 - 信号場の存在とスイッチバック: https://www.hakonenavi.jp/hakone-tozan/
 - 仙人台を含む公式資料: https://www.hakonenavi.jp/_wp/wp-content/uploads/2025/09/d3f53da6390150014059d6fb32fce430.pdf
 - 座標照合: https://zh.wikipedia.org/wiki/出山信號場 、https://zh.wikipedia.org/wiki/上大平台信號場 、https://zh.wikipedia.org/wiki/仙人台信號場
