@@ -351,6 +351,14 @@ fn validate_hakone_service_order(
     let expected = [
         "9933906", "9933912", "9933907", "9933913", "9933914", "9933908",
     ];
+    for station_id in expected {
+        let count = ordered.iter().filter(|&&id| id == station_id).count();
+        if count != 1 {
+            errors.push(format!(
+                "line_group_cd 975: station_cd {station_id} は1行必要ですが {count} 行あります"
+            ));
+        }
+    }
     if !ordered
         .windows(expected.len())
         .any(|window| window == expected)
@@ -537,36 +545,56 @@ mod tests {
             .any(|error| error.contains("同じ駅グループ")));
     }
 
-    /// 路線の駅順とは独立して系統内の欠落・入れ替え・種別変更を検出する。
+    /// 路線の駅順とは独立して6駅の欠落・重複・入れ替え・種別と系統の変更を検出する。
     #[test]
     fn hakone_service_order_is_independent_of_station_sort_order() {
         let stations = records(include_str!("../../data/3!stations.csv"));
-        let mut services = records(include_str!("../../data/5!station_station_types.csv"));
+        let services = records(include_str!("../../data/5!station_station_types.csv"));
         assert!(validate_hakone_service_order(&services, &stations).is_empty());
-        let position = |id| {
-            services
-                .iter()
-                .position(|row| row.get(3) == Some("975") && row.get(1) == Some(id))
-                .unwrap()
-        };
-        let a = position("9933912");
-        let b = position("9933907");
-        let original = services[a].clone();
-        let mut fields: Vec<String> = original.iter().map(str::to_owned).collect();
-        fields[2] = "100".to_owned();
-        services[a] = StringRecord::from(fields);
-        assert!(!validate_hakone_service_order(&services, &stations).is_empty());
-        services[a] = original;
-        let mut extra: Vec<String> = services[a].iter().map(str::to_owned).collect();
-        extra[2] = "100".to_owned();
-        // 正しい駅列を残したまま異なる種別の行を末尾へ追加しても失敗する。
-        services.push(StringRecord::from(extra));
-        assert!(!validate_hakone_service_order(&services, &stations).is_empty());
-        services.pop();
-        services.swap(a, b);
         assert!(validate_station_orders(&stations).is_empty());
-        assert!(!validate_hakone_service_order(&services, &stations).is_empty());
-        services.remove(a);
-        assert!(!validate_hakone_service_order(&services, &stations).is_empty());
+        let targets = [
+            "9933906", "9933912", "9933907", "9933913", "9933914", "9933908",
+        ];
+        for station_id in targets {
+            let position = services
+                .iter()
+                .position(|row| row.get(3) == Some("975") && row.get(1) == Some(station_id))
+                .unwrap();
+            let mut changed = services.clone();
+            changed.remove(position);
+            assert!(!validate_hakone_service_order(&changed, &stations).is_empty());
+
+            // 正しい連続列を残して、各対象駅を列の前・後に重複させる。
+            for insertion in [0, services.len()] {
+                let mut changed = services.clone();
+                changed.insert(insertion, services[position].clone());
+                assert!(!validate_hakone_service_order(&changed, &stations).is_empty());
+            }
+
+            for column in [2, 3] {
+                let mut changed = services.clone();
+                let mut fields: Vec<String> = changed[position].iter().map(str::to_owned).collect();
+                fields[column] = if column == 2 { "100" } else { "974" }.to_owned();
+                changed[position] = StringRecord::from(fields.clone());
+                assert!(!validate_hakone_service_order(&changed, &stations).is_empty());
+                if column == 2 {
+                    // 駅の欠落ではなく、異なる種別の追加行でも失敗する。
+                    let mut added = services.clone();
+                    added.push(StringRecord::from(fields));
+                    assert!(!validate_hakone_service_order(&added, &stations).is_empty());
+                }
+            }
+        }
+        let positions: Vec<usize> = services
+            .iter()
+            .enumerate()
+            .filter(|(_, row)| row.get(3) == Some("975") && targets.contains(&row.get(1).unwrap()))
+            .map(|(index, _)| index)
+            .collect();
+        for pair in positions.windows(2) {
+            let mut changed = services.clone();
+            changed.swap(pair[0], pair[1]);
+            assert!(!validate_hakone_service_order(&changed, &stations).is_empty());
+        }
     }
 }
