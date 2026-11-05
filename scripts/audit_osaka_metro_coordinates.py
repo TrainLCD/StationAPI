@@ -59,7 +59,7 @@ if BEFORE:
     assert len(old_rows) == len(all_rows)
     changed = []
     for old, new in zip(old_rows, all_rows):
-        assert old.keys() == new.keys()
+        assert list(old) == list(new), "CSV column order changed"
         if old != new:
             assert old["station_cd"] == new["station_cd"]
             assert new["line_cd"] in lines

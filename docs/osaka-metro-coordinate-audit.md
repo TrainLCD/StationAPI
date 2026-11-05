@@ -68,7 +68,12 @@ N02の座標系はJGD2011、CSVはWGS84を要求する。厳密な時点・測�
 - 修正後の134件を再照合し、50m超の点が0件になることを確認。
 - `git diff --check` を実行。
 - WSL UbuntuのPython 3.14.4でも独立した全134件の照合と変更範囲検証に成功。
-- `cargo run -p data_validator` はWindows側・WSL Ubuntu（kitten）側のPATHおよび標準配置先にcargoが見つからず実行不可。Rustのfmt/clippy/testも未実行。既存のCIによる検証が必要。
+- WSLに導入されたcargo 1.99.1で `cargo run -p data_validator` が成功（[VALID] No errors reported）。
+- `make fmt` が成功。
+- `make test` が成功（Worker 37 passed / 1 ignoredを含む）。
+- `make clippy` がネイティブ・wasm32両方で成功。
+- ローカルWorker検証はgenerated/がないためdata/*.csvを使用する。生成後データでの走行時間の回帰確認はGitHub CIのビルド・検証結果を別途参照。
+- CSVの列順を含む比較へ修正し、正規の134件照合が通過、列順だけを変更したCSVを拒否することを確認。
 
 ## 再現
 
