@@ -623,3 +623,4 @@ line_cd,company_cd,line_name,line_name_k,line_name_h,line_name_r,line_name_rn,li
 99925,242,鹿児島市電１系統,カゴシマシデンイチケイトウ,鹿児島市電１系統,Kagoshima City Tram Route 1,Kagoshima City Tram Route 1,鹿儿岛市电1系统,가고시마 시덴 1계통,#4243BE,4,I,,,,#4243BE,,,,REVERSED_ROUND,,,,0,99925,419.36632
 99926,242,鹿児島市電２系統,カゴシマシデンニケイトウ,鹿児島市電２系統,Kagoshima City Tram Route 2,Kagoshima City Tram Route 2,鹿儿岛市电2系统,가고시마 시덴 2계통,#EF1731,4,N,,,,#EF1731,,,,REVERSED_ROUND,,,,0,99926,367.48816
 99927,243,ゆいレール,ユイレール,沖縄都市モノレール線,Yui Rail,Yui Rail,冲绳都市单轨电车,유이레일,#CC0000,5,,,,,#CC0000,,,,MONOCHROME_ROUND,,,,0,99927,875.63476
+99719,222,広電循環線,ヒロデンジュンカンセン,広電循環線,Hiroden Loop Line,Hiroden Loop Line,广电循环线,히로덴 순환선,#FF5900,4,M,H,U,,#00A85F,#7DBF4C,#0092D7,,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,REVERSED_ROUND_HORIZONTAL,,0,99719,
