@@ -36,5 +36,7 @@
 連続駅順チェックは、`data_validator/src/main.rs` の
 `EXPECTED_CONSECUTIVE_STATION_ORDERS` に登録した区間について、
 `3!stations.csv` の有効駅を `e_sort`・`station_cd` 順に並べて検査する。
-`5!station_station_types.csv` の系統所属 (`line_group_cd`)・系統内の駅順・
-停車フラグ (`pass`) の退行は、このチェックの対象外である。
+循環線の両端 (`9971901`・`9971922`) が同じ駅グループを参照することも検査する。
+箱根の系統975については、`5!station_station_types.csv` の有効駅のCSV行順を
+別途検査し、塔ノ沢から宮ノ下までの信号場を含む並びを確認する。
+それ以外の系統内の駅順と停車フラグ (`pass`) は、これらの検査の対象外である。
