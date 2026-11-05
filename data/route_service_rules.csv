@@ -31,3 +31,4 @@ type_cd,line_group_id,requires_timetable,boarding_wait_seconds,source,type_name,
 555,1199,true,,https://www.jrkyushu-kanpachiichiroku.jp/info/,いちろく,公式運行カレンダーに限定（毎日運転ではない）,2026-10-21
 556,1203,true,,https://www.tobu.co.jp/sl/guide/,SL大樹(鬼怒川温泉方面),運転日と行先パターンが日によって変わる,2026-11-01
 557,1204,true,,https://www.tobu.co.jp/sl/guide/,SL大樹ふたら,運転日と行先パターンが日によって変わる,2026-11-01
+559,1205,true,,https://www.tobu.co.jp/cms-pdf/releases/20261015141245OBw85VzO_rZmXZuPsKRzJg.pdf,区間急行(船橋方面),2026-11-21改正・平日朝5本・柏から船橋への片方向,2026-11-02
