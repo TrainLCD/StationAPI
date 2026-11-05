@@ -453,17 +453,6 @@ where
                     return None;
                 }
 
-                // JR九州の博多駅は路線記号を付けず「00」と案内する。
-                // 地下鉄の同一駅グループや、他駅の路線記号には影響させない。
-                if index == 0 && matches!(station.station_cd, 1190231 | 1190301 | 1190812) {
-                    return Some(StationNumber {
-                        line_symbol: String::new(),
-                        line_symbol_color: sym_color.to_string(),
-                        line_symbol_shape: sym_shape.to_string(),
-                        station_number: station_number.to_string(),
-                    });
-                }
-
                 if let Some(sym) = line_symbols_raw[index] {
                     let station_number_string = format!("{sym}-{station_number}");
 
@@ -3750,9 +3739,9 @@ mod tests {
                 (1132005, "JJ-05"),
                 (9990718, "N-18"),
                 (9990503, "K-11"),
-                (1190231, "00"),
-                (1190301, "00"),
-                (1190812, "00"),
+                (1190231, "JA-00"),
+                (1190301, "JB-00"),
+                (1190812, "JC-00"),
                 (1190230, "JA-01"),
                 (1190302, "JB-01"),
                 (1190811, "JC-01"),
@@ -3788,8 +3777,8 @@ mod tests {
                 let numbers = interactor.get_station_numbers(&station);
                 assert_eq!(numbers.len(), 1, "station {station_cd}");
                 assert_eq!(numbers[0].station_number, expected, "station {station_cd}");
-                if expected == "00" {
-                    assert!(numbers[0].line_symbol.is_empty());
+                if matches!(station_cd, 1190231 | 1190301 | 1190812) {
+                    assert_eq!(numbers[0].line_symbol, line["line_symbol1"]);
                     assert_eq!(numbers[0].line_symbol_shape, line["line_symbol1_shape"]);
                     assert_eq!(numbers[0].line_symbol_color, line["line_symbol1_color"]);
                 }
