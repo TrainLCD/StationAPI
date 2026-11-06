@@ -76,17 +76,15 @@ runs:
       env:
         STRICT: ${{ inputs.fail-on-missing-bus-feeds }}
       run: |
-        # preprocessor がフィードを 1 つ丸ごと飛ばすのは gtfs/mod.rs の
-        # 3 経路 (download 失敗 / 読み込み失敗 / 東急バス ODPT JSON) だけで、
-        # いずれもこの文言で終わる。個別のエラー文 (「の取得に失敗」など) で
-        # 拾うと、読み込み失敗と、外側の文言に含まれない東急バスを取りこぼす。
-        if grep -q "このフィードを飛ばす" /tmp/preprocessor.log; then
-          grep "このフィードを飛ばす" /tmp/preprocessor.log
+        # フィード全体のスキップと、必須ファイル・ディレクトリの欠損を検出する。
+        # 任意の translations.txt は、欠損時にこの警告を出さない。
+        if grep -qE "このフィードを飛ばす|が無いので読み飛ばす" /tmp/preprocessor.log; then
+          grep -E "このフィードを飛ばす|が無いので読み飛ばす" /tmp/preprocessor.log
           if [ "$STRICT" = "true" ]; then
-            echo "::error::取り込めなかったバスフィードがある。ODPT_ACCESS_TOKEN を確認すること"
+            echo "::error::バスデータに欠損がある。取得エラーと必須ファイルの欠損警告を確認すること"
             exit 1
           fi
-          echo "::warning::取り込めなかったバスフィードがある (検証ビルドのため続行する)"
+          echo "::warning::バスデータに欠損がある (検証ビルドのため続行する)"
         else
           echo "すべてのバスフィードを取り込んだ"
         fi

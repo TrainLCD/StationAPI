@@ -79,6 +79,7 @@ fn normalize_srt_headsigns(data: &mut GtfsData) {
     }
 }
 
+/// CSVを開きます。必須ファイルが無い場合は、デプロイ検証で検出する警告を出します。
 fn reader(path: &Path) -> Result<Option<csv::Reader<std::fs::File>>> {
     if !path.exists() {
         warn!("{} が無いので読み飛ばす", path.display());
@@ -110,6 +111,7 @@ struct ColumnRecord<'a> {
 }
 
 impl<'a> ColumnRecord<'a> {
+    /// 正規化した列位置から元のレコードを参照し、省略された任意列はNoneにします。
     fn get(&self, index: usize) -> Option<&'a str> {
         self.columns
             .get(index)
@@ -119,6 +121,7 @@ impl<'a> ColumnRecord<'a> {
     }
 }
 
+/// 路線の各列と英語の路線名を読み込み、フィード内のIDを名前空間化します。
 fn load_routes(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
     let Some(mut rdr) = reader(&dir.join("routes.txt"))? else {
         return Ok(());
@@ -161,6 +164,7 @@ fn load_routes(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
     Ok(())
 }
 
+/// 停留所の座標・親停留所・翻訳を読み込み、英語名が無ければ読みから補います。
 fn load_stops(
     data: &mut GtfsData,
     dir: &Path,
@@ -242,6 +246,7 @@ fn coordinate(record: &ColumnRecord<'_>, index: usize, stop_id: &str, column: &s
     }
 }
 
+/// 便の路線・行先・方向・shapeを、フィードごとの列配置から読み込みます。
 fn load_trips(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
     let Some(mut rdr) = reader(&dir.join("trips.txt"))? else {
         return Ok(());
@@ -278,6 +283,7 @@ fn load_trips(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
     Ok(())
 }
 
+/// 各便の停車順と走行距離を読み込みます。距離列の省略時はNoneにします。
 fn load_stop_times(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
     let Some(mut rdr) = reader(&dir.join("stop_times.txt"))? else {
         return Ok(());
@@ -324,6 +330,7 @@ pub fn load_translations(dir: &Path) -> Result<Translations> {
     load_field_translations(dir, "stops", "stop_name")
 }
 
+/// 指定されたテーブル・フィールドの訳語を、レコードIDと日本語名で索引します。
 fn load_field_translations(dir: &Path, table: &str, field: &str) -> Result<Translations> {
     let mut translations = Translations::new();
     let path = dir.join("translations.txt");
@@ -372,6 +379,7 @@ fn load_field_translations(dir: &Path, table: &str, field: &str) -> Result<Trans
     Ok(translations)
 }
 
+/// 対応言語の訳語を設定し、親IDへの補完時は既存の訳語を保持します。
 fn set_language(
     translations: &mut Translations,
     key: &str,
