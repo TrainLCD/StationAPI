@@ -34,6 +34,9 @@ This project includes a comprehensive dataset of Japanese railway information in
   (https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-2025.html) を加工して作成
 - Bus stops and routes are derived from the GTFS and ODPT feeds listed in
   `preprocessor/src/gtfs/feed.rs` and `preprocessor/src/gtfs/odpt.rs`.
+- Nagoya SRT bus routes and stops use the Nagoya City Housing and City Planning
+  Bureau GTFS (2026-09-11), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/),
+  [source](https://ckan.odpt.org/dataset/nagoya_housing_city_planning_bureau_nagoya_srt_all_lines/resource/a7588aea-27fd-4962-b39a-912209f19a1b), processed for TrainLCD.
 - Some of the reference travel times in `travel_times/cases.csv` are derived from
   the Toei Subway GTFS (Bureau of Transportation, Tokyo Metropolitan Government,
   CC BY 4.0) and from the Tokyo Metro, Metropolitan Intercity Railway (Tsukuba

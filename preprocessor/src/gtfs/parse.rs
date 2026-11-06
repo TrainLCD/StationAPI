@@ -1,8 +1,6 @@
 //! GTFS のテキストファイルを読む。
 //!
-//! 列は位置で読む。GTFS-JP は列順が仕様で決まっており、既存の取り込みも
-//! 位置で読んでいたため、同じ解釈を保つ。`translations.txt` だけは
-//! フィードごとに列数が違うので列名で引く。
+//! 列順と省略される任意列はフィードごとに異なるため、列名で解決する。
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -38,7 +36,47 @@ pub fn load_feed(data: &mut GtfsData, feed: &GtfsFeed) -> Result<()> {
     load_stops(data, dir, feed, &translations)?;
     load_trips(data, dir, feed)?;
     load_stop_times(data, dir, feed)?;
+    if feed.id == "nagoya_srt" {
+        normalize_srt_headsigns(data);
+    }
     Ok(())
+}
+
+/// SRTのtrip_headsignは「通常便」「最終便」などの便区分です。
+/// 行先として表示する名称は、循環便では路線名、それ以外では終点から補います。
+fn normalize_srt_headsigns(data: &mut GtfsData) {
+    let times = data.stop_times_by_trip();
+    let names: HashMap<_, _> = data
+        .stops
+        .iter()
+        .map(|stop| (stop.stop_id.as_str(), stop.stop_name.as_str()))
+        .collect();
+    let routes: HashMap<_, _> = data
+        .routes
+        .iter()
+        .map(|route| (route.route_id.as_str(), route.route_long_name.as_deref()))
+        .collect();
+    let headsigns: HashMap<_, _> = data
+        .trips
+        .iter()
+        .filter(|trip| trip.route_id.starts_with("nagoya_srt:"))
+        .filter_map(|trip| {
+            let stops = times.get(trip.trip_id.as_str())?;
+            let first = stops.first()?;
+            let last = stops.last()?;
+            let name = if first.stop_id == last.stop_id {
+                routes.get(trip.route_id.as_str()).copied().flatten()
+            } else {
+                names.get(last.stop_id.as_str()).copied()
+            }?;
+            Some((trip.trip_id.clone(), name.to_string()))
+        })
+        .collect();
+    for trip in &mut data.trips {
+        if let Some(headsign) = headsigns.get(&trip.trip_id) {
+            trip.trip_headsign = Some(headsign.clone());
+        }
+    }
 }
 
 fn reader(path: &Path) -> Result<Option<csv::Reader<std::fs::File>>> {
@@ -54,23 +92,68 @@ fn reader(path: &Path) -> Result<Option<csv::Reader<std::fs::File>>> {
 }
 
 /// 空文字は列が無いのと同じ扱いにする。
-fn cell(record: &csv::StringRecord, index: usize) -> Option<&str> {
+fn cell<'a>(record: &ColumnRecord<'a>, index: usize) -> Option<&'a str> {
     record.get(index).filter(|value| !value.is_empty())
+}
+
+/// 任意列の省略・並べ替えが他の列の意味を変えないよう、ヘッダーを一度だけ索引する。
+fn column_indices(headers: &csv::StringRecord, names: &[&str]) -> Vec<Option<usize>> {
+    names
+        .iter()
+        .map(|name| headers.iter().position(|h| h == *name))
+        .collect()
+}
+
+struct ColumnRecord<'a> {
+    record: &'a csv::StringRecord,
+    columns: &'a [Option<usize>],
+}
+
+impl<'a> ColumnRecord<'a> {
+    fn get(&self, index: usize) -> Option<&'a str> {
+        self.columns
+            .get(index)
+            .copied()
+            .flatten()
+            .and_then(|i| self.record.get(i))
+    }
 }
 
 fn load_routes(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
     let Some(mut rdr) = reader(&dir.join("routes.txt"))? else {
         return Ok(());
     };
+    let translations = load_field_translations(dir, "routes", "route_long_name")?;
     // route_id,agency_id,route_short_name,route_long_name,route_desc,
     // route_type,route_url,route_color,route_text_color,jp_parent_route_id
+    let columns = column_indices(
+        rdr.headers()?,
+        &[
+            "route_id",
+            "agency_id",
+            "route_short_name",
+            "route_long_name",
+            "route_desc",
+            "route_type",
+            "route_url",
+            "route_color",
+            "route_text_color",
+            "jp_parent_route_id",
+        ],
+    );
     for record in rdr.records() {
-        let record = record?;
+        let raw = record?;
+        let record = ColumnRecord {
+            record: &raw,
+            columns: &columns,
+        };
         data.push_route(Route {
             route_id: scoped_id(feed, record.get(0).unwrap_or("")),
             route_short_name: cell(&record, 2).map(str::to_string),
             route_long_name: cell(&record, 3).map(str::to_string),
-            route_long_name_r: None,
+            route_long_name_r: translations
+                .get(record.get(0).unwrap_or(""))
+                .and_then(|t| t.en.clone()),
             route_type: record.get(5).unwrap_or("3").parse().unwrap_or(3),
             route_color: cell(&record, 7).map(str::to_string),
         });
@@ -89,8 +172,27 @@ fn load_stops(
     };
     // stop_id,stop_code,stop_name,stop_desc,stop_lat,stop_lon,zone_id,
     // stop_url,location_type,parent_station,...
+    let columns = column_indices(
+        rdr.headers()?,
+        &[
+            "stop_id",
+            "stop_code",
+            "stop_name",
+            "stop_desc",
+            "stop_lat",
+            "stop_lon",
+            "zone_id",
+            "stop_url",
+            "location_type",
+            "parent_station",
+        ],
+    );
     for record in rdr.records() {
-        let record = record?;
+        let raw = record?;
+        let record = ColumnRecord {
+            record: &raw,
+            columns: &columns,
+        };
         let original_stop_id = record.get(0).unwrap_or("");
         let stop_name = record.get(2).unwrap_or("").to_string();
 
@@ -129,7 +231,7 @@ fn load_stops(
 
 /// 座標を読む。読めない値を黙って 0.0 にすると、ギニア湾の座標として
 /// 距離計算やまとめ処理へ流れてしまうので警告を出す。
-fn coordinate(record: &csv::StringRecord, index: usize, stop_id: &str, column: &str) -> f64 {
+fn coordinate(record: &ColumnRecord<'_>, index: usize, stop_id: &str, column: &str) -> f64 {
     let raw = record.get(index).unwrap_or("");
     match raw.trim().parse() {
         Ok(value) => value,
@@ -146,8 +248,25 @@ fn load_trips(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
     };
     // route_id,service_id,trip_id,trip_headsign,trip_short_name,
     // direction_id,block_id,shape_id,...
+    let columns = column_indices(
+        rdr.headers()?,
+        &[
+            "route_id",
+            "service_id",
+            "trip_id",
+            "trip_headsign",
+            "trip_short_name",
+            "direction_id",
+            "block_id",
+            "shape_id",
+        ],
+    );
     for record in rdr.records() {
-        let record = record?;
+        let raw = record?;
+        let record = ColumnRecord {
+            record: &raw,
+            columns: &columns,
+        };
         data.push_trip(Trip {
             trip_id: scoped_id(feed, record.get(2).unwrap_or("")),
             route_id: scoped_id(feed, record.get(0).unwrap_or("")),
@@ -165,8 +284,27 @@ fn load_stop_times(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<(
     };
     // trip_id,arrival_time,departure_time,stop_id,stop_sequence,stop_headsign,
     // pickup_type,drop_off_type,shape_dist_traveled,timepoint
+    let columns = column_indices(
+        rdr.headers()?,
+        &[
+            "trip_id",
+            "arrival_time",
+            "departure_time",
+            "stop_id",
+            "stop_sequence",
+            "stop_headsign",
+            "pickup_type",
+            "drop_off_type",
+            "shape_dist_traveled",
+            "timepoint",
+        ],
+    );
     for record in rdr.records() {
-        let record = record?;
+        let raw = record?;
+        let record = ColumnRecord {
+            record: &raw,
+            columns: &columns,
+        };
         data.push_stop_time(StopTime {
             trip_id: scoped_id(feed, record.get(0).unwrap_or("")),
             stop_id: scoped_id(feed, record.get(3).unwrap_or("")),
@@ -183,6 +321,10 @@ fn load_stop_times(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<(
 /// フィードと、`field_value` (= 日本語の停留所名) のフィードがある。どちらも
 /// 引けるように両方を索引する。列数はフィードによって違うので列名で解決する。
 pub fn load_translations(dir: &Path) -> Result<Translations> {
+    load_field_translations(dir, "stops", "stop_name")
+}
+
+fn load_field_translations(dir: &Path, table: &str, field: &str) -> Result<Translations> {
     let mut translations = Translations::new();
     let path = dir.join("translations.txt");
     if !path.exists() {
@@ -206,7 +348,7 @@ pub fn load_translations(dir: &Path) -> Result<Translations> {
 
     for record in rdr.records() {
         let record = record?;
-        if record.get(table_idx) != Some("stops") || record.get(field_idx) != Some("stop_name") {
+        if record.get(table_idx) != Some(table) || record.get(field_idx) != Some(field) {
             continue;
         }
         let language = record.get(lang_idx).unwrap_or("");
@@ -253,6 +395,160 @@ fn set_language(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nagoya_srt_feed_preserves_columns_translations_and_loop_patterns() {
+        use crate::gtfs::{feed::GTFS_FEEDS, integrate};
+        use crate::rail::Dataset;
+
+        let feed = GtfsFeed {
+            path: concat!(env!("CARGO_MANIFEST_DIR"), "/test_data/nagoya_srt"),
+            ..*GTFS_FEEDS
+                .iter()
+                .find(|feed| feed.id == "nagoya_srt")
+                .unwrap()
+        };
+        let mut gtfs = GtfsData::default();
+        load_feed(&mut gtfs, &feed).unwrap();
+        assert_eq!(gtfs.routes.len(), 2);
+        assert_eq!(gtfs.stops.len(), 11);
+        assert_eq!(gtfs.trips.len(), 20);
+        for (shape, headsign) in [
+            ("101", "名駅－栄ルート"),
+            ("102", "栄"),
+            ("103", "名駅－栄ルート"),
+            ("104", "名古屋駅"),
+            ("201", "名駅－名城ルート"),
+            ("202", "名駅－名城ルート"),
+        ] {
+            assert!(gtfs
+                .trips
+                .iter()
+                .filter(
+                    |trip| trip.shape_id.as_deref() == Some(format!("nagoya_srt:{shape}").as_str())
+                )
+                .all(|trip| trip.trip_headsign.as_deref() == Some(headsign)));
+        }
+        assert_eq!(gtfs.routes[0].route_color.as_deref(), Some("E26B0A"));
+        assert_eq!(gtfs.routes[1].route_color.as_deref(), Some("FFFF00"));
+        assert_eq!(
+            gtfs.routes[0].route_long_name_r.as_deref(),
+            Some("Nagoya Sta. - Sakae Route")
+        );
+        assert!(gtfs.stops.iter().all(|stop| stop.parent_station.is_none()));
+        let castle = gtfs
+            .stops
+            .iter()
+            .find(|stop| stop.stop_id == "nagoya_srt:20_01")
+            .unwrap();
+        assert_eq!(castle.stop_name_r.as_deref(), Some("Nagoya Castle"));
+        assert_eq!(castle.stop_name_k.as_deref(), Some("ナゴヤジョウ"));
+        assert_eq!(castle.stop_name_ko.as_deref(), Some("나고야성"));
+        assert_eq!(castle.stop_lat, 35.181405);
+        assert!(gtfs.trips.iter().all(|trip| trip.direction_id == Some(0)));
+        assert!(gtfs.trips.iter().all(|trip| trip
+            .shape_id
+            .as_deref()
+            .is_some_and(|id| id.starts_with("nagoya_srt:"))));
+        // timepoint=1 is not a distance: the optional shape_dist_traveled column is absent.
+        assert!(gtfs
+            .stop_times
+            .iter()
+            .all(|stop| stop.shape_dist_traveled.is_none()));
+
+        let mut dataset = Dataset::load(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../data")
+                .as_path(),
+        )
+        .unwrap();
+        let line_count = dataset.lines.len();
+        let station_count = dataset.stations.len();
+        let type_count = dataset.types.len();
+        let sst_count = dataset.sst.len();
+        integrate::integrate(&mut dataset, &gtfs).unwrap();
+        assert_eq!(dataset.lines.len() - line_count, 2);
+        assert_eq!(dataset.stations.len() - station_count, 12);
+        let prefecture = dataset.stations.col("pref_cd");
+        assert!(dataset.stations.rows()[station_count..]
+            .iter()
+            .all(|row| row[prefecture].as_deref() == Some("23")));
+        assert_eq!(dataset.types.len() - type_count, 6);
+        let company = dataset.lines.col("company_cd");
+        let color = dataset.lines.col("line_color_c");
+        let transport = dataset.lines.col("transport_type");
+        let lines = &dataset.lines.rows()[line_count..];
+        assert!(lines
+            .iter()
+            .all(|row| row[company].as_deref() == Some("256")
+                && row[transport].as_deref() == Some("1")));
+        assert_eq!(lines[0][color].as_deref(), Some("#E26B0A"));
+        assert_eq!(lines[1][color].as_deref(), Some("#FFFF00"));
+        let station_id = dataset.stations.col("station_cd");
+        let known: std::collections::HashSet<_> = dataset.stations.rows()[station_count..]
+            .iter()
+            .map(|row| row[station_id].clone())
+            .collect();
+        let sst_station = dataset.sst.col("station_cd");
+        assert!(dataset.sst.rows()[sst_count..]
+            .iter()
+            .all(|row| known.contains(&row[sst_station])));
+        let station_name = dataset.stations.col("station_name");
+        let names: std::collections::HashMap<_, _> = dataset.stations.rows()[station_count..]
+            .iter()
+            .map(|row| {
+                (
+                    row[station_id].clone(),
+                    row[station_name].as_deref().unwrap(),
+                )
+            })
+            .collect();
+        let group = dataset.sst.col("line_group_cd");
+        let mut patterns: std::collections::HashMap<_, Vec<&str>> =
+            std::collections::HashMap::new();
+        for row in &dataset.sst.rows()[sst_count..] {
+            patterns
+                .entry(row[group].clone())
+                .or_default()
+                .push(names[&row[sst_station]]);
+        }
+        let mut actual: Vec<_> = patterns.into_values().collect();
+        actual.sort();
+        let mut expected = vec![
+            vec![
+                "栄",
+                "広小路本町",
+                "納屋橋",
+                "柳橋中央市場",
+                "名古屋駅桜通",
+                "名古屋駅",
+                "柳橋",
+                "広小路本町",
+            ],
+            vec![
+                "栄",
+                "広小路本町",
+                "納屋橋",
+                "名古屋駅桜通",
+                "名古屋駅",
+                "柳橋",
+                "広小路本町",
+            ],
+            vec!["名古屋駅桜通", "名古屋駅", "柳橋", "広小路本町", "栄"],
+            vec![
+                "栄",
+                "広小路本町",
+                "納屋橋",
+                "柳橋中央市場",
+                "名古屋駅桜通",
+                "名古屋駅",
+            ],
+            vec!["名古屋駅太閤通口", "円頓寺", "名古屋城"],
+            vec!["名古屋駅太閤通口", "柳橋中央市場", "円頓寺", "名古屋城"],
+        ];
+        expected.sort();
+        assert_eq!(actual, expected);
+    }
 
     fn write_translations(name: &str, contents: &str) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(name);

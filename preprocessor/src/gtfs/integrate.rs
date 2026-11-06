@@ -99,7 +99,13 @@ fn routes_to_lines(dataset: &mut Dataset, gtfs: &GtfsData, codes: &mut BusCodes)
             &dataset.lines,
             &mut row,
             "line_name_r",
-            text(route.route_long_name.clone().unwrap_or_default()),
+            text(
+                route
+                    .route_long_name_r
+                    .clone()
+                    .or_else(|| route.route_long_name.clone())
+                    .unwrap_or_default(),
+            ),
         );
         set(&dataset.lines, &mut row, "line_color_c", text(line_color));
         set(&dataset.lines, &mut row, "line_type", int(route.route_type));
@@ -597,7 +603,13 @@ fn stops_to_stations(
             set(t, &mut row, "station_name_zh", stop.stop_name_zh.clone());
             set(t, &mut row, "station_name_ko", stop.stop_name_ko.clone());
             set(t, &mut row, "line_cd", int(line_cd));
-            set(t, &mut row, "pref_cd", int(13));
+            // 既存フィードは東京都内だが、名古屋SRTは愛知県の停留所。
+            let pref_cd = if stop.stop_id.starts_with("nagoya_srt:") {
+                23
+            } else {
+                13
+            };
+            set(t, &mut row, "pref_cd", int(pref_cd));
             set(t, &mut row, "post", text(""));
             set(t, &mut row, "address", text(""));
             set(t, &mut row, "lon", text(stop.stop_lon.to_string()));
