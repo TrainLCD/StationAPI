@@ -26,7 +26,7 @@ help:
 	@echo "  clean            - Clean build artifacts"
 	@echo ""
 	@echo "Environment variables:"
-	@echo "  ODPT_ACCESS_TOKEN   - Required by all bus feeds except Toei"
+	@echo "  ODPT_ACCESS_TOKEN   - Required by all bus feeds except Toei and Nagoya City SRT"
 	@echo "  DISABLE_BUS_FEATURE - Set to true to build rail-only data"
 
 # worker は Workers 上でしか動かないが、索引 (src/index.rs) はネイティブでも

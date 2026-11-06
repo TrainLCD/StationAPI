@@ -64,6 +64,13 @@ pub const GTFS_FEEDS: &[GtfsFeed] = &[
         url: "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current",
         requires_consumer_key: true,
     },
+    GtfsFeed {
+        id: "nagoya_srt",
+        name: "名古屋市SRT",
+        path: "data/NagoyaSRT-GTFS",
+        url: "https://api-public.odpt.org/api/v4/files/odpt/NagoyaHousingCityPlanningBureau/NagoyaSRT_AllLines.zip?date=20260911",
+        requires_consumer_key: false,
+    },
 ];
 
 /// ID をフィードで名前空間化する。

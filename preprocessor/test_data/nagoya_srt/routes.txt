@@ -1,0 +1,3 @@
+route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_color,route_text_color
+1,3000020231002,,名駅－栄ルート,,3,E26B0A,FFFFFF
+2,3000020231002,,名駅－名城ルート,,3,FFFF00,000000
