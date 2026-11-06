@@ -603,7 +603,7 @@ fn stops_to_stations(
             set(t, &mut row, "station_name_zh", stop.stop_name_zh.clone());
             set(t, &mut row, "station_name_ko", stop.stop_name_ko.clone());
             set(t, &mut row, "line_cd", int(line_cd));
-            // 既存フィードは東京都内だが、名古屋SRTは愛知県の停留所。
+            // 既存フィードは東京都内だが、名古屋市SRTは愛知県の停留所。
             let pref_cd = if stop.stop_id.starts_with("nagoya_srt:") {
                 23
             } else {

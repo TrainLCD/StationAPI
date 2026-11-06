@@ -66,7 +66,7 @@ pub const GTFS_FEEDS: &[GtfsFeed] = &[
     },
     GtfsFeed {
         id: "nagoya_srt",
-        name: "名古屋SRT",
+        name: "名古屋市SRT",
         path: "data/NagoyaSRT-GTFS",
         url: "https://api-public.odpt.org/api/v4/files/odpt/NagoyaHousingCityPlanningBureau/NagoyaSRT_AllLines.zip?date=20260911",
         requires_consumer_key: false,

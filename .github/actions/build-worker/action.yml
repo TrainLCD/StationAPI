@@ -8,7 +8,7 @@ inputs:
   odpt-access-token:
     description: >-
       ODPT の consumer key。空にすると西武バス・京王バス・東急バスと
-      そのコミュニティ路線が HTTP 403 で落ち、都営バスと名古屋SRTだけが取り込まれる。
+      そのコミュニティ路線が HTTP 403 で落ち、都営バスと名古屋市SRTだけが取り込まれる。
       preprocessor は警告して続行するため、欠損に気付けるよう
       fail-on-missing-bus-feeds と併用すること。
     required: false
