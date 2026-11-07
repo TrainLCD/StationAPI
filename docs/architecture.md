@@ -164,8 +164,8 @@ make data     # cargo run --profile tool -p stationapi-preprocessor
 2. 各駅停車の系統を生成する (`generate_virtual_local_rail_services`)
 3. 国土数値情報の鉄道データ (N02) を取得し、隣り合う駅のあいだの線路の長さを
    求める (`track::generate_connections`。[駅間の線路の長さ](#駅間の線路の長さ))
-4. GTFS フィード 6 本を取得・展開して読み込む (都営バス・西武バス・京王バスと、
-   東急バスが運行する大田区・品川区・目黒区のコミュニティバス)
+4. GTFS フィード 7 本を取得・展開して読み込む (都営バス・西武バス・京王バスと、
+   東急バスが運行する大田区・品川区・目黒区のコミュニティバス、名古屋市SRT)
 5. 東急バスの ODPT JSON を読み込む (7 日間キャッシュする)
 6. バスのデータを lines / stations / types / station_station_types に統合する
 7. `generated/*.csv` に書き出す (8 テーブル)
@@ -832,3 +832,13 @@ wrangler 4 は、複数の環境が定義されている状態で `--env` を省
 - [近傍バス停検索機能](./nearby-bus-stops.md)
 - [乗換経路探索 (RAPTOR) の設計](./route-search.md)
 - [データ貢献ガイドライン](../data/README.md)
+
+### 名古屋市SRT
+
+名古屋市住宅都市局の[GTFS（2026年9月11日版）](https://ckan.odpt.org/dataset/nagoya_housing_city_planning_bureau_nagoya_srt_all_lines/resource/a7588aea-27fd-4962-b39a-912209f19a1b)を取り込みます。
+名駅－栄ルートと名駅－名城ルートはバスとして登録します。
+`nagoya_srt:` の接頭辞を使い、事業者コード256（名古屋市SRT）に割り当てます。
+GTFSの任意列の省略や列順の違いに対応するため、列名で読み込みます。
+停留所の翻訳と路線の英語名は `translations.txt` を使います。
+SRTの便区分（通常便など）は行先に使わず、循環便は路線名、その他は終点を使います。
+運行日と出発時刻は既存のバス取込と同様に判定しません。
