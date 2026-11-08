@@ -1292,19 +1292,16 @@ mod tests {
 
     /// C−758の名古屋駅を、出発時ののりばの順に返す。
     #[test]
+    #[ignore = "requires generated bus data; run by build_worker.yml"]
     fn c758_graphql_keeps_the_platform_codes_in_stop_order() {
-        // 生成済みのバスデータがないビルドでは、この系統は存在しない。
-        let line_group_id = 152_672_049;
-        if index::sst_by_group(line_group_id).next().is_none() {
-            return;
-        }
         let schema = crate::graphql::build_schema(crate::interactor());
-        let result = block_on(schema.execute(format!(
-            "{{ lineGroupStations(lineGroupId: {line_group_id}) {{ name platformCode }} }}"
-        )));
+        let result = block_on(
+            schema.execute("{ lineGroupStations(lineGroupId: 152672049) { name platformCode } }"),
+        );
         assert!(result.errors.is_empty(), "{:?}", result.errors);
         let data = result.data.into_json().unwrap();
         let stops = data["lineGroupStations"].as_array().unwrap();
+        assert!(stops.len() >= 3, "C−758の停車データが不足しています");
         assert_eq!(
             stops[0],
             serde_json::json!({ "name": "名古屋駅", "platformCode": "9" })
