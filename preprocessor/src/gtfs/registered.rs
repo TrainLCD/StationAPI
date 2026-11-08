@@ -1,11 +1,11 @@
 //! フィード別の設定を読み込み、既存フィードの後に追加する。
 
-use std::{collections::HashSet, fs, path::Path};
+use std::{fs, path::Path};
 
 use anyhow::{ensure, Context, Result};
 use serde::Deserialize;
 
-use super::{feed, model::GtfsData, parse};
+use super::{feed, model::GtfsData, read_complete_feed};
 use crate::table::{int, text, Table};
 
 const NAMESPACE_PREFIX: &str = "zz_gtfs_";
@@ -31,10 +31,12 @@ struct Company {
     url: String,
 }
 
+/// 設定ファイルから登録した名前空間を識別する。
 pub(super) fn is_registered(id: &str) -> bool {
     id.starts_with(NAMESPACE_PREFIX)
 }
 
+/// 既存の採番を保つため、設定ファイルを名前順に適用する。
 pub(super) fn load(data: &mut GtfsData, companies: &mut Table) -> Result<()> {
     let mut paths = fs::read_dir("data/gtfs-feeds")?
         .map(|entry| entry.map(|entry| entry.path()))
@@ -48,6 +50,7 @@ pub(super) fn load(data: &mut GtfsData, companies: &mut Table) -> Result<()> {
     Ok(())
 }
 
+/// 設定を検証し、取り込みに成功したフィードと事業者を追加する。
 fn load_registration(data: &mut GtfsData, companies: &mut Table, path: &Path) -> Result<()> {
     let id = path
         .file_stem()
@@ -77,60 +80,19 @@ fn load_registration(data: &mut GtfsData, companies: &mut Table, path: &Path) ->
         requires_consumer_key: registration.url.starts_with(ODPT_AUTH_PREFIX),
     };
 
-    // 途中で壊れたフィードの一部だけが出力に混ざらないよう、別のデータに読む。
-    let mut feed_data = GtfsData::default();
-    if let Err(error) = feed::download(&feed)
-        .and_then(|()| parse::load_feed(&mut feed_data, &feed))
-        .and_then(|()| verify_patterns(&feed_data))
-    {
-        crate::warn!(
-            "{} の読み込みに失敗: {error}。このフィードを飛ばす",
-            feed.name
-        );
+    let Some(mut feed_data) = read_complete_feed(&feed) else {
         return Ok(());
-    }
-
+    };
     register_company(companies, &registration)?;
-    for mut route in feed_data.routes {
+    for route in &mut feed_data.routes {
         route.company_cd = Some(registration.company_cd);
-        data.push_route(route);
     }
-    for stop in feed_data.stops {
-        data.push_stop(stop);
-    }
-    for trip in feed_data.trips {
-        data.push_trip(trip);
-    }
-    for time in feed_data.stop_times {
-        data.push_stop_time(time);
-    }
+    data.append_feed(feed_data);
     crate::info!("{} の GTFS を取り込んだ", feed.name);
     Ok(())
 }
 
-fn verify_patterns(data: &GtfsData) -> Result<()> {
-    let trips_with_stops: HashSet<_> = data
-        .stop_times
-        .iter()
-        .map(|time| time.trip_id.as_str())
-        .collect();
-    let served_routes: HashSet<_> = data
-        .trips
-        .iter()
-        .filter(|trip| trips_with_stops.contains(trip.trip_id.as_str()))
-        .map(|trip| trip.route_id.as_str())
-        .collect();
-    ensure!(
-        !data.routes.is_empty()
-            && data
-                .routes
-                .iter()
-                .all(|route| served_routes.contains(route.route_id.as_str())),
-        "有効な停車順がない路線がある"
-    );
-    Ok(())
-}
-
+/// 既存の事業者を再利用し、同じコードで異なる事業者を登録する誤りを防ぐ。
 fn register_company(table: &mut Table, registration: &Registration) -> Result<()> {
     let code = registration.company_cd;
     let code_cell = int(code);
