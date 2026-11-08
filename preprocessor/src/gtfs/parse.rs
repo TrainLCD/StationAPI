@@ -28,7 +28,7 @@ pub struct Translation {
 pub type Translations = HashMap<String, Translation>;
 
 /// 1 フィードを読み込んで `data` へ足す。
-pub fn load_feed(data: &mut GtfsData, feed: &GtfsFeed) -> Result<()> {
+pub fn load_feed(data: &mut GtfsData, feed: &GtfsFeed, strict_stop_references: bool) -> Result<()> {
     let dir = Path::new(feed.path);
     if !dir.exists() {
         warn!("{} のディレクトリが無いので読み飛ばす", feed.name);
@@ -44,7 +44,7 @@ pub fn load_feed(data: &mut GtfsData, feed: &GtfsFeed) -> Result<()> {
     let trip_start = data.trips.len();
     let stop_time_start = data.stop_times.len();
     load_trips(data, dir, feed, scheduled_services.as_ref())?;
-    load_stop_times(data, dir, feed)?;
+    load_stop_times(data, dir, feed, strict_stop_references)?;
     if uses_stop_order_patterns(feed.id) {
         derive_stop_order_patterns(
             &mut data.trips[trip_start..],
@@ -442,7 +442,13 @@ fn load_trips(
 }
 
 /// 各便の停車順と走行距離を読み込みます。距離列の省略時はNoneにします。
-fn load_stop_times(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
+/// 停車時刻を読み込み、厳格なフィードでは無効な便・停留所への参照を拒否する。
+fn load_stop_times(
+    data: &mut GtfsData,
+    dir: &Path,
+    feed: &GtfsFeed,
+    strict_stop_references: bool,
+) -> Result<()> {
     let Some(mut rdr) = reader(&dir.join("stop_times.txt"))? else {
         return Ok(());
     };
@@ -469,12 +475,18 @@ fn load_stop_times(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<(
             record: &raw,
             columns: &columns,
         };
-        data.push_stop_time(StopTime {
-            trip_id: scoped_id(feed, record.get(0).unwrap_or("")),
-            stop_id: scoped_id(feed, record.get(3).unwrap_or("")),
+        let trip_id = record.get(0).unwrap_or("");
+        let stop_id = record.get(3).unwrap_or("");
+        let valid_references = data.push_stop_time(StopTime {
+            trip_id: scoped_id(feed, trip_id),
+            stop_id: scoped_id(feed, stop_id),
             stop_sequence: record.get(4).unwrap_or("0").parse().unwrap_or(0),
             shape_dist_traveled: cell(&record, 8).and_then(|v| v.parse().ok()),
         });
+        ensure!(
+            !strict_stop_references || valid_references,
+            "stop_times.txt の trip_id {trip_id:?} または stop_id {stop_id:?} が未登録"
+        );
     }
     Ok(())
 }
@@ -633,7 +645,7 @@ mod tests {
             ..NAGOYA_CITY_BUS
         };
         let mut gtfs = GtfsData::default();
-        load_feed(&mut gtfs, &feed).unwrap();
+        load_feed(&mut gtfs, &feed, false).unwrap();
         assert_eq!(gtfs.trips.len(), 3);
         assert!(gtfs
             .trips
@@ -720,7 +732,7 @@ mod tests {
                 .unwrap()
         };
         let mut gtfs = GtfsData::default();
-        load_feed(&mut gtfs, &feed).unwrap();
+        load_feed(&mut gtfs, &feed, false).unwrap();
         assert_eq!(gtfs.routes.len(), 2);
         assert_eq!(gtfs.stops.len(), 11);
         assert_eq!(gtfs.trips.len(), 20);

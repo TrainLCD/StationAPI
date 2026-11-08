@@ -21,7 +21,7 @@ fn load_gtfs_feed(data: &mut GtfsData, feed: &GtfsFeed) {
         warn!("{} の取得に失敗: {e}。このフィードを飛ばす", feed.name);
         return;
     }
-    if let Err(e) = parse::load_feed(data, feed) {
+    if let Err(e) = parse::load_feed(data, feed, false) {
         warn!("{} の読み込みに失敗: {e}。このフィードを飛ばす", feed.name);
     }
 }
@@ -30,7 +30,7 @@ fn load_gtfs_feed(data: &mut GtfsData, feed: &GtfsFeed) {
 fn read_complete_feed(feed: &GtfsFeed) -> Option<GtfsData> {
     let mut data = GtfsData::default();
     if let Err(error) = feed::download(feed)
-        .and_then(|()| parse::load_feed(&mut data, feed))
+        .and_then(|()| parse::load_feed(&mut data, feed, true))
         .and_then(|()| verify_patterns(&data))
     {
         warn!(
@@ -116,4 +116,43 @@ pub fn load(companies: &mut crate::table::Table) -> Result<GtfsData> {
         data.stop_times.len()
     );
     Ok(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+
+    #[test]
+    fn complete_feed_rejects_dangling_stop_time_references() {
+        let dir =
+            std::env::temp_dir().join(format!("stationapi_pp_strict_gtfs_{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("routes.txt"),
+            "route_id,route_long_name,route_type\nr,テスト,3\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.join("stops.txt"),
+            "stop_id,stop_name,stop_lat,stop_lon\ns,停留所,35.0,139.0\n",
+        )
+        .unwrap();
+        fs::write(dir.join("trips.txt"), "route_id,trip_id\nr,t\n").unwrap();
+        let feed = GtfsFeed {
+            path: dir.to_str().unwrap(),
+            ..feed::MINATO_CHIIBUS
+        };
+        let stop_times = dir.join("stop_times.txt");
+        let valid = "trip_id,stop_id,stop_sequence\nt,s,1\n";
+        fs::write(&stop_times, valid).unwrap();
+        let accepts_valid = read_complete_feed(&feed).is_some();
+        fs::write(&stop_times, format!("{valid}unknown,s,2\n")).unwrap();
+        let rejects_unknown_trip = read_complete_feed(&feed).is_none();
+        fs::write(&stop_times, format!("{valid}t,unknown,2\n")).unwrap();
+        let rejects_unknown_stop = read_complete_feed(&feed).is_none();
+        fs::remove_dir_all(dir).unwrap();
+        assert!(accepts_valid && rejects_unknown_trip && rejects_unknown_stop);
+    }
 }

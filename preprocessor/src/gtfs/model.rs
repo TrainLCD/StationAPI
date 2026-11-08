@@ -119,17 +119,18 @@ impl GtfsData {
         }
     }
 
-    /// 参照先の trip / stop が無い行は取り込まない (外部キー相当)。
-    pub fn push_stop_time(&mut self, stop_time: StopTime) {
+    /// 参照先の trip / stop が無い行は取り込まず、false を返す。
+    pub fn push_stop_time(&mut self, stop_time: StopTime) -> bool {
         if !self.trip_ids.contains(&stop_time.trip_id)
             || !self.stop_ids.contains(&stop_time.stop_id)
         {
-            return;
+            return false;
         }
         let key = (stop_time.trip_id.clone(), stop_time.stop_sequence);
         if self.stop_time_keys.insert(key) {
             self.stop_times.push(stop_time);
         }
+        true
     }
 
     pub fn has_stop(&self, stop_id: &str) -> bool {
