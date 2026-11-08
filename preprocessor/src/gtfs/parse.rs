@@ -9,7 +9,10 @@ use anyhow::{ensure, Context, Result};
 use serde::Deserialize;
 use stationapi::domain::romaji::{romaji_display_name, to_fullwidth_katakana};
 
-use super::feed::{scoped_id, GtfsFeed, HOKKAIDO_CHUO_BUS, NAGOYA_CITY_BUS};
+use super::feed::{
+    hokkaido_express_company_cd, scoped_id, uses_stop_order_patterns, GtfsFeed,
+    HOKKAIDO_EXPRESS_BUS, NAGOYA_CITY_BUS,
+};
 use super::model::{index_stop_times_by_trip, GtfsData, Route, Stop, StopTime, Trip};
 use crate::warn;
 
@@ -42,7 +45,7 @@ pub fn load_feed(data: &mut GtfsData, feed: &GtfsFeed) -> Result<()> {
     let stop_time_start = data.stop_times.len();
     load_trips(data, dir, feed, scheduled_services.as_ref())?;
     load_stop_times(data, dir, feed)?;
-    if feed.id == HOKKAIDO_CHUO_BUS.id {
+    if uses_stop_order_patterns(feed.id) {
         derive_stop_order_patterns(
             &mut data.trips[trip_start..],
             &data.stop_times[stop_time_start..],
@@ -213,6 +216,9 @@ fn load_routes(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
         return Ok(());
     };
     let city_bus = feed.id == NAGOYA_CITY_BUS.id;
+    let hokkaido_express = feed.id == HOKKAIDO_EXPRESS_BUS.id;
+    // 未登録の事業者があれば、このフィードの路線を一部だけ取り込まずに失敗させる。
+    let mut express_routes = Vec::new();
     let field = if city_bus {
         "route_short_name"
     } else {
@@ -250,14 +256,31 @@ fn load_routes(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
                 None
             }
         });
-        data.push_route(Route {
+        let company_cd = if hokkaido_express {
+            let agency_id = record.get(1).unwrap_or_default();
+            Some(hokkaido_express_company_cd(agency_id).with_context(|| {
+                format!("北海道高速バスの路線 {route_id} に未登録の agency_id {agency_id:?}")
+            })?)
+        } else {
+            None
+        };
+        let route = Route {
             route_id: scoped_id(feed, route_id),
+            company_cd,
             route_short_name: cell(&record, 2).map(str::to_string),
             route_long_name: cell(&record, 3).map(str::to_string),
             route_long_name_r: translation.and_then(|t| t.en.clone()),
             route_type: record.get(5).unwrap_or("3").parse().unwrap_or(3),
             route_color: cell(&record, 7).map(str::to_string),
-        });
+        };
+        if hokkaido_express {
+            express_routes.push(route);
+        } else {
+            data.push_route(route);
+        }
+    }
+    for route in express_routes {
+        data.push_route(route);
     }
     Ok(())
 }
@@ -525,6 +548,31 @@ fn set_language(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn express_routes_map_each_agency_and_reject_an_unmapped_feed() {
+        let dir = std::env::temp_dir().join(format!(
+            "stationapi_pp_express_routes_{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let routes = dir.join("routes.txt");
+        let known = "route_id,agency_id,route_long_name,route_type\n\
+                     chuo,4430001050451,札幌～函館,3\n\
+                     dohoku,8450001002208,札幌～旭川,3\n";
+        std::fs::write(&routes, known).unwrap();
+        let mut valid = GtfsData::default();
+        load_routes(&mut valid, &dir, &HOKKAIDO_EXPRESS_BUS).unwrap();
+        assert_eq!(valid.routes[0].company_cd, Some(258));
+        assert_eq!(valid.routes[1].company_cd, Some(261));
+
+        std::fs::write(&routes, format!("{known}unknown,0,未登録,3\n")).unwrap();
+        let mut invalid = GtfsData::default();
+        let result = load_routes(&mut invalid, &dir, &HOKKAIDO_EXPRESS_BUS);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(result.unwrap_err().to_string().contains("agency_id"));
+        assert!(invalid.routes.is_empty());
+    }
 
     #[test]
     fn derived_patterns_follow_stop_sequence_and_reuse_identical_orders() {

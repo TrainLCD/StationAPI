@@ -12,6 +12,8 @@ use crate::warn;
 #[derive(Debug, Clone)]
 pub struct Route {
     pub route_id: String,
+    /// 複数事業者を含む GTFS で routes.txt の agency_id から引いたコード。
+    pub company_cd: Option<i32>,
     pub route_short_name: Option<String>,
     pub route_long_name: Option<String>,
     /// GTFS の translations.txt に収録された英語表示名。
