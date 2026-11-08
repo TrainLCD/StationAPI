@@ -1,0 +1,13 @@
+{
+  "name": "中央区コミュニティバス「江戸バス」",
+  "url": "https://api.odpt.org/api/v4/files/odpt/TokyoChuoCity/Alldata.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/tokyo_chuo_city_alldata",
+  "license": "Public Transportation Open Data Basic License",
+  "company": {
+    "name": "中央区",
+    "kana": "チュウオウク",
+    "english": "Chuo City",
+    "url": "https://www.city.chuo.lg.jp/"
+  },
+  "company_cd": 272
+}
