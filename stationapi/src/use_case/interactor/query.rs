@@ -2360,20 +2360,9 @@ fn forward_bus_segment_signature(
         .position(|s| s.station_g_cd == from_g_cd && s.pass != Some(1))?;
     let to = stops[from + 1..]
         .iter()
-        .position(|s| s.station_g_cd == to_g_cd && s.pass != Some(1))
-        .map(|index| from + 1 + index);
-    let segment = match to {
-        Some(to) => stops[from..=to].to_vec(),
-        None if is_circular_route(stops) => {
-            let to = stops[..from]
-                .iter()
-                .position(|s| s.station_g_cd == to_g_cd && s.pass != Some(1))?;
-            select_circular_arc(stops, from, to, true)
-        }
-        None => return None,
-    };
+        .position(|s| s.station_g_cd == to_g_cd && s.pass != Some(1))?;
     Some(
-        segment
+        stops[from..=from + 1 + to]
             .iter()
             .filter(|s| s.pass != Some(1))
             .map(|s| s.station_g_cd)
