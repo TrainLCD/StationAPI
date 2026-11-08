@@ -27,6 +27,14 @@ pub const NAGOYA_CITY_BUS: GtfsFeed = GtfsFeed {
     requires_consumer_key: false,
 };
 
+pub const HOKKAIDO_CHUO_BUS: GtfsFeed = GtfsFeed {
+    id: "hokkaido_chuo",
+    name: "北海道中央バス",
+    path: "data/HokkaidoChuoBus-GTFS",
+    url: "https://ckan.hoda.jp/dataset/24d1dd70-5395-4d6b-b41f-0d83e8eabdb9/resource/dbadfccc-670e-49b9-be77-c3f346ee3160/download/hokkaido_chuo.zip",
+    requires_consumer_key: false,
+};
+
 pub const GTFS_FEEDS: &[GtfsFeed] = &[
     GtfsFeed {
         id: "toei",

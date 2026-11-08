@@ -9,8 +9,8 @@ use anyhow::{ensure, Context, Result};
 use serde::Deserialize;
 use stationapi::domain::romaji::{romaji_display_name, to_fullwidth_katakana};
 
-use super::feed::{scoped_id, GtfsFeed, NAGOYA_CITY_BUS};
-use super::model::{GtfsData, Route, Stop, StopTime, Trip};
+use super::feed::{scoped_id, GtfsFeed, HOKKAIDO_CHUO_BUS, NAGOYA_CITY_BUS};
+use super::model::{index_stop_times_by_trip, GtfsData, Route, Stop, StopTime, Trip};
 use crate::warn;
 
 /// `translations.txt` の 1 エントリ。
@@ -38,12 +38,38 @@ pub fn load_feed(data: &mut GtfsData, feed: &GtfsFeed) -> Result<()> {
     let translations = load_translations(dir)?;
     load_routes(data, dir, feed)?;
     load_stops(data, dir, feed, &translations)?;
+    let trip_start = data.trips.len();
+    let stop_time_start = data.stop_times.len();
     load_trips(data, dir, feed, scheduled_services.as_ref())?;
     load_stop_times(data, dir, feed)?;
+    if feed.id == HOKKAIDO_CHUO_BUS.id {
+        derive_stop_order_patterns(
+            &mut data.trips[trip_start..],
+            &data.stop_times[stop_time_start..],
+        );
+    }
     if feed.id == "nagoya_srt" {
         normalize_srt_headsigns(data);
     }
     Ok(())
+}
+
+/// shape_id が無い便は、停留所の並びを運行パターンのキーにする。
+fn derive_stop_order_patterns(trips: &mut [Trip], stop_times: &[StopTime]) {
+    let by_trip = index_stop_times_by_trip(stop_times);
+    for trip in trips.iter_mut().filter(|trip| trip.shape_id.is_none()) {
+        let Some(times) = by_trip.get(trip.trip_id.as_str()) else {
+            continue;
+        };
+        let mut pattern = String::from("stop_order:");
+        for time in times {
+            // ID に区切り文字が含まれても並びが衝突しないよう、長さを先に書く。
+            pattern.push_str(&time.stop_id.len().to_string());
+            pattern.push(':');
+            pattern.push_str(&time.stop_id);
+        }
+        trip.shape_id = Some(pattern);
+    }
 }
 
 /// 運行曜日または追加運行日がある service_id を集めます。
@@ -499,6 +525,42 @@ fn set_language(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn derived_patterns_follow_stop_sequence_and_reuse_identical_orders() {
+        let mut trips: Vec<_> = ["a", "b", "reverse"]
+            .into_iter()
+            .map(|id| Trip {
+                trip_id: id.to_string(),
+                route_id: "route".to_string(),
+                trip_headsign: None,
+                direction_id: None,
+                shape_id: None,
+            })
+            .collect();
+        let stop_times: Vec<_> = [
+            ("a", "first", 1),
+            ("a", "last", 2),
+            ("b", "last", 20),
+            ("b", "first", 10),
+            ("reverse", "last", 1),
+            ("reverse", "first", 2),
+        ]
+        .into_iter()
+        .map(|(trip, stop, sequence)| StopTime {
+            trip_id: trip.to_string(),
+            stop_id: stop.to_string(),
+            stop_sequence: sequence,
+            shape_dist_traveled: None,
+        })
+        .collect();
+
+        derive_stop_order_patterns(&mut trips, &stop_times);
+
+        assert!(trips[0].shape_id.is_some());
+        assert_eq!(trips[0].shape_id, trips[1].shape_id);
+        assert_ne!(trips[0].shape_id, trips[2].shape_id);
+    }
 
     #[test]
     fn nagoya_city_bus_keeps_scheduled_patterns_and_their_stop_order() {

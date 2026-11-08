@@ -14,6 +14,7 @@ data/TokyuBus-MeguroCity-GTFS/
 data/TokyuBus-ODPT/
 data/KeioBus-GTFS/
 data/NagoyaCityBus-GTFS/
+data/HokkaidoChuoBus-GTFS/
 data/N02-25/
 scripts/.osm_cache/
 scripts/.gtfs_cache/

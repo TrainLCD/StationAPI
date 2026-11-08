@@ -40,6 +40,7 @@ pub fn load() -> Result<GtfsData> {
 
     // 既存の路線・停留所 ID の衝突解決順を維持するため、東急の後に足す。
     load_gtfs_feed(&mut data, &feed::NAGOYA_CITY_BUS);
+    load_gtfs_feed(&mut data, &feed::HOKKAIDO_CHUO_BUS);
 
     data.drop_dangling_parents();
 

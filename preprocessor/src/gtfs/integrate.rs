@@ -670,7 +670,9 @@ fn stops_to_stations(
                 platform_code.map(str::to_string),
             );
             set(t, &mut row, "line_cd", int(line_cd));
-            let pref_cd = if stop.stop_id.starts_with("nagoya_srt:")
+            let pref_cd = if stop.stop_id.starts_with("hokkaido_chuo:") {
+                1
+            } else if stop.stop_id.starts_with("nagoya_srt:")
                 || stop.stop_id.starts_with("nagoya_city_bus:")
             {
                 23
@@ -844,7 +846,7 @@ fn trip_variations_to_types(
         let mut parents: Vec<&str> = times.iter().filter_map(parent_of_time).collect();
         parents.sort();
         parents.dedup();
-        let stop_set_key = if parents.is_empty() {
+        let stop_set_key = if parents.is_empty() || route_id.starts_with("hokkaido_chuo:") {
             None
         } else {
             Some(parents.join("|"))
@@ -885,8 +887,13 @@ fn trip_variations_to_types(
     variations.sort_by(|a, b| {
         // 既存の種別・系統 ID を優先して割り当てる。
         a.route_id
-            .starts_with("nagoya_city_bus:")
-            .cmp(&b.route_id.starts_with("nagoya_city_bus:"))
+            .starts_with("hokkaido_chuo:")
+            .cmp(&b.route_id.starts_with("hokkaido_chuo:"))
+            .then(
+                a.route_id
+                    .starts_with("nagoya_city_bus:")
+                    .cmp(&b.route_id.starts_with("nagoya_city_bus:")),
+            )
             .then(a.route_id.cmp(b.route_id))
             .then(b.stop_count.cmp(&a.stop_count))
             .then(a.shape_id.cmp(b.shape_id))
