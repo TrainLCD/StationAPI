@@ -675,6 +675,7 @@ fn stops_to_stations(
             set(t, &mut row, "line_cd", int(line_cd));
             let pref_cd = if stop.stop_id.starts_with("hokkaido_chuo:")
                 || stop.stop_id.starts_with("hokkaido_express:")
+                || stop.stop_id.starts_with("jotetsu:")
             {
                 1
             } else if stop.stop_id.starts_with("nagoya_srt:")
@@ -895,6 +896,7 @@ fn trip_variations_to_types(
         Some("nagoya_city_bus") => 1,
         Some("hokkaido_chuo") => 2,
         Some("hokkaido_express") => 3,
+        Some("jotetsu") => 4,
         _ => 0,
     };
     variations.sort_by(|a, b| {
