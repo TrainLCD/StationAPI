@@ -300,7 +300,10 @@ fn load_stops(
             stop_name_ko: translation.and_then(|t| t.ko.clone()),
             stop_lat: coordinate(&record, 4, original_stop_id, "stop_lat"),
             stop_lon: coordinate(&record, 5, original_stop_id, "stop_lon"),
-            platform_code: cell(&record, 10).map(str::to_string),
+            platform_code: cell(&record, 10)
+                .map(str::trim)
+                .filter(|code| !code.is_empty())
+                .map(str::to_string),
             parent_station: cell(&record, 9).map(|s| scoped_id(feed, s)),
         });
     }

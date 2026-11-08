@@ -1290,6 +1290,7 @@ mod tests {
     const MITAKA: u32 = 1131105;
     const NAKA_MEGURO: u32 = 2600103;
 
+    /// C−758の名古屋駅を、出発時ののりばの順に返す。
     #[test]
     fn c758_graphql_keeps_the_platform_codes_in_stop_order() {
         // 生成済みのバスデータがないビルドでは、この系統は存在しない。

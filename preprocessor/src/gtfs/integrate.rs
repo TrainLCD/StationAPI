@@ -556,6 +556,50 @@ fn trip_is_better(candidate: &TripRank, current: &TripRank) -> bool {
         .is_lt()
 }
 
+/// 親停留所と系統の組ごとに、実際に停まる子停留所ののりばを調べる。
+/// コードが欠けているか異なるコードが混ざる場合は、単一の番号を返せない。
+fn child_platform_codes(gtfs: &GtfsData) -> HashMap<(&str, &str), Option<&str>> {
+    let children: HashMap<_, _> = gtfs
+        .stops
+        .iter()
+        .filter_map(|stop| {
+            Some((
+                stop.stop_id.as_str(),
+                (
+                    stop.parent_station.as_deref()?,
+                    stop.platform_code.as_deref(),
+                ),
+            ))
+        })
+        .collect();
+    if !children.values().any(|(_, code)| code.is_some()) {
+        return HashMap::new();
+    }
+
+    let route_by_trip: HashMap<_, _> = gtfs
+        .trips
+        .iter()
+        .map(|trip| (trip.trip_id.as_str(), trip.route_id.as_str()))
+        .collect();
+    let mut codes = HashMap::new();
+    for time in &gtfs.stop_times {
+        if let (Some(&(parent, code)), Some(&route)) = (
+            children.get(time.stop_id.as_str()),
+            route_by_trip.get(time.trip_id.as_str()),
+        ) {
+            codes
+                .entry((parent, route))
+                .and_modify(|previous| {
+                    if *previous != code {
+                        *previous = None;
+                    }
+                })
+                .or_insert(code);
+        }
+    }
+    codes
+}
+
 /// 停留所を stations へ。物理停留所 1 件につき、通る系統の数だけ行を作る。
 fn stops_to_stations(
     dataset: &mut Dataset,
@@ -578,6 +622,7 @@ fn stops_to_stations(
         .collect();
 
     let group_ids = build_station_g_cd_map(&stops, &parent_ids);
+    let child_platform_codes = child_platform_codes(gtfs);
     let groups = group_ids.values().copied().collect::<HashSet<_>>().len();
     info!("バス停 {} 件を {groups} グループにまとめた", stops.len());
 
@@ -612,7 +657,18 @@ fn stops_to_stations(
             set(t, &mut row, "station_name_rn", station_name_rn.clone());
             set(t, &mut row, "station_name_zh", stop.stop_name_zh.clone());
             set(t, &mut row, "station_name_ko", stop.stop_name_ko.clone());
-            set(t, &mut row, "platform_code", stop.platform_code.clone());
+            let platform_code = stop.platform_code.as_deref().or_else(|| {
+                child_platform_codes
+                    .get(&(stop.stop_id.as_str(), route_id.as_str()))
+                    .copied()
+                    .flatten()
+            });
+            set(
+                t,
+                &mut row,
+                "platform_code",
+                platform_code.map(str::to_string),
+            );
             set(t, &mut row, "line_cd", int(line_cd));
             let pref_cd = if stop.stop_id.starts_with("nagoya_srt:")
                 || stop.stop_id.starts_with("nagoya_city_bus:")
@@ -1205,4 +1261,58 @@ fn build_type_name_roman(
 /// 列名を指定して 1 セルを埋める。
 fn set(table: &crate::table::Table, row: &mut [Cell], column: &str, value: Cell) {
     row[table.col(column)] = value;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gtfs::model::{StopTime, Trip};
+
+    /// 停車実績を系統ごとに集計し、複数候補や不明なコードからは番号を選ばない。
+    #[test]
+    fn child_platform_codes_require_agreement_on_the_route() {
+        let mut gtfs = GtfsData::default();
+        gtfs.stops = [("a", Some("1")), ("b", Some("2")), ("c", None)]
+            .into_iter()
+            .map(|(id, code)| Stop {
+                stop_id: id.into(),
+                stop_name: "新橋駅前".into(),
+                stop_name_k: None,
+                stop_name_r: None,
+                stop_name_zh: None,
+                stop_name_ko: None,
+                stop_lat: 35.0,
+                stop_lon: 139.0,
+                platform_code: code.map(str::to_string),
+                parent_station: Some("parent".into()),
+            })
+            .collect();
+        for (route, visits) in [
+            ("route1", &["a", "a"][..]),
+            ("route2", &["b"][..]),
+            ("multiple", &["a", "b", "a"][..]),
+            ("unknown", &["c", "a"][..]),
+        ] {
+            gtfs.trips.push(Trip {
+                trip_id: route.into(),
+                route_id: route.into(),
+                trip_headsign: None,
+                direction_id: None,
+                shape_id: None,
+            });
+            for (i, stop_id) in visits.iter().enumerate() {
+                gtfs.stop_times.push(StopTime {
+                    trip_id: route.into(),
+                    stop_id: (*stop_id).into(),
+                    stop_sequence: i as i32 + 1,
+                    shape_dist_traveled: None,
+                });
+            }
+        }
+        let codes = child_platform_codes(&gtfs);
+        assert_eq!(codes[&("parent", "route1")], Some("1"));
+        assert_eq!(codes[&("parent", "route2")], Some("2"));
+        assert_eq!(codes[&("parent", "multiple")], None);
+        assert_eq!(codes[&("parent", "unknown")], None);
+    }
 }
