@@ -35,6 +35,33 @@ pub const HOKKAIDO_CHUO_BUS: GtfsFeed = GtfsFeed {
     requires_consumer_key: false,
 };
 
+pub const HOKKAIDO_EXPRESS_BUS: GtfsFeed = GtfsFeed {
+    id: "hokkaido_express",
+    name: "北海道高速バス",
+    path: "data/HokkaidoExpressBus-GTFS",
+    url: "https://ckan.hoda.jp/dataset/24d1dd70-5395-4d6b-b41f-0d83e8eabdb9/resource/ccfd2358-c804-4cfe-b4fe-278c3f035c64/download/hokkaido-express_bus.zip",
+    requires_consumer_key: false,
+};
+
+pub(super) fn hokkaido_express_company_cd(agency_id: &str) -> Option<i32> {
+    match agency_id {
+        "4430001050451" => Some(258), // 北海道中央バス
+        "7430001025970" => Some(259), // JR北海道バス
+        "8450001008147" => Some(260), // 宗谷バス
+        "8450001002208" => Some(261), // 道北バス
+        "8460001000078" => Some(262), // 阿寒バス
+        "2450001009068" => Some(263), // 沿岸バス
+        "9430001021456" => Some(264), // 北海道バス
+        "9430001033740" => Some(265), // 北都交通
+        "5460301003048" => Some(266), // 網走バス
+        _ => None,
+    }
+}
+
+pub(super) fn uses_stop_order_patterns(feed_id: &str) -> bool {
+    feed_id == HOKKAIDO_CHUO_BUS.id || feed_id == HOKKAIDO_EXPRESS_BUS.id
+}
+
 pub const GTFS_FEEDS: &[GtfsFeed] = &[
     GtfsFeed {
         id: "toei",
