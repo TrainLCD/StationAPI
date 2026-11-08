@@ -59,6 +59,14 @@ pub const CHIYODA_KAZAGURUMA: GtfsFeed = GtfsFeed {
     requires_consumer_key: false,
 };
 
+pub const ODAKYU_BUS: GtfsFeed = GtfsFeed {
+    id: "west_odakyu",
+    name: "小田急バス",
+    path: "data/OdakyuBus-GTFS",
+    url: "https://api.odpt.org/api/v4/files/odpt/OdakyuBus/AIILines.zip?date=current",
+    requires_consumer_key: true,
+};
+
 pub(super) fn hokkaido_express_company_cd(agency_id: &str) -> Option<i32> {
     match agency_id {
         "4430001050451" => Some(258), // 北海道中央バス
@@ -80,6 +88,7 @@ pub(super) fn uses_stop_order_patterns(feed_id: &str) -> bool {
         HOKKAIDO_EXPRESS_BUS.id,
         JOTETSU_BUS.id,
         CHIYODA_KAZAGURUMA.id,
+        ODAKYU_BUS.id,
     ]
     .contains(&feed_id)
 }

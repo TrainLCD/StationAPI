@@ -409,8 +409,8 @@ fn load_trips(
         {
             continue;
         }
-        let pattern = if feed.id == CHIYODA_KAZAGURUMA.id {
-            // 風ぐるまは区間便と全区間便で shape_id を共有するため、停車順で区別する。
+        let pattern = if [CHIYODA_KAZAGURUMA.id, super::feed::ODAKYU_BUS.id].contains(&feed.id) {
+            // 線形IDの有無にかかわらず、区間便などを実際の停車順で区別する。
             None
         } else {
             // 名古屋市バスでは shape_id が空で、jp_pattern_id が停車順を区別する。

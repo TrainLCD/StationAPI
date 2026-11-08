@@ -44,6 +44,7 @@ pub fn load() -> Result<GtfsData> {
     load_gtfs_feed(&mut data, &feed::HOKKAIDO_EXPRESS_BUS);
     load_gtfs_feed(&mut data, &feed::JOTETSU_BUS);
     load_gtfs_feed(&mut data, &feed::CHIYODA_KAZAGURUMA);
+    load_gtfs_feed(&mut data, &feed::ODAKYU_BUS);
 
     data.drop_dangling_parents();
 

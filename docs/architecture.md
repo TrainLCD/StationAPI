@@ -260,7 +260,7 @@ N02 は `data/N02-25/` にキャッシュします (git 管理外。CI では `a
 
 | 変数 | 効果 |
 |---|---|
-| `ODPT_ACCESS_TOKEN` | 認証が必要な ODPT フィード（西武バス・京王バス・東急バス系）の取得に使います。未設定でも、未展開の認証不要フィードは取得します。認証付き GTFS は展開済みデータ（`data/*-GTFS/`）を使い、東急バスの ODPT JSON は期限切れも含めてキャッシュの読み込みを試みます。取得に失敗したフィードは警告してスキップします。GTFS の読み込みに失敗した場合は警告を出し、失敗前に読み込んだデータが出力に残ることがあります。 |
+| `ODPT_ACCESS_TOKEN` | 認証が必要な ODPT フィード（西武バス・京王バス・東急バス系・小田急バス）の取得に使います。未設定でも、未展開の認証不要フィードは取得します。認証付き GTFS は展開済みデータ（`data/*-GTFS/`）を使い、東急バスの ODPT JSON は期限切れも含めてキャッシュの読み込みを試みます。取得に失敗したフィードは警告してスキップします。GTFS の読み込みに失敗した場合は警告を出し、失敗前に読み込んだデータが出力に残ることがあります。 |
 | `DISABLE_BUS_FEATURE` | `true` (または `1`) にするとバスを取り込まない (鉄道のみ) |
 
 `ODPT_ACCESS_TOKEN` に空文字列を設定すると、期限切れの ODPT JSON キャッシュは
@@ -885,3 +885,8 @@ GTFS の `platform_code` は停留所名と別に保持し、GraphQL の `Statio
 
 [日立自動車交通の公開GTFS](https://ckan.odpt.org/dataset/hitachi_automobile_transportation_chiyoda_alllines)を `ward_chiyoda:` 名前空間に取り込み、事業者コード268を使います。
 同じ `shape_id` に停車順の異なる便が含まれるため、運行パターンは便ごとの停車順から作ります。
+
+### 小田急バス
+
+[小田急バスのODPT GTFS](https://ckan.odpt.org/dataset/odakyu_bus_aii_lines)を `west_odakyu:` 名前空間に取り込み、事業者コード269を使います。
+取得には既存の `ODPT_ACCESS_TOKEN` を使い、運行パターンは便ごとの停車順から作ります。
