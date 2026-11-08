@@ -899,6 +899,7 @@ fn trip_variations_to_types(
         Some("hokkaido_express") => 3,
         Some("jotetsu") => 4,
         Some("ward_chiyoda") => 5,
+        Some("ward_tokyo_bunkyo") => 9,
         Some("west_odakyu") => 6,
         Some("west_tokyo_nishi") => 7,
         _ => 0,

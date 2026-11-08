@@ -47,6 +47,7 @@ pub fn load() -> Result<GtfsData> {
     load_gtfs_feed(&mut data, &feed::ODAKYU_BUS);
     load_gtfs_feed(&mut data, &feed::NISHI_TOKYO_BUS);
 
+    load_gtfs_feed(&mut data, &feed::BUNKYO_BGURU);
     data.drop_dangling_parents();
 
     // 1 つも取り込めていない場合は失敗させる。ここで成功にすると、バスが
