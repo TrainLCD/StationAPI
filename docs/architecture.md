@@ -886,6 +886,11 @@ GTFS の `platform_code` は停留所名と別に保持し、GraphQL の `Statio
 [日立自動車交通の公開GTFS](https://ckan.odpt.org/dataset/hitachi_automobile_transportation_chiyoda_alllines)を `ward_chiyoda:` 名前空間に取り込み、事業者コード268を使います。
 同じ `shape_id` に停車順の異なる便が含まれるため、運行パターンは便ごとの停車順から作ります。
 
+### 文京区「Bーぐる」
+
+[配布元のGTFS](https://ckan.odpt.org/dataset/hitachi_automobile_transportation_all_lines)を `ward_tokyo_bunkyo:` 名前空間に取り込み、風ぐるまと同じ事業者コード268を使います。
+運行パターンは配布元の `shape_id` で区別します。
+
 ### 小田急バス
 
 [小田急バスのODPT GTFS](https://ckan.odpt.org/dataset/odakyu_bus_aii_lines)を `west_odakyu:` 名前空間に取り込み、事業者コード269を使います。
