@@ -2,13 +2,14 @@
 //!
 //! 列順と省略される任意列はフィードごとに異なるため、列名で解決する。
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
+use serde::Deserialize;
 use stationapi::domain::romaji::{romaji_display_name, to_fullwidth_katakana};
 
-use super::feed::{scoped_id, GtfsFeed};
+use super::feed::{scoped_id, GtfsFeed, NAGOYA_CITY_BUS};
 use super::model::{GtfsData, Route, Stop, StopTime, Trip};
 use crate::warn;
 
@@ -31,15 +32,74 @@ pub fn load_feed(data: &mut GtfsData, feed: &GtfsFeed) -> Result<()> {
         return Ok(());
     }
 
+    let scheduled_services = (feed.id == NAGOYA_CITY_BUS.id)
+        .then(|| load_scheduled_services(dir))
+        .transpose()?;
     let translations = load_translations(dir)?;
     load_routes(data, dir, feed)?;
     load_stops(data, dir, feed, &translations)?;
-    load_trips(data, dir, feed)?;
+    load_trips(data, dir, feed, scheduled_services.as_ref())?;
     load_stop_times(data, dir, feed)?;
     if feed.id == "nagoya_srt" {
         normalize_srt_headsigns(data);
     }
     Ok(())
+}
+
+/// 運行曜日または追加運行日がある service_id を集めます。
+/// 市バスの GTFS には運行休止中の便も収録されています。
+fn load_scheduled_services(dir: &Path) -> Result<HashSet<String>> {
+    #[derive(Deserialize)]
+    struct Calendar {
+        service_id: String,
+        monday: u8,
+        tuesday: u8,
+        wednesday: u8,
+        thursday: u8,
+        friday: u8,
+        saturday: u8,
+        sunday: u8,
+    }
+
+    #[derive(Deserialize)]
+    struct CalendarDate {
+        service_id: String,
+        exception_type: u8,
+    }
+
+    let mut services = HashSet::new();
+    let calendar = dir.join("calendar.txt");
+    if calendar.exists() {
+        let mut rdr = csv::Reader::from_path(calendar)?;
+        for row in rdr.deserialize::<Calendar>() {
+            let row = row?;
+            if [
+                row.monday,
+                row.tuesday,
+                row.wednesday,
+                row.thursday,
+                row.friday,
+                row.saturday,
+                row.sunday,
+            ]
+            .contains(&1)
+            {
+                services.insert(row.service_id);
+            }
+        }
+    }
+    let calendar_dates = dir.join("calendar_dates.txt");
+    if calendar_dates.exists() {
+        let mut rdr = csv::Reader::from_path(calendar_dates)?;
+        for row in rdr.deserialize::<CalendarDate>() {
+            let row = row?;
+            if row.exception_type == 1 {
+                services.insert(row.service_id);
+            }
+        }
+    }
+    ensure!(!services.is_empty(), "名古屋市バスの運行日を読み取れない");
+    Ok(services)
 }
 
 /// SRTのtrip_headsignは「通常便」「最終便」などの便区分です。
@@ -126,7 +186,13 @@ fn load_routes(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
     let Some(mut rdr) = reader(&dir.join("routes.txt"))? else {
         return Ok(());
     };
-    let translations = load_field_translations(dir, "routes", "route_long_name")?;
+    let city_bus = feed.id == NAGOYA_CITY_BUS.id;
+    let field = if city_bus {
+        "route_short_name"
+    } else {
+        "route_long_name"
+    };
+    let translations = load_field_translations(dir, "routes", field)?;
     // route_id,agency_id,route_short_name,route_long_name,route_desc,
     // route_type,route_url,route_color,route_text_color,jp_parent_route_id
     let columns = column_indices(
@@ -150,13 +216,19 @@ fn load_routes(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
             record: &raw,
             columns: &columns,
         };
+        let route_id = record.get(0).unwrap_or("");
+        let translation = translations.get(route_id).or_else(|| {
+            if city_bus {
+                cell(&record, 2).and_then(|name| translations.get(name))
+            } else {
+                None
+            }
+        });
         data.push_route(Route {
-            route_id: scoped_id(feed, record.get(0).unwrap_or("")),
+            route_id: scoped_id(feed, route_id),
             route_short_name: cell(&record, 2).map(str::to_string),
             route_long_name: cell(&record, 3).map(str::to_string),
-            route_long_name_r: translations
-                .get(record.get(0).unwrap_or(""))
-                .and_then(|t| t.en.clone()),
+            route_long_name_r: translation.and_then(|t| t.en.clone()),
             route_type: record.get(5).unwrap_or("3").parse().unwrap_or(3),
             route_color: cell(&record, 7).map(str::to_string),
         });
@@ -247,7 +319,12 @@ fn coordinate(record: &ColumnRecord<'_>, index: usize, stop_id: &str, column: &s
 }
 
 /// 便の路線・行先・方向・shapeを、フィードごとの列配置から読み込みます。
-fn load_trips(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
+fn load_trips(
+    data: &mut GtfsData,
+    dir: &Path,
+    feed: &GtfsFeed,
+    scheduled_services: Option<&HashSet<String>>,
+) -> Result<()> {
     let Some(mut rdr) = reader(&dir.join("trips.txt"))? else {
         return Ok(());
     };
@@ -264,6 +341,7 @@ fn load_trips(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
             "direction_id",
             "block_id",
             "shape_id",
+            "jp_pattern_id",
         ],
     );
     for record in rdr.records() {
@@ -272,12 +350,25 @@ fn load_trips(data: &mut GtfsData, dir: &Path, feed: &GtfsFeed) -> Result<()> {
             record: &raw,
             columns: &columns,
         };
+        if scheduled_services
+            .is_some_and(|services| !services.contains(record.get(1).unwrap_or("")))
+        {
+            continue;
+        }
+        // 名古屋市バスでは shape_id が空で、jp_pattern_id が停車順を区別する。
+        let pattern = cell(&record, 7).or_else(|| {
+            if feed.id == NAGOYA_CITY_BUS.id {
+                cell(&record, 8)
+            } else {
+                None
+            }
+        });
         data.push_trip(Trip {
             trip_id: scoped_id(feed, record.get(2).unwrap_or("")),
             route_id: scoped_id(feed, record.get(0).unwrap_or("")),
             trip_headsign: cell(&record, 3).map(str::to_string),
             direction_id: cell(&record, 5).and_then(|v| v.parse().ok()),
-            shape_id: cell(&record, 7).map(|s| scoped_id(feed, s)),
+            shape_id: pattern.map(|id| scoped_id(feed, id)),
         });
     }
     Ok(())
@@ -403,6 +494,82 @@ fn set_language(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nagoya_city_bus_keeps_scheduled_patterns_and_their_stop_order() {
+        use crate::gtfs::integrate;
+        use crate::rail::Dataset;
+
+        let feed = GtfsFeed {
+            path: concat!(env!("CARGO_MANIFEST_DIR"), "/test_data/nagoya_city_bus"),
+            ..NAGOYA_CITY_BUS
+        };
+        let mut gtfs = GtfsData::default();
+        load_feed(&mut gtfs, &feed).unwrap();
+        assert_eq!(gtfs.trips.len(), 3);
+        assert!(gtfs
+            .trips
+            .iter()
+            .all(|trip| trip.route_id != "nagoya_city_bus:6201"));
+        let outbound = gtfs
+            .trips
+            .iter()
+            .find(|trip| trip.shape_id.as_deref() == Some("nagoya_city_bus:6303031"))
+            .unwrap();
+        let times = gtfs.stop_times_by_trip();
+        let stops = &times[outbound.trip_id.as_str()];
+        assert_eq!(stops.len(), 27);
+        assert_eq!(stops.first().unwrap().stop_id, "nagoya_city_bus:050600G1");
+        assert_eq!(stops.last().unwrap().stop_id, "nagoya_city_bus:15033901");
+
+        let mut dataset =
+            Dataset::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../data")).unwrap();
+        let line_count = dataset.lines.len();
+        let type_count = dataset.types.len();
+        let station_count = dataset.stations.len();
+        integrate::integrate(&mut dataset, &gtfs).unwrap();
+        let company = dataset.lines.col("company_cd");
+        let line_name = dataset.lines.col("line_name");
+        let english_name = dataset.lines.col("line_name_r");
+        let lines: Vec<_> = dataset.lines.rows()[line_count..]
+            .iter()
+            .map(|row| {
+                (
+                    row[company].as_deref(),
+                    row[line_name].as_deref(),
+                    row[english_name].as_deref(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            lines,
+            [
+                (Some("257"), Some("Ｃ－７５８"), Some("C-758")),
+                (
+                    Some("257"),
+                    Some("ゆとりーとライン"),
+                    Some("ゆとりーとライン")
+                ),
+            ]
+        );
+        assert_eq!(dataset.types.len() - type_count, 3);
+        let type_name = dataset.types.col("type_name");
+        assert!(dataset.types.rows()[type_count..]
+            .iter()
+            .any(|row| row[type_name]
+                .as_deref()
+                .is_some_and(|name| name.ends_with("(循環)"))));
+        let prefecture = dataset.stations.col("pref_cd");
+        let stop_name = dataset.stations.col("station_name");
+        let stop_name_r = dataset.stations.col("station_name_r");
+        assert!(dataset.stations.rows()[station_count..]
+            .iter()
+            .all(|row| row[prefecture].as_deref() == Some("23")));
+        assert!(dataset.stations.rows()[station_count..]
+            .iter()
+            .any(|row| row[stop_name].as_deref() == Some("大曽根")
+                && row[stop_name_r].as_deref() == Some("Ozone")));
+    }
 
     #[test]
     fn nagoya_srt_feed_preserves_columns_translations_and_loop_patterns() {

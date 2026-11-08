@@ -1,0 +1,4 @@
+route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_color,route_text_color,jp_parent_route_id
+6101,3000020231002,Ｃ－７５８,,,3,,,,
+6201,3000020231002,深夜１,,,3,,,,
+6303,3000020231002,ゆとりーとライン,,,3,,,,

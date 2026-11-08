@@ -9,7 +9,18 @@ pub mod parse;
 use anyhow::{bail, Result};
 
 use crate::warn;
+use feed::GtfsFeed;
 use model::GtfsData;
+
+fn load_gtfs_feed(data: &mut GtfsData, feed: &GtfsFeed) {
+    if let Err(e) = feed::download(feed) {
+        warn!("{} の取得に失敗: {e}。このフィードを飛ばす", feed.name);
+        return;
+    }
+    if let Err(e) = parse::load_feed(data, feed) {
+        warn!("{} の読み込みに失敗: {e}。このフィードを飛ばす", feed.name);
+    }
+}
 
 /// 全フィードを取得して読み込む。
 ///
@@ -19,19 +30,16 @@ pub fn load() -> Result<GtfsData> {
     let mut data = GtfsData::default();
 
     for feed in feed::GTFS_FEEDS {
-        if let Err(e) = feed::download(feed) {
-            warn!("{} の取得に失敗: {e}。このフィードを飛ばす", feed.name);
-            continue;
-        }
-        if let Err(e) = parse::load_feed(&mut data, feed) {
-            warn!("{} の読み込みに失敗: {e}。このフィードを飛ばす", feed.name);
-        }
+        load_gtfs_feed(&mut data, feed);
     }
 
     match odpt::download() {
         Ok(odpt_data) => odpt::load(&mut data, &odpt_data),
         Err(e) => warn!("東急バスの ODPT JSON を取得できない: {e}。このフィードを飛ばす"),
     }
+
+    // 既存の路線・停留所 ID の衝突解決順を維持するため、東急の後に足す。
+    load_gtfs_feed(&mut data, &feed::NAGOYA_CITY_BUS);
 
     data.drop_dangling_parents();
 

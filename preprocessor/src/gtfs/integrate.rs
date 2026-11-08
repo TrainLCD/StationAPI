@@ -54,12 +54,22 @@ pub fn integrate(dataset: &mut Dataset, gtfs: &GtfsData) -> Result<()> {
 
 /// gtfs_routes を lines へ。
 fn routes_to_lines(dataset: &mut Dataset, gtfs: &GtfsData, codes: &mut BusCodes) -> Result<()> {
+    let served_routes: HashSet<&str> = gtfs
+        .trips
+        .iter()
+        .map(|trip| trip.route_id.as_str())
+        .collect();
     let mut added = 0usize;
     for route in &gtfs.routes {
         // 接頭辞から事業者を引けない系統は取り込まない。
         let Some(company_cd) = company_cd_for_gtfs_route(&route.route_id) else {
             continue;
         };
+        if route.route_id.starts_with("nagoya_city_bus:")
+            && !served_routes.contains(route.route_id.as_str())
+        {
+            continue;
+        }
         let line_cd = codes.line_cd(&route.route_id)?;
         let line_name = route
             .route_short_name
@@ -603,8 +613,9 @@ fn stops_to_stations(
             set(t, &mut row, "station_name_zh", stop.stop_name_zh.clone());
             set(t, &mut row, "station_name_ko", stop.stop_name_ko.clone());
             set(t, &mut row, "line_cd", int(line_cd));
-            // 既存フィードは東京都内だが、名古屋市SRTは愛知県の停留所。
-            let pref_cd = if stop.stop_id.starts_with("nagoya_srt:") {
+            let pref_cd = if stop.stop_id.starts_with("nagoya_srt:")
+                || stop.stop_id.starts_with("nagoya_city_bus:")
+            {
                 23
             } else {
                 13
@@ -785,6 +796,14 @@ fn trip_variations_to_types(
         let first_parent = first.and_then(parent_of_time);
         let last_parent = last.and_then(parent_of_time);
 
+        let first_stop_name = first.and_then(|time| name_of(&time.stop_id));
+        let last_stop_name = last.and_then(|time| name_of(&time.stop_id));
+        // 市バスの循環便は同じ停留所でも、始発と終点のポール ID が異なる。
+        let is_loop = first_parent.is_some() && first_parent == last_parent
+            || route_id.starts_with("nagoya_city_bus:")
+                && first_stop_name.is_some()
+                && first_stop_name == last_stop_name;
+
         variations.push(Variation {
             route_id,
             shape_id,
@@ -796,19 +815,22 @@ fn trip_variations_to_types(
             route_long_name_r: route.route_long_name_r.as_deref(),
             route_color: route.route_color.as_deref(),
             stop_count: times.len(),
-            first_stop_name: first.and_then(|time| name_of(&time.stop_id)),
+            first_stop_name,
             first_stop_name_r: first.and_then(|time| roman_of(&time.stop_id)),
-            last_stop_name: last.and_then(|time| name_of(&time.stop_id)),
+            last_stop_name,
             last_stop_name_r: last.and_then(|time| roman_of(&time.stop_id)),
-            is_loop: first_parent.is_some() && first_parent == last_parent,
+            is_loop,
             stop_set_key,
         });
     }
 
     // 停留所数の多い shape が接尾辞なしの名前を取れるよう、この順で並べる。
     variations.sort_by(|a, b| {
+        // 既存の種別・系統 ID を優先して割り当てる。
         a.route_id
-            .cmp(b.route_id)
+            .starts_with("nagoya_city_bus:")
+            .cmp(&b.route_id.starts_with("nagoya_city_bus:"))
+            .then(a.route_id.cmp(b.route_id))
             .then(b.stop_count.cmp(&a.stop_count))
             .then(a.shape_id.cmp(b.shape_id))
     });
@@ -1100,6 +1122,10 @@ fn build_type_name(
     }
 
     match (variation.is_loop, first_stop, headsign) {
+        // 市バスの行先には公式の経由地が含まれる。
+        (true, _, Some(head)) if variation.route_id.starts_with("nagoya_city_bus:") => {
+            format!("{head} (循環)")
+        }
         (true, _, Some(head)) => loop_name(head),
         (true, Some(first), None) => loop_name(first),
         (false, Some(first), Some(head)) if first != head => format!("{first} → {head}"),
@@ -1126,6 +1152,10 @@ fn build_type_name_roman(
         let first_r = variation.first_stop_name_r.filter(|s| !s.is_empty());
         match (japanese, variation.last_stop_name, last_r) {
             (Some(head), Some(last), Some(roman)) if head == last => Some(roman),
+            // 市バスの行先には経由地の注記が付くため、終点の公式英語名を使う。
+            (_, _, Some(roman)) if variation.route_id.starts_with("nagoya_city_bus:") => {
+                Some(roman)
+            }
             _ => {
                 if variation.is_loop && japanese.is_some() {
                     // 循環は始発 == 終点なので、始発のローマ字で代用できる。

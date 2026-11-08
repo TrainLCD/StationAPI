@@ -1,0 +1,3 @@
+service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date
+平日,1,1,1,1,1,0,0,20260328,20270430
+平日深夜,0,0,0,0,0,0,0,20260328,20270430

@@ -151,6 +151,8 @@ pub fn company_cd_for_gtfs_route(route_id: &str) -> Option<i32> {
         Some(254) // 京王バス
     } else if route_id.starts_with("nagoya_srt:") {
         Some(256) // 名古屋市 (SRT)
+    } else if route_id.starts_with("nagoya_city_bus:") {
+        Some(257) // 名古屋市バス
     } else if route_id.starts_with("tokyu_") {
         Some(255) // 東急バス
     } else {

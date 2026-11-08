@@ -14,8 +14,7 @@ pub struct Route {
     pub route_id: String,
     pub route_short_name: Option<String>,
     pub route_long_name: Option<String>,
-    /// GTFS フィードには英語名の列が無く、東急 ODPT からも入らないため常に `None`。
-    /// 種別名のローマ字化で参照されるので、列としては残してある。
+    /// GTFS の translations.txt に収録された英語表示名。
     pub route_long_name_r: Option<String>,
     pub route_type: i32,
     pub route_color: Option<String>,
