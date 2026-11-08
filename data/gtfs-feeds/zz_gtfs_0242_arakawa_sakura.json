@@ -1,0 +1,13 @@
+{
+  "name": "荒川区コミュニティバスさくら",
+  "url": "https://api.gtfs-data.jp/v2/organizations/arakawacity/feeds/sakura/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=arakawacity*sakura",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "荒川区",
+    "kana": "アラカワク",
+    "english": "Arakawa City",
+    "url": "https://www.city.arakawa.tokyo.jp/a040/koutsuu-bus/komyuniteibasu/sakura.html"
+  },
+  "company_cd": 277
+}
