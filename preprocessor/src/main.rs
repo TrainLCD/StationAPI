@@ -70,7 +70,7 @@ fn main() -> Result<()> {
     if bus_feature_disabled() {
         info!("DISABLE_BUS_FEATURE が立っているのでバスを取り込まない");
     } else {
-        let gtfs = gtfs::load()?;
+        let gtfs = gtfs::load(&mut dataset.companies)?;
         gtfs::integrate::integrate(&mut dataset, &gtfs)?;
     }
 

@@ -409,12 +409,13 @@ fn load_trips(
         {
             continue;
         }
-        let pattern = if [
-            CHIYODA_KAZAGURUMA.id,
-            super::feed::ODAKYU_BUS.id,
-            super::feed::NISHI_TOKYO_BUS.id,
-        ]
-        .contains(&feed.id)
+        let pattern = if super::registered::is_registered(feed.id)
+            || [
+                CHIYODA_KAZAGURUMA.id,
+                super::feed::ODAKYU_BUS.id,
+                super::feed::NISHI_TOKYO_BUS.id,
+            ]
+            .contains(&feed.id)
         {
             // 線形IDの有無にかかわらず、区間便などを実際の停車順で区別する。
             None

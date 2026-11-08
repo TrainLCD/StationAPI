@@ -10,16 +10,16 @@ use zip::ZipArchive;
 use crate::{info, warn};
 
 #[derive(Clone, Copy)]
-pub struct GtfsFeed {
+pub struct GtfsFeed<'a> {
     /// ID の前置に使う。フィードをまたいだ ID の衝突を防ぐ。
-    pub id: &'static str,
-    pub name: &'static str,
-    pub path: &'static str,
-    pub url: &'static str,
+    pub id: &'a str,
+    pub name: &'a str,
+    pub path: &'a str,
+    pub url: &'a str,
     pub requires_consumer_key: bool,
 }
 
-pub const NAGOYA_CITY_BUS: GtfsFeed = GtfsFeed {
+pub const NAGOYA_CITY_BUS: GtfsFeed<'static> = GtfsFeed {
     id: "nagoya_city_bus",
     name: "名古屋市バス",
     path: "data/NagoyaCityBus-GTFS",
@@ -27,7 +27,7 @@ pub const NAGOYA_CITY_BUS: GtfsFeed = GtfsFeed {
     requires_consumer_key: false,
 };
 
-pub const HOKKAIDO_CHUO_BUS: GtfsFeed = GtfsFeed {
+pub const HOKKAIDO_CHUO_BUS: GtfsFeed<'static> = GtfsFeed {
     id: "hokkaido_chuo",
     name: "北海道中央バス",
     path: "data/HokkaidoChuoBus-GTFS",
@@ -35,7 +35,7 @@ pub const HOKKAIDO_CHUO_BUS: GtfsFeed = GtfsFeed {
     requires_consumer_key: false,
 };
 
-pub const HOKKAIDO_EXPRESS_BUS: GtfsFeed = GtfsFeed {
+pub const HOKKAIDO_EXPRESS_BUS: GtfsFeed<'static> = GtfsFeed {
     id: "hokkaido_express",
     name: "北海道高速バス",
     path: "data/HokkaidoExpressBus-GTFS",
@@ -43,7 +43,7 @@ pub const HOKKAIDO_EXPRESS_BUS: GtfsFeed = GtfsFeed {
     requires_consumer_key: false,
 };
 
-pub const JOTETSU_BUS: GtfsFeed = GtfsFeed {
+pub const JOTETSU_BUS: GtfsFeed<'static> = GtfsFeed {
     id: "jotetsu",
     name: "じょうてつバス",
     path: "data/JotetsuBus-GTFS",
@@ -51,7 +51,7 @@ pub const JOTETSU_BUS: GtfsFeed = GtfsFeed {
     requires_consumer_key: false,
 };
 
-pub const CHIYODA_KAZAGURUMA: GtfsFeed = GtfsFeed {
+pub const CHIYODA_KAZAGURUMA: GtfsFeed<'static> = GtfsFeed {
     id: "ward_chiyoda",
     name: "千代田区地域福祉交通「風ぐるま」",
     path: "data/ChiyodaKazaguruma-GTFS",
@@ -59,7 +59,7 @@ pub const CHIYODA_KAZAGURUMA: GtfsFeed = GtfsFeed {
     requires_consumer_key: false,
 };
 
-pub const BUNKYO_BGURU: GtfsFeed = GtfsFeed {
+pub const BUNKYO_BGURU: GtfsFeed<'static> = GtfsFeed {
     id: "ward_tokyo_bunkyo",
     name: "文京区「Bーぐる」",
     path: "data/BunkyoBguru-GTFS",
@@ -67,7 +67,7 @@ pub const BUNKYO_BGURU: GtfsFeed = GtfsFeed {
     requires_consumer_key: false,
 };
 
-pub const ODAKYU_BUS: GtfsFeed = GtfsFeed {
+pub const ODAKYU_BUS: GtfsFeed<'static> = GtfsFeed {
     id: "west_odakyu",
     name: "小田急バス",
     path: "data/OdakyuBus-GTFS",
@@ -75,7 +75,7 @@ pub const ODAKYU_BUS: GtfsFeed = GtfsFeed {
     requires_consumer_key: true,
 };
 
-pub const NISHI_TOKYO_BUS: GtfsFeed = GtfsFeed {
+pub const NISHI_TOKYO_BUS: GtfsFeed<'static> = GtfsFeed {
     id: "west_tokyo_nishi",
     name: "西東京バス",
     path: "data/NishiTokyoBus-GTFS",
@@ -99,19 +99,20 @@ pub(super) fn hokkaido_express_company_cd(agency_id: &str) -> Option<i32> {
 }
 
 pub(super) fn uses_stop_order_patterns(feed_id: &str) -> bool {
-    [
-        HOKKAIDO_CHUO_BUS.id,
-        HOKKAIDO_EXPRESS_BUS.id,
-        JOTETSU_BUS.id,
-        CHIYODA_KAZAGURUMA.id,
-        BUNKYO_BGURU.id,
-        ODAKYU_BUS.id,
-        NISHI_TOKYO_BUS.id,
-    ]
-    .contains(&feed_id)
+    super::registered::is_registered(feed_id)
+        || [
+            HOKKAIDO_CHUO_BUS.id,
+            HOKKAIDO_EXPRESS_BUS.id,
+            JOTETSU_BUS.id,
+            CHIYODA_KAZAGURUMA.id,
+            BUNKYO_BGURU.id,
+            ODAKYU_BUS.id,
+            NISHI_TOKYO_BUS.id,
+        ]
+        .contains(&feed_id)
 }
 
-pub const GTFS_FEEDS: &[GtfsFeed] = &[
+pub const GTFS_FEEDS: &[GtfsFeed<'static>] = &[
     GtfsFeed {
         id: "toei",
         name: "都営バス",

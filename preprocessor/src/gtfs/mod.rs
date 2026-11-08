@@ -5,6 +5,7 @@ pub mod integrate;
 pub mod model;
 pub mod odpt;
 pub mod parse;
+mod registered;
 
 use anyhow::{bail, Result};
 
@@ -26,7 +27,7 @@ fn load_gtfs_feed(data: &mut GtfsData, feed: &GtfsFeed) {
 ///
 /// 1 つのフィードが落ちても他は取り込む。事業者側の一時的な不調や URL 変更で
 /// バスが丸ごと消えるのは影響が大きすぎるため、警告にとどめて先へ進む。
-pub fn load() -> Result<GtfsData> {
+pub fn load(companies: &mut crate::table::Table) -> Result<GtfsData> {
     let mut data = GtfsData::default();
 
     for feed in feed::GTFS_FEEDS {
@@ -48,6 +49,7 @@ pub fn load() -> Result<GtfsData> {
     load_gtfs_feed(&mut data, &feed::NISHI_TOKYO_BUS);
 
     load_gtfs_feed(&mut data, &feed::BUNKYO_BGURU);
+    registered::load(&mut data, companies)?;
     data.drop_dangling_parents();
 
     // 1 つも取り込めていない場合は失敗させる。ここで成功にすると、バスが
