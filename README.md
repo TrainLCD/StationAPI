@@ -43,6 +43,8 @@ This project includes a comprehensive dataset of Japanese railway information in
   (Jorudan, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), processed for TrainLCD.
 - Jotetsu Bus routes and stops use the [GTFS feed published on HODA](https://ckan.hoda.jp/dataset/gtfs-data/resource/fef98fef-6fe2-472f-bde3-9d4f0a509a4a)
   (Jorudan, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), processed for TrainLCD.
+- Chiyoda Kazaguruma routes and stops use the [GTFS feed from Hitachi Automobile Transportation](https://ckan.odpt.org/dataset/hitachi_automobile_transportation_chiyoda_alllines)
+  ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), processed for TrainLCD.
 - Nagoya City SRT bus routes and stops use the Nagoya City Housing and City Planning
   Bureau GTFS (2026-09-11), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/),
   [source](https://ckan.odpt.org/dataset/nagoya_housing_city_planning_bureau_nagoya_srt_all_lines/resource/a7588aea-27fd-4962-b39a-912209f19a1b), processed for TrainLCD.

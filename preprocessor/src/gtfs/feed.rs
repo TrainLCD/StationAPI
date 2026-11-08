@@ -51,6 +51,14 @@ pub const JOTETSU_BUS: GtfsFeed = GtfsFeed {
     requires_consumer_key: false,
 };
 
+pub const CHIYODA_KAZAGURUMA: GtfsFeed = GtfsFeed {
+    id: "ward_chiyoda",
+    name: "千代田区地域福祉交通「風ぐるま」",
+    path: "data/ChiyodaKazaguruma-GTFS",
+    url: "https://api-public.odpt.org/api/v4/files/odpt/HitachiAutomobileTransportation/Chiyoda_ALLLINES.zip?date=current",
+    requires_consumer_key: false,
+};
+
 pub(super) fn hokkaido_express_company_cd(agency_id: &str) -> Option<i32> {
     match agency_id {
         "4430001050451" => Some(258), // 北海道中央バス
@@ -71,6 +79,7 @@ pub(super) fn uses_stop_order_patterns(feed_id: &str) -> bool {
         HOKKAIDO_CHUO_BUS.id,
         HOKKAIDO_EXPRESS_BUS.id,
         JOTETSU_BUS.id,
+        CHIYODA_KAZAGURUMA.id,
     ]
     .contains(&feed_id)
 }
