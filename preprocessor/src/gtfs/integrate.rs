@@ -902,6 +902,7 @@ fn trip_variations_to_types(
         Some("ward_tokyo_bunkyo") => 9,
         Some("west_odakyu") => 6,
         Some("west_tokyo_nishi") => 7,
+        Some("ward_minato") => 8,
         _ => 0,
     };
     variations.sort_by(|a, b| {

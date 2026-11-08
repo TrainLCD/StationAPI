@@ -413,6 +413,7 @@ fn load_trips(
             CHIYODA_KAZAGURUMA.id,
             super::feed::ODAKYU_BUS.id,
             super::feed::NISHI_TOKYO_BUS.id,
+            super::feed::MINATO_CHIIBUS.id,
         ]
         .contains(&feed.id)
         {

@@ -54,6 +54,8 @@ This project includes a comprehensive dataset of Japanese railway information in
   ([Public Transportation Open Data Basic License](https://developer.odpt.org/terms/data_basic_license.html)), processed for TrainLCD.
 - Nishi Tokyo Bus routes and stops use the [GTFS feed from Nishi Tokyo Bus Co., Ltd.](https://ckan.odpt.org/dataset/nishi_tokyo_bus_nt_bus)
   ([Public Transportation Open Data Basic License](https://developer.odpt.org/terms/data_basic_license.html)), processed for TrainLCD.
+- Minato Chiibus routes and stops use the [GTFS feed from Fuji Express](https://bus.fujikyu.co.jp/rosen/gtfs/)
+  ([CC BY](https://search.ckan.jp/datasets/catalog.data.metro.tokyo.lg.jp__dataset:t131032d0000000243)), processed for TrainLCD.
 - Some of the reference travel times in `travel_times/cases.csv` are derived from
   the Toei Subway GTFS (Bureau of Transportation, Tokyo Metropolitan Government,
   CC BY 4.0) and from the Tokyo Metro, Metropolitan Intercity Railway (Tsukuba

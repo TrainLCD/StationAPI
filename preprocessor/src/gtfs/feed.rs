@@ -83,6 +83,14 @@ pub const NISHI_TOKYO_BUS: GtfsFeed = GtfsFeed {
     requires_consumer_key: true,
 };
 
+pub const MINATO_CHIIBUS: GtfsFeed = GtfsFeed {
+    id: "ward_minato",
+    name: "港区「ちぃばす」",
+    path: "data/MinatoChiibus-GTFS",
+    url: "https://gtfs-jp.buskita.com/fxc/gtfs.zip",
+    requires_consumer_key: false,
+};
+
 pub(super) fn hokkaido_express_company_cd(agency_id: &str) -> Option<i32> {
     match agency_id {
         "4430001050451" => Some(258), // 北海道中央バス
@@ -107,6 +115,7 @@ pub(super) fn uses_stop_order_patterns(feed_id: &str) -> bool {
         BUNKYO_BGURU.id,
         ODAKYU_BUS.id,
         NISHI_TOKYO_BUS.id,
+        MINATO_CHIIBUS.id,
     ]
     .contains(&feed_id)
 }
