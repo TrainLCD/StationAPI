@@ -354,6 +354,7 @@ pub fn load(data: &mut GtfsData, odpt: &OdptData) {
             stop_name_ko: None,
             stop_lat: stop.lat,
             stop_lon: stop.lon,
+            platform_code: None,
             parent_station: None,
         });
         stop_count += 1;

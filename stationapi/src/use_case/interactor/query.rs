@@ -1519,6 +1519,7 @@ where
         Ok(result)
     }
 
+    /// 駅と接続路線に表示用の属性を補い、自路線では元の停車位置を保持する。
     async fn update_station_vec_with_attributes(
         &self,
         stations: Vec<Station>,
@@ -1715,6 +1716,12 @@ where
         // SST 行を優先して O(1) で種別を取得する。
         let train_type_map = StationTrainTypes::new(&train_types);
 
+        // 同一系統・グループに複数のポールがあっても、自路線は駅IDで特定する。
+        let station_lookup_by_id: std::collections::HashMap<i32, &Station> = stations_by_group_ids
+            .iter()
+            .map(|s| (s.station_cd, s))
+            .collect();
+
         // Build lookup map for stations_by_group_ids: (line_cd, station_g_cd) -> Station
         let station_lookup: std::collections::HashMap<(i32, i32), &Station> = stations_by_group_ids
             .iter()
@@ -1832,14 +1839,19 @@ where
             for line in station_lines.iter_mut() {
                 line.company = company_map.get(&line.company_cd).cloned();
                 line.line_symbols = self.get_line_symbols(line);
-                // SST 行を持つ自路線の駅は親駅と揃える。行を持たない駅と他路線は従来の索引で引く。
-                let station_ref = if line.line_cd == station.line_cd && station.sst_id.is_some() {
+                // SST 行のある自路線は停車順上の出現を保持し、なければ駅IDで引く。
+                let same_line_station = if line.line_cd != station.line_cd {
+                    None
+                } else if station.sst_id.is_some() {
                     station.line.as_ref().and_then(|line| line.station.as_ref())
                 } else {
+                    station_lookup_by_id.get(&station.station_cd).copied()
+                };
+                let station_ref = same_line_station.or_else(|| {
                     station_lookup
                         .get(&(line.line_cd, station.station_g_cd))
                         .copied()
-                };
+                });
                 if let Some(station_ref) = station_ref {
                     let mut station_copy = station_ref.clone();
                     let station_numbers: Vec<StationNumber> =
@@ -1958,6 +1970,7 @@ where
             station_number3: row.station_number3.clone(),
             station_number4: row.station_number4.clone(),
             three_letter_code: row.three_letter_code.clone(),
+            platform_code: row.platform_code.clone(),
             line_cd: row.line_cd,
             line: Some(Box::new(extracted_line.clone())),
             lines: vec![],
@@ -2281,6 +2294,7 @@ mod tests {
             station_number3: None,
             station_number4: None,
             three_letter_code: None,
+            platform_code: None,
             line_cd,
             line: None,
             lines: vec![],
@@ -4672,6 +4686,40 @@ mod tests {
                         assert_eq!(nested.line_group_cd, station.line_group_cd);
                     }
                 }
+            }
+        }
+
+        /// 同一系統・グループでも、自路線のネスト駅は元のポールを参照する。
+        #[tokio::test]
+        async fn own_line_nested_station_keeps_each_bus_platform() {
+            let mut first = create_test_station(101, 1001, 100, None);
+            first.transport_type = TransportType::Bus;
+            first.platform_code = Some("1".into());
+            let mut second = first.clone();
+            second.station_cd = 102;
+            second.platform_code = Some("2".into());
+            let stations = vec![first, second];
+            let mut line = create_test_line_for_station_group(100, 1001);
+            line.transport_type = TransportType::Bus;
+            let interactor = QueryInteractor {
+                station_repository: ConfigurableMockStationRepository::new(
+                    stations.clone(),
+                    vec![],
+                ),
+                line_repository: ConfigurableMockLineRepository::new(vec![line]),
+                train_type_repository: ConfigurableMockTrainTypeRepository::new(vec![]),
+                company_repository: ConfigurableMockCompanyRepository::new(vec![]),
+            };
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Bus, false)
+                .await
+                .unwrap();
+
+            assert_eq!(result.len(), 2);
+            for (station, code) in result.iter().zip(["1", "2"]) {
+                let nested = station.lines[0].station.as_ref().unwrap();
+                assert_eq!(nested.station_cd, station.station_cd);
+                assert_eq!(nested.platform_code.as_deref(), Some(code));
             }
         }
 

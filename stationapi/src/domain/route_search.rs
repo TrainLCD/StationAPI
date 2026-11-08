@@ -1294,6 +1294,7 @@ mod tests {
             station_number3: None,
             station_number4: None,
             three_letter_code: None,
+            platform_code: None,
             line_cd: line_group,
             line: None,
             lines: vec![],

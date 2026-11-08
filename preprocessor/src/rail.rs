@@ -69,6 +69,7 @@ pub const STATION_COLUMNS: &[&str] = &[
     "station_number3",
     "station_number4",
     "three_letter_code",
+    "platform_code",
     "line_cd",
     "pref_cd",
     "post",

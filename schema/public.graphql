@@ -132,6 +132,7 @@ type Station {
 	nameChinese: String
 	nameKorean: String
 	threeLetterCode: String
+	platformCode: String
 	prefectureId: Int
 	postalCode: String
 	address: String
@@ -163,6 +164,7 @@ type StationNested {
 	nameChinese: String
 	nameKorean: String
 	threeLetterCode: String
+	platformCode: String
 	prefectureId: Int
 	postalCode: String
 	address: String
