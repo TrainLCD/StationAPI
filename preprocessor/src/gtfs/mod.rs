@@ -125,7 +125,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn complete_feed_rejects_dangling_stop_time_references() {
+    fn complete_feed_rejects_invalid_stop_times() {
         let dir =
             std::env::temp_dir().join(format!("stationapi_pp_strict_gtfs_{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
@@ -152,7 +152,20 @@ mod tests {
         let rejects_unknown_trip = read_complete_feed(&feed).is_none();
         fs::write(&stop_times, format!("{valid}t,unknown,2\n")).unwrap();
         let rejects_unknown_stop = read_complete_feed(&feed).is_none();
+        fs::write(&stop_times, format!("{valid}t,s,1\n")).unwrap();
+        let rejects_duplicate_sequence = read_complete_feed(&feed).is_none();
+        fs::write(&stop_times, "trip_id,stop_id,stop_sequence\nt,s,invalid\n").unwrap();
+        let rejects_invalid_sequence = read_complete_feed(&feed).is_none();
+        fs::write(&stop_times, "trip_id,stop_id,stop_sequence\nt,s,-1\n").unwrap();
+        let rejects_negative_sequence = read_complete_feed(&feed).is_none();
         fs::remove_dir_all(dir).unwrap();
-        assert!(accepts_valid && rejects_unknown_trip && rejects_unknown_stop);
+        assert!(
+            accepts_valid
+                && rejects_unknown_trip
+                && rejects_unknown_stop
+                && rejects_duplicate_sequence
+                && rejects_invalid_sequence
+                && rejects_negative_sequence
+        );
     }
 }

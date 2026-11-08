@@ -61,6 +61,13 @@ pub struct StopTime {
     pub shape_dist_traveled: Option<f64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PushStopTimeResult {
+    Inserted,
+    InvalidReference,
+    Duplicate,
+}
+
 /// 取り込んだ GTFS 一式。行の並びは取り込み順を保つ。
 #[derive(Default)]
 pub struct GtfsData {
@@ -119,18 +126,20 @@ impl GtfsData {
         }
     }
 
-    /// 参照先の trip / stop が無い行は取り込まず、false を返す。
-    pub fn push_stop_time(&mut self, stop_time: StopTime) -> bool {
+    /// 参照先の trip / stop が無い行と、便内で停車順が重複する行は取り込まない。
+    pub fn push_stop_time(&mut self, stop_time: StopTime) -> PushStopTimeResult {
         if !self.trip_ids.contains(&stop_time.trip_id)
             || !self.stop_ids.contains(&stop_time.stop_id)
         {
-            return false;
+            return PushStopTimeResult::InvalidReference;
         }
         let key = (stop_time.trip_id.clone(), stop_time.stop_sequence);
         if self.stop_time_keys.insert(key) {
             self.stop_times.push(stop_time);
+            PushStopTimeResult::Inserted
+        } else {
+            PushStopTimeResult::Duplicate
         }
-        true
     }
 
     pub fn has_stop(&self, stop_id: &str) -> bool {

@@ -13,7 +13,9 @@ use super::feed::{
     hokkaido_express_company_cd, scoped_id, uses_stop_order_patterns, GtfsFeed, CHIYODA_KAZAGURUMA,
     HOKKAIDO_EXPRESS_BUS, NAGOYA_CITY_BUS,
 };
-use super::model::{index_stop_times_by_trip, GtfsData, Route, Stop, StopTime, Trip};
+use super::model::{
+    index_stop_times_by_trip, GtfsData, PushStopTimeResult, Route, Stop, StopTime, Trip,
+};
 use crate::warn;
 
 /// `translations.txt` の 1 エントリ。
@@ -477,15 +479,24 @@ fn load_stop_times(
         };
         let trip_id = record.get(0).unwrap_or("");
         let stop_id = record.get(3).unwrap_or("");
-        let valid_references = data.push_stop_time(StopTime {
+        let stop_sequence = record.get(4).and_then(|value| value.parse::<i32>().ok());
+        ensure!(
+            !strict_stop_references || stop_sequence.is_some_and(|sequence| sequence >= 0),
+            "stop_times.txt の stop_sequence が不正"
+        );
+        let result = data.push_stop_time(StopTime {
             trip_id: scoped_id(feed, trip_id),
             stop_id: scoped_id(feed, stop_id),
-            stop_sequence: record.get(4).unwrap_or("0").parse().unwrap_or(0),
+            stop_sequence: stop_sequence.unwrap_or(0),
             shape_dist_traveled: cell(&record, 8).and_then(|v| v.parse().ok()),
         });
         ensure!(
-            !strict_stop_references || valid_references,
+            !strict_stop_references || result != PushStopTimeResult::InvalidReference,
             "stop_times.txt の trip_id {trip_id:?} または stop_id {stop_id:?} が未登録"
+        );
+        ensure!(
+            !strict_stop_references || result != PushStopTimeResult::Duplicate,
+            "stop_times.txt の trip_id {trip_id:?} で stop_sequence が重複"
         );
     }
     Ok(())
