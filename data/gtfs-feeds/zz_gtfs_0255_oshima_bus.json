@@ -1,0 +1,13 @@
+{
+  "name": "大島バス",
+  "url": "https://api.odpt.org/api/v4/files/odpt/OshimaBus/AllLines.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/oshima_bus_all_lines",
+  "license": "Public Transportation Open Data Basic License",
+  "company": {
+    "name": "大島バス",
+    "kana": "オオシマバス",
+    "english": "Oshima Bus",
+    "url": "https://www.oshima-bus.com/"
+  },
+  "company_cd": 290
+}
