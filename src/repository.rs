@@ -464,6 +464,36 @@ impl StationRepository for MemStationRepository {
         Ok(out)
     }
 
+    async fn get_rail_stations_near_bus_stops(
+        &self,
+        coords: &[(i32, f64, f64)],
+        radius_meters: f64,
+    ) -> Result<HashMap<i32, Vec<Station>>, DomainError> {
+        let radius_km = radius_meters / 1000.0;
+        let mut stations_by_stop = HashMap::new();
+        for &(stop_cd, lat, lon) in coords {
+            let mut seen_lines = HashSet::new();
+            let stations: Vec<_> =
+                index::within_radius(lat, lon, radius_km, TransportType::Rail as i32)
+                    .into_iter()
+                    .filter_map(|(record, _)| {
+                        let line = active_line(record.line_cd)?;
+                        if !seen_lines.insert(line.line_cd) {
+                            return None;
+                        }
+                        let mut station = record.to_entity(Some(line));
+                        station.line_group_cd = index::first_line_group_cd(record.station_cd);
+                        station.has_train_types = station.line_group_cd.is_some();
+                        Some(station)
+                    })
+                    .collect();
+            if !stations.is_empty() {
+                stations_by_stop.insert(stop_cd, stations);
+            }
+        }
+        Ok(stations_by_stop)
+    }
+
     /// 1. その路線 (station_id 指定時はその駅) に紐づく系統を priority 降順で 1 件選ぶ。
     ///    候補の無い新幹線は、停車する種別のうち types.id が最も若いものの系統を選ぶ
     /// 2. その系統の停車駅を sst.id 順で返す
@@ -1289,6 +1319,33 @@ mod tests {
     const SHIBUYA: u32 = 1130205;
     const MITAKA: u32 = 1131105;
     const NAKA_MEGURO: u32 = 2600103;
+
+    #[test]
+    fn nearby_rail_transfers_keep_the_closest_station_per_line_within_the_radius() {
+        let tokyo = index::station_by_cd(TOKYO as i32).unwrap();
+        let coords = [(1, tokyo.lat, tokyo.lon), (2, 0.0, 0.0)];
+        let candidates =
+            block_on(MemStationRepository.get_rail_stations_near_bus_stops(&coords, 300.0))
+                .unwrap();
+        let stations = &candidates[&1];
+        assert_eq!(stations[0].station_cd, TOKYO as i32);
+        assert!(!candidates.contains_key(&2));
+        assert!(stations.iter().all(|station| {
+            station.transport_type == TransportType::Rail
+                && index::haversine_km(tokyo.lat, tokyo.lon, station.lat, station.lon) <= 0.3
+        }));
+
+        // 半径を広げて同じ路線の別駅も入る場合でも、東京駅を優先する。
+        let candidates =
+            block_on(MemStationRepository.get_rail_stations_near_bus_stops(&coords[..1], 3000.0))
+                .unwrap();
+        let on_tokyo_line: Vec<_> = candidates[&1]
+            .iter()
+            .filter(|station| station.line_cd == tokyo.line_cd)
+            .map(|station| station.station_cd)
+            .collect();
+        assert_eq!(on_tokyo_line, vec![TOKYO as i32]);
+    }
 
     /// C−758の名古屋駅を、出発時ののりばの順に返す。
     #[test]
