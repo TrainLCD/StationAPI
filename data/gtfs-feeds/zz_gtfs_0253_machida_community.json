@@ -1,0 +1,13 @@
+{
+  "name": "町田市民バス・コミュニティバス",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/MachidaCity/AllLines.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/machida_city_all_lines",
+  "license": "CC0 1.0",
+  "company": {
+    "name": "町田市",
+    "kana": "マチダシ",
+    "english": "Machida City",
+    "url": "https://www.city.machida.tokyo.jp/"
+  },
+  "company_cd": 288
+}
