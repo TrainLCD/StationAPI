@@ -897,6 +897,7 @@ fn trip_variations_to_types(
         Some("hokkaido_chuo") => 2,
         Some("hokkaido_express") => 3,
         Some("jotetsu") => 4,
+        Some("ward_chiyoda") => 5,
         _ => 0,
     };
     variations.sort_by(|a, b| {
