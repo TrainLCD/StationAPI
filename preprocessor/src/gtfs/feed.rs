@@ -67,6 +67,14 @@ pub const ODAKYU_BUS: GtfsFeed = GtfsFeed {
     requires_consumer_key: true,
 };
 
+pub const NISHI_TOKYO_BUS: GtfsFeed = GtfsFeed {
+    id: "west_tokyo_nishi",
+    name: "西東京バス",
+    path: "data/NishiTokyoBus-GTFS",
+    url: "https://api.odpt.org/api/v4/files/odpt/NishiTokyoBus/NTBus.zip?date=current",
+    requires_consumer_key: true,
+};
+
 pub(super) fn hokkaido_express_company_cd(agency_id: &str) -> Option<i32> {
     match agency_id {
         "4430001050451" => Some(258), // 北海道中央バス
@@ -89,6 +97,7 @@ pub(super) fn uses_stop_order_patterns(feed_id: &str) -> bool {
         JOTETSU_BUS.id,
         CHIYODA_KAZAGURUMA.id,
         ODAKYU_BUS.id,
+        NISHI_TOKYO_BUS.id,
     ]
     .contains(&feed_id)
 }
