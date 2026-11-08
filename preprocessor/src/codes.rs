@@ -163,6 +163,8 @@ pub fn company_cd_for_gtfs_route(route_id: &str) -> Option<i32> {
         Some(269) // 小田急バス
     } else if route_id.starts_with("west_tokyo_nishi:") {
         Some(270) // 西東京バス
+    } else if route_id.starts_with("ward_minato:") {
+        Some(271) // フジエクスプレス
     } else if route_id.starts_with("tokyu_") {
         Some(255) // 東急バス
     } else {
