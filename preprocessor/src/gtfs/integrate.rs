@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use stationapi::domain::arrival_estimation::haversine_distance;
 use stationapi::domain::romaji::strip_macrons;
+use stationapi::model::TrainDirection;
 
 use super::model::{GtfsData, Stop};
 use anyhow::Result;
@@ -948,8 +949,17 @@ fn trip_variations_to_types(
         let line_group_cd = codes.line_group_cd(variation.route_id, variation.shape_id)?;
 
         let is_bidirectional = directions[index].len() > 1;
-        let direction = if is_bidirectional {
-            0 // 上下がまとまったので Both
+        let feed_id = variation.route_id.split_once(':').map_or("", |(id, _)| id);
+        let uses_stop_order = super::feed::uses_stop_order_patterns(feed_id);
+        let direction = if is_bidirectional || (uses_stop_order && variation.is_loop) {
+            TrainDirection::Both as i32
+        } else if uses_stop_order {
+            // GTFS の direction_id=0 は片方向。API の Both とは区別する。
+            if variation.direction_id == Some(1) {
+                TrainDirection::Inbound as i32
+            } else {
+                TrainDirection::Outbound as i32
+            }
         } else {
             variation.direction_id.unwrap_or(0)
         };

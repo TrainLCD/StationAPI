@@ -883,12 +883,12 @@ where
 
         // Track seen line_group_cds to avoid duplicates
         let mut seen_line_group_cds = HashSet::new();
-        // Track seen (kind, stop signature) pairs to drop locally redundant train types.
+        // Track kind, stops, and the destination of directed bus patterns.
         // Two train types are redundant only when they share both the same `kind` and the
         // same stops across the segment. A local and a limited express that happen to stop
         // at the same stations have different kinds and are still distinct services, so
         // both are kept.
-        let mut seen_segment_signatures: HashSet<(Option<i32>, Vec<i32>)> = HashSet::new();
+        let mut seen_segment_signatures = HashSet::new();
 
         for mut train_type in train_types {
             let Some(lgc) = train_type.line_group_cd else {
@@ -899,11 +899,30 @@ where
             }
             // Skip train types whose stops within the requested segment are identical to a
             // train type of the same kind we've already emitted.
-            if let Some(group_stops) = stops_by_line_group.get(&lgc) {
-                if let Some(signature) = segment_stop_signature(group_stops, from_g_cd, to_g_cd) {
-                    if !seen_segment_signatures.insert((train_type.kind, signature)) {
-                        continue;
-                    }
+            let group_stops = stops_by_line_group.get(&lgc).map(Vec::as_slice);
+            let directed_bus = train_type.kind == Some(model::TrainTypeKind::BusRoute as i32)
+                && matches!(
+                    train_type
+                        .direction
+                        .and_then(|value| model::TrainDirection::try_from(value).ok()),
+                    Some(model::TrainDirection::Inbound | model::TrainDirection::Outbound)
+                );
+            let (destination, signature) = if directed_bus {
+                let Some(signature) = group_stops
+                    .and_then(|stops| forward_bus_segment_signature(stops, from_g_cd, to_g_cd))
+                else {
+                    continue;
+                };
+                (Some(train_type.type_name.clone()), Some(signature))
+            } else {
+                (
+                    None,
+                    group_stops.and_then(|stops| segment_stop_signature(stops, from_g_cd, to_g_cd)),
+                )
+            };
+            if let Some(signature) = signature {
+                if !seen_segment_signatures.insert((train_type.kind, destination, signature)) {
+                    continue;
                 }
             }
 
@@ -2330,6 +2349,38 @@ fn segment_stop_signature(
     Some(signature)
 }
 
+/// A directed bus pattern serves the segment only when boarding precedes alighting.
+fn forward_bus_segment_signature(
+    stops: &[&Station],
+    from_g_cd: i32,
+    to_g_cd: i32,
+) -> Option<Vec<i32>> {
+    let from = stops
+        .iter()
+        .position(|s| s.station_g_cd == from_g_cd && s.pass != Some(1))?;
+    let to = stops[from + 1..]
+        .iter()
+        .position(|s| s.station_g_cd == to_g_cd && s.pass != Some(1))
+        .map(|index| from + 1 + index);
+    let segment = match to {
+        Some(to) => stops[from..=to].to_vec(),
+        None if is_circular_route(stops) => {
+            let to = stops[..from]
+                .iter()
+                .position(|s| s.station_g_cd == to_g_cd && s.pass != Some(1))?;
+            select_circular_arc(stops, from, to, true)
+        }
+        None => return None,
+    };
+    Some(
+        segment
+            .iter()
+            .filter(|s| s.pass != Some(1))
+            .map(|s| s.station_g_cd)
+            .collect(),
+    )
+}
+
 /// Calculate the distance between two points on Earth using the Haversine formula.
 /// Returns the distance in meters. Delegates to the shared domain implementation to
 /// avoid duplicating the formula.
@@ -2510,6 +2561,24 @@ mod tests {
         let mut station = create_test_station(station_g_cd, station_g_cd, 1, Some(line_group_cd));
         station.pass = pass;
         station
+    }
+
+    #[test]
+    fn directed_bus_patterns_match_only_their_boarding_order() {
+        let ishiyama = create_stop(1, 100, Some(0));
+        let rokku_minami = create_stop(2, 100, Some(0));
+        let to_makomanai = [&ishiyama, &rokku_minami];
+        let to_ishiyama = [&rokku_minami, &ishiyama];
+        assert_eq!(
+            forward_bus_segment_signature(&to_makomanai, 1, 2),
+            Some(vec![1, 2])
+        );
+        assert_eq!(forward_bus_segment_signature(&to_ishiyama, 1, 2), None);
+        assert_eq!(
+            forward_bus_segment_signature(&to_ishiyama, 2, 1),
+            Some(vec![2, 1])
+        );
+        assert_eq!(segment_stop_signature(&to_ishiyama, 1, 2), Some(vec![1, 2]));
     }
 
     #[test]
