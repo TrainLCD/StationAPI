@@ -8,6 +8,8 @@
 `license` は利用条件です。 `company_cd` は事業者コードです。
 既存事業者のときは `company` を省略します。新規事業者には
 `company` で `name`、`kana`、`english`、`url` を指定します。
+正式名称が `name` と異なる場合は `name_full` に指定します。
+省略すると `name` が正式名称にも使われます。
 同じ事業者の複数のフィードは同じ定義を使えます。
 
 `https://api.odpt.org/` のフィードには既存の `ODPT_ACCESS_TOKEN` を使います。
