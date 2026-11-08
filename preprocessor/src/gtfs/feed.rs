@@ -59,6 +59,14 @@ pub const CHIYODA_KAZAGURUMA: GtfsFeed = GtfsFeed {
     requires_consumer_key: false,
 };
 
+pub const BUNKYO_BGURU: GtfsFeed = GtfsFeed {
+    id: "ward_tokyo_bunkyo",
+    name: "文京区「Bーぐる」",
+    path: "data/BunkyoBguru-GTFS",
+    url: "https://api-public.odpt.org/api/v4/files/odpt/HitachiAutomobileTransportation/AllLines.zip?date=current",
+    requires_consumer_key: false,
+};
+
 pub const ODAKYU_BUS: GtfsFeed = GtfsFeed {
     id: "west_odakyu",
     name: "小田急バス",
@@ -104,6 +112,7 @@ pub(super) fn uses_stop_order_patterns(feed_id: &str) -> bool {
         HOKKAIDO_EXPRESS_BUS.id,
         JOTETSU_BUS.id,
         CHIYODA_KAZAGURUMA.id,
+        BUNKYO_BGURU.id,
         ODAKYU_BUS.id,
         NISHI_TOKYO_BUS.id,
         MINATO_CHIIBUS.id,

@@ -45,6 +45,8 @@ This project includes a comprehensive dataset of Japanese railway information in
   (Jorudan, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), processed for TrainLCD.
 - Chiyoda Kazaguruma routes and stops use the [GTFS feed from Hitachi Automobile Transportation](https://ckan.odpt.org/dataset/hitachi_automobile_transportation_chiyoda_alllines)
   ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), processed for TrainLCD.
+- Bunkyo B-guru routes and stops use the [GTFS feed from Hitachi Automobile Transportation](https://ckan.odpt.org/dataset/hitachi_automobile_transportation_all_lines)
+  ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), processed for TrainLCD.
 - Nagoya City SRT bus routes and stops use the Nagoya City Housing and City Planning
   Bureau GTFS (2026-09-11), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/),
   [source](https://ckan.odpt.org/dataset/nagoya_housing_city_planning_bureau_nagoya_srt_all_lines/resource/a7588aea-27fd-4962-b39a-912209f19a1b), processed for TrainLCD.
