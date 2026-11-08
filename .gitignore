@@ -19,6 +19,7 @@ data/HokkaidoExpressBus-GTFS/
 data/JotetsuBus-GTFS/
 data/ChiyodaKazaguruma-GTFS/
 data/OdakyuBus-GTFS/
+data/NishiTokyoBus-GTFS/
 data/N02-25/
 scripts/.osm_cache/
 scripts/.gtfs_cache/
