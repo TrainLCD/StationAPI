@@ -1,0 +1,13 @@
+{
+  "name": "東大和市「ちょこバス」",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/HigashiyamatoCity/AllLines_CC0.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/higashiyamato_city_all_lines_cc0",
+  "license": "CC0 1.0",
+  "company": {
+    "name": "東大和市",
+    "kana": "ヒガシヤマトシ",
+    "english": "Higashiyamato City",
+    "url": "https://www.city.higashiyamato.lg.jp/kurashi/dorokotsu/1002085/1002091.html"
+  },
+  "company_cd": 283
+}
