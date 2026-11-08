@@ -4,10 +4,10 @@
   "source": "https://gtfs-data.jp/search?target_feed=arakawacity*sakura",
   "license": "CC BY 4.0",
   "company": {
-    "name": "荒川区",
-    "kana": "アラカワク",
-    "english": "Arakawa City",
-    "url": "https://www.city.arakawa.tokyo.jp/a040/koutsuu-bus/komyuniteibasu/sakura.html"
+    "name": "京成バス東京",
+    "kana": "ケイセイバストウキョウ",
+    "english": "Keisei Bus Tokyo",
+    "url": "https://www.keiseibus.co.jp/bus_company/tokyo/"
   },
   "company_cd": 277
 }
