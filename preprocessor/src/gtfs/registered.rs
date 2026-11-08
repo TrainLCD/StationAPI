@@ -26,6 +26,7 @@ struct Registration {
 #[serde(deny_unknown_fields)]
 struct Company {
     name: String,
+    name_full: Option<String>,
     kana: String,
     english: String,
     url: String,
@@ -107,7 +108,7 @@ fn register_company(table: &mut Table, registration: &Registration) -> Result<()
         int(99),
         text(&company.name),
         text(&company.kana),
-        text(&company.name),
+        text(company.name_full.as_deref().unwrap_or(&company.name)),
         text(&company.name),
         text(&company.english),
         text(&company.english),
@@ -122,4 +123,39 @@ fn register_company(table: &mut Table, registration: &Registration) -> Result<()
         table.push(row);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn company_full_name_is_optional_and_keeps_the_short_name() {
+        let mut table = Table::new(crate::rail::COMPANY_COLUMNS, Some("company_cd"));
+        let mut registration: Registration = serde_json::from_value(serde_json::json!({
+            "name": "テストフィード",
+            "url": "https://example.com/feed.zip",
+            "source": "https://example.com/",
+            "license": "CC0",
+            "company_cd": 1,
+            "company": {
+                "name": "テストバス",
+                "kana": "テストバス",
+                "english": "Test Bus",
+                "url": "https://example.com/"
+            }
+        }))
+        .unwrap();
+        register_company(&mut table, &registration).unwrap();
+
+        registration.company_cd = 2;
+        registration.company.as_mut().unwrap().name_full = Some("テストバス株式会社".into());
+        register_company(&mut table, &registration).unwrap();
+
+        let full = table.col("company_name_h");
+        let short = table.col("company_name_r");
+        assert_eq!(table.rows()[0][full].as_deref(), Some("テストバス"));
+        assert_eq!(table.rows()[1][full].as_deref(), Some("テストバス株式会社"));
+        assert_eq!(table.rows()[1][short].as_deref(), Some("テストバス"));
+    }
 }
