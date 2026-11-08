@@ -164,11 +164,12 @@ make data     # cargo run --profile tool -p stationapi-preprocessor
 2. 各駅停車の系統を生成する (`generate_virtual_local_rail_services`)
 3. 国土数値情報の鉄道データ (N02) を取得し、隣り合う駅のあいだの線路の長さを
    求める (`track::generate_connections`。[駅間の線路の長さ](#駅間の線路の長さ))
-4. GTFS フィード 7 本を取得・展開して読み込む (都営バス・西武バス・京王バスと、
+4. GTFS フィードを取得・展開して読み込む (都営バス・西武バス・京王バスと、
    東急バスが運行する大田区・品川区・目黒区のコミュニティバス、名古屋市SRT)
 5. 東急バスの ODPT JSON を読み込む (7 日間キャッシュする)
-6. バスのデータを lines / stations / types / station_station_types に統合する
-7. `generated/*.csv` に書き出す (8 テーブル)
+6. 名古屋市バスの GTFS を取得・展開して読み込む
+7. バスのデータを lines / stations / types / station_station_types に統合する
+8. `generated/*.csv` に書き出す (8 テーブル)
 
 取得や読み込みに失敗したフィードは、警告を出して飛ばします。ただし、GTFS の
 路線を 1 つも取り込めなかった場合は、バスが丸ごと欠けたデータを出さないよう
@@ -842,3 +843,11 @@ GTFSの任意列の省略や列順の違いに対応するため、列名で読�
 停留所の翻訳と路線の英語名は `translations.txt` を使います。
 SRTの便区分（通常便など）は行先に使わず、循環便は路線名、その他は終点を使います。
 運行日と出発時刻は既存のバス取込と同様に判定しません。
+
+### 名古屋市バス
+
+名古屋市交通局の[市バスGTFS-JP（2026年3月28日改正）](https://data.bodik.jp/dataset/231002_7109030000_bus-gtfs-jp/resource/125a1d12-7df6-489c-abde-911856e05d1b)を取り込みます。
+`nagoya_city_bus:` の接頭辞を使い、事業者コード257（名古屋市バス）に割り当てます。
+`shape_id` が空なので `jp_pattern_id` で運行パターンを区別します。
+運行曜日も追加運行日も無い便は取り込みから外します。
+同じ系統・停留所のポールは、座標を保持したまま `stationTrainTypes` の候補をまとめます。検索時の運行日や出発時刻は判定しません。

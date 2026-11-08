@@ -1,0 +1,5 @@
+route_id,service_id,trip_id,trip_headsign,trip_short_name,direction_id,block_id,shape_id,wheelchair_accessible,bikes_allowed,jp_trip_desc,jp_trip_desc_symbol,jp_office_id,jp_pattern_id
+6101,平日,6101001_平日_0930,名古屋駅（大須本町通経由）,,1,,,0,,,,,6101001
+6201,平日深夜,6201001_平日深夜_2530,藤が丘（今池経由）,,1,,,0,,,,,6201001
+6303,平日,6303031_平日_0622,高蔵寺（小幡緑地経由）,,1,,,0,,,,,6303031
+6303,平日,6303032_平日_0600,大曽根（小幡緑地経由）,,0,,,0,,,,,6303032

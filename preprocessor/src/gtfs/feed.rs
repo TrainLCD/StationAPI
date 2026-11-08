@@ -19,6 +19,14 @@ pub struct GtfsFeed {
     pub requires_consumer_key: bool,
 }
 
+pub const NAGOYA_CITY_BUS: GtfsFeed = GtfsFeed {
+    id: "nagoya_city_bus",
+    name: "名古屋市バス",
+    path: "data/NagoyaCityBus-GTFS",
+    url: "https://data.bodik.jp/dataset/c5794008-8053-42ab-99b9-ee7f6fdf9a9e/resource/125a1d12-7df6-489c-abde-911856e05d1b/download/20260328_bus-gtfs-jp.zip",
+    requires_consumer_key: false,
+};
+
 pub const GTFS_FEEDS: &[GtfsFeed] = &[
     GtfsFeed {
         id: "toei",
@@ -120,7 +128,7 @@ pub fn download(feed: &GtfsFeed) -> Result<()> {
 }
 
 fn download_and_extract(feed: &GtfsFeed, path: &Path) -> Result<()> {
-    info!("{} を ODPT から取得する", feed.name);
+    info!("{} の GTFS を取得する", feed.name);
 
     // `without_url()` で URL を落とす。付けたままだと acl:consumerKey が
     // エラーメッセージ経由でログへ出る。
