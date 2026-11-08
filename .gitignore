@@ -22,6 +22,7 @@ data/BunkyoBguru-GTFS/
 data/OdakyuBus-GTFS/
 data/NishiTokyoBus-GTFS/
 data/MinatoChiibus-GTFS/
+data/gtfs-cache/
 data/N02-25/
 scripts/.osm_cache/
 scripts/.gtfs_cache/

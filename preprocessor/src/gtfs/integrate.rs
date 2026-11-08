@@ -102,12 +102,13 @@ fn routes_to_lines(dataset: &mut Dataset, gtfs: &GtfsData, codes: &mut BusCodes)
             "line_name",
             text(line_name.clone()),
         );
-        set(
-            &dataset.lines,
-            &mut row,
-            "line_name_k",
-            text(line_name.clone()),
-        );
+        let feed_id = route.route_id.split_once(':').map_or("", |(id, _)| id);
+        let search_name = if super::registered::is_registered(feed_id) {
+            stationapi::domain::normalize::normalize_for_search(&line_name)
+        } else {
+            line_name.clone()
+        };
+        set(&dataset.lines, &mut row, "line_name_k", text(search_name));
         set(&dataset.lines, &mut row, "line_name_h", text(line_name));
         set(
             &dataset.lines,
@@ -867,6 +868,10 @@ fn trip_variations_to_types(
         let last_stop_name = last.and_then(|time| name_of(&time.stop_id));
         // 市バスの循環便は同じ停留所でも、始発と終点のポール ID が異なる。
         let is_loop = first_parent.is_some() && first_parent == last_parent
+            || super::registered::is_registered(feed_id)
+                && first
+                    .zip(last)
+                    .is_some_and(|(first, last)| first.stop_id == last.stop_id)
             || route_id.starts_with("nagoya_city_bus:")
                 && first_stop_name.is_some()
                 && first_stop_name == last_stop_name;
@@ -900,6 +905,7 @@ fn trip_variations_to_types(
         Some("jotetsu") => 4,
         Some("ward_chiyoda") => 5,
         Some("ward_tokyo_bunkyo") => 9,
+        Some(id) if super::registered::is_registered(id) => 10,
         Some("west_odakyu") => 6,
         Some("west_tokyo_nishi") => 7,
         Some("ward_minato") => 8,
