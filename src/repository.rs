@@ -1371,6 +1371,39 @@ mod tests {
     }
 
     #[test]
+    fn jotetsu_route_types_keep_the_headsign_for_the_requested_direction() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+
+        let Some(line) = index::lines().iter().find(|line| {
+            line.company_cd == 267 && line.line_name == "１２真駒内駅～３条５～石山六区"
+        }) else {
+            // 生成済み GTFS が無い場合は正本 CSV だけでテストする。
+            return;
+        };
+        let group = |name: &str| {
+            index::stations_by_line(line.line_cd)
+                .find(|station| station.name == name)
+                .unwrap()
+                .station_g_cd as u32
+        };
+        let ishiyama = group("石山六区");
+        let rokku_minami = group("六区南");
+        let interactor = crate::interactor();
+        for (from, to, expected) in [
+            (ishiyama, rokku_minami, "石山六区 → 真駒内駅"),
+            (rokku_minami, ishiyama, "真駒内駅 → 石山六区"),
+        ] {
+            let names: Vec<_> =
+                block_on(interactor.get_train_types(from, to, Some(line.line_cd as u32)))
+                    .unwrap()
+                    .into_iter()
+                    .map(|kind| kind.type_name)
+                    .collect();
+            assert_eq!(names, [expected]);
+        }
+    }
+
+    #[test]
     fn nagoya_city_bus_offers_both_directions_from_the_same_stop() {
         use stationapi::use_case::traits::query::QueryUseCase;
 
