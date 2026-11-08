@@ -61,8 +61,11 @@ fn routes_to_lines(dataset: &mut Dataset, gtfs: &GtfsData, codes: &mut BusCodes)
         .collect();
     let mut added = 0usize;
     for route in &gtfs.routes {
-        // 接頭辞から事業者を引けない系統は取り込まない。
-        let Some(company_cd) = company_cd_for_gtfs_route(&route.route_id) else {
+        // 路線単位の事業者指定を優先し、それがなければ接頭辞で引く。
+        let Some(company_cd) = route
+            .company_cd
+            .or_else(|| company_cd_for_gtfs_route(&route.route_id))
+        else {
             continue;
         };
         if route.route_id.starts_with("nagoya_city_bus:")
@@ -670,7 +673,9 @@ fn stops_to_stations(
                 platform_code.map(str::to_string),
             );
             set(t, &mut row, "line_cd", int(line_cd));
-            let pref_cd = if stop.stop_id.starts_with("hokkaido_chuo:") {
+            let pref_cd = if stop.stop_id.starts_with("hokkaido_chuo:")
+                || stop.stop_id.starts_with("hokkaido_express:")
+            {
                 1
             } else if stop.stop_id.starts_with("nagoya_srt:")
                 || stop.stop_id.starts_with("nagoya_city_bus:")
@@ -846,7 +851,8 @@ fn trip_variations_to_types(
         let mut parents: Vec<&str> = times.iter().filter_map(parent_of_time).collect();
         parents.sort();
         parents.dedup();
-        let stop_set_key = if parents.is_empty() || route_id.starts_with("hokkaido_chuo:") {
+        let feed_id = route_id.split_once(':').map_or("", |(id, _)| id);
+        let stop_set_key = if parents.is_empty() || super::feed::uses_stop_order_patterns(feed_id) {
             None
         } else {
             Some(parents.join("|"))
@@ -884,16 +890,16 @@ fn trip_variations_to_types(
     }
 
     // 停留所数の多い shape が接尾辞なしの名前を取れるよう、この順で並べる。
+    // フィードを追加した順に採番し、ハッシュ衝突時にも既存 ID を維持する。
+    let feed_order = |route_id: &str| match route_id.split_once(':').map(|(id, _)| id) {
+        Some("nagoya_city_bus") => 1,
+        Some("hokkaido_chuo") => 2,
+        Some("hokkaido_express") => 3,
+        _ => 0,
+    };
     variations.sort_by(|a, b| {
-        // 既存の種別・系統 ID を優先して割り当てる。
-        a.route_id
-            .starts_with("hokkaido_chuo:")
-            .cmp(&b.route_id.starts_with("hokkaido_chuo:"))
-            .then(
-                a.route_id
-                    .starts_with("nagoya_city_bus:")
-                    .cmp(&b.route_id.starts_with("nagoya_city_bus:")),
-            )
+        feed_order(a.route_id)
+            .cmp(&feed_order(b.route_id))
             .then(a.route_id.cmp(b.route_id))
             .then(b.stop_count.cmp(&a.stop_count))
             .then(a.shape_id.cmp(b.shape_id))

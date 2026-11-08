@@ -322,6 +322,7 @@ pub fn load(data: &mut GtfsData, odpt: &OdptData) {
         let before = data.routes.len();
         data.push_route(Route {
             route_id,
+            company_cd: None,
             route_short_name: Some(name.clone()),
             route_long_name: Some(name),
             route_long_name_r: None,
