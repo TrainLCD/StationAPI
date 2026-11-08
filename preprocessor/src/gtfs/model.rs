@@ -153,15 +153,19 @@ impl GtfsData {
 
     /// trip_id -> stop_sequence 昇順の stop_times。
     pub fn stop_times_by_trip(&self) -> HashMap<&str, Vec<&StopTime>> {
-        let mut map: HashMap<&str, Vec<&StopTime>> = HashMap::new();
-        for stop_time in &self.stop_times {
-            map.entry(stop_time.trip_id.as_str())
-                .or_default()
-                .push(stop_time);
-        }
-        for times in map.values_mut() {
-            times.sort_by_key(|time| time.stop_sequence);
-        }
-        map
+        index_stop_times_by_trip(&self.stop_times)
     }
+}
+
+pub(super) fn index_stop_times_by_trip(stop_times: &[StopTime]) -> HashMap<&str, Vec<&StopTime>> {
+    let mut map: HashMap<&str, Vec<&StopTime>> = HashMap::new();
+    for stop_time in stop_times {
+        map.entry(stop_time.trip_id.as_str())
+            .or_default()
+            .push(stop_time);
+    }
+    for times in map.values_mut() {
+        times.sort_by_key(|time| time.stop_sequence);
+    }
+    map
 }

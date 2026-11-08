@@ -167,7 +167,7 @@ make data     # cargo run --profile tool -p stationapi-preprocessor
 4. GTFS フィードを取得・展開して読み込む (都営バス・西武バス・京王バスと、
    東急バスが運行する大田区・品川区・目黒区のコミュニティバス、名古屋市SRT)
 5. 東急バスの ODPT JSON を読み込む (7 日間キャッシュする)
-6. 名古屋市バスの GTFS を取得・展開して読み込む
+6. 名古屋市バスと北海道中央バスの GTFS をこの順に取得・展開して読み込む
 7. バスのデータを lines / stations / types / station_station_types に統合する
 8. `generated/*.csv` に書き出す (8 テーブル)
 
@@ -860,3 +860,10 @@ SRTの便区分（通常便など）は行先に使わず、循環便は路線�
 GTFS の `platform_code` は停留所名と別に保持し、GraphQL の `Station.platformCode` と `StationNested.platformCode` で返します。
 親停留所にコードがない場合は、同じ系統で使う子停留所のコードがすべて一致するときに引き継ぎます。
 検索時の運行日や出発時刻は判定しません。
+
+### 北海道中央バス
+
+[HODAの北海道中央バスGTFS](https://ckan.hoda.jp/dataset/gtfs-data/resource/dbadfccc-670e-49b9-be77-c3f346ee3160)を取り込みます。
+`hokkaido_chuo:` の接頭辞を使い、事業者コード258、都道府県コード1に割り当てます。
+`shape_id` が空の便は `stop_sequence` 順の停留所ID列から運行パターンを作ります。
+同じ停留所を異なる順番で回る便を区別するため、このフィードでは停留所の集合によるパターンの統合を行いません。

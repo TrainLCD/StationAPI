@@ -37,6 +37,8 @@ This project includes a comprehensive dataset of Japanese railway information in
 - Nagoya City Bus routes and stops use the Transportation Bureau, City of Nagoya
   [GTFS-JP dataset (2026-03-28)](https://data.bodik.jp/dataset/231002_7109030000_bus-gtfs-jp/resource/125a1d12-7df6-489c-abde-911856e05d1b),
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), processed for TrainLCD.
+- Hokkaido Chuo Bus routes and stops use the [GTFS feed published on HODA](https://ckan.hoda.jp/dataset/gtfs-data/resource/dbadfccc-670e-49b9-be77-c3f346ee3160)
+  (Jorudan, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), processed for TrainLCD.
 - Nagoya City SRT bus routes and stops use the Nagoya City Housing and City Planning
   Bureau GTFS (2026-09-11), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/),
   [source](https://ckan.odpt.org/dataset/nagoya_housing_city_planning_bureau_nagoya_srt_all_lines/resource/a7588aea-27fd-4962-b39a-912209f19a1b), processed for TrainLCD.
