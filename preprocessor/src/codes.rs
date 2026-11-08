@@ -155,6 +155,14 @@ pub fn company_cd_for_gtfs_route(route_id: &str) -> Option<i32> {
         Some(257) // 名古屋市バス
     } else if route_id.starts_with("hokkaido_chuo:") {
         Some(258) // 北海道中央バス
+    } else if route_id.starts_with("jotetsu:") {
+        Some(267) // じょうてつバス
+    } else if route_id.starts_with("ward_chiyoda:") {
+        Some(268) // 日立自動車交通
+    } else if route_id.starts_with("west_odakyu:") {
+        Some(269) // 小田急バス
+    } else if route_id.starts_with("west_tokyo_nishi:") {
+        Some(270) // 西東京バス
     } else if route_id.starts_with("tokyu_") {
         Some(255) // 東急バス
     } else {

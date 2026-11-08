@@ -43,6 +43,38 @@ pub const HOKKAIDO_EXPRESS_BUS: GtfsFeed = GtfsFeed {
     requires_consumer_key: false,
 };
 
+pub const JOTETSU_BUS: GtfsFeed = GtfsFeed {
+    id: "jotetsu",
+    name: "じょうてつバス",
+    path: "data/JotetsuBus-GTFS",
+    url: "https://ckan.hoda.jp/dataset/24d1dd70-5395-4d6b-b41f-0d83e8eabdb9/resource/fef98fef-6fe2-472f-bde3-9d4f0a509a4a/download/joutetsu.zip",
+    requires_consumer_key: false,
+};
+
+pub const CHIYODA_KAZAGURUMA: GtfsFeed = GtfsFeed {
+    id: "ward_chiyoda",
+    name: "千代田区地域福祉交通「風ぐるま」",
+    path: "data/ChiyodaKazaguruma-GTFS",
+    url: "https://api-public.odpt.org/api/v4/files/odpt/HitachiAutomobileTransportation/Chiyoda_ALLLINES.zip?date=current",
+    requires_consumer_key: false,
+};
+
+pub const ODAKYU_BUS: GtfsFeed = GtfsFeed {
+    id: "west_odakyu",
+    name: "小田急バス",
+    path: "data/OdakyuBus-GTFS",
+    url: "https://api.odpt.org/api/v4/files/odpt/OdakyuBus/AIILines.zip?date=current",
+    requires_consumer_key: true,
+};
+
+pub const NISHI_TOKYO_BUS: GtfsFeed = GtfsFeed {
+    id: "west_tokyo_nishi",
+    name: "西東京バス",
+    path: "data/NishiTokyoBus-GTFS",
+    url: "https://api.odpt.org/api/v4/files/odpt/NishiTokyoBus/NTBus.zip?date=current",
+    requires_consumer_key: true,
+};
+
 pub(super) fn hokkaido_express_company_cd(agency_id: &str) -> Option<i32> {
     match agency_id {
         "4430001050451" => Some(258), // 北海道中央バス
@@ -59,7 +91,15 @@ pub(super) fn hokkaido_express_company_cd(agency_id: &str) -> Option<i32> {
 }
 
 pub(super) fn uses_stop_order_patterns(feed_id: &str) -> bool {
-    feed_id == HOKKAIDO_CHUO_BUS.id || feed_id == HOKKAIDO_EXPRESS_BUS.id
+    [
+        HOKKAIDO_CHUO_BUS.id,
+        HOKKAIDO_EXPRESS_BUS.id,
+        JOTETSU_BUS.id,
+        CHIYODA_KAZAGURUMA.id,
+        ODAKYU_BUS.id,
+        NISHI_TOKYO_BUS.id,
+    ]
+    .contains(&feed_id)
 }
 
 pub const GTFS_FEEDS: &[GtfsFeed] = &[

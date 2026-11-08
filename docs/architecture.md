@@ -167,7 +167,7 @@ make data     # cargo run --profile tool -p stationapi-preprocessor
 4. GTFS フィードを取得・展開して読み込む (都営バス・西武バス・京王バスと、
    東急バスが運行する大田区・品川区・目黒区のコミュニティバス、名古屋市SRT)
 5. 東急バスの ODPT JSON を読み込む (7 日間キャッシュする)
-6. 名古屋市バス、北海道中央バス、北海道高速バスの GTFS をこの順に取得・展開して読み込む
+6. 名古屋市バス、北海道中央バス、北海道高速バス、じょうてつバス、千代田区「風ぐるま」の GTFS をこの順に取得・展開して読み込む
 7. バスのデータを lines / stations / types / station_station_types に統合する
 8. `generated/*.csv` に書き出す (8 テーブル)
 
@@ -260,7 +260,7 @@ N02 は `data/N02-25/` にキャッシュします (git 管理外。CI では `a
 
 | 変数 | 効果 |
 |---|---|
-| `ODPT_ACCESS_TOKEN` | 認証が必要な ODPT フィード（西武バス・京王バス・東急バス系）の取得に使います。未設定でも、未展開の認証不要フィードは取得します。認証付き GTFS は展開済みデータ（`data/*-GTFS/`）を使い、東急バスの ODPT JSON は期限切れも含めてキャッシュの読み込みを試みます。取得に失敗したフィードは警告してスキップします。GTFS の読み込みに失敗した場合は警告を出し、失敗前に読み込んだデータが出力に残ることがあります。 |
+| `ODPT_ACCESS_TOKEN` | 認証が必要な ODPT フィード（西武バス・京王バス・東急バス系・小田急バス・西東京バス）の取得に使います。未設定でも、未展開の認証不要フィードは取得します。認証付き GTFS は展開済みデータ（`data/*-GTFS/`）を使い、東急バスの ODPT JSON は期限切れも含めてキャッシュの読み込みを試みます。取得に失敗したフィードは警告してスキップします。GTFS の読み込みに失敗した場合は警告を出し、失敗前に読み込んだデータが出力に残ることがあります。 |
 | `DISABLE_BUS_FEATURE` | `true` (または `1`) にするとバスを取り込まない (鉄道のみ) |
 
 `ODPT_ACCESS_TOKEN` に空文字列を設定すると、期限切れの ODPT JSON キャッシュは
@@ -875,3 +875,23 @@ GTFS の `platform_code` は停留所名と別に保持し、GraphQL の `Statio
 同じ路線に複数の事業者が共同運行で関わる場合も、配布データの路線と事業者の組をそのまま使います。
 未登録の `agency_id` がある場合はこのフィードの読み込みを失敗させ、デプロイ時に欠損を検出します。
 停留所の都道府県コードは1とし、一般路線と同様に停車順から運行パターンを作ります。
+
+### じょうてつバス
+
+[HODAのじょうてつバスGTFS](https://ckan.hoda.jp/dataset/gtfs-data/resource/fef98fef-6fe2-472f-bde3-9d4f0a509a4a)を `jotetsu:` 名前空間に取り込みます。
+事業者コード267、都道府県コード1を使い、停車順から運行パターンを作ります。
+
+### 千代田区「風ぐるま」
+
+[日立自動車交通の公開GTFS](https://ckan.odpt.org/dataset/hitachi_automobile_transportation_chiyoda_alllines)を `ward_chiyoda:` 名前空間に取り込み、事業者コード268を使います。
+同じ `shape_id` に停車順の異なる便が含まれるため、運行パターンは便ごとの停車順から作ります。
+
+### 小田急バス
+
+[小田急バスのODPT GTFS](https://ckan.odpt.org/dataset/odakyu_bus_aii_lines)を `west_odakyu:` 名前空間に取り込み、事業者コード269を使います。
+取得には既存の `ODPT_ACCESS_TOKEN` を使い、運行パターンは便ごとの停車順から作ります。
+
+### 西東京バス
+
+[西東京バスのODPT GTFS](https://ckan.odpt.org/dataset/nishi_tokyo_bus_nt_bus)を `west_tokyo_nishi:` 名前空間に取り込み、事業者コード270を使います。
+取得には既存の `ODPT_ACCESS_TOKEN` を使い、運行パターンは便ごとの停車順から作ります。

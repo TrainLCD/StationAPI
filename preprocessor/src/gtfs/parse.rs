@@ -10,7 +10,7 @@ use serde::Deserialize;
 use stationapi::domain::romaji::{romaji_display_name, to_fullwidth_katakana};
 
 use super::feed::{
-    hokkaido_express_company_cd, scoped_id, uses_stop_order_patterns, GtfsFeed,
+    hokkaido_express_company_cd, scoped_id, uses_stop_order_patterns, GtfsFeed, CHIYODA_KAZAGURUMA,
     HOKKAIDO_EXPRESS_BUS, NAGOYA_CITY_BUS,
 };
 use super::model::{index_stop_times_by_trip, GtfsData, Route, Stop, StopTime, Trip};
@@ -409,14 +409,25 @@ fn load_trips(
         {
             continue;
         }
-        // 名古屋市バスでは shape_id が空で、jp_pattern_id が停車順を区別する。
-        let pattern = cell(&record, 7).or_else(|| {
-            if feed.id == NAGOYA_CITY_BUS.id {
-                cell(&record, 8)
-            } else {
-                None
-            }
-        });
+        let pattern = if [
+            CHIYODA_KAZAGURUMA.id,
+            super::feed::ODAKYU_BUS.id,
+            super::feed::NISHI_TOKYO_BUS.id,
+        ]
+        .contains(&feed.id)
+        {
+            // 線形IDの有無にかかわらず、区間便などを実際の停車順で区別する。
+            None
+        } else {
+            // 名古屋市バスでは shape_id が空で、jp_pattern_id が停車順を区別する。
+            cell(&record, 7).or_else(|| {
+                if feed.id == NAGOYA_CITY_BUS.id {
+                    cell(&record, 8)
+                } else {
+                    None
+                }
+            })
+        };
         data.push_trip(Trip {
             trip_id: scoped_id(feed, record.get(2).unwrap_or("")),
             route_id: scoped_id(feed, record.get(0).unwrap_or("")),

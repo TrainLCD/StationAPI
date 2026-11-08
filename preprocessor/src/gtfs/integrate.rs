@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use stationapi::domain::arrival_estimation::haversine_distance;
 use stationapi::domain::romaji::strip_macrons;
+use stationapi::model::TrainDirection;
 
 use super::model::{GtfsData, Stop};
 use anyhow::Result;
@@ -675,6 +676,7 @@ fn stops_to_stations(
             set(t, &mut row, "line_cd", int(line_cd));
             let pref_cd = if stop.stop_id.starts_with("hokkaido_chuo:")
                 || stop.stop_id.starts_with("hokkaido_express:")
+                || stop.stop_id.starts_with("jotetsu:")
             {
                 1
             } else if stop.stop_id.starts_with("nagoya_srt:")
@@ -895,6 +897,10 @@ fn trip_variations_to_types(
         Some("nagoya_city_bus") => 1,
         Some("hokkaido_chuo") => 2,
         Some("hokkaido_express") => 3,
+        Some("jotetsu") => 4,
+        Some("ward_chiyoda") => 5,
+        Some("west_odakyu") => 6,
+        Some("west_tokyo_nishi") => 7,
         _ => 0,
     };
     variations.sort_by(|a, b| {
@@ -946,8 +952,17 @@ fn trip_variations_to_types(
         let line_group_cd = codes.line_group_cd(variation.route_id, variation.shape_id)?;
 
         let is_bidirectional = directions[index].len() > 1;
-        let direction = if is_bidirectional {
-            0 // 上下がまとまったので Both
+        let feed_id = variation.route_id.split_once(':').map_or("", |(id, _)| id);
+        let uses_stop_order = super::feed::uses_stop_order_patterns(feed_id);
+        let direction = if is_bidirectional || (uses_stop_order && variation.is_loop) {
+            TrainDirection::Both as i32
+        } else if uses_stop_order {
+            // GTFS の direction_id=0 は片方向。API の Both とは区別する。
+            if variation.direction_id == Some(1) {
+                TrainDirection::Inbound as i32
+            } else {
+                TrainDirection::Outbound as i32
+            }
         } else {
             variation.direction_id.unwrap_or(0)
         };
