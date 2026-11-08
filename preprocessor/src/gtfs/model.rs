@@ -30,6 +30,7 @@ pub struct Stop {
     pub stop_name_ko: Option<String>,
     pub stop_lat: f64,
     pub stop_lon: f64,
+    pub platform_code: Option<String>,
     /// 空文字は取り込み時に `None` へ寄せる。親子関係を持つフィードだけが値を持つ。
     pub parent_station: Option<String>,
 }

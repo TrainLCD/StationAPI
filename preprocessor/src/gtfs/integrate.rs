@@ -612,6 +612,7 @@ fn stops_to_stations(
             set(t, &mut row, "station_name_rn", station_name_rn.clone());
             set(t, &mut row, "station_name_zh", stop.stop_name_zh.clone());
             set(t, &mut row, "station_name_ko", stop.stop_name_ko.clone());
+            set(t, &mut row, "platform_code", stop.platform_code.clone());
             set(t, &mut row, "line_cd", int(line_cd));
             let pref_cd = if stop.stop_id.starts_with("nagoya_srt:")
                 || stop.stop_id.starts_with("nagoya_city_bus:")

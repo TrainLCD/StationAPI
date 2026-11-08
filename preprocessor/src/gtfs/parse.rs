@@ -261,6 +261,7 @@ fn load_stops(
             "stop_url",
             "location_type",
             "parent_station",
+            "platform_code",
         ],
     );
     for record in rdr.records() {
@@ -299,6 +300,7 @@ fn load_stops(
             stop_name_ko: translation.and_then(|t| t.ko.clone()),
             stop_lat: coordinate(&record, 4, original_stop_id, "stop_lat"),
             stop_lon: coordinate(&record, 5, original_stop_id, "stop_lon"),
+            platform_code: cell(&record, 10).map(str::to_string),
             parent_station: cell(&record, 9).map(|s| scoped_id(feed, s)),
         });
     }
@@ -562,6 +564,14 @@ mod tests {
         let prefecture = dataset.stations.col("pref_cd");
         let stop_name = dataset.stations.col("station_name");
         let stop_name_r = dataset.stations.col("station_name_r");
+        let platform_code = dataset.stations.col("platform_code");
+        let nagoya_platforms: HashSet<_> = dataset.stations.rows()[station_count..]
+            .iter()
+            .filter(|row| row[stop_name].as_deref() == Some("名古屋駅"))
+            .filter_map(|row| row[platform_code].as_deref())
+            .collect();
+        assert!(nagoya_platforms.contains("9"));
+        assert!(nagoya_platforms.contains("21"));
         assert!(dataset.stations.rows()[station_count..]
             .iter()
             .all(|row| row[prefecture].as_deref() == Some("23")));

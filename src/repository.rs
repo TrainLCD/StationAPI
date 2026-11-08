@@ -1291,6 +1291,31 @@ mod tests {
     const NAKA_MEGURO: u32 = 2600103;
 
     #[test]
+    fn c758_graphql_keeps_the_platform_codes_in_stop_order() {
+        // 生成済みのバスデータがないビルドでは、この系統は存在しない。
+        let line_group_id = 152_672_049;
+        if index::sst_by_group(line_group_id).next().is_none() {
+            return;
+        }
+        let schema = crate::graphql::build_schema(crate::interactor());
+        let result = block_on(schema.execute(format!(
+            "{{ lineGroupStations(lineGroupId: {line_group_id}) {{ name platformCode }} }}"
+        )));
+        assert!(result.errors.is_empty(), "{:?}", result.errors);
+        let data = result.data.into_json().unwrap();
+        let stops = data["lineGroupStations"].as_array().unwrap();
+        assert_eq!(
+            stops[0],
+            serde_json::json!({ "name": "名古屋駅", "platformCode": "9" })
+        );
+        assert_eq!(
+            stops[1],
+            serde_json::json!({ "name": "名古屋駅", "platformCode": "21" })
+        );
+        assert_eq!(stops[2]["name"], "柳橋西");
+    }
+
+    #[test]
     fn nagoya_city_bus_offers_both_directions_from_the_same_stop() {
         use stationapi::use_case::traits::query::QueryUseCase;
 

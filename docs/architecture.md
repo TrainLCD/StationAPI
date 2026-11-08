@@ -856,4 +856,6 @@ SRTの便区分（通常便など）は行先に使わず、循環便は路線�
 `nagoya_city_bus:` の接頭辞を使い、事業者コード257（名古屋市バス）に割り当てます。
 `shape_id` が空なので `jp_pattern_id` で運行パターンを区別します。
 運行曜日も追加運行日も無い便は取り込みから外します。
-同じ系統・停留所のポールは、座標を保持したまま `stationTrainTypes` の候補をまとめます。検索時の運行日や出発時刻は判定しません。
+同じ系統・停留所のポールは、座標を保持したまま `stationTrainTypes` の候補をまとめます。
+GTFS の `platform_code` は停留所名と別に保持し、GraphQL の `Station.platformCode` と `StationNested.platformCode` で返します。
+検索時の運行日や出発時刻は判定しません。
