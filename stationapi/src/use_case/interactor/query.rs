@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Maximum distance in meters to search for nearby bus stops from a rail station
 const NEARBY_BUS_STOP_RADIUS_METERS: f64 = 300.0;
+const NEARBY_RAIL_STATION_RADIUS_METERS: f64 = 300.0;
 
 /// Check if a station's transport type matches the filter
 fn matches_transport_filter(station_type: TransportType, filter: TransportTypeFilter) -> bool {
@@ -123,6 +124,8 @@ where
         let mut stations = self
             .enriched_stations_by_id_vec(station_ids, transport_type)
             .await?;
+        self.add_nearby_rail_transfers(&mut stations, transport_type)
+            .await?;
         // 並びは指定された ID の順 (repository がそう返し、付帯情報の付与も
         // 並びを変えない)。ディープリンクで経路の駅を ID の順に渡すクライアントは、
         // その順で隣り合う組の線路の長さを乗車距離に使う
@@ -236,6 +239,8 @@ where
                 transport_type,
                 false,
             )
+            .await?;
+        self.add_nearby_rail_transfers(&mut stations, transport_type)
             .await?;
         self.attach_track_distances(&mut stations).await?;
 
@@ -356,6 +361,8 @@ where
                 transport_type,
                 false,
             )
+            .await?;
+        self.add_nearby_rail_transfers(&mut stations, transport_type)
             .await?;
         self.attach_track_distances(&mut stations).await?;
 
@@ -1517,6 +1524,69 @@ where
             .await?;
 
         Ok(result)
+    }
+
+    /// 走行画面に渡すバス停へ、のりばごとの座標から鉄道の乗換候補を付ける。
+    async fn add_nearby_rail_transfers(
+        &self,
+        stations: &mut [Station],
+        transport_type: TransportTypeFilter,
+    ) -> Result<(), UseCaseError> {
+        if transport_type != TransportTypeFilter::RailAndBus {
+            return Ok(());
+        }
+
+        let mut seen_stops = HashSet::new();
+        let coords: Vec<_> = stations
+            .iter()
+            .filter(|stop| {
+                stop.transport_type == TransportType::Bus && seen_stops.insert(stop.station_cd)
+            })
+            .map(|stop| (stop.station_cd, stop.lat, stop.lon))
+            .collect();
+        if coords.is_empty() {
+            return Ok(());
+        }
+
+        let candidates = self
+            .station_repository
+            .get_rail_stations_near_bus_stops(&coords, NEARBY_RAIL_STATION_RADIUS_METERS)
+            .await?;
+        if candidates.is_empty() {
+            return Ok(());
+        }
+        let mut company_ids: Vec<u32> = candidates
+            .values()
+            .flatten()
+            .filter_map(|station| station.company_cd.map(|id| id as u32))
+            .collect();
+        company_ids.sort_unstable();
+        company_ids.dedup();
+        let companies: HashMap<_, _> = self
+            .find_company_by_id_vec(&company_ids)
+            .await?
+            .into_iter()
+            .map(|company| (company.company_cd, company))
+            .collect();
+
+        for stop in stations {
+            let Some(nearby_stations) = candidates.get(&stop.station_cd) else {
+                continue;
+            };
+            let mut seen_lines: HashSet<_> = stop.lines.iter().map(|line| line.line_cd).collect();
+            for station in nearby_stations {
+                if seen_lines.insert(station.line_cd) {
+                    let mut line = self.extract_line_from_station(station);
+                    line.line_symbols = self.get_line_symbols(&line);
+                    line.company = companies.get(&line.company_cd).cloned();
+                    let mut station = station.clone();
+                    station.station_numbers = self.get_station_numbers(&station);
+                    line.station = Some(station);
+                    stop.lines.push(line);
+                }
+            }
+        }
+        Ok(())
     }
 
     /// 駅と接続路線に表示用の属性を補い、自路線では元の停車位置を保持する。
@@ -3982,6 +4052,7 @@ mod tests {
             stations_by_group: Vec<Station>,
             bus_stops: Vec<Station>,
             stations_by_line_group: Vec<Station>,
+            nearby_rail_stations: HashMap<i32, Vec<Station>>,
             /// get_track_distances がどの組にも返す長さ
             track_distance: Option<f64>,
         }
@@ -3992,6 +4063,7 @@ mod tests {
                     stations_by_group,
                     bus_stops,
                     stations_by_line_group: vec![],
+                    nearby_rail_stations: HashMap::new(),
                     track_distance: None,
                 }
             }
@@ -4029,6 +4101,18 @@ mod tests {
                 pairs: &[(u32, u32)],
             ) -> Result<Vec<Option<f64>>, DomainError> {
                 Ok(vec![self.track_distance; pairs.len()])
+            }
+            async fn get_rail_stations_near_bus_stops(
+                &self,
+                coords: &[(i32, f64, f64)],
+                _: f64,
+            ) -> Result<HashMap<i32, Vec<Station>>, DomainError> {
+                Ok(coords
+                    .iter()
+                    .filter_map(|&(id, _, _)| {
+                        Some((id, self.nearby_rail_stations.get(&id)?.clone()))
+                    })
+                    .collect())
             }
             async fn find_by_id(&self, _: u32) -> Result<Option<Station>, DomainError> {
                 Ok(None)
@@ -4143,8 +4227,13 @@ mod tests {
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
-            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
-                Ok(vec![])
+            async fn get_by_line_group_id(&self, id: u32) -> Result<Vec<Station>, DomainError> {
+                Ok(self
+                    .stations_by_line_group
+                    .iter()
+                    .filter(|station| station.line_group_cd == Some(id as i32))
+                    .cloned()
+                    .collect())
             }
             async fn get_by_line_group_id_vec(
                 &self,
@@ -4500,6 +4589,51 @@ mod tests {
                 vec![(3000, 3001), (3000, 3003), (3001, 3002), (3002, 3003)]
             );
             assert!(track.values().all(|d| *d == 1234.0));
+        }
+
+        #[tokio::test]
+        async fn bus_route_includes_rail_transfers_for_the_matching_platform() {
+            let mut stop = create_bus_stop(200, 35.0, 139.0, 20);
+            stop.line_group_cd = Some(20);
+            let mut other_platform = create_bus_stop(201, 35.001, 139.0, 20);
+            other_platform.station_g_cd = stop.station_g_cd;
+            other_platform.line_group_cd = stop.line_group_cd;
+            let mut rail_station = create_test_station(300, 300, 30, None);
+            rail_station.company_cd = Some(1);
+            rail_station.line_symbol1 = Some("JY".to_string());
+            rail_station.station_number1 = Some("01".to_string());
+            let mut interactor = create_configurable_interactor(
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+                vec![create_test_company(1, "JR東日本")],
+            );
+            interactor.station_repository.stations_by_line_group =
+                vec![stop.clone(), other_platform];
+            interactor
+                .station_repository
+                .nearby_rail_stations
+                .insert(stop.station_cd, vec![rail_station]);
+
+            let stations = interactor
+                .get_stations_by_line_group_id(20, TransportTypeFilter::RailAndBus)
+                .await
+                .unwrap();
+            let line = &stations[0].lines[0];
+            assert_eq!(line.line_cd, 30);
+            assert_eq!(line.company.as_ref().unwrap().company_cd, 1);
+            let destination = line.station.as_ref().unwrap();
+            assert_eq!(destination.station_cd, 300);
+            assert_eq!(destination.station_numbers[0].station_number, "JY-01");
+            assert!(stations[1].lines.is_empty());
+
+            let bus_only = interactor
+                .get_stations_by_line_group_id(20, TransportTypeFilter::Bus)
+                .await
+                .unwrap();
+            assert_eq!(bus_only.len(), 2);
+            assert!(bus_only.iter().all(|station| station.lines.is_empty()));
         }
 
         #[tokio::test]

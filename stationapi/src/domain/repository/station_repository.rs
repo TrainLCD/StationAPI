@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 
@@ -103,6 +103,14 @@ pub trait StationRepository: Send + Sync + 'static {
         limit_per_station: u32,
         radius_meters: f64,
     ) -> Result<Vec<(u32, Station)>, DomainError>;
+    /// 各バス停から半径内の鉄道駅を距離順に返す。同じ路線では最寄りの駅だけを返す。
+    async fn get_rail_stations_near_bus_stops(
+        &self,
+        _coords: &[(i32, f64, f64)], // (station_cd, lat, lon)
+        _radius_meters: f64,
+    ) -> Result<HashMap<i32, Vec<Station>>, DomainError> {
+        Ok(HashMap::new())
+    }
     async fn get_route_stops(
         &self,
         from_station_id: u32,
@@ -122,7 +130,6 @@ pub trait StationRepository: Send + Sync + 'static {
 mod tests {
     use super::*;
     use crate::model::StopCondition;
-    use std::collections::HashMap;
 
     // モック実装
     pub struct MockStationRepository {
