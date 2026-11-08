@@ -106,6 +106,7 @@ pub(super) fn hokkaido_express_company_cd(agency_id: &str) -> Option<i32> {
     }
 }
 
+/// 便ごとの停車順を使って運行パターンを区別するフィードを判定する。
 pub(super) fn uses_stop_order_patterns(feed_id: &str) -> bool {
     super::registered::is_registered(feed_id)
         || [

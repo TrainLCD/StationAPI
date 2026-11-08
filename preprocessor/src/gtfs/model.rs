@@ -77,6 +77,22 @@ pub struct GtfsData {
 }
 
 impl GtfsData {
+    /// 検証済みのフィードを取り込み順の末尾に追加する。
+    pub(super) fn append_feed(&mut self, feed: Self) {
+        for route in feed.routes {
+            self.push_route(route);
+        }
+        for stop in feed.stops {
+            self.push_stop(stop);
+        }
+        for trip in feed.trips {
+            self.push_trip(trip);
+        }
+        for time in feed.stop_times {
+            self.push_stop_time(time);
+        }
+    }
+
     pub fn push_route(&mut self, route: Route) {
         if self.route_ids.insert(route.route_id.clone()) {
             self.routes.push(route);

@@ -7,12 +7,15 @@ pub mod odpt;
 pub mod parse;
 mod registered;
 
-use anyhow::{bail, Result};
+use std::collections::HashSet;
+
+use anyhow::{bail, ensure, Result};
 
 use crate::warn;
 use feed::GtfsFeed;
 use model::GtfsData;
 
+/// 従来のフィードを読み込み、取得や解析に失敗した場合は警告する。
 fn load_gtfs_feed(data: &mut GtfsData, feed: &GtfsFeed) {
     if let Err(e) = feed::download(feed) {
         warn!("{} の取得に失敗: {e}。このフィードを飛ばす", feed.name);
@@ -21,6 +24,46 @@ fn load_gtfs_feed(data: &mut GtfsData, feed: &GtfsFeed) {
     if let Err(e) = parse::load_feed(data, feed) {
         warn!("{} の読み込みに失敗: {e}。このフィードを飛ばす", feed.name);
     }
+}
+
+/// フィードを一時データに読み込み、全路線に停車順がある場合にだけ返す。
+fn read_complete_feed(feed: &GtfsFeed) -> Option<GtfsData> {
+    let mut data = GtfsData::default();
+    if let Err(error) = feed::download(feed)
+        .and_then(|()| parse::load_feed(&mut data, feed))
+        .and_then(|()| verify_patterns(&data))
+    {
+        warn!(
+            "{} の読み込みに失敗: {error}。このフィードを飛ばす",
+            feed.name
+        );
+        return None;
+    }
+    Some(data)
+}
+
+/// 路線ごとに、停車時刻に結び付く便があることを確認する。
+fn verify_patterns(data: &GtfsData) -> Result<()> {
+    let trips_with_stops: HashSet<_> = data
+        .stop_times
+        .iter()
+        .map(|time| time.trip_id.as_str())
+        .collect();
+    let served_routes: HashSet<_> = data
+        .trips
+        .iter()
+        .filter(|trip| trips_with_stops.contains(trip.trip_id.as_str()))
+        .map(|trip| trip.route_id.as_str())
+        .collect();
+    ensure!(
+        !data.routes.is_empty()
+            && data
+                .routes
+                .iter()
+                .all(|route| served_routes.contains(route.route_id.as_str())),
+        "有効な停車順がない路線がある"
+    );
+    Ok(())
 }
 
 /// 全フィードを取得して読み込む。
@@ -47,7 +90,9 @@ pub fn load(companies: &mut crate::table::Table) -> Result<GtfsData> {
     load_gtfs_feed(&mut data, &feed::CHIYODA_KAZAGURUMA);
     load_gtfs_feed(&mut data, &feed::ODAKYU_BUS);
     load_gtfs_feed(&mut data, &feed::NISHI_TOKYO_BUS);
-    load_gtfs_feed(&mut data, &feed::MINATO_CHIIBUS);
+    if let Some(chiibus) = read_complete_feed(&feed::MINATO_CHIIBUS) {
+        data.append_feed(chiibus);
+    }
 
     load_gtfs_feed(&mut data, &feed::BUNKYO_BGURU);
     registered::load(&mut data, companies)?;
