@@ -22,6 +22,8 @@ struct Registration {
     excluded_route_ids: Vec<String>,
     company_cd: i32,
     company: Option<Company>,
+    #[serde(default)]
+    allow_routes_without_trips: bool,
 }
 
 #[derive(Deserialize)]
@@ -91,6 +93,9 @@ fn load_registration(data: &mut GtfsData, companies: &mut Table, path: &Path) ->
                 .map(|route_id| feed::scoped_id(&feed, route_id))
                 .collect();
             data.exclude_routes(&excluded);
+        }
+        if registration.allow_routes_without_trips {
+            data.drop_routes_without_trips();
         }
     }) else {
         return Ok(());

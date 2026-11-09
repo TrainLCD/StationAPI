@@ -165,6 +165,19 @@ mod tests {
         fs::write(&stop_times, valid).unwrap();
         fs::write(
             dir.join("routes.txt"),
+            "route_id,route_long_name,route_type\nr,テスト,3\nseasonal,季節路線,3\n",
+        )
+        .unwrap();
+        let rejects_unused_route_by_default = read_complete_feed(&feed, |_| {}).is_none();
+        let skips_unused_route_when_allowed =
+            read_complete_feed(&feed, GtfsData::drop_routes_without_trips)
+                .is_some_and(|data| data.routes.len() == 1);
+        fs::write(dir.join("trips.txt"), "route_id,trip_id\nr,t\nseasonal,u\n").unwrap();
+        let rejects_route_with_trip_but_no_stop_times =
+            read_complete_feed(&feed, GtfsData::drop_routes_without_trips).is_none();
+        fs::write(dir.join("trips.txt"), "route_id,trip_id\nr,t\n").unwrap();
+        fs::write(
+            dir.join("routes.txt"),
             "route_id,route_long_name,route_type\nr,テスト,3\npaused,運休中,3\nwithdrawn,廃止,3\n",
         )
         .unwrap();
@@ -200,6 +213,9 @@ mod tests {
                 && rejects_duplicate_sequence
                 && rejects_invalid_sequence
                 && rejects_negative_sequence
+                && rejects_unused_route_by_default
+                && skips_unused_route_when_allowed
+                && rejects_route_with_trip_but_no_stop_times
                 && accepts_exclusion_before_validation
         );
     }
