@@ -1,0 +1,13 @@
+{
+  "name": "みどり市路線バス",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/MidoriCity/AllLines.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/midori_city_all_lines",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "みどり市",
+    "kana": "ミドリシ",
+    "english": "Midori City",
+    "url": "https://www.city.midori.gunma.jp/"
+  },
+  "company_cd": 303
+}
