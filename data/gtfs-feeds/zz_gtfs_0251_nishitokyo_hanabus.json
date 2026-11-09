@@ -1,0 +1,13 @@
+{
+  "name": "西東京市コミュニティバス「はなバス」",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/NishitokyoCity/AllLines.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/nishitokyo_city_all_lines",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "西東京市",
+    "kana": "ニシトウキョウシ",
+    "english": "Nishitokyo City",
+    "url": "https://www.city.nishitokyo.lg.jp/kurasi/kotu/hanabus/unkouroot"
+  },
+  "company_cd": 286
+}

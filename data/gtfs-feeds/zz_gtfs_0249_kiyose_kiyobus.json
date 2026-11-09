@@ -1,0 +1,13 @@
+{
+  "name": "清瀬市「きよバス」",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/KiyoseCity/KiyoBus.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/kiyose_city_kiyo_bus",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "清瀬市",
+    "kana": "キヨセシ",
+    "english": "Kiyose City",
+    "url": "https://www.city.kiyose.lg.jp/kurashi/sumaidourokoutuu/communitybus/1003943.html"
+  },
+  "company_cd": 284
+}

@@ -1,0 +1,13 @@
+{
+  "name": "台東区コミュニティバス「めぐりん」",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/TokyoTaitoCity/megurinCCBY40.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/tokyo_taito_city_megurin_ccby40",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "台東区",
+    "kana": "タイトウク",
+    "english": "Taito City",
+    "url": "https://www.city.taito.lg.jp/kenchiku/kotsu/megurin/index.html"
+  },
+  "company_cd": 276
+}

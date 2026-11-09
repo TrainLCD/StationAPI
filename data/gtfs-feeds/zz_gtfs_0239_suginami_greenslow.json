@@ -1,0 +1,13 @@
+{
+  "name": "杉並区グリーンスローモビリティ",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/TokyoSuginamiCity/GreenSlowMobility.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/tokyo_suginami_city_green_slow_mobility",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "杉並区",
+    "kana": "スギナミク",
+    "english": "Suginami City",
+    "url": "https://www.city.suginami.tokyo.jp/guide/machi/green_slow/index.html"
+  },
+  "company_cd": 274
+}
