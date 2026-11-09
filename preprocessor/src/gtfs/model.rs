@@ -89,6 +89,11 @@ impl GtfsData {
         if self.route_ids.is_disjoint(excluded) {
             return;
         }
+        let previously_used: HashSet<_> = self
+            .stops_with_parents(self.stop_times.iter().map(|time| time.stop_id.as_str()))
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
         self.routes
             .retain(|route| !excluded.contains(&route.route_id));
         self.route_ids.retain(|id| !excluded.contains(id));
@@ -105,23 +110,33 @@ impl GtfsData {
         self.stop_time_keys
             .retain(|(trip_id, _)| self.trip_ids.contains(trip_id));
 
-        let mut used_stops: HashSet<_> = self
-            .stop_times
-            .iter()
-            .map(|time| time.stop_id.clone())
+        let still_used =
+            self.stops_with_parents(self.stop_times.iter().map(|time| time.stop_id.as_str()));
+        let retained = self.stops.iter().filter_map(|stop| {
+            let id = stop.stop_id.as_str();
+            (still_used.contains(id) || !previously_used.contains(id)).then_some(id)
+        });
+        let retained: HashSet<_> = self
+            .stops_with_parents(retained)
+            .into_iter()
+            .map(str::to_owned)
             .collect();
+        self.stops.retain(|stop| retained.contains(&stop.stop_id));
+        self.stop_ids.retain(|id| retained.contains(id));
+    }
+
+    fn stops_with_parents<'a>(&'a self, ids: impl Iterator<Item = &'a str>) -> HashSet<&'a str> {
         let parents = self.parent_stop_ids();
-        for time in &self.stop_times {
-            let mut stop = time.stop_id.as_str();
-            while let Some(&parent) = parents.get(stop) {
-                if !used_stops.insert(parent.to_owned()) {
+        let mut retained = HashSet::new();
+        for mut id in ids {
+            while retained.insert(id) {
+                let Some(&parent) = parents.get(id) else {
                     break;
-                }
-                stop = parent;
+                };
+                id = parent;
             }
         }
-        self.stops.retain(|stop| used_stops.contains(&stop.stop_id));
-        self.stop_ids.retain(|id| used_stops.contains(id));
+        retained
     }
 
     /// 検証済みのフィードを取り込み順の末尾に追加する。

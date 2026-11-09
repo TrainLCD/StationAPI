@@ -35,21 +35,39 @@ impl Polygon {
     fn contains(&self, lon: f64, lat: f64) -> bool {
         (self.min[0]..=self.max[0]).contains(&lon)
             && (self.min[1]..=self.max[1]).contains(&lat)
-            && contains(&self.outer, lon, lat)
-            && !self.holes.iter().any(|ring| contains(ring, lon, lat))
+            && ring_location(&self.outer, lon, lat) != Location::Outside
+            && !self
+                .holes
+                .iter()
+                .any(|ring| ring_location(ring, lon, lat) == Location::Inside)
     }
 }
 
-fn contains(ring: &[[f64; 2]], lon: f64, lat: f64) -> bool {
+#[derive(Debug, PartialEq, Eq)]
+enum Location {
+    Outside,
+    Inside,
+    Boundary,
+}
+
+fn ring_location(ring: &[[f64; 2]], lon: f64, lat: f64) -> Location {
     let mut inside = false;
-    for edge in ring.windows(2) {
-        let [x1, y1] = edge[0];
-        let [x2, y2] = edge[1];
+    for (&[x1, y1], &[x2, y2]) in ring.iter().zip(ring.iter().cycle().skip(1)) {
+        if (x1.min(x2)..=x1.max(x2)).contains(&lon)
+            && (y1.min(y2)..=y1.max(y2)).contains(&lat)
+            && ((x2 - x1) * (lat - y1) - (y2 - y1) * (lon - x1)).abs() <= 1e-12
+        {
+            return Location::Boundary;
+        }
         if (y1 > lat) != (y2 > lat) && lon < (x2 - x1) * (lat - y1) / (y2 - y1) + x1 {
             inside = !inside;
         }
     }
-    inside
+    if inside {
+        Location::Inside
+    } else {
+        Location::Outside
+    }
 }
 
 pub(super) fn uses_coordinates(stop_id: &str) -> bool {
@@ -97,14 +115,15 @@ impl Prefectures {
     pub(super) fn code_at(&self, lon: f64, lat: f64) -> Option<i32> {
         self.0
             .iter()
-            .find(|polygon| polygon.contains(lon, lat))
+            .filter(|polygon| polygon.contains(lon, lat))
             .map(|polygon| polygon.code)
+            .min() // 共有境界は小さい方の都道府県コードに揃える。
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Prefectures;
+    use super::{ring_location, Location, Prefectures};
 
     #[test]
     fn uses_stop_coordinates_across_prefecture_borders() {
@@ -113,5 +132,13 @@ mod tests {
         assert_eq!(index.code_at(139.19004, 36.23697), Some(11)); // 本庄駅
         assert_eq!(index.code_at(138.63519, 36.34237), Some(20)); // 軽井沢駅
         assert_eq!(index.code_at(0.0, 0.0), None);
+    }
+
+    #[test]
+    fn accepts_the_boundary_of_an_unclosed_ring() {
+        let ring = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
+        assert_eq!(ring_location(&ring, 0.0, 0.5), Location::Boundary);
+        assert_eq!(ring_location(&ring, 0.5, 0.5), Location::Inside);
+        assert_eq!(ring_location(&ring, -0.5, 0.5), Location::Outside);
     }
 }

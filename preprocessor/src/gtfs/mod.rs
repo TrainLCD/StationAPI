@@ -165,22 +165,32 @@ mod tests {
         fs::write(&stop_times, valid).unwrap();
         fs::write(
             dir.join("routes.txt"),
-            "route_id,route_long_name,route_type\nr,テスト,3\npaused,運休中,3\n",
+            "route_id,route_long_name,route_type\nr,テスト,3\npaused,運休中,3\nwithdrawn,廃止,3\n",
         )
         .unwrap();
         fs::write(
             dir.join("stops.txt"),
-            "stop_id,stop_name,stop_lat,stop_lon,parent_station\ns,乗り場,35.0,139.0,p\np,親停留所,35.0,139.0,\nu,未使用,36.0,139.0,\n",
+            "stop_id,stop_name,stop_lat,stop_lon,parent_station\ns,乗り場,35.0,139.0,p\np,親停留所,35.0,139.0,\nu,未使用,36.0,139.0,\nx,廃止停留所,36.0,139.0,\n",
         )
         .unwrap();
+        fs::write(
+            dir.join("trips.txt"),
+            "route_id,trip_id\nr,t\nwithdrawn,w\n",
+        )
+        .unwrap();
+        fs::write(&stop_times, format!("{valid}w,x,1\n")).unwrap();
         let accepts_exclusion_before_validation = read_complete_feed(&feed, |data| {
-            data.exclude_routes(&HashSet::from([feed::scoped_id(&feed, "paused")]));
+            data.exclude_routes(&HashSet::from([
+                feed::scoped_id(&feed, "paused"),
+                feed::scoped_id(&feed, "withdrawn"),
+            ]));
         })
         .is_some_and(|data| {
             data.routes.len() == 1
                 && data.has_stop(&feed::scoped_id(&feed, "s"))
                 && data.has_stop(&feed::scoped_id(&feed, "p"))
-                && !data.has_stop(&feed::scoped_id(&feed, "u"))
+                && data.has_stop(&feed::scoped_id(&feed, "u"))
+                && !data.has_stop(&feed::scoped_id(&feed, "x"))
         });
         fs::remove_dir_all(dir).unwrap();
         assert!(
