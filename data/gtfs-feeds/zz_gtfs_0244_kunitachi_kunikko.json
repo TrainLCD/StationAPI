@@ -1,0 +1,13 @@
+{
+  "name": "国立市コミュニティバスくにっこ",
+  "url": "https://api.gtfs-data.jp/v2/organizations/kunitachicity/feeds/kunikko/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=kunitachicity*kunikko",
+  "license": "CC0 1.0",
+  "company": {
+    "name": "国立市",
+    "kana": "クニタチシ",
+    "english": "Kunitachi City",
+    "url": "https://www.city.kunitachi.tokyo.jp/"
+  },
+  "company_cd": 279
+}

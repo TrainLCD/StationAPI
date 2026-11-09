@@ -1,0 +1,7 @@
+{
+  "name": "北区コミュニティバス「Kバス」",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/HitachiAutomobileTransportation/KitaAllLines.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/hitachi_automobile_transportation_kita_all_lines",
+  "license": "CC BY 4.0",
+  "company_cd": 268
+}
