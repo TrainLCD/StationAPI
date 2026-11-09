@@ -1,0 +1,14 @@
+{
+  "name": "上信ハイヤー",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/JoshinHire/AllLines.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/joshin_hire_all_lines",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "上信ハイヤー",
+    "name_full": "上信ハイヤー株式会社",
+    "kana": "ジョウシンハイヤー",
+    "english": "Joshin Hire",
+    "url": "https://www.joshin-hire.co.jp/"
+  },
+  "company_cd": 295
+}

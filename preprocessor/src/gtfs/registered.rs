@@ -18,6 +18,8 @@ struct Registration {
     url: String,
     source: String,
     license: String,
+    #[serde(default)]
+    excluded_route_ids: Vec<String>,
     company_cd: i32,
     company: Option<Company>,
     #[serde(default)]
@@ -83,8 +85,19 @@ fn load_registration(data: &mut GtfsData, companies: &mut Table, path: &Path) ->
         requires_consumer_key: registration.url.starts_with(ODPT_AUTH_PREFIX),
     };
 
-    let Some(mut feed_data) = read_complete_feed(&feed, registration.allow_routes_without_trips)
-    else {
+    let Some(mut feed_data) = read_complete_feed(&feed, |data| {
+        if !registration.excluded_route_ids.is_empty() {
+            let excluded = registration
+                .excluded_route_ids
+                .iter()
+                .map(|route_id| feed::scoped_id(&feed, route_id))
+                .collect();
+            data.exclude_routes(&excluded);
+        }
+        if registration.allow_routes_without_trips {
+            data.drop_routes_without_trips();
+        }
+    }) else {
         return Ok(());
     };
     register_company(companies, &registration)?;
