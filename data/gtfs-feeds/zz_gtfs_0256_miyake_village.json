@@ -1,0 +1,13 @@
+{
+  "name": "三宅村営バス",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/MiyakeVill/AllLine.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/miyake_vill_all_line",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "三宅村",
+    "kana": "ミヤケムラ",
+    "english": "Miyake Village",
+    "url": "https://www.vill.miyake.tokyo.jp/kurashi/seikatsu_kankyou/koutsuu/bus.html"
+  },
+  "company_cd": 291
+}

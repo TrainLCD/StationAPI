@@ -167,7 +167,7 @@ make data     # cargo run --profile tool -p stationapi-preprocessor
 4. GTFS フィードを取得・展開して読み込む (都営バス・西武バス・京王バスと、
    東急バスが運行する大田区・品川区・目黒区のコミュニティバス、名古屋市SRT)
 5. 東急バスの ODPT JSON を読み込む (7 日間キャッシュする)
-6. 名古屋市バス、北海道中央バス、北海道高速バス、じょうてつバス、千代田区「風ぐるま」の GTFS をこの順に取得・展開して読み込む
+6. 名古屋市バス、北海道中央バス、北海道高速バス、じょうてつバス、千代田区「風ぐるま」、小田急バス、西東京バス、港区「ちぃばす」、文京区「Bーぐる」の GTFS をこの順に取得・展開して読み込む
 7. [追加フィードの設定](../data/gtfs-feeds/)をファイル名順に読み込み、既存フィードの後に取り込む。追加フィードは停車順から運行パターンを作る。
 8. バスのデータを lines / stations / types / station_station_types に統合する
 9. `generated/*.csv` に書き出す (8 テーブル)
@@ -901,3 +901,8 @@ GTFS の `platform_code` は停留所名と別に保持し、GraphQL の `Statio
 
 [西東京バスのODPT GTFS](https://ckan.odpt.org/dataset/nishi_tokyo_bus_nt_bus)を `west_tokyo_nishi:` 名前空間に取り込み、事業者コード270を使います。
 取得には既存の `ODPT_ACCESS_TOKEN` を使い、運行パターンは便ごとの停車順から作ります。
+
+### 港区「ちぃばす」
+
+[配布元のGTFS](https://bus.fujikyu.co.jp/rosen/gtfs/)を `ward_minato:` 名前空間に取り込み、事業者コード271を使います。
+同じ停車順に異なる線形IDが付く便があるため、便ごとの停車順を運行パターンのキーにします。
