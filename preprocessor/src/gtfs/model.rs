@@ -84,8 +84,11 @@ pub struct GtfsData {
 }
 
 impl GtfsData {
-    /// 指定した路線と、その路線だけに属する便・停車時刻を除外する。
+    /// 指定した路線・便・停車時刻と、運行パターンに使われなくなった停留所を除外する。
     pub(super) fn exclude_routes(&mut self, excluded: &HashSet<String>) {
+        if self.route_ids.is_disjoint(excluded) {
+            return;
+        }
         self.routes
             .retain(|route| !excluded.contains(&route.route_id));
         self.route_ids.retain(|id| !excluded.contains(id));
@@ -101,6 +104,24 @@ impl GtfsData {
             .retain(|time| self.trip_ids.contains(&time.trip_id));
         self.stop_time_keys
             .retain(|(trip_id, _)| self.trip_ids.contains(trip_id));
+
+        let mut used_stops: HashSet<_> = self
+            .stop_times
+            .iter()
+            .map(|time| time.stop_id.clone())
+            .collect();
+        let parents = self.parent_stop_ids();
+        for time in &self.stop_times {
+            let mut stop = time.stop_id.as_str();
+            while let Some(&parent) = parents.get(stop) {
+                if !used_stops.insert(parent.to_owned()) {
+                    break;
+                }
+                stop = parent;
+            }
+        }
+        self.stops.retain(|stop| used_stops.contains(&stop.stop_id));
+        self.stop_ids.retain(|id| used_stops.contains(id));
     }
 
     /// 検証済みのフィードを取り込み順の末尾に追加する。
