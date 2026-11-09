@@ -1,0 +1,14 @@
+{
+  "name": "永井バス(永井運輸)一般路線",
+  "url": "https://api.gtfs-data.jp/v2/organizations/nagai-unyu/feeds/Nagaibus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=nagai-unyu*Nagaibus",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "永井バス",
+    "name_full": "永井運輸株式会社",
+    "kana": "ナガイバス",
+    "english": "Nagai Bus",
+    "url": "https://www.nagai-unyu.net/"
+  },
+  "company_cd": 294
+}
