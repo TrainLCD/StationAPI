@@ -1,0 +1,13 @@
+{
+  "name": "藤岡市めぐるん",
+  "url": "https://www.city.fujioka.gunma.jp/material/files/group/9/rosenbus_gtfsdata_20261001.zip",
+  "source": "https://www.city.fujioka.gunma.jp/soshiki/somubu/chiikianzen/2/1/951.html",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "藤岡市",
+    "kana": "フジオカシ",
+    "english": "Fujioka City",
+    "url": "https://www.city.fujioka.gunma.jp/"
+  },
+  "company_cd": 300
+}
