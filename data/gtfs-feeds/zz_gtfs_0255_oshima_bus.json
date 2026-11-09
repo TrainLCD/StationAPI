@@ -5,6 +5,7 @@
   "license": "Public Transportation Open Data Basic License",
   "company": {
     "name": "大島バス",
+    "name_full": "大島旅客自動車株式会社",
     "kana": "オオシマバス",
     "english": "Oshima Bus",
     "url": "https://www.oshima-bus.com/"
