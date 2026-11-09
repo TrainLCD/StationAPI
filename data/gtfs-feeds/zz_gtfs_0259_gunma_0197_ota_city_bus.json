@@ -1,0 +1,13 @@
+{
+  "name": "太田市シティライナーおおた・市営無料バス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/gunma-otacity/feeds/ootacitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=gunma-otacity*ootacitybus",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "太田市",
+    "kana": "オオタシ",
+    "english": "Ota City",
+    "url": "https://www.city.ota.gunma.jp/"
+  },
+  "company_cd": 306
+}
