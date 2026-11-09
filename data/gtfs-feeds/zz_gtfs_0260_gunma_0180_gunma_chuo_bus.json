@@ -1,0 +1,14 @@
+{
+  "name": "群馬中央バス",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/GunmachuoBus/AllLines.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/gunmachuo_bus_all_lines",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "群馬中央バス",
+    "name_full": "群馬中央バス株式会社",
+    "kana": "グンマチュウオウバス",
+    "english": "Gunma Chuo Bus",
+    "url": "https://gunmachuobus.co.jp/"
+  },
+  "company_cd": 311
+}
