@@ -1,0 +1,13 @@
+{
+  "name": "沼田市バス",
+  "url": "https://www.city.numata.gunma.jp/_res/projects/default_project/_page_/001/013/089/gtfs20260218.zip",
+  "source": "https://www.city.numata.gunma.jp/life/kotsu/bus/1013089.html",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "沼田市",
+    "kana": "ヌマタシ",
+    "english": "Numata City",
+    "url": "https://www.city.numata.gunma.jp/"
+  },
+  "company_cd": 297
+}

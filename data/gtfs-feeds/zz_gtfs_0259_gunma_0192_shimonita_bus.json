@@ -1,0 +1,13 @@
+{
+  "name": "しもにたバス(下仁田町)",
+  "url": "https://www.town.shimonita.lg.jp/shimonita-bus/m01/gtfs.20260401shimonita.zip",
+  "source": "https://www.town.shimonita.lg.jp/shimonita-bus/m01/shimonita_opendata.html",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "下仁田町",
+    "kana": "シモニタマチ",
+    "english": "Shimonita Town",
+    "url": "https://www.town.shimonita.lg.jp/"
+  },
+  "company_cd": 301
+}
