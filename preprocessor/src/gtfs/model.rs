@@ -84,6 +84,61 @@ pub struct GtfsData {
 }
 
 impl GtfsData {
+    /// 指定した路線・便・停車時刻と、運行パターンに使われなくなった停留所を除外する。
+    pub(super) fn exclude_routes(&mut self, excluded: &HashSet<String>) {
+        if self.route_ids.is_disjoint(excluded) {
+            return;
+        }
+        let previously_used: HashSet<_> = self
+            .stops_with_parents(self.stop_times.iter().map(|time| time.stop_id.as_str()))
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+        self.routes
+            .retain(|route| !excluded.contains(&route.route_id));
+        self.route_ids.retain(|id| !excluded.contains(id));
+        self.trips.retain(|trip| {
+            if excluded.contains(&trip.route_id) {
+                self.trip_ids.remove(&trip.trip_id);
+                false
+            } else {
+                true
+            }
+        });
+        self.stop_times
+            .retain(|time| self.trip_ids.contains(&time.trip_id));
+        self.stop_time_keys
+            .retain(|(trip_id, _)| self.trip_ids.contains(trip_id));
+
+        let still_used =
+            self.stops_with_parents(self.stop_times.iter().map(|time| time.stop_id.as_str()));
+        let retained = self.stops.iter().filter_map(|stop| {
+            let id = stop.stop_id.as_str();
+            (still_used.contains(id) || !previously_used.contains(id)).then_some(id)
+        });
+        let retained: HashSet<_> = self
+            .stops_with_parents(retained)
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+        self.stops.retain(|stop| retained.contains(&stop.stop_id));
+        self.stop_ids.retain(|id| retained.contains(id));
+    }
+
+    fn stops_with_parents<'a>(&'a self, ids: impl Iterator<Item = &'a str>) -> HashSet<&'a str> {
+        let parents = self.parent_stop_ids();
+        let mut retained = HashSet::new();
+        for mut id in ids {
+            while retained.insert(id) {
+                let Some(&parent) = parents.get(id) else {
+                    break;
+                };
+                id = parent;
+            }
+        }
+        retained
+    }
+
     /// 検証済みのフィードを取り込み順の末尾に追加する。
     pub(super) fn append_feed(&mut self, feed: Self) {
         for route in feed.routes {
