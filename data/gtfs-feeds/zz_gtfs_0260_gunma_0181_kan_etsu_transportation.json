@@ -1,0 +1,15 @@
+{
+  "name": "関越交通",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/Kan_etsuTransportation/AllLines.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/kan_etsu_transportation_all_lines",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "関越交通",
+    "name_full": "関越交通株式会社",
+    "kana": "カンエツコウツウ",
+    "english": "Kan-etsu Transportation",
+    "url": "https://kan-etsu.net/"
+  },
+  "company_cd": 312,
+  "allow_routes_without_trips": true
+}
