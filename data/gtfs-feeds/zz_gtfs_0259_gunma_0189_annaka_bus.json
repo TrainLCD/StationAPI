@@ -1,0 +1,13 @@
+{
+  "name": "安中市路線バス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/annakacity/feeds/annakashi-rosenbus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=annakacity*annakashi-rosenbus",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "安中市",
+    "kana": "アンナカシ",
+    "english": "Annaka City",
+    "url": "https://www.city.annaka.lg.jp/"
+  },
+  "company_cd": 299
+}
