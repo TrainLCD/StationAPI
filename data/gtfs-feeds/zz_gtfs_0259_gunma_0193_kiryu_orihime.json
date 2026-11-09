@@ -1,0 +1,13 @@
+{
+  "name": "おりひめバス(桐生市)",
+  "url": "https://www.city.kiryu.lg.jp/_res/common/opendata/1014528/kiryu_orihime_gtfs.zip",
+  "source": "https://www.city.kiryu.lg.jp/kurashi/kotsu/bus/orihime_od.html",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "桐生市",
+    "kana": "キリュウシ",
+    "english": "Kiryu City",
+    "url": "https://www.city.kiryu.lg.jp/"
+  },
+  "company_cd": 302
+}
