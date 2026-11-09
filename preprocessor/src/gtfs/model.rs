@@ -106,6 +106,23 @@ impl GtfsData {
         }
     }
 
+    /// 便が設定されていない路線を停車順の検証前に外す。
+    pub(super) fn drop_routes_without_trips(&mut self) {
+        let routes_with_trips: HashSet<_> = self
+            .trips
+            .iter()
+            .map(|trip| trip.route_id.as_str())
+            .collect();
+        self.routes.retain(|route| {
+            if routes_with_trips.contains(route.route_id.as_str()) {
+                return true;
+            }
+            self.route_ids.remove(&route.route_id);
+            crate::info!("便のない路線 {} を取り込みから外した", route.route_id);
+            false
+        });
+    }
+
     pub fn push_stop(&mut self, stop: Stop) {
         if self.stop_ids.insert(stop.stop_id.clone()) {
             self.stops.push(stop);

@@ -169,6 +169,7 @@ make data     # cargo run --profile tool -p stationapi-preprocessor
 5. 東急バスの ODPT JSON を読み込む (7 日間キャッシュする)
 6. 名古屋市バス、北海道中央バス、北海道高速バス、じょうてつバス、千代田区「風ぐるま」、小田急バス、西東京バス、港区「ちぃばす」、文京区「Bーぐる」の GTFS をこの順に取得・展開して読み込む
 7. [追加フィードの設定](../data/gtfs-feeds/)をファイル名順に読み込み、既存フィードの後に取り込む。追加フィードは停車順から運行パターンを作る。
+   季節路線を路線一覧に残すフィードでは、設定で便のない路線だけを停車順の検証前に除外できる。
 8. バスのデータを lines / stations / types / station_station_types に統合する
 9. `generated/*.csv` に書き出す (8 テーブル)
 

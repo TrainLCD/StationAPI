@@ -27,11 +27,16 @@ fn load_gtfs_feed(data: &mut GtfsData, feed: &GtfsFeed) {
 }
 
 /// フィードを一時データに読み込み、全路線に停車順がある場合にだけ返す。
-fn read_complete_feed(feed: &GtfsFeed) -> Option<GtfsData> {
+fn read_complete_feed(feed: &GtfsFeed, allow_routes_without_trips: bool) -> Option<GtfsData> {
     let mut data = GtfsData::default();
     if let Err(error) = feed::download(feed)
         .and_then(|()| parse::load_feed(&mut data, feed, true))
-        .and_then(|()| verify_patterns(&data))
+        .and_then(|()| {
+            if allow_routes_without_trips {
+                data.drop_routes_without_trips();
+            }
+            verify_patterns(&data)
+        })
     {
         warn!(
             "{} の読み込みに失敗: {error}。このフィードを飛ばす",
@@ -90,7 +95,7 @@ pub fn load(companies: &mut crate::table::Table) -> Result<GtfsData> {
     load_gtfs_feed(&mut data, &feed::CHIYODA_KAZAGURUMA);
     load_gtfs_feed(&mut data, &feed::ODAKYU_BUS);
     load_gtfs_feed(&mut data, &feed::NISHI_TOKYO_BUS);
-    if let Some(chiibus) = read_complete_feed(&feed::MINATO_CHIIBUS) {
+    if let Some(chiibus) = read_complete_feed(&feed::MINATO_CHIIBUS, false) {
         data.append_feed(chiibus);
     }
 
@@ -147,17 +152,28 @@ mod tests {
         let stop_times = dir.join("stop_times.txt");
         let valid = "trip_id,stop_id,stop_sequence\nt,s,1\n";
         fs::write(&stop_times, valid).unwrap();
-        let accepts_valid = read_complete_feed(&feed).is_some();
+        let accepts_valid = read_complete_feed(&feed, false).is_some();
         fs::write(&stop_times, format!("{valid}unknown,s,2\n")).unwrap();
-        let rejects_unknown_trip = read_complete_feed(&feed).is_none();
+        let rejects_unknown_trip = read_complete_feed(&feed, false).is_none();
         fs::write(&stop_times, format!("{valid}t,unknown,2\n")).unwrap();
-        let rejects_unknown_stop = read_complete_feed(&feed).is_none();
+        let rejects_unknown_stop = read_complete_feed(&feed, false).is_none();
         fs::write(&stop_times, format!("{valid}t,s,1\n")).unwrap();
-        let rejects_duplicate_sequence = read_complete_feed(&feed).is_none();
+        let rejects_duplicate_sequence = read_complete_feed(&feed, false).is_none();
         fs::write(&stop_times, "trip_id,stop_id,stop_sequence\nt,s,invalid\n").unwrap();
-        let rejects_invalid_sequence = read_complete_feed(&feed).is_none();
+        let rejects_invalid_sequence = read_complete_feed(&feed, false).is_none();
         fs::write(&stop_times, "trip_id,stop_id,stop_sequence\nt,s,-1\n").unwrap();
-        let rejects_negative_sequence = read_complete_feed(&feed).is_none();
+        let rejects_negative_sequence = read_complete_feed(&feed, false).is_none();
+        fs::write(&stop_times, valid).unwrap();
+        fs::write(
+            dir.join("routes.txt"),
+            "route_id,route_long_name,route_type\nr,テスト,3\nseasonal,季節路線,3\n",
+        )
+        .unwrap();
+        let rejects_unused_route_by_default = read_complete_feed(&feed, false).is_none();
+        let skips_unused_route_when_allowed =
+            read_complete_feed(&feed, true).is_some_and(|data| data.routes.len() == 1);
+        fs::write(dir.join("trips.txt"), "route_id,trip_id\nr,t\nseasonal,u\n").unwrap();
+        let rejects_route_with_trip_but_no_stop_times = read_complete_feed(&feed, true).is_none();
         fs::remove_dir_all(dir).unwrap();
         assert!(
             accepts_valid
@@ -166,6 +182,9 @@ mod tests {
                 && rejects_duplicate_sequence
                 && rejects_invalid_sequence
                 && rejects_negative_sequence
+                && rejects_unused_route_by_default
+                && skips_unused_route_when_allowed
+                && rejects_route_with_trip_but_no_stop_times
         );
     }
 }
