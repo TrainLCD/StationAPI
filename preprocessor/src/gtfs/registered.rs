@@ -18,6 +18,8 @@ struct Registration {
     url: String,
     source: String,
     license: String,
+    #[serde(default)]
+    excluded_route_ids: Vec<String>,
     company_cd: i32,
     company: Option<Company>,
 }
@@ -84,6 +86,21 @@ fn load_registration(data: &mut GtfsData, companies: &mut Table, path: &Path) ->
     let Some(mut feed_data) = read_complete_feed(&feed) else {
         return Ok(());
     };
+    if !registration.excluded_route_ids.is_empty() {
+        let excluded = registration
+            .excluded_route_ids
+            .iter()
+            .map(|route_id| feed::scoped_id(&feed, route_id))
+            .collect();
+        feed_data.exclude_routes(&excluded);
+        if feed_data.routes.is_empty() {
+            crate::warn!(
+                "{} は取り込み対象の路線が無い。このフィードを飛ばす",
+                feed.name
+            );
+            return Ok(());
+        }
+    }
     register_company(companies, &registration)?;
     for route in &mut feed_data.routes {
         route.company_cd = Some(registration.company_cd);

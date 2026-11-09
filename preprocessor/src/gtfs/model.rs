@@ -84,6 +84,25 @@ pub struct GtfsData {
 }
 
 impl GtfsData {
+    /// 指定した路線と、その路線だけに属する便・停車時刻を除外する。
+    pub(super) fn exclude_routes(&mut self, excluded: &HashSet<String>) {
+        self.routes
+            .retain(|route| !excluded.contains(&route.route_id));
+        self.route_ids.retain(|id| !excluded.contains(id));
+        self.trips.retain(|trip| {
+            if excluded.contains(&trip.route_id) {
+                self.trip_ids.remove(&trip.trip_id);
+                false
+            } else {
+                true
+            }
+        });
+        self.stop_times
+            .retain(|time| self.trip_ids.contains(&time.trip_id));
+        self.stop_time_keys
+            .retain(|(trip_id, _)| self.trip_ids.contains(trip_id));
+    }
+
     /// 検証済みのフィードを取り込み順の末尾に追加する。
     pub(super) fn append_feed(&mut self, feed: Self) {
         for route in feed.routes {
