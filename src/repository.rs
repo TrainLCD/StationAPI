@@ -1344,8 +1344,8 @@ mod tests {
         let types = block_on(MemTrainTypeRepository.get_by_station_id(3100521)).unwrap();
         assert!(types
             .iter()
-            .any(|ty| ty.type_cd == 306 && ty.line_group_cd == Some(332)));
-        assert!(!types.iter().any(|ty| ty.type_cd == 512));
+            .any(|ty| ty.type_cd == Some(306) && ty.line_group_cd == Some(332)));
+        assert!(!types.iter().any(|ty| ty.type_cd == Some(512)));
     }
 
     #[test]
