@@ -628,6 +628,11 @@ fn stops_to_stations(
 
     let group_ids = build_station_g_cd_map(&stops, &parent_ids);
     let child_platform_codes = child_platform_codes(gtfs);
+    let prefectures = stops
+        .iter()
+        .any(|stop| super::prefecture::uses_coordinates(&stop.stop_id))
+        .then(super::prefecture::Prefectures::load)
+        .transpose()?;
     let groups = group_ids.values().copied().collect::<HashSet<_>>().len();
     info!("バス停 {} 件を {groups} グループにまとめた", stops.len());
 
@@ -648,6 +653,24 @@ fn stops_to_stations(
             .as_deref()
             .map(hiragana_to_katakana)
             .unwrap_or_else(|| stop.stop_name.clone());
+
+        let pref_cd = if super::prefecture::uses_coordinates(&stop.stop_id) {
+            prefectures
+                .as_ref()
+                .and_then(|index| index.code_at(stop.stop_lon, stop.stop_lat))
+                .unwrap_or(0)
+        } else if stop.stop_id.starts_with("hokkaido_chuo:")
+            || stop.stop_id.starts_with("hokkaido_express:")
+            || stop.stop_id.starts_with("jotetsu:")
+        {
+            1
+        } else if stop.stop_id.starts_with("nagoya_srt:")
+            || stop.stop_id.starts_with("nagoya_city_bus:")
+        {
+            23
+        } else {
+            13
+        };
 
         for (route_id, stop_sequence) in routes {
             let station_cd = codes.station_cd(&stop.stop_id, route_id)?;
@@ -675,18 +698,6 @@ fn stops_to_stations(
                 platform_code.map(str::to_string),
             );
             set(t, &mut row, "line_cd", int(line_cd));
-            let pref_cd = if stop.stop_id.starts_with("hokkaido_chuo:")
-                || stop.stop_id.starts_with("hokkaido_express:")
-                || stop.stop_id.starts_with("jotetsu:")
-            {
-                1
-            } else if stop.stop_id.starts_with("nagoya_srt:")
-                || stop.stop_id.starts_with("nagoya_city_bus:")
-            {
-                23
-            } else {
-                13
-            };
             set(t, &mut row, "pref_cd", int(pref_cd));
             set(t, &mut row, "post", text(""));
             set(t, &mut row, "address", text(""));
