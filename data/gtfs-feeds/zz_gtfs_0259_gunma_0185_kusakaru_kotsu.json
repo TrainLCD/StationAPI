@@ -1,0 +1,14 @@
+{
+  "name": "草軽交通",
+  "url": "https://api.gtfs-data.jp/v2/organizations/kusakarukotsu/feeds/kusakarubus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=kusakarukotsu*kusakarubus",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "草軽交通",
+    "name_full": "草軽交通株式会社",
+    "kana": "クサカルコウツウ",
+    "english": "Kusakaru Kotsu",
+    "url": "https://www.kkkg.co.jp/"
+  },
+  "company_cd": 296
+}
