@@ -1320,6 +1320,34 @@ mod tests {
     const MITAKA: u32 = 1131105;
     const NAKA_MEGURO: u32 = 2600103;
 
+    /// 2026-03-14 改正で五位堂は朝の大阪方面・夕方以降の下り特急のみ停車。
+    /// 全列車停車や、ひのとりまで停車する扱いにしない。
+    #[test]
+    fn goido_limited_express_is_a_partial_stop_but_hinotori_passes() {
+        for (group, type_cd, pass, condition) in [
+            (332, 306, 5, StopCondition::PartialStop),
+            (335, 512, 1, StopCondition::Not),
+        ] {
+            let stations = block_on(MemStationRepository.get_by_line_group_id(group)).unwrap();
+            let goido = stations
+                .iter()
+                .find(|station| station.station_cd == 3100521)
+                .expect("五位堂が系統から欠落しています");
+            assert_eq!(goido.type_cd, Some(type_cd));
+            assert_eq!(goido.pass, Some(pass));
+            assert_eq!(goido.stop_condition, condition);
+        }
+    }
+
+    #[test]
+    fn goido_offers_limited_express_but_not_hinotori() {
+        let types = block_on(MemTrainTypeRepository.get_by_station_id(3100521)).unwrap();
+        assert!(types
+            .iter()
+            .any(|ty| ty.type_cd == Some(306) && ty.line_group_cd == Some(332)));
+        assert!(!types.iter().any(|ty| ty.type_cd == Some(512)));
+    }
+
     #[test]
     fn nearby_rail_transfers_keep_the_closest_station_per_line_within_the_radius() {
         let tokyo = index::station_by_cd(TOKYO as i32).unwrap();
