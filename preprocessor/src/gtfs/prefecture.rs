@@ -1,4 +1,4 @@
-//! 県境を越える群馬フィードの停留所を、座標から都道府県に割り当てる。
+//! 県境を越える群馬・神奈川フィードの停留所を、座標から都道府県に割り当てる。
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -74,7 +74,9 @@ pub(super) fn uses_coordinates(stop_id: &str) -> bool {
     stop_id
         .strip_prefix("zz_gtfs_")
         .and_then(|id| id.split_once('_'))
-        .is_some_and(|(_, namespace)| namespace.starts_with("gunma_"))
+        .is_some_and(|(_, namespace)| {
+            namespace.starts_with("gunma_") || namespace.starts_with("kanagawa_")
+        })
 }
 
 pub(super) struct Prefectures(Vec<Polygon>);
@@ -123,7 +125,17 @@ impl Prefectures {
 
 #[cfg(test)]
 mod tests {
-    use super::{ring_location, Location, Prefectures};
+    use super::{ring_location, uses_coordinates, Location, Prefectures};
+
+    #[test]
+    fn coordinate_lookup_is_scoped_to_supported_namespaces() {
+        assert!(uses_coordinates("zz_gtfs_0261_kanagawa_0259_yokohama:s1"));
+        assert!(uses_coordinates(
+            "zz_gtfs_0260_gunma_0177_nippon_chuo_bus:s1"
+        ));
+        assert!(!uses_coordinates("zz_gtfs_0237_chuo_edobus:s1"));
+        assert!(!uses_coordinates("tokyu:s1"));
+    }
 
     #[test]
     fn uses_stop_coordinates_across_prefecture_borders() {
@@ -131,6 +143,8 @@ mod tests {
         assert_eq!(index.code_at(139.01234, 36.32218), Some(10)); // 高崎駅
         assert_eq!(index.code_at(139.19004, 36.23697), Some(11)); // 本庄駅
         assert_eq!(index.code_at(138.63519, 36.34237), Some(20)); // 軽井沢駅
+        assert_eq!(index.code_at(139.622, 35.466), Some(14)); // 横浜駅
+        assert_eq!(index.code_at(139.446, 35.543), Some(13)); // 町田駅（県境を越える路線）
         assert_eq!(index.code_at(0.0, 0.0), None);
     }
 
