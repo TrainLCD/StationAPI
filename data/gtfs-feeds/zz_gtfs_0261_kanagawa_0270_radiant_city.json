@@ -1,0 +1,14 @@
+{
+  "name": "大新東(レイディアントシティ横濱)",
+  "url": "https://api.gtfs-data.jp/v2/organizations/daishinto/feeds/Radiant-City/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=daishinto*Radiant-City",
+  "license": "CC0 1.0",
+  "company_cd": 318,
+  "company": {
+    "name": "大新東",
+    "kana": "ダイシントウ",
+    "english": "Daishinto",
+    "url": "https://daishinto.co.jp/",
+    "name_full": "大新東株式会社"
+  }
+}
