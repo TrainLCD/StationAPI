@@ -1,0 +1,13 @@
+{
+  "name": "二宮町コミュニティバス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/ninomiyatown/feeds/Ninomiyatowncommunitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=ninomiyatown*Ninomiyatowncommunitybus",
+  "license": "CC BY 4.0",
+  "company_cd": 321,
+  "company": {
+    "name": "二宮町",
+    "kana": "ニノミヤマチ",
+    "english": "Ninomiya Town",
+    "url": "https://www.town.ninomiya.kanagawa.jp/"
+  }
+}
