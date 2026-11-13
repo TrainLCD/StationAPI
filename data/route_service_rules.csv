@@ -31,3 +31,4 @@ type_cd,line_group_id,requires_timetable,boarding_wait_seconds,source,type_name,
 555,1199,true,,https://www.jrkyushu-kanpachiichiroku.jp/info/,いちろく,公式運行カレンダーに限定（毎日運転ではない）,2026-10-21
 556,1203,true,,https://www.tobu.co.jp/sl/guide/,SL大樹(鬼怒川温泉方面),運転日と行先パターンが日によって変わる,2026-11-01
 557,1204,true,,https://www.tobu.co.jp/sl/guide/,SL大樹ふたら,運転日と行先パターンが日によって変わる,2026-11-01
+559,1205,true,,https://www.kominato.co.jp/wp-content/uploads/2026/11/5dea0a9c3f44035ef01ca403a909380a.pdf,房総里山トロッコ,2026年11月21日以降の指定日運転・五井～高滝,2026-11-13
