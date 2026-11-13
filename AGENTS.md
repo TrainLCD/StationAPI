@@ -132,5 +132,14 @@ Commands this guide and `.claude/skills/create-pr` rely on:
 
 Service-rule evidence must include the canonical `type_name`, `reason`, `checked_on`, and `source` in `data/route_service_rules.csv`. The validator checks names against IDs to prevent a numeric-ID typo from excluding unrelated services. Confirm restricted operation from a primary source and scope shared type IDs to the relevant line groups. See `docs/route-service-audit.md`; do not infer operating availability from calibration-only GTFS samples or a service name alone.
 
+### Required issue linkage
+
+- Every PR must reference at least one issue for the same work in its `関連Issue` section. This applies to documentation, dependency updates, and release/canary PRs as well as code and data changes.
+- Before creating a PR, search existing issues by the problem, requested behavior, and affected component. Read candidate issues and reuse an issue for the same work, including one in another repository; do not create a duplicate merely to obtain an issue number.
+- If no issue covers the work, create one before opening the PR. Describe the problem or purpose, scope, and acceptance criteria, and assign it to `@TinyKitten`.
+- Use `Closes #123` when the PR completes the issue, or `Refs #123` for partial work or a reference that must stay open. For cross-repository issues, use `Closes TrainLCD/Repository#123` or `Refs TrainLCD/Repository#123`. Check the issue's remaining scope before choosing a closing keyword.
+- Do not leave the section empty, retain only its template comment, or write "none" because the request came from chat. Verify the referenced issue exists and matches the PR before publishing or updating the PR.
+- This requirement takes precedence over any optional `related_issue` input or empty-issue fallback in PR creation instructions. Release/canary PRs may reuse the issues covered by their changes; do not close unfinished issues just to satisfy this rule.
+
 ## Maintenance
 Keep this guide aligned with the repository. If a workflow, environment requirement, or endpoint changes, update AGENTS.md in the same pull request so automation agents and contributors work from current instructions.
