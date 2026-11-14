@@ -137,6 +137,7 @@ mod tests {
         ));
         assert!(!uses_coordinates("zz_gtfs_0237_chuo_edobus:s1"));
         assert!(!uses_coordinates("tokyu:s1"));
+        assert!(uses_coordinates("zz_gtfs_0262_osaka_0535_limonbus:1001_05"));
     }
 
     #[test]

@@ -193,3 +193,75 @@ mod tests {
         assert_eq!(table.rows()[1][short].as_deref(), Some("テストバス"));
     }
 }
+
+#[cfg(test)]
+mod limonbus_tests {
+    use super::*;
+
+    #[test]
+    fn limonbus_preserves_routes_patterns_platforms_and_prefectures() {
+        let registration: Registration = serde_json::from_str(include_str!(
+            "../../../data/gtfs-feeds/zz_gtfs_0262_osaka_0535_limonbus.json"
+        ))
+        .unwrap();
+        let feed = feed::GtfsFeed {
+            id: "zz_gtfs_0262_osaka_0535_limonbus",
+            name: &registration.name,
+            path: concat!(env!("CARGO_MANIFEST_DIR"), "/test_data/limonbus"),
+            url: &registration.url,
+            requires_consumer_key: false,
+        };
+        let mut gtfs = GtfsData::default();
+        crate::gtfs::parse::load_feed(&mut gtfs, &feed, true).unwrap();
+        crate::gtfs::verify_patterns(&gtfs).unwrap();
+        assert_eq!(gtfs.routes.len(), 4);
+        assert_eq!(gtfs.stops.len(), 11);
+        assert_eq!(gtfs.trips.len(), 4);
+        for route in &mut gtfs.routes {
+            route.company_cd = Some(registration.company_cd);
+        }
+        let mut dataset =
+            crate::rail::Dataset::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../data"))
+                .unwrap();
+        register_company(&mut dataset.companies, &registration).unwrap();
+        let lines = dataset.lines.len();
+        let stations = dataset.stations.len();
+        let types = dataset.types.len();
+        let sst = dataset.sst.len();
+        crate::gtfs::integrate::integrate(&mut dataset, &gtfs).unwrap();
+        assert_eq!(dataset.lines.len() - lines, 4);
+        assert_eq!(dataset.types.len() - types, 4);
+        assert_eq!(dataset.stations.len() - stations, 24);
+        assert_eq!(dataset.sst.len() - sst, 24);
+        let name = dataset.stations.col("station_name");
+        let prefecture = dataset.stations.col("pref_cd");
+        let platform = dataset.stations.col("platform_code");
+        let expected = [
+            ("大阪・なんば", "27"),
+            ("京都駅", "26"),
+            ("金沢駅", "17"),
+            ("高山駅", "21"),
+            ("ひだホテルプラザ", "21"),
+            ("平湯", "21"),
+            ("河口湖駅", "19"),
+            ("ハイランドリゾートホテル＆スパ", "19"),
+            ("東京八重洲", "13"),
+            ("松本", "20"),
+        ];
+        for (stop, code) in expected {
+            let rows: Vec<_> = dataset.stations.rows()[stations..]
+                .iter()
+                .filter(|row| row[name].as_deref() == Some(stop))
+                .collect();
+            assert!(!rows.is_empty(), "missing {stop}");
+            assert!(
+                rows.iter()
+                    .all(|row| row[prefecture].as_deref() == Some(code)),
+                "wrong prefecture for {stop}"
+            );
+            if stop == "大阪・なんば" {
+                assert!(rows.iter().all(|row| row[platform].as_deref() == Some("5")));
+            }
+        }
+    }
+}
