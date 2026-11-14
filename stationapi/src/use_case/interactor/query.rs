@@ -1683,6 +1683,8 @@ where
         // When skip_types_join is true, skip the expensive train-type lookups
         // (used by the lineListStations query).
         // Also batch-fetch bus stop candidates in parallel.
+        // 半径内の候補をすべて取得する。停留所は路線ごとの行なので、固定件数で
+        // 打ち切ると同じバス停グループの一部路線だけ station が欠落する。
         let (stations_by_group_ids, lines, bus_candidates_flat) = if skip_types_join {
             if let Some(prefetched) = prefetched_group_stations {
                 // Group stations already fetched by expanded primary query
@@ -1690,7 +1692,7 @@ where
                     self.get_lines_by_station_group_id_vec_no_types(&station_group_ids),
                     self.get_bus_stops_near_stations(
                         &unique_bus_coords,
-                        50,
+                        u32::MAX,
                         bus_search_radius_meters
                     ),
                 )?;
@@ -1701,7 +1703,7 @@ where
                     self.get_lines_by_station_group_id_vec_no_types(&station_group_ids),
                     self.get_bus_stops_near_stations(
                         &unique_bus_coords,
-                        50,
+                        u32::MAX,
                         bus_search_radius_meters
                     ),
                 )?
@@ -1712,7 +1714,7 @@ where
                 self.get_lines_by_station_group_id_vec(&station_group_ids),
             )?;
             let bus = self
-                .get_bus_stops_near_stations(&unique_bus_coords, 50, bus_search_radius_meters)
+                .get_bus_stops_near_stations(&unique_bus_coords, u32::MAX, bus_search_radius_meters)
                 .await?;
             (s, l, bus)
         };
@@ -1728,10 +1730,10 @@ where
         }
 
         // Collect all bus station group IDs for batch bus lines fetch.
-        // 候補は駅グループの代表座標で引いた最寄り N 件なので、実際に採用される
+        // 候補は駅グループの代表座標の検索半径内にある全件で、実際に採用される
         // のは各駅の座標から NEARBY_BUS_STOP_RADIUS_METERS 以内のものだけ。
         // ここで先に絞らないと、採用されないバス停の駅グループぶんまで路線を
-        // 引くことになり、経路が長いほど無駄が (駅数 × N) で効く。
+        // 引くことになり、経路が長いほど無駄が増える。
         // 採否の判定は下の駅ごとのループと同じ式を使う。
         let mut all_bus_station_group_ids: Vec<u32> = stations
             .iter()
@@ -1873,6 +1875,15 @@ where
                         .collect();
 
                     if !nearby_bus_stops.is_empty() {
+                        // Build stop-per-line map; first (closest) stop wins
+                        let mut bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> =
+                            std::collections::HashMap::new();
+                        for bus_stop in &nearby_bus_stops {
+                            bus_stop_by_line_cd
+                                .entry(bus_stop.line_cd)
+                                .or_insert(bus_stop);
+                        }
+
                         // Collect bus lines from pre-fetched data, iterating
                         // nearby_bus_stops in order (distance-sorted) to preserve
                         // deterministic ordering.
@@ -1886,23 +1897,13 @@ where
                                 {
                                     for &bus_line in lines_for_g_cd {
                                         if bus_line.transport_type == TransportType::Bus
+                                            && bus_stop_by_line_cd.contains_key(&bus_line.line_cd)
                                             && seen_bus_line_cds.insert(bus_line.line_cd)
                                         {
                                             bus_lines.push(bus_line.clone());
                                         }
                                     }
                                 }
-                            }
-                        }
-
-                        // Build stop-per-line map; first (closest) stop wins
-                        let mut bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> =
-                            std::collections::HashMap::new();
-                        for bus_stop in &nearby_bus_stops {
-                            if seen_bus_line_cds.contains(&bus_stop.line_cd) {
-                                bus_stop_by_line_cd
-                                    .entry(bus_stop.line_cd)
-                                    .or_insert(bus_stop);
                             }
                         }
 
@@ -4270,7 +4271,7 @@ mod tests {
                             Some(TransportType::Bus),
                         )
                         .await?;
-                    for stop in stops {
+                    for stop in stops.into_iter().take(limit_per_station as usize) {
                         result.push((source_g_cd, stop));
                     }
                 }
@@ -5076,6 +5077,69 @@ mod tests {
                 has_bus_line,
                 "Rail station should have nearby bus routes added when transport_type is RailAndBus"
             );
+        }
+
+        #[tokio::test]
+        async fn nearby_bus_routes_keep_stations_beyond_fifty_candidates() {
+            for (skip_types_join, prefetched) in [(false, false), (true, false), (true, true)] {
+                let rail = create_test_station(101, 1001, 100, None);
+                let mut stops = Vec::new();
+                let mut lines = vec![create_test_line_for_station_group(100, 1001)];
+                for i in 0..60 {
+                    let mut stop = create_bus_stop(200 + i, rail.lat, rail.lon, 500 + i);
+                    stop.station_g_cd = 200;
+                    stop.platform_code = Some("7".to_string());
+                    let mut line = create_test_line_for_station_group(500 + i, 200);
+                    line.transport_type = TransportType::Bus;
+                    stops.push(stop);
+                    lines.push(line);
+                }
+                // 同じグループでも300m以内に停留所のない路線は選択候補にしません。
+                let mut outside_line = create_test_line_for_station_group(999, 200);
+                outside_line.transport_type = TransportType::Bus;
+                lines.push(outside_line);
+                let mut farther_stop = stops[0].clone();
+                farther_stop.station_cd = 9999;
+                farther_stop.lat += 0.001;
+                stops.push(farther_stop);
+                let mut outside_stop = create_bus_stop(9998, rail.lat + 0.01, rail.lon, 999);
+                outside_stop.station_g_cd = 200;
+                stops.push(outside_stop);
+                let interactor = create_configurable_interactor(
+                    vec![rail.clone()],
+                    stops,
+                    lines,
+                    vec![],
+                    vec![],
+                );
+                let prefetched_stations = prefetched.then(|| vec![rail.clone()]);
+                let result = interactor
+                    .update_station_vec_with_attributes_inner(
+                        vec![rail],
+                        None,
+                        TransportTypeFilter::RailAndBus,
+                        skip_types_join,
+                        prefetched_stations,
+                    )
+                    .await
+                    .unwrap();
+                let buses: Vec<_> = result[0]
+                    .lines
+                    .iter()
+                    .filter(|line| line.transport_type == TransportType::Bus)
+                    .collect();
+                assert_eq!(buses.len(), 60);
+                for (i, line) in buses.iter().enumerate() {
+                    assert_eq!(line.line_cd, 500 + i as i32);
+                    let stop = line
+                        .station
+                        .as_ref()
+                        .expect("every bus route must be selectable");
+                    assert_eq!(stop.line_cd, line.line_cd);
+                    assert_eq!(stop.station_cd, 200 + i as i32);
+                    assert_eq!(stop.platform_code.as_deref(), Some("7"));
+                }
+            }
         }
 
         #[tokio::test]
