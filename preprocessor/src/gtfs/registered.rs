@@ -5,8 +5,12 @@ use std::{fs, path::Path};
 use anyhow::{ensure, Context, Result};
 use serde::Deserialize;
 
-use super::{feed, model::GtfsData, read_complete_feed};
+use super::{feed, model::GtfsData, read_complete_feed_prepared};
 use crate::table::{int, text, Table};
+
+#[path = "normalization.rs"]
+mod normalization;
+use normalization::Normalization;
 
 const NAMESPACE_PREFIX: &str = "zz_gtfs_";
 const ODPT_AUTH_PREFIX: &str = "https://api.odpt.org/";
@@ -24,6 +28,8 @@ struct Registration {
     company: Option<Company>,
     #[serde(default)]
     allow_routes_without_trips: bool,
+    #[serde(default)]
+    normalization: Option<Normalization>,
 }
 
 #[derive(Deserialize)]
@@ -85,19 +91,27 @@ fn load_registration(data: &mut GtfsData, companies: &mut Table, path: &Path) ->
         requires_consumer_key: registration.url.starts_with(ODPT_AUTH_PREFIX),
     };
 
-    let Some(mut feed_data) = read_complete_feed(&feed, |data| {
-        if !registration.excluded_route_ids.is_empty() {
-            let excluded = registration
-                .excluded_route_ids
-                .iter()
-                .map(|route_id| feed::scoped_id(&feed, route_id))
-                .collect();
-            data.exclude_routes(&excluded);
-        }
-        if registration.allow_routes_without_trips {
-            data.drop_routes_without_trips();
-        }
-    }) else {
+    let Some(mut feed_data) = read_complete_feed_prepared(
+        &feed,
+        || {
+            registration
+                .normalization
+                .map_or(Ok(()), |profile| profile.prepare(Path::new(&cache)))
+        },
+        |data| {
+            if !registration.excluded_route_ids.is_empty() {
+                let excluded = registration
+                    .excluded_route_ids
+                    .iter()
+                    .map(|route_id| feed::scoped_id(&feed, route_id))
+                    .collect();
+                data.exclude_routes(&excluded);
+            }
+            if registration.allow_routes_without_trips {
+                data.drop_routes_without_trips();
+            }
+        },
+    ) else {
         return Ok(());
     };
     register_company(companies, &registration)?;
@@ -108,6 +122,10 @@ fn load_registration(data: &mut GtfsData, companies: &mut Table, path: &Path) ->
     crate::info!("{} の GTFS を取り込んだ", feed.name);
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "daito_tests.rs"]
+mod daito_tests;
 
 /// 既存の事業者を再利用し、同じコードで異なる事業者を登録する誤りを防ぐ。
 fn register_company(table: &mut Table, registration: &Registration) -> Result<()> {

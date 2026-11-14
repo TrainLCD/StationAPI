@@ -29,8 +29,17 @@ fn load_gtfs_feed(data: &mut GtfsData, feed: &GtfsFeed) {
 
 /// フィードを一時データに読み込み、全路線に停車順がある場合にだけ返す。
 fn read_complete_feed(feed: &GtfsFeed, prepare: impl FnOnce(&mut GtfsData)) -> Option<GtfsData> {
+    read_complete_feed_prepared(feed, || Ok(()), prepare)
+}
+
+fn read_complete_feed_prepared(
+    feed: &GtfsFeed,
+    prepare_files: impl FnOnce() -> Result<()>,
+    prepare: impl FnOnce(&mut GtfsData),
+) -> Option<GtfsData> {
     let mut data = GtfsData::default();
     if let Err(error) = feed::download(feed)
+        .and_then(|()| prepare_files())
         .and_then(|()| parse::load_feed(&mut data, feed, true))
         .and_then(|()| {
             prepare(&mut data);

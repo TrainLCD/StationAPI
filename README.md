@@ -57,6 +57,7 @@ This project includes a comprehensive dataset of Japanese railway information in
 - Minato Chiibus routes and stops use the [GTFS feed from Fuji Express](https://bus.fujikyu.co.jp/rosen/gtfs/)
   ([CC BY](https://search.ckan.jp/datasets/catalog.data.metro.tokyo.lg.jp__dataset:t131032d0000000243)), processed for TrainLCD.
 - Limon Bus (Shinki Kanko): [source and attribution](data/gtfs-feeds/zz_gtfs_0262_osaka_0535_limonbus.md), CC BY 4.0.
+- Daito City community buses and shared taxis: [source and attribution](data/gtfs-feeds/zz_gtfs_0263_osaka_extra_daito.md), CC BY 4.0. See the [Osaka coverage audit](docs/osaka-gtfs-audit.md) for additional candidates and access requirements.
 - Each additional bus GTFS feed lists its data source and license in [`data/gtfs-feeds/`](data/gtfs-feeds/).
 - Gunma GTFS stop prefectures are assigned using [prefecture boundaries derived by Kyodo News](https://github.com/kyodo-official/japan-choropleth/tree/eccecca8f37d0569e13b56f62d71b137c75ea2f5)
   from the MLIT [2025 administrative area dataset](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2025.html) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
