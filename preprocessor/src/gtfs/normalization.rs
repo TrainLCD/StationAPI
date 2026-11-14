@@ -107,7 +107,14 @@ fn normalize_daito(directory: &Path) -> Result<()> {
     }
     let stops = stops.into_inner()?;
     // 両ファイルの検証が終わるまで原本を変更しない。
-    fs::write(path, trips)?;
-    fs::write(directory.join("stops.txt"), stops)?;
+    // 書き込み失敗でキャッシュを切り詰めないよう、両方を準備してから置き換える。
+    // rename 間で失敗しても各ファイルは完全で、正規化は再実行できる。
+    let stops_path = directory.join("stops.txt");
+    let trips_tmp = path.with_extension("txt.tmp");
+    let stops_tmp = stops_path.with_extension("txt.tmp");
+    fs::write(&trips_tmp, trips)?;
+    fs::write(&stops_tmp, stops)?;
+    fs::rename(&trips_tmp, path)?;
+    fs::rename(&stops_tmp, stops_path)?;
     Ok(())
 }

@@ -113,3 +113,21 @@ fn unexpected_stop_defects_do_not_modify_either_file() {
         stops
     );
 }
+
+#[test]
+fn daito_staging_write_failure_preserves_cache_and_can_retry() {
+    let fixture = Fixture::new();
+    let trips_before = fs::read(fixture.0.join("trips.txt")).unwrap();
+    let stops_before = fs::read(fixture.0.join("stops.txt")).unwrap();
+    // 最初の一時ファイルを書き込んだ後、二つ目の書き込みを失敗させる。
+    let blocked = fixture.0.join("stops.txt.tmp");
+    fs::create_dir(&blocked).unwrap();
+    assert!(Normalization::Daito2026.prepare(&fixture.0).is_err());
+    assert_eq!(fs::read(fixture.0.join("trips.txt")).unwrap(), trips_before);
+    assert_eq!(fs::read(fixture.0.join("stops.txt")).unwrap(), stops_before);
+    fs::remove_dir(blocked).unwrap();
+    Normalization::Daito2026.prepare(&fixture.0).unwrap();
+    assert!(std::str::from_utf8(&fs::read(fixture.0.join("trips.txt")).unwrap()).is_ok());
+    assert!(!fixture.0.join("trips.txt.tmp").exists());
+    assert!(!fixture.0.join("stops.txt.tmp").exists());
+}
