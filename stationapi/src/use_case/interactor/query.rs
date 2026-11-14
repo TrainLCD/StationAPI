@@ -1875,15 +1875,6 @@ where
                         .collect();
 
                     if !nearby_bus_stops.is_empty() {
-                        // Build stop-per-line map; first (closest) stop wins
-                        let mut bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> =
-                            std::collections::HashMap::new();
-                        for bus_stop in &nearby_bus_stops {
-                            bus_stop_by_line_cd
-                                .entry(bus_stop.line_cd)
-                                .or_insert(bus_stop);
-                        }
-
                         // Collect bus lines from pre-fetched data, iterating
                         // nearby_bus_stops in order (distance-sorted) to preserve
                         // deterministic ordering.
@@ -1897,13 +1888,23 @@ where
                                 {
                                     for &bus_line in lines_for_g_cd {
                                         if bus_line.transport_type == TransportType::Bus
-                                            && bus_stop_by_line_cd.contains_key(&bus_line.line_cd)
                                             && seen_bus_line_cds.insert(bus_line.line_cd)
                                         {
                                             bus_lines.push(bus_line.clone());
                                         }
                                     }
                                 }
+                            }
+                        }
+
+                        // Build stop-per-line map; first (closest) stop wins
+                        let mut bus_stop_by_line_cd: std::collections::HashMap<i32, &Station> =
+                            std::collections::HashMap::new();
+                        for bus_stop in &nearby_bus_stops {
+                            if seen_bus_line_cds.contains(&bus_stop.line_cd) {
+                                bus_stop_by_line_cd
+                                    .entry(bus_stop.line_cd)
+                                    .or_insert(bus_stop);
                             }
                         }
 
@@ -5094,14 +5095,16 @@ mod tests {
                     stops.push(stop);
                     lines.push(line);
                 }
-                // 同じグループでも300m以内に停留所のない路線は選択候補にしません。
+                // 同じグループの路線は、対応する停留所が距離外でも従来どおり一覧に残します。
                 let mut outside_line = create_test_line_for_station_group(999, 200);
                 outside_line.transport_type = TransportType::Bus;
                 lines.push(outside_line);
-                let mut farther_stop = stops[0].clone();
-                farther_stop.station_cd = 9999;
-                farther_stop.lat += 0.001;
-                stops.push(farther_stop);
+                // 候補順の先頭を選ぶ既存動作を維持し、ここでは距離順を再計算しません。
+                stops[0].lat += 0.001;
+                let mut later_stop = stops[0].clone();
+                later_stop.station_cd = 9999;
+                later_stop.lat = rail.lat;
+                stops.push(later_stop);
                 let mut outside_stop = create_bus_stop(9998, rail.lat + 0.01, rail.lon, 999);
                 outside_stop.station_g_cd = 200;
                 stops.push(outside_stop);
@@ -5128,8 +5131,10 @@ mod tests {
                     .iter()
                     .filter(|line| line.transport_type == TransportType::Bus)
                     .collect();
-                assert_eq!(buses.len(), 60);
-                for (i, line) in buses.iter().enumerate() {
+                assert_eq!(buses.len(), 61);
+                assert_eq!(buses[60].line_cd, 999);
+                assert!(buses[60].station.is_none());
+                for (i, line) in buses.iter().take(60).enumerate() {
                     assert_eq!(line.line_cd, 500 + i as i32);
                     let stop = line
                         .station
