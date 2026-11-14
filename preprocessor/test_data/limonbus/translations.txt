@@ -1,0 +1,280 @@
+table_name,field_name,language,translation,record_id,record_sub_id,field_value
+agency,agency_name,ja-Hrkt,"しんきかんこうかぶしきがいしゃ",2140001059268,,
+agency,agency_name,en,"Shinki Bus Tours Co.,Ltd.",2140001059268,,
+stops,stop_name,ja-Hrkt,"おおさか・なんば",1001_05,,
+stops,stop_name,ja-Hrkt,"きょうとえき",1002_02,,
+stops,stop_name,ja-Hrkt,"かなざわえき",1003_01,,
+stops,stop_name,ja-Hrkt,"かなざわえき",1003_02,,
+stops,stop_name,ja-Hrkt,"たかやまえき",1004_01,,
+stops,stop_name,ja-Hrkt,"ひだほてるぷらざ",1005_01,,
+stops,stop_name,ja-Hrkt,"ひらゆ",1006_01,,
+stops,stop_name,ja-Hrkt,"かわぐちこえき",1007_07,,
+stops,stop_name,ja-Hrkt,"はいらんどりぞーとほてるあんどすぱ",1008_01,,
+stops,stop_name,ja-Hrkt,"とうきょうやえす",1010_01,,
+stops,stop_name,ja-Hrkt,"まつもと",1011_01,,
+stops,stop_name,en,"Osaka Namba",1001_05,,
+stops,stop_name,en,"Kyoto Sta.",1002_02,,
+stops,stop_name,en,"Kanazawa Sta.",1003_01,,
+stops,stop_name,en,"Kanazawa Sta.",1003_02,,
+stops,stop_name,en,"Takayama Sta.",1004_01,,
+stops,stop_name,en,"Hida Hotel Plaza",1005_01,,
+stops,stop_name,en,"Hirayu",1006_01,,
+stops,stop_name,en,"Kawaguchiko Sta.",1007_07,,
+stops,stop_name,en,"Highland Resort Hotel & Spa",1008_01,,
+stops,stop_name,en,"Tokyo Yaesu",1010_01,,
+stops,stop_name,en,"Matsumoto",1011_01,,
+stop_times,stop_headsign,en,"Kanazawa Sta./Kyoto Sta./Osaka Namba",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,en,"Kanazawa Sta./Takayama Sta.",,,金沢駅/高山駅
+stop_times,stop_headsign,en,"Kawaguchiko Sta./Takayama",,,河口湖駅/高山
+stop_times,stop_headsign,en,"Kawaguchiko Sta./Tokyo Yaesu",,,河口湖駅/東京八重洲
+stop_times,stop_headsign,en,"Kyoto Sta./Osaka Namba",,,京都駅/大阪・なんば
+stop_times,stop_headsign,en,"Takayama",,,高山
+stop_times,stop_headsign,en,"Tokyo yaesu",,,東京八重洲
+stops,stop_name,ko,"오사카 남바",1001_05,,
+stops,stop_name,ko,"교토 역",1002_02,,
+stops,stop_name,ko,"가나자와 역",1003_01,,
+stops,stop_name,ko,"가나자와 역",1003_02,,
+stops,stop_name,ko,"다카야마 역",1004_01,,
+stops,stop_name,ko,"히다 호텔 플라자",1005_01,,
+stops,stop_name,ko,"히라유",1006_01,,
+stops,stop_name,ko,"가와구치코 역",1007_07,,
+stops,stop_name,ko,"하이랜드 리조트 호텔 & 스파",1008_01,,
+stops,stop_name,ko,"도쿄 야에스",1010_01,,
+stops,stop_name,ko,"마츠모토",1011_01,,
+stop_times,stop_headsign,ko,"가나자와 역/교토 역/오사카 남바",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,ko,"가나자와 역/다카야마 역",,,金沢駅/高山駅
+stop_times,stop_headsign,ko,"가와구치코 역/다카야마",,,河口湖駅/高山
+stop_times,stop_headsign,ko,"가와구치코 역/도쿄",,,河口湖駅/東京八重洲
+stop_times,stop_headsign,ko,"교토 역/오사카,남바",,,京都駅/大阪・なんば
+stop_times,stop_headsign,ko,"다카야마",,,高山
+stop_times,stop_headsign,ko,"도쿄 야에스",,,東京八重洲
+stops,stop_name,fr,"Osaka Namba",1001_05,,
+stops,stop_name,fr,"Gare de Kyoto",1002_02,,
+stops,stop_name,fr,"Gare de Kanazawa",1003_01,,
+stops,stop_name,fr,"Gare de Kanazawa",1003_02,,
+stops,stop_name,fr,"Gare de Takayama",1004_01,,
+stops,stop_name,fr,"Hôtel Hida Plaza",1005_01,,
+stops,stop_name,fr,"Hirayu",1006_01,,
+stops,stop_name,fr,"Gare de Kawaguchiko",1007_07,,
+stops,stop_name,fr,"Hôtel & Spa Highland Resort",1008_01,,
+stops,stop_name,fr,"Tokyo Yaesu",1010_01,,
+stops,stop_name,fr,"Matsumoto",1011_01,,
+stop_times,stop_headsign,fr,"Gare de Kanazawa/Gare de Kyoto/Osaka Namba",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,fr,"Gare de Kanazawa/Gare de Takayama",,,金沢駅/高山駅
+stop_times,stop_headsign,fr,"Gare de Kawaguchiko/Takayama",,,河口湖駅/高山
+stop_times,stop_headsign,fr,"Gare de Kawaguchiko/Tokyo Yaesu",,,河口湖駅/東京八重洲
+stop_times,stop_headsign,fr,"Gare de Kyoto/Osaka Namba",,,京都駅/大阪・なんば
+stop_times,stop_headsign,fr,"Takayama",,,高山
+stop_times,stop_headsign,fr,"Tokyo Yaesu",,,東京八重洲
+stops,stop_name,id,"Osaka Namba",1001_05,,
+stops,stop_name,id,"Stasiun Kyoto",1002_02,,
+stops,stop_name,id,"Stasiun Kanazawa",1003_01,,
+stops,stop_name,id,"Stasiun Kanazawa",1003_02,,
+stops,stop_name,id,"Stasiun Takayama",1004_01,,
+stops,stop_name,id,"Hida Hotel Plaza",1005_01,,
+stops,stop_name,id,"Hirayu",1006_01,,
+stops,stop_name,id,"Stasiun Kawaguchiko",1007_07,,
+stops,stop_name,id,"Highland Resort Hotel & Spa",1008_01,,
+stops,stop_name,id,"Tokyo Yaesu",1010_01,,
+stops,stop_name,id,"Matsumoto",1011_01,,
+stop_times,stop_headsign,id,"Stasiun Kanazawa/Stasiun Kyoto/Osaka Namba",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,id,"Stasiun Kanazawa/Stasiun Takayama",,,金沢駅/高山駅
+stop_times,stop_headsign,id,"Stasiun Kawaguchiko/Takayama",,,河口湖駅/高山
+stop_times,stop_headsign,id,"Stasiun Kawaguchiko/Tokyo Yaesu",,,河口湖駅/東京八重洲
+stop_times,stop_headsign,id,"Stasiun Kyoto/Osaka Namba",,,京都駅/大阪・なんば
+stop_times,stop_headsign,id,"Takayama",,,高山
+stop_times,stop_headsign,id,"Tokyo Yaesu",,,東京八重洲
+stops,stop_name,it,"Osaka Namba",1001_05,,
+stops,stop_name,it,"Stazione di Kyoto",1002_02,,
+stops,stop_name,it,"Stazione di Kanazawa",1003_01,,
+stops,stop_name,it,"Stazione di Kanazawa",1003_02,,
+stops,stop_name,it,"Stazione di Takayama",1004_01,,
+stops,stop_name,it,"Hotel Hida Plaza",1005_01,,
+stops,stop_name,it,"Hirayu",1006_01,,
+stops,stop_name,it,"Stazione di Kawaguchiko",1007_07,,
+stops,stop_name,it,"Hotel & Spa Highland Resort",1008_01,,
+stops,stop_name,it,"Tokyo Yaesu",1010_01,,
+stops,stop_name,it,"Matsumoto",1011_01,,
+stop_times,stop_headsign,it,"Stazione di Kanazawa/Stazione di Kyoto/Osaka Namba",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,it,"Stazione di Kanazawa/Stazione di Takayama",,,金沢駅/高山駅
+stop_times,stop_headsign,it,"Stazione di Kawaguchiko/Takayama",,,河口湖駅/高山
+stop_times,stop_headsign,it,"Stazione di Kawaguchiko/Tokyo Yaesu",,,河口湖駅/東京八重洲
+stop_times,stop_headsign,it,"Stazione di Kyoto/Osaka Namba",,,京都駅/大阪・なんば
+stop_times,stop_headsign,it,"Takayama",,,高山
+stop_times,stop_headsign,it,"Tokyo Yaesu",,,東京八重洲
+stops,stop_name,zh-cn,"大阪 难波",1001_05,,
+stops,stop_name,zh-cn,"京都站",1002_02,,
+stops,stop_name,zh-cn,"金泽站",1003_01,,
+stops,stop_name,zh-cn,"金泽站",1003_02,,
+stops,stop_name,zh-cn,"高山站",1004_01,,
+stops,stop_name,zh-cn,"飞驒广场酒店",1005_01,,
+stops,stop_name,zh-cn,"平汤",1006_01,,
+stops,stop_name,zh-cn,"河口湖站",1007_07,,
+stops,stop_name,zh-cn,"海兰德水疗度假酒店",1008_01,,
+stops,stop_name,zh-cn,"东京八重洲",1010_01,,
+stops,stop_name,zh-cn,"松本",1011_01,,
+stop_times,stop_headsign,zh-cn,"金泽站/京都站/大阪 难波",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,zh-cn,"金泽站/高山站",,,金沢駅/高山駅
+stop_times,stop_headsign,zh-cn,"河口湖站/高山",,,河口湖駅/高山
+stop_times,stop_headsign,zh-cn,"河口湖站/东京",,,河口湖駅/東京八重洲
+stop_times,stop_headsign,zh-cn,"京都站/大阪 难波",,,京都駅/大阪・なんば
+stop_times,stop_headsign,zh-cn,"高山",,,高山
+stop_times,stop_headsign,zh-cn,"东京八重洲",,,東京八重洲
+stops,stop_name,zh-tw,"大阪 難波",1001_05,,
+stops,stop_name,zh-tw,"京都車站",1002_02,,
+stops,stop_name,zh-tw,"金澤車站",1003_01,,
+stops,stop_name,zh-tw,"金澤車站",1003_02,,
+stops,stop_name,zh-tw,"高山車站",1004_01,,
+stops,stop_name,zh-tw,"飛驒廣場飯店",1005_01,,
+stops,stop_name,zh-tw,"平湯",1006_01,,
+stops,stop_name,zh-tw,"河口湖車站",1007_07,,
+stops,stop_name,zh-tw,"高原渡假飯店與溫泉",1008_01,,
+stops,stop_name,zh-tw,"東京八重洲",1010_01,,
+stops,stop_name,zh-tw,"松本",1011_01,,
+stop_times,stop_headsign,zh-tw,"金澤車站/京都車站/大阪 難波",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,zh-tw,"金澤車站/高山車站",,,金沢駅/高山駅
+stop_times,stop_headsign,zh-tw,"河口湖車站/高山",,,河口湖駅/高山
+stop_times,stop_headsign,zh-tw,"河口湖車站/東京",,,河口湖駅/東京八重洲
+stop_times,stop_headsign,zh-tw,"京都車站/大阪 難波",,,京都駅/大阪・なんば
+stop_times,stop_headsign,zh-tw,"高山",,,高山
+stop_times,stop_headsign,zh-tw,"東京八重洲",,,東京八重洲
+stops,stop_name,ru,"Осака Намба",1001_05,,
+stops,stop_name,ru,"Станция Киото",1002_02,,
+stops,stop_name,ru,"Станция Каназава",1003_01,,
+stops,stop_name,ru,"Станция Каназава",1003_02,,
+stops,stop_name,ru,"Станция Такаяма",1004_01,,
+stops,stop_name,ru,"Отель Хида Плаза",1005_01,,
+stops,stop_name,ru,"Хираю",1006_01,,
+stops,stop_name,ru,"Станция Кавагучико",1007_07,,
+stops,stop_name,ru,"Отель и СПА Хайленд Резорт",1008_01,,
+stops,stop_name,ru,"Токио Яэсу",1010_01,,
+stops,stop_name,ru,"Мацумото",1011_01,,
+stop_times,stop_headsign,ru,"Станция Каназава/Станция Киото/Осака Намба",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,ru,"Станция Каназава/Станция Такаяма",,,金沢駅/高山駅
+stop_times,stop_headsign,ru,"Станция Кавагучико/Такаяма",,,河口湖駅/高山
+stop_times,stop_headsign,ru,"Станция Кавагучико/Токио",,,河口湖駅/東京八重洲
+stop_times,stop_headsign,ru,"Станция Киото/Осака Намба",,,京都駅/大阪・なんば
+stop_times,stop_headsign,ru,"Такаяма",,,高山
+stop_times,stop_headsign,ru,"Токио Яэсу",,,東京八重洲
+stops,stop_name,es,"Osaka Namba",1001_05,,
+stops,stop_name,es,"Estación de Kioto",1002_02,,
+stops,stop_name,es,"Estación de Kanazawa",1003_01,,
+stops,stop_name,es,"Estación de Kanazawa",1003_02,,
+stops,stop_name,es,"Estación de Takayama",1004_01,,
+stops,stop_name,es,"Hotel Hida Plaza",1005_01,,
+stops,stop_name,es,"Hirayu",1006_01,,
+stops,stop_name,es,"Estación Kawaguchiko",1007_07,,
+stops,stop_name,es,"Hotel y spa Highland Resort",1008_01,,
+stops,stop_name,es,"Tokio Yaesu",1010_01,,
+stops,stop_name,es,"Matsumoto",1011_01,,
+stop_times,stop_headsign,es,"Estación de Kanazawa/Estación de Kioto/Osaka Namba",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,es,"Estación de Kanazawa/Estación de Takayama",,,金沢駅/高山駅
+stop_times,stop_headsign,es,"Estación Kawaguchiko/Takayama",,,河口湖駅/高山
+stop_times,stop_headsign,es,"Estación Kawaguchiko/Tokio Yaesu",,,河口湖駅/東京八重洲
+stop_times,stop_headsign,es,"Estación de Kioto/Osaka Namba",,,京都駅/大阪・なんば
+stop_times,stop_headsign,es,"Takayama",,,高山
+stop_times,stop_headsign,es,"Tokio Yaesu",,,東京八重洲
+stops,stop_name,hi,"ओसाका नंबा",1001_05,,
+stops,stop_name,hi,"क्योटो स्टेशन",1002_02,,
+stops,stop_name,hi,"कनाज़ावा स्टेशन",1003_01,,
+stops,stop_name,hi,"कनाज़ावा स्टेशन",1003_02,,
+stops,stop_name,hi,"ताकायामा स्टेशन",1004_01,,
+stops,stop_name,hi,"हिदा होटल प्लाज़ा",1005_01,,
+stops,stop_name,hi,"हिरायु",1006_01,,
+stops,stop_name,hi,"कावागुचिको स्टेशन",1007_07,,
+stops,stop_name,hi,"हाइलैंड रिसॉर्ट होटल और स्पा",1008_01,,
+stops,stop_name,hi,"टोक्यो येसु",1010_01,,
+stops,stop_name,hi,"मात्सुमोतो",1011_01,,
+stop_times,stop_headsign,hi,"कनाज़ावा स्टेशन/क्योटो स्टेशन/ओसाका नंबा",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,hi,"कनाज़ावा स्टेशन/ताकायामा स्टेशन",,,金沢駅/高山駅
+stop_times,stop_headsign,hi,"कावागुचिको स्टेशन/ताकायामा",,,河口湖駅/高山
+stop_times,stop_headsign,hi,"क्योटो स्टेशन/ओसाका नंबा",,,京都駅/大阪・なんば
+stop_times,stop_headsign,hi,"ताकायामा",,,高山
+stop_times,stop_headsign,hi,"टोक्यो येसु",,,東京八重洲
+stops,stop_name,vi,"Osaka Namba",1001_05,,
+stops,stop_name,vi,"Ga Kyoto",1002_02,,
+stops,stop_name,vi,"Ga Kanazawa",1003_01,,
+stops,stop_name,vi,"Ga Kanazawa",1003_02,,
+stops,stop_name,vi,"Ga Takayama",1004_01,,
+stops,stop_name,vi,"Khách sạn Hida Plaza",1005_01,,
+stops,stop_name,vi,"Hirayu",1006_01,,
+stops,stop_name,vi,"Ga Kawaguchiko",1007_07,,
+stops,stop_name,vi,"Khách sạn & Spa Highland Resort",1008_01,,
+stops,stop_name,vi,"Tokyo Yaesu",1010_01,,
+stops,stop_name,vi,"Matsumoto",1011_01,,
+stop_times,stop_headsign,vi,"Ga Kanazawa/Ga Kyoto/Osaka Namba",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,vi,"Ga Kanazawa/Ga Takayama",,,金沢駅/高山駅
+stop_times,stop_headsign,vi,"Ga Kawaguchiko/Takayama",,,河口湖駅/高山
+stop_times,stop_headsign,vi,"Ga Kawaguchiko/Tokyo Yaesu",,,河口湖駅/東京八重洲
+stop_times,stop_headsign,vi,"Ga Kyoto/Osaka Namba",,,京都駅/大阪・なんば
+stop_times,stop_headsign,vi,"Takayama",,,高山
+stop_times,stop_headsign,vi,"Tokyo Yaesu",,,東京八重洲
+stops,stop_name,th,"โอซาก้า นันบะ",1001_05,,
+stops,stop_name,th,"สถานีเกียวโต",1002_02,,
+stops,stop_name,th,"สถานีคานาซาวะ",1003_01,,
+stops,stop_name,th,"สถานีคานาซาวะ",1003_02,,
+stops,stop_name,th,"สถานีทาคายามะ",1004_01,,
+stops,stop_name,th,"โรงแรมฮิดะ พลาซ่า",1005_01,,
+stops,stop_name,th,"ฮิระยุ",1006_01,,
+stops,stop_name,th,"สถานีทะเลสาบคาวากุจิ",1007_07,,
+stops,stop_name,th,"โรงแรมและสปาไฮแลนด์รีสอร์ต",1008_01,,
+stops,stop_name,th,"โตเกียว ยาเอสุ",1010_01,,
+stops,stop_name,th,"มัตสึโมโต้",1011_01,,
+stop_times,stop_headsign,th,"สถานีคานาซาวะ/สถานีเกียวโต/โอซาก้า นันบะ",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,th,"สถานีคานาซาวะ/สถานีทาคายามะ",,,金沢駅/高山駅
+stop_times,stop_headsign,th,"สถานีคาวากุจิโกะ/ทาคายามะ",,,河口湖駅/高山
+stop_times,stop_headsign,th,"สถานีเกียวโต/โอซาก้า นันบะ",,,京都駅/大阪・なんば
+stop_times,stop_headsign,th,"ทาคายามะ",,,高山
+stop_times,stop_headsign,th,"โตเกียว ยาเอสุ",,,東京八重洲
+stops,stop_name,ta,"ஓசாக்கா நம்பா",1001_05,,
+stops,stop_name,ta,"கியோட்டோ நிலையம்",1002_02,,
+stops,stop_name,ta,"கனசாவா நிலையம்",1003_01,,
+stops,stop_name,ta,"கனசாவா நிலையம்",1003_02,,
+stops,stop_name,ta,"தகயாமா நிலையம்",1004_01,,
+stops,stop_name,ta,"ஹிடா ஹோட்டல் பிளாசா",1005_01,,
+stops,stop_name,ta,"ஹிராயு",1006_01,,
+stops,stop_name,ta,"காவாகுச்சி கோ சினையம்",1007_07,,
+stops,stop_name,ta,"ஹைலாண்ட் ரிசார்ட் ஹோட்டல் & ஸ்பா",1008_01,,
+stops,stop_name,ta,"டோக்கியோ யாசு",1010_01,,
+stops,stop_name,ta,"மாட்சுமோட்டோ",1011_01,,
+stop_times,stop_headsign,ta,"கனசாவா நிலையம்/கியோட்டோ நிலையம்/ஓசாக்கா நம்பா",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,ta,"கனசாவா நிலையம்/தகயாமா நிலையம்",,,金沢駅/高山駅
+stop_times,stop_headsign,ta,"காவாகுச்சி கோ சினையம்/தகயாமா",,,河口湖駅/高山
+stop_times,stop_headsign,ta,"கியோட்டோ நிலையம்/ஓசாக்கா நம்பா",,,京都駅/大阪・なんば
+stop_times,stop_headsign,ta,"தகயாமா",,,高山
+stop_times,stop_headsign,ta,"டோக்கியோ யாசு",,,東京八重洲
+stops,stop_name,ne,"ओसाका नम्बा",1001_05,,
+stops,stop_name,ne,"क्योटो स्टेशन",1002_02,,
+stops,stop_name,ne,"कानाजावा स्टेशन",1003_01,,
+stops,stop_name,ne,"कानाजावा स्टेशन",1003_02,,
+stops,stop_name,ne,"टाकायामा स्टेशन",1004_01,,
+stops,stop_name,ne,"हिदा होटल प्लाजा",1005_01,,
+stops,stop_name,ne,"हिरायु",1006_01,,
+stops,stop_name,ne,"कावागुचिको स्टेशन",1007_07,,
+stops,stop_name,ne,"हाइल्याण्ड रिसोर्ट होटल एण्ड स्पा",1008_01,,
+stops,stop_name,ne,"टोकियो येसु",1010_01,,
+stops,stop_name,ne,"मात्सुमोटो",1011_01,,
+stop_times,stop_headsign,ne,"कानाजावा स्टेशन/क्योटो स्टेशन/ओसाका नम्बा",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,ne,"कानाजावा स्टेशन/टाकायामा स्टेशन",,,金沢駅/高山駅
+stop_times,stop_headsign,ne,"कावागुचिको स्टेशन/टाकायामा",,,河口湖駅/高山
+stop_times,stop_headsign,ne,"क्योटो स्टेशन/ओसाका नम्बा",,,京都駅/大阪・なんば
+stop_times,stop_headsign,ne,"टाकायामा",,,高山
+stop_times,stop_headsign,ne,"टोकियो येसु",,,東京八重洲
+stops,stop_name,mn,"Осака Намба",1001_05,,
+stops,stop_name,mn,"Киото өртөө",1002_02,,
+stops,stop_name,mn,"Каназава өртөө",1003_01,,
+stops,stop_name,mn,"Каназава өртөө",1003_02,,
+stops,stop_name,mn,"Такаяма өртөө",1004_01,,
+stops,stop_name,mn,"Хида Плаза Зочид Буудал",1005_01,,
+stops,stop_name,mn,"Хираю",1006_01,,
+stops,stop_name,mn,"Кавагучи нуурын өртөө",1007_07,,
+stops,stop_name,mn,"Хайланд ресорт зочид буудал & спа",1008_01,,
+stops,stop_name,mn,"Токио Яэсү",1010_01,,
+stops,stop_name,mn,"Мацумото",1011_01,,
+stop_times,stop_headsign,mn,"Каназава өртөө/Киото өртөө/Осака Намба",,,金沢駅/京都駅/大阪・なんば
+stop_times,stop_headsign,mn,"Каназава өртөө/Такаяма өртөө",,,金沢駅/高山駅
+stop_times,stop_headsign,mn,"Кавагучи нуурын өртөө/Такаяма",,,河口湖駅/高山
+stop_times,stop_headsign,mn,"Кавагучи нуурын өртөө/Токио",,,河口湖駅/東京八重洲
+stop_times,stop_headsign,mn,"Киото өртөө/Осака Намба",,,京都駅/大阪・なんば
+stop_times,stop_headsign,mn,"Такаяма",,,高山
+stop_times,stop_headsign,mn,"Токио Яэсү",,,東京八重洲

@@ -1,0 +1,14 @@
+{
+  "name": "Limon Bus",
+  "url": "https://api.gtfs-data.jp/v2/organizations/shinkikanko/feeds/limonbus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=shinkikanko*limonbus",
+  "license": "CC BY 4.0",
+  "company_cd": 323,
+  "company": {
+    "name": "神姫観光",
+    "name_full": "神姫観光株式会社",
+    "kana": "シンキカンコウ",
+    "english": "Shinki Kanko",
+    "url": "https://www.limonbus.com/"
+  }
+}
