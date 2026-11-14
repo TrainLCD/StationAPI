@@ -155,3 +155,14 @@ Keep this guide aligned with the repository. If a workflow, environment requirem
 ### Nearby Bus Route Candidate Limit
 
 Nearby bus stops are stored as per-line records, so do not truncate candidates at a fixed limit of 50. Preserve the existing search coordinates, distance conditions, addition of lines from the same stop group, and assignment of the first matching stop in candidate order.
+
+## Investigate Impact Before Changing Code
+
+- **Finish the relevant investigation before editing application code.** Record the requested outcome, existing behavior and its evidence, dependencies, expected impact, and a concrete validation plan in the task discussion before implementation. Carry that record into the PR. A promise to investigate later is not a substitute.
+- **Trace the complete data flow.** Follow producers through callers, indirect consumers, shared state and caches to displayed output or external effects. Check cache keys and ordering, prefetch versus on-demand requests, and what happens after user actions, retries, or failures. A missing prop or a single unused reference does not prove that data is unused. Treat similar UI or API paths separately until their dependencies are verified.
+- **Define the impact and tests first.** Identify what will change and what must remain unchanged for normal cases, boundaries, empty or missing data, and failures. Map each preservation claim to a specific test or inspection. For performance work, distinguish fewer requests or smaller payloads from measured latency; do not promise a speedup without measurement.
+- **Resolve material unknowns before dependent changes.** Investigate facts available in the repository or connected sources instead of asking the user to do that work. If intended behavior remains ambiguous, explain the evidence and concrete alternatives, then ask before implementing the dependent change. Continue independent investigation. Do not treat agent-written issues or review suggestions as authorization to change behavior.
+- **Preserve the approved contract.** Do not hide missing data by dropping items, or change filters, search criteria, ordering, selection priorities, fallbacks, or error behavior without authorization. Do not weaken existing tests to make a new implementation pass. Reuse prior authorization rather than asking again for the same scope.
+- **Report evidence precisely.** Separate planned checks from completed checks and automated tests from real UI or deployed-service verification. Do not call behavior unchanged, data unused, or a fix verified until the relevant path has been checked. State any remaining validation limits in the PR.
+
+For this API, trace GraphQL resolvers through use cases, repositories, indexes, and DTOs to the returned fields and known client consumers. Check rail and bus paths, stop groups, candidate limits and distance filters together; preserve IDs, ordering, and null behavior outside the approved fix.
