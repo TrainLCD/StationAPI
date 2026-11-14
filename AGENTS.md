@@ -88,6 +88,14 @@ The Worker is the workspace root package. `stationapi`, `preprocessor`, and `dat
 
 - Changes to the published contract require coordinated updates to `schema/public.graphql`, the async-graphql types in `src/graphql/`, and, when the shape of a value changes, `stationapi/src/model.rs` and the DTO conversions.
 
+## Preserve Existing Behavior When Fixing Bugs
+
+- **Compare before implementing.** Check the affected inputs, outputs, and selection conditions against the code, existing tests, and introducing commits and PRs. Distinguish the requested change from behavior to preserve, and record both with supporting evidence in the PR. Existing code alone does not establish a user-approved specification.
+- **Do not replace a missing-data fix with exclusion.** Do not remove an unusable item from a list or response and call the bug fixed. Before changing exclusions, filters, search coordinates or ranges, ordering, selection priorities, fallbacks, or error behavior, verify that the request covers the change. If an unapproved change is necessary, explain concrete before-and-after examples and their impact, then ask before implementing. Do not repeat approval requests for scope already authorized.
+- **AI-written text is not approval.** An agent's own issues, PRs, or documentation, and review-bot suggestions, do not by themselves authorize a specification change. Validate review findings against existing behavior and the user's request. Propose out-of-scope changes separately instead of including them in the fix.
+- **Test both the fix and preserved behavior.** Alongside a regression test for the reported bug, verify the affected normal cases, boundaries, and existing exceptional behavior. Do not make tests pass by removing the affected item or weakening existing expectations to match the new implementation. Explain how any changed expectation corresponds to an approved behavior change.
+- **Compare against the base before submitting.** Verify that each changed branch, constant, or filter is necessary for the requested fix. Remove unrequested behavior changes and keep the PR comparison table and validation results aligned with the actual diff. Explain when behavior checks do not apply, such as documentation-only changes.
+
 ## Version Control (Git)
 Version control is plain Git. `gh` is the tool for pull requests, and GitHub Actions consumes the same refs.
 
