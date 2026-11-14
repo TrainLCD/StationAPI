@@ -151,3 +151,7 @@ Service-rule evidence must include the canonical `type_name`, `reason`, `checked
 
 ## Maintenance
 Keep this guide aligned with the repository. If a workflow, environment requirement, or endpoint changes, update AGENTS.md in the same pull request so automation agents and contributors work from current instructions.
+
+### Nearby Bus Route Candidate Limit
+
+Nearby bus stops are stored as per-line records, so do not truncate candidates at a fixed limit of 50. Preserve the existing search coordinates, distance conditions, addition of lines from the same stop group, and assignment of the first matching stop in candidate order.
