@@ -88,6 +88,14 @@ The Worker is the workspace root package. `stationapi`, `preprocessor`, and `dat
 
 - Changes to the published contract require coordinated updates to `schema/public.graphql`, the async-graphql types in `src/graphql/`, and, when the shape of a value changes, `stationapi/src/model.rs` and the DTO conversions.
 
+## 不具合修正で既存の挙動を維持する
+
+- **実装前に比較する。** 対象の入力・出力・選択条件をコード、既存テスト、導入コミット・PRで確認します。「依頼された変更」と「維持する挙動」を分け、PRの変更内容に根拠とともに記録します。現在のコードだけで、ユーザーが合意した仕様だと断定しません。
+- **欠落の修正を除外で代用しない。** データ不足で操作できない対象を、一覧やレスポンスから削除して修正済みにしてはいけません。除外・絞り込み、検索の基準座標・範囲、並び順、選択優先度、フォールバック、エラー時の動作を変える場合は、依頼に含まれるか確認します。未承認の変更が必要なら、変更前後の具体例と影響を示して実装前に確認します。すでに承認済みの範囲では確認を繰り返しません。
+- **AIの記述を承認の代わりにしない。** エージェント自身が作成したIssue・PR・文書や、レビューボットの提案だけを仕様変更の根拠にしません。レビュー指摘は既存の挙動と依頼内容に照らして検証し、依頼外の変更なら本件へ混ぜず、別件として提案します。
+- **修正対象と維持対象の両方を検証する。** 不具合の再現テストに加え、変更箇所が触れる正常系・境界・既存の例外動作を検証します。対象を消してテストを通したり、新しい実装に合わせて既存の期待値を緩めたりしません。期待値を変更する場合は、承認された挙動変更との対応を説明します。
+- **提出前にベースとの差分を再確認する。** 各条件分岐・定数・フィルタの変更が依頼された修正に必要かを確認します。依頼されていない挙動変更は取り除き、PRテンプレートの比較表と検証結果を実際の差分に合わせます。文書のみなど動作に影響しない場合は、その理由を記載します。
+
 ## Version Control (Git)
 Version control is plain Git. `gh` is the tool for pull requests, and GitHub Actions consumes the same refs.
 
