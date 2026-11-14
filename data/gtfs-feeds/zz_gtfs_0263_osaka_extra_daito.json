@@ -1,0 +1,14 @@
+{
+  "name": "大東市コミュニティバス・東部地域乗合タクシー",
+  "url": "https://www.city.daito.lg.jp/uploaded/attachment/41955.zip",
+  "source": "https://www.city.daito.lg.jp/site/kokyokotsu/68741.html",
+  "license": "CC BY 4.0",
+  "company_cd": 324,
+  "company": {
+    "name": "大東市",
+    "kana": "ダイトウシ",
+    "english": "Daito City",
+    "url": "https://www.city.daito.lg.jp/"
+  },
+  "normalization": "daito_2026"
+}

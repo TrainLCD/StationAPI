@@ -1,4 +1,4 @@
-//! 県境を越える群馬・神奈川フィードの停留所を、座標から都道府県に割り当てる。
+//! 県境を越える群馬・神奈川・大阪フィードの停留所を、座標から都道府県に割り当てる。
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -75,7 +75,9 @@ pub(super) fn uses_coordinates(stop_id: &str) -> bool {
         .strip_prefix("zz_gtfs_")
         .and_then(|id| id.split_once('_'))
         .is_some_and(|(_, namespace)| {
-            namespace.starts_with("gunma_") || namespace.starts_with("kanagawa_")
+            namespace.starts_with("gunma_")
+                || namespace.starts_with("kanagawa_")
+                || namespace.starts_with("osaka_")
         })
 }
 
