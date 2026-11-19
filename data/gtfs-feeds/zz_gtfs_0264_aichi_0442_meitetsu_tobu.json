@@ -1,0 +1,14 @@
+{
+  "name": "名鉄東部交通バス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/nishiocity/feeds/meitestu_tobu/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=nishiocity*meitestu_tobu",
+  "license": "CC0 1.0",
+  "company_cd": 325,
+  "company": {
+    "name": "名鉄東部交通",
+    "name_full": "名鉄東部交通株式会社",
+    "kana": "メイテツトウブコウツウ",
+    "english": "Meitetsu Tobu Kotsu",
+    "url": "https://www.meitetsu-toubukoutsu.com/"
+  }
+}
