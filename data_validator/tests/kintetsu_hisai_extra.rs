@@ -55,6 +55,7 @@ fn timetable_rules_are_scoped_and_regular_hisai_stop_is_preserved() {
         let matching_types: Vec<_> = types.iter().filter(|row| &row[1] == id.as_str()).collect();
         assert_eq!(matching_types.len(), 1);
         assert_eq!(&matching_types[0][8], direction);
+        assert!(matching_types[0][4].starts_with("Special Limited Express (for "));
         assert_eq!(&matching_types[0][9], "4");
         assert_eq!(&matching_types[0][10], "0");
         assert!(
