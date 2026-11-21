@@ -1,0 +1,11 @@
+{
+  "source": "https://opendata.pref.saitama.lg.jp/resource_download/6515",
+  "catalog": "112143_2143_pdl",
+  "updated": "2026-02-24T00:00:00",
+  "sha256": "e5e61fd60f70e864c3616bbe805a695e2a379e458b876e56d37e59c91a1fc5e5",
+  "publisher": "春日部市",
+  "license": "公共データ利用規約第1.0版（PDL1.0）",
+  "source_page": "https://opendata.pref.saitama.lg.jp/resources/6515",
+  "retrieved": "2026-11-21",
+  "notice": "配布元のZIPを改変せず収録。TrainLCDが系統・停留所・運行パターンのデータに加工して使用。"
+}

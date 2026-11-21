@@ -57,6 +57,12 @@ runs:
         path: data/N02-25
         key: n02-25
 
+    - name: Fetch registered Saitama Open Data GTFS
+      shell: bash
+      env:
+        STRICT: ${{ inputs.fail-on-missing-bus-feeds }}
+      run: python3 preprocessor/scripts/prepare_saitama_gtfs.py
+
     # data/*.csv をそのまま Worker へ渡すと本番と挙動が変わる。列車種別を
     # 持たない路線には各駅停車の系統を補う必要があり (約2,400行)、バス停と
     # バス路線は GTFS / ODPT から、駅間の線路の長さは国土数値情報 (N02) から
