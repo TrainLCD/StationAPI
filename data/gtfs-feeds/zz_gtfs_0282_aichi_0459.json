@@ -1,0 +1,13 @@
+{
+  "name": "瀬戸市コミュニティバス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/setocity/feeds/setocitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=setocity*setocitybus",
+  "license": "CC BY 4.0",
+  "company_cd": 343,
+  "company": {
+    "name": "瀬戸市コミュニティバス",
+    "kana": "セトシコミュニティバス",
+    "english": "Seto City Community Bus",
+    "url": "http://www.city.seto.aichi.jp/bunya/koukyoukoutuu/"
+  }
+}

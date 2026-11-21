@@ -1,0 +1,13 @@
+{
+  "name": "刈谷市公共施設連絡バス かりまる",
+  "url": "https://api.gtfs-data.jp/v2/organizations/kariyacity/feeds/communitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?agencyId=kariyacity",
+  "license": "CC BY 4.0",
+  "company_cd": 359,
+  "company": {
+    "name": "刈谷市",
+    "kana": "カリヤシ",
+    "english": "Kariya City",
+    "url": "https://www.city.kariya.lg.jp/kurashi/road_park/kotsu/1021258/index.html"
+  }
+}
