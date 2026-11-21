@@ -1,10 +1,10 @@
 name: Locate Aichi staging deployment
-on: [push]
+on: [pull_request]
 permissions:
   actions: read
 jobs:
   locate:
-    if: github.ref_name == 'feature/aichi-stage-verification-1798'
+    if: github.head_ref == 'feature/aichi-stage-verification-1798'
     runs-on: ubuntu-latest
     steps:
       - env:
