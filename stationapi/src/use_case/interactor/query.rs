@@ -182,6 +182,23 @@ where
 
         Ok(lines)
     }
+    async fn get_nearby_bus_stops(
+        &self,
+        latitude: f64,
+        longitude: f64,
+    ) -> Result<Vec<Station>, UseCaseError> {
+        let hits = self
+            .get_bus_stops_near_stations(
+                &[(0, latitude, longitude)],
+                u32::MAX,
+                NEARBY_BUS_STOP_RADIUS_METERS,
+            )
+            .await?;
+        let stops = hits.into_iter().map(|(_, stop)| stop).collect();
+        self.update_station_vec_with_attributes(stops, None, TransportTypeFilter::Bus, true)
+            .await
+    }
+
     async fn get_stations_by_coordinates(
         &self,
         latitude: f64,
