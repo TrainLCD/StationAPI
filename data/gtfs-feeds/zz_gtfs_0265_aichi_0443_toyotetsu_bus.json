@@ -10,5 +10,6 @@
     "kana": "トヨテツバス",
     "english": "Toyotetsu Bus",
     "url": "https://www.toyotetsu.jp/"
-  }
+  },
+  "allow_routes_without_trips": true
 }
