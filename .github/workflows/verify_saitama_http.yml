@@ -1,0 +1,37 @@
+name: Verify Saitama GTFS distribution
+on:
+  push:
+    branches: [verify/saitama-1786-feed-http]
+permissions: {}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check publisher response and ZIP integrity
+        shell: python
+        run: |
+          import hashlib, io, urllib.request, urllib.error, urllib.parse, zipfile
+          from concurrent.futures import ThreadPoolExecutor
+          class Redirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  print(req.full_url.split("?")[0], code, "redirect host", urllib.parse.urlsplit(newurl).hostname, flush=True)
+                  return super().redirect_request(req, fp, code, msg, headers, newurl)
+          def probe(resource):
+              url = "https://opendata.pref.saitama.lg.jp/resource_download/" + resource
+              req = urllib.request.Request(url, headers={"User-Agent":"TrainLCD/StationAPI (GTFS data importer)"})
+              try:
+                  with urllib.request.build_opener(Redirect()).open(req, timeout=30) as response:
+                      data = response.read()
+                      names = zipfile.ZipFile(io.BytesIO(data)).namelist()
+                      print(resource, response.status, len(data), hashlib.sha256(data).hexdigest(), "stops.txt" in names)
+              except urllib.error.HTTPError as e:
+                  import xml.etree.ElementTree as ET
+                  body = e.read(4096)
+                  try:
+                      error = ET.fromstring(body).findtext("Code")
+                  except ET.ParseError:
+                      error = None
+                  print(resource, e.code, urllib.parse.urlsplit(e.url).hostname, e.headers.get("server"), e.headers.get("x-cache"), error, flush=True)
+                  raise RuntimeError(f"resource {resource}: HTTP {e.code}") from None
+          with ThreadPoolExecutor() as pool:
+              list(pool.map(probe, ["6515","3750","8489"]))
