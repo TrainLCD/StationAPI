@@ -35,3 +35,4 @@ type_cd,line_group_id,requires_timetable,boarding_wait_seconds,source,type_name,
 561,1207,true,,https://www.keikyu.co.jp/ride/kakueki/pdf/other_holiday2026.pdf,普通(三崎口方面),土休日836T印西牧の原8:20発三崎口行・2026年11月21日改正,2026-11-17
 562,1207,true,,https://www.keikyu.co.jp/ride/kakueki/pdf/other_holiday2026.pdf,特急(三崎口方面),土休日836T印西牧の原8:20発三崎口行・2026年11月21日改正,2026-11-17
 563,1208,true,,https://www.tobu.co.jp/file.jsp?id=128563,区間急行(船橋方面),2026-11-21改正・平日朝5本・柏から船橋への片方向,2026-11-21
+567,1212,true,,https://www.mt-torokko.com/information/timetable/,普通(JR豊肥本線直通),JR肥後大津～南阿蘇鉄道高森の朝2往復に限定,2026-11-22
