@@ -1,4 +1,4 @@
-//! 県境を越える群馬・神奈川・大阪・愛知フィードの停留所を、座標から都道府県に割り当てる。
+//! 県境を越える群馬・神奈川・大阪・愛知・埼玉フィードの停留所を、座標から都道府県に割り当てる。
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -79,6 +79,7 @@ pub(super) fn uses_coordinates(stop_id: &str) -> bool {
                 || namespace.starts_with("kanagawa_")
                 || namespace.starts_with("osaka_")
                 || namespace.starts_with("aichi_")
+                || namespace.starts_with("saitama_")
         })
 }
 
@@ -137,6 +138,7 @@ mod tests {
             "zz_gtfs_0260_gunma_0177_nippon_chuo_bus:s1"
         ));
         assert!(uses_coordinates("zz_gtfs_0264_aichi_0442_meitetsu_tobu:s1"));
+        assert!(uses_coordinates("zz_gtfs_0266_saitama_0199_kitaku:s1"));
         assert!(!uses_coordinates("zz_gtfs_0237_chuo_edobus:s1"));
         assert!(!uses_coordinates("tokyu:s1"));
         assert!(uses_coordinates("zz_gtfs_0262_osaka_0535_limonbus:1001_05"));
