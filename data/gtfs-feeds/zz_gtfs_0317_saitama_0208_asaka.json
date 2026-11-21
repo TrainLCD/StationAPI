@@ -1,0 +1,14 @@
+{
+  "name": "朝霞市内循環バス（わくわく号）",
+  "url": "https://www.city.asaka.lg.jp/uploaded/attachment/110771.zip",
+  "source": "https://www.city.asaka.lg.jp/soshiki/26/gtfs.html",
+  "license": "朝霞市公開オープンデータ（配布ページに個別ライセンス名の記載なし）",
+  "normalization": "asaka_nested_zip",
+  "company_cd": 608,
+  "company": {
+    "name": "朝霞市",
+    "kana": "アサカシ",
+    "english": "Asaka City",
+    "url": "https://www.city.asaka.lg.jp/"
+  }
+}

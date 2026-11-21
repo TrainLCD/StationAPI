@@ -1,0 +1,11 @@
+{
+  "source": "https://opendata.pref.saitama.lg.jp/resource_download/3750",
+  "catalog": "114642_733_pdl",
+  "updated": "2026-05-27T00:00:00",
+  "sha256": "bd70afef8e9ab17734ef37bcb2a6acb17b2a3c790b870bb2e1262a652edc5666",
+  "publisher": "杉戸町",
+  "license": "公共データ利用規約第1.0版（PDL1.0）",
+  "source_page": "https://opendata.pref.saitama.lg.jp/resources/3750",
+  "retrieved": "2026-11-21",
+  "notice": "配布元のZIPを改変せず収録。TrainLCDが系統・停留所・運行パターンのデータに加工して使用。"
+}

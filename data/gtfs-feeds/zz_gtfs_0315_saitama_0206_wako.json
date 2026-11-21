@@ -1,0 +1,13 @@
+{
+  "name": "和光市内循環バス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/wakocity/feeds/Wako-City-junkanbus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=wakocity*Wako-City-junkanbus",
+  "license": "CC BY 4.0",
+  "company_cd": 606,
+  "company": {
+    "name": "和光市",
+    "kana": "ワコウシ",
+    "english": "Wako City",
+    "url": "https://gtfs-data.jp/search?target_feed=wakocity*Wako-City-junkanbus"
+  }
+}
