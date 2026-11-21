@@ -8,14 +8,46 @@ use std::{fs, path::Path};
 pub(super) enum Normalization {
     #[serde(rename = "daito_2026")]
     Daito2026,
+    AsakaNestedZip,
 }
 
 impl Normalization {
     pub(super) fn prepare(self, directory: &Path) -> Result<()> {
         match self {
+            Self::AsakaNestedZip => unpack_asaka(directory),
             Self::Daito2026 => normalize_daito(directory),
         }
     }
+}
+
+fn unpack_asaka(directory: &Path) -> Result<()> {
+    let mut archives = Vec::new();
+    for entry in fs::read_dir(directory)? {
+        let path = entry?.path();
+        if path.extension().is_some_and(|ext| ext == "zip") {
+            archives.push(path);
+        }
+    }
+    if archives.is_empty() && directory.join("routes.txt").is_file() {
+        return Ok(());
+    }
+    ensure!(archives.len() == 1, "朝霞市の配布ZIPの構成が変更された");
+    let mut archive = zip::ZipArchive::new(fs::File::open(&archives[0])?)?;
+    for name in [
+        "routes.txt",
+        "stops.txt",
+        "trips.txt",
+        "stop_times.txt",
+        "translations.txt",
+    ] {
+        let mut entry = match archive.by_name(name) {
+            Err(zip::result::ZipError::FileNotFound) if name == "translations.txt" => continue,
+            result => result?,
+        };
+        let mut output = fs::File::create(directory.join(name))?;
+        std::io::copy(&mut entry, &mut output)?;
+    }
+    Ok(())
 }
 
 fn normalize_daito(directory: &Path) -> Result<()> {
