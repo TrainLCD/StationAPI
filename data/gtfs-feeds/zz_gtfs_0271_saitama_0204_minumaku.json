@@ -1,0 +1,13 @@
+{
+  "name": "さいたま市見沼区コミュニティバス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/saitamacity/feeds/minumakucommunitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=saitamacity*minumakucommunitybus",
+  "license": "CC BY 4.0",
+  "company_cd": 327,
+  "company": {
+    "name": "さいたま市",
+    "kana": "サイタマシ",
+    "english": "Saitama City",
+    "url": "https://www.city.saitama.lg.jp/001/010/018/004/p095589.html"
+  }
+}
