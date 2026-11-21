@@ -203,6 +203,11 @@ fn download_url(feed: &GtfsFeed) -> Result<String> {
 /// 途中で失敗したら展開先を消す。中途半端なディレクトリを次回の実行が
 /// 正常なフィードと見なしてしまうため。
 pub fn download(feed: &GtfsFeed) -> Result<()> {
+    if std::env::var("REJECTED_SAITAMA_GTFS")
+        .is_ok_and(|ids| ids.split(',').any(|id| id == feed.id))
+    {
+        bail!("{} の ZIP はこのビルドで検証エラーになった", feed.name);
+    }
     let path = Path::new(feed.path);
     if path.exists() {
         info!("{} は取得済みなのでダウンロードを省略する", feed.name);

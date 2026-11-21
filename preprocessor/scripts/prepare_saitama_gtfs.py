@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import tempfile
 from datetime import datetime
@@ -90,15 +91,18 @@ def stage(registration, url, resource):
 
 
 if __name__ == "__main__":
+    rejected = []
     for registration in sorted(Path("data/gtfs-feeds").glob("*.json")):
         url = json.loads(registration.read_text(encoding="utf-8"))["url"]
         resource = url.removeprefix(PORTAL)
         if url.startswith(PORTAL) and resource.isascii() and resource.isdigit():
+            if not re.fullmatch(r"zz_gtfs_[a-z0-9_]+", registration.stem):
+                raise ValueError(f"Invalid feed namespace: {registration.stem!r}")
             try:
                 stage(registration, url, resource)
             except (OSError, ValueError, KeyError, BadZipFile, HTTPException) as error:
                 # The Rust importer trusts an existing cache directory. Discard the old
-                # edition after a failed refresh so it will retry the publisher URL.
+                # edition after a failed refresh.
                 destination = CACHE / registration.stem
                 if destination.is_symlink():
                     destination.unlink()
@@ -106,5 +110,10 @@ if __name__ == "__main__":
                     shutil.rmtree(destination)
                 if os.environ.get("STRICT") == "true":
                     raise
-                # No partial feed was staged. The normal importer can still try the live URL.
+                # A transport error can be retried. Never reimport a rejected payload.
+                if isinstance(error, (ValueError, KeyError, BadZipFile)):
+                    rejected.append(registration.stem)
                 print(f"::warning::{registration.stem}: {type(error).__name__}: GTFS preparation failed")
+    if rejected:
+        with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+            env.write("REJECTED_SAITAMA_GTFS=" + ",".join(rejected) + "\n")
