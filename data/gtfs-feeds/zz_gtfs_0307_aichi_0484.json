@@ -1,0 +1,13 @@
+{
+  "name": "豊川市コミュニティバス",
+  "url": "https://opendata-east-mikawa.jp/node/1784/download",
+  "source": "https://opendata-east-mikawa.jp/node/1783",
+  "license": "CC BY 4.0",
+  "company_cd": 368,
+  "company": {
+    "name": "豊川市コミュニティバス",
+    "kana": "トヨカワシコミュニティバス",
+    "english": "Toyokawa City Community Bus",
+    "url": "https://www.city.toyokawa.lg.jp/kurashi_tetsuzuki/doro_kotsu/3/2/12291.html"
+  }
+}

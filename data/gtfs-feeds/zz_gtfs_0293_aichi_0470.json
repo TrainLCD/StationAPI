@@ -1,0 +1,13 @@
+{
+  "name": "武豊町「ゆめころん」",
+  "url": "https://api.gtfs-data.jp/v2/organizations/taketoyotown/feeds/communitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?agencyId=taketoyotown",
+  "license": "CC BY 4.0",
+  "company_cd": 354,
+  "company": {
+    "name": "武豊町",
+    "kana": "タケトヨチョウ",
+    "english": "Taketoyo Town",
+    "url": "http://www.town.taketoyo.lg.jp/contents_detail.php?co=kak&frmId=517"
+  }
+}
