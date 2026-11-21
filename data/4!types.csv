@@ -336,3 +336,5 @@ DEFAULT,559,房総里山トロッコ,ボウソウサトヤマトロッコ,Bōsō
 DEFAULT,561,普通(三崎口方面),フツウ,Local(for Misakiguchi),慢车,보통,#000000,2,0,0,土休日836T・印西牧の原〜泉岳寺,COMPLETE
 DEFAULT,562,特急(三崎口方面),トッキュウ,Limited Express(for Misakiguchi),特快,특급,#EA0104,2,3,0,土休日836T・泉岳寺〜三崎口,COMPLETE
 DEFAULT,563,区間急行(船橋方面),クカンキュウコウ,Section Express(for Funabashi),区间快速(船桥方向),구간급행(후나바시 방면),#FF99FF,2,3,0,東武野田線・2026-11-21改正・平日朝のみ,COMPLETE
+DEFAULT,565,臨時特急(近鉄名古屋方面),リンジトッキュウ,Extra Limited Express(for Kintetsu-Nagoya),临时特快(近铁名古屋方向),임시 특급(긴테쓰나고야 방면),#DC143C,1,4,0,2026-11-21～23および12-20のみ・鳥羽14:44発近鉄名古屋行,COMPLETE
+DEFAULT,566,臨時特急(松阪方面),リンジトッキュウ,Extra Limited Express(for Matsusaka),临时特快(松阪方向),임시 특급(마쓰사카 방면),#DC143C,2,4,0,2026-12-20のみ・近鉄名古屋6:05発松阪行,COMPLETE
