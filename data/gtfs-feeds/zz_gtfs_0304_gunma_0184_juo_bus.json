@@ -1,0 +1,14 @@
+{
+  "name": "十王自動車（伊勢崎本庄線）",
+  "url": "https://api.odpt.org/api/v4/files/odpt/JuoBus/Isesaki_Honjo_Line.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/juo_bus_isesaki_honjo_line",
+  "license": "Public Transportation Open Data Basic License",
+  "company": {
+    "name": "十王自動車",
+    "name_full": "十王自動車株式会社",
+    "kana": "ジュウオウジドウシャ",
+    "english": "Juo Jidousha",
+    "url": "https://www.juo.co.jp/"
+  },
+  "company_cd": 308
+}
