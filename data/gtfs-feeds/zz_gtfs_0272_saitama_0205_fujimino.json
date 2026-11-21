@@ -1,0 +1,13 @@
+{
+  "name": "ふじみ野市内循環バス「ふじみん号」",
+  "url": "https://www.city.fujimino.saitama.jp/material/files/group/5/112453_basujoho.zip",
+  "source": "https://www.city.fujimino.saitama.jp/shinojoho/shisei/opendata/15419.html",
+  "license": "CC BY 4.0",
+  "company_cd": 605,
+  "company": {
+    "name": "ふじみ野市",
+    "kana": "フジミノシ",
+    "english": "Fujimino City",
+    "url": "https://www.city.fujimino.saitama.jp/shinojoho/shisei/opendata/15419.html"
+  }
+}
