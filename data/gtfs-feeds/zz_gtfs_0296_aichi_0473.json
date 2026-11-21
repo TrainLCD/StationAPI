@@ -1,0 +1,13 @@
+{
+  "name": "みよし市 さんさんバス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/aichi-miyoshicity/feeds/sansanbus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=aichi-miyoshicity*sansanbus",
+  "license": "CC BY 4.0",
+  "company_cd": 357,
+  "company": {
+    "name": "みよし市",
+    "kana": "ミヨシシ",
+    "english": "Miyoshi City",
+    "url": "https://www.city.aichi-miyoshi.lg.jp/soshiki/keieikikaku/kikaku/koukyoukoutu/sansanbusu/1685.html"
+  }
+}
