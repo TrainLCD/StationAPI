@@ -1,0 +1,13 @@
+{
+  "name": "北名古屋市 市内循環バス「きたバス」",
+  "url": "https://api.gtfs-data.jp/v2/organizations/kitanagoyacity/feeds/communitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=kitanagoyacity*communitybus",
+  "license": "CC BY 4.0",
+  "company_cd": 332,
+  "company": {
+    "name": "北名古屋市",
+    "kana": "キタナゴヤシ",
+    "english": "Kitanagoya City",
+    "url": "https://www.city.kitanagoya.lg.jp/kurashi/1005922/1001884/index.html"
+  }
+}

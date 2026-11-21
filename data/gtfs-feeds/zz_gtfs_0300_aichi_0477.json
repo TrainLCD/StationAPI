@@ -1,0 +1,13 @@
+{
+  "name": "知立市 ミニバス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/chiryucity/feeds/communitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=chiryucity*communitybus",
+  "license": "CC BY 2.1",
+  "company_cd": 361,
+  "company": {
+    "name": "知立市",
+    "kana": "チリュウシ",
+    "english": "Chiryu City",
+    "url": "https://www.city.chiryu.aichi.jp/soshiki/toshiseibi/machizukuri/gyomu/1/1445358636807.html"
+  }
+}

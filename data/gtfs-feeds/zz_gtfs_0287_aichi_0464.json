@@ -1,0 +1,13 @@
+{
+  "name": "コミュニティバス「グルーン」(常滑市)",
+  "url": "https://api.gtfs-data.jp/v2/organizations/tokonamecity/feeds/Gruun/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=tokonamecity*Gruun",
+  "license": "CC0",
+  "company_cd": 348,
+  "company": {
+    "name": "コミュニティバス Gruun",
+    "kana": "コミュニティバスグルーン",
+    "english": "Community Bus Gruun",
+    "url": "https://www.city.tokoname.aichi.jp/kurashi/1006388/1006546.html"
+  }
+}
