@@ -32,3 +32,5 @@ type_cd,line_group_id,requires_timetable,boarding_wait_seconds,source,type_name,
 556,1203,true,,https://www.tobu.co.jp/sl/guide/,SL大樹(鬼怒川温泉方面),運転日と行先パターンが日によって変わる,2026-11-01
 557,1204,true,,https://www.tobu.co.jp/sl/guide/,SL大樹ふたら,運転日と行先パターンが日によって変わる,2026-11-01
 559,1205,true,,https://www.kominato.co.jp/wp-content/uploads/2026/11/5dea0a9c3f44035ef01ca403a909380a.pdf,房総里山トロッコ,2026年11月21日以降の指定日運転・五井～高滝,2026-11-13
+561,1207,true,,https://www.keikyu.co.jp/ride/kakueki/pdf/other_holiday2026.pdf,普通(三崎口方面),土休日836T印西牧の原8:20発三崎口行・2026年11月21日改正,2026-11-17
+562,1207,true,,https://www.keikyu.co.jp/ride/kakueki/pdf/other_holiday2026.pdf,特急(三崎口方面),土休日836T印西牧の原8:20発三崎口行・2026年11月21日改正,2026-11-17
