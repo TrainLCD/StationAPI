@@ -1,0 +1,13 @@
+{
+  "name": "田原市コミュニティバス",
+  "url": "https://opendata-east-mikawa.jp/node/3025/download",
+  "source": "https://opendata-east-mikawa.jp/node/2201",
+  "license": "CC BY 4.0",
+  "company_cd": 366,
+  "company": {
+    "name": "田原市",
+    "kana": "タハラシ",
+    "english": "Tahara City",
+    "url": "https://www.city.tahara.aichi.jp/kurashi/koutsu/1013539/1003154.html"
+  }
+}

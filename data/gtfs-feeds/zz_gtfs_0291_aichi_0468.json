@@ -1,0 +1,13 @@
+{
+  "name": "南知多町 海っ子バス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/minamichitatown/feeds/communitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=minamichitatown*communitybus",
+  "license": "CC BY 4.0",
+  "company_cd": 352,
+  "company": {
+    "name": "南知多町役場",
+    "kana": "ミナミチタチョウヤクバ",
+    "english": "Minamichita Town Office",
+    "url": "https://www.town.minamichita.lg.jp/kurashi/bus/index.html"
+  }
+}
