@@ -1,0 +1,102 @@
+﻿table_name,field_name,language,translation,record_id,record_sub_id,field_value
+agency,agency_name,ja-Hrkt,なごやし,3000020231002,,
+agency,agency_name,en,Nagoya City,3000020231002,,
+stops,stop_name,ja-Hrkt,さかえ,11_01,,
+stops,stop_name,ja-Hrkt,ひろこうじほんまち,12_01,,
+stops,stop_name,ja-Hrkt,ひろこうじほんまち,12_02,,
+stops,stop_name,ja-Hrkt,なやばし,13_01,,
+stops,stop_name,ja-Hrkt,なごやえきさくらどおり,14_01,,
+stops,stop_name,ja-Hrkt,なごやえき,15_01,,
+stops,stop_name,ja-Hrkt,やなぎばし,16_01,,
+stops,stop_name,ja-Hrkt,なごやじょう,20_01,,
+stops,stop_name,ja-Hrkt,なごやえきたいこうどおりぐち,21_01,,
+stops,stop_name,ja-Hrkt,やなぎばしちゅうおうしじょう,22_01,,
+stops,stop_name,ja-Hrkt,えんどうじ,23_01,,
+stops,stop_name,en,Sakae,11_01,,
+stops,stop_name,en,Hirokoji-Hommachi,12_01,,
+stops,stop_name,en,Hirokoji-Hommachi,12_02,,
+stops,stop_name,en,Nayabashi,13_01,,
+stops,stop_name,en,Nagoya Sta. Sakura-dori,14_01,,
+stops,stop_name,en,Nagoya Sta.,15_01,,
+stops,stop_name,en,Yanagibashi,16_01,,
+stops,stop_name,en,Nagoya Castle,20_01,,
+stops,stop_name,en,Nagoya Sta. Taikodori-guchi,21_01,,
+stops,stop_name,en,Yanagibashi Central Market,22_01,,
+stops,stop_name,en,Endoji,23_01,,
+stops,stop_name,zh-Hant,榮,11_01,,
+stops,stop_name,zh-Hant,廣小路本町,12_01,,
+stops,stop_name,zh-Hant,廣小路本町,12_02,,
+stops,stop_name,zh-Hant,納屋橋,13_01,,
+stops,stop_name,zh-Hant,名古屋站櫻通,14_01,,
+stops,stop_name,zh-Hant,名古屋站,15_01,,
+stops,stop_name,zh-Hant,柳橋,16_01,,
+stops,stop_name,zh-Hant,名古屋城,20_01,,
+stops,stop_name,zh-Hant,名古屋站太閤通口,21_01,,
+stops,stop_name,zh-Hant,柳橋中央市場,22_01,,
+stops,stop_name,zh-Hant,圓頓寺,23_01,,
+stops,stop_name,zh-Hans,荣,11_01,,
+stops,stop_name,zh-Hans,广小路本町,12_01,,
+stops,stop_name,zh-Hans,广小路本町,12_02,,
+stops,stop_name,zh-Hans,纳屋桥,13_01,,
+stops,stop_name,zh-Hans,名古屋站樱通,14_01,,
+stops,stop_name,zh-Hans,名古屋站,15_01,,
+stops,stop_name,zh-Hans,柳桥,16_01,,
+stops,stop_name,zh-Hans,名古屋城,20_01,,
+stops,stop_name,zh-Hans,名古屋站太阁通口,21_01,,
+stops,stop_name,zh-Hans,柳桥中央市场,22_01,,
+stops,stop_name,zh-Hans,圆顿寺,23_01,,
+stops,stop_name,ko,사카에,11_01,,
+stops,stop_name,ko,히로코우지 혼마치,12_01,,
+stops,stop_name,ko,히로코우지 혼마치,12_02,,
+stops,stop_name,ko,나야바시,13_01,,
+stops,stop_name,ko,나고야 역 사쿠라도오리,14_01,,
+stops,stop_name,ko,나고야 역,15_01,,
+stops,stop_name,ko,야나기바시,16_01,,
+stops,stop_name,ko,나고야성,20_01,,
+stops,stop_name,ko,나고야 역 타이코도오리 출구,21_01,,
+stops,stop_name,ko,야나기바시 중앙시장,22_01,,
+stops,stop_name,ko,엔도지,23_01,,
+routes,route_long_name,en,Nagoya Sta. - Sakae Route,1,,
+routes,route_long_name,en,Nagoya Sta. - Nagoya Castle Route,2,,
+routes,route_long_name,zh-Hant,名古屋車站－榮町路線,1,,
+routes,route_long_name,zh-Hant,名古屋車站－名城路線,2,,
+routes,route_long_name,zh-Hans,名站 - 荣路线,1,,
+routes,route_long_name,zh-Hans,名站 - 名城路线,2,,
+routes,route_long_name,ko,메이에키 – 사카에 노선,1,,
+routes,route_long_name,ko,메이에키 – 메이죠 노선,2,,
+stop_times,stop_headsign,en,For Nagoya Castle,,,名古屋城 行き
+stop_times,stop_headsign,en,For Nagoya Sta.,,,名古屋駅 行き
+stop_times,stop_headsign,en,For Nagoya Sta. Taikodori-guchi,,,名古屋駅太閤通口 行き
+stop_times,stop_headsign,en,For Sakae,,,栄 行き
+stop_times,stop_headsign,zh-Hant,開往名古屋城,,,名古屋城 行き
+stop_times,stop_headsign,zh-Hant,開往名古屋站.,,,名古屋駅 行き
+stop_times,stop_headsign,zh-Hant,開往名古屋站太閤通口.,,,名古屋駅太閤通口 行き
+stop_times,stop_headsign,zh-Hant,開往榮,,,栄 行き
+stop_times,stop_headsign,zh-Hans,开往名古屋城,,,名古屋城 行き
+stop_times,stop_headsign,zh-Hans,开往名古屋站.,,,名古屋駅 行き
+stop_times,stop_headsign,zh-Hans,开往名古屋站太阁通口.,,,名古屋駅太閤通口 行き
+stop_times,stop_headsign,zh-Hans,开往荣,,,栄 行き
+stop_times,stop_headsign,ko,나고야성 방면,,,名古屋城 行き
+stop_times,stop_headsign,ko,나고야 역 방면.,,,名古屋駅 行き
+stop_times,stop_headsign,ko,나고야 역 타이코도오리 출구 방면.,,,名古屋駅太閤通口 行き
+stop_times,stop_headsign,ko,사카에 방면,,,栄 行き
+trips,trip_headsign,en,First bus,,,始発便
+trips,trip_headsign,en,Second bus,,,次発便
+trips,trip_headsign,en,Regular bus,,,通常便
+trips,trip_headsign,en,Last bus,,,最終便
+trips,trip_headsign,en,First and second bus,,,始発・次発便
+trips,trip_headsign,zh-Hant,首班車,,,始発便
+trips,trip_headsign,zh-Hant,下一班車,,,次発便
+trips,trip_headsign,zh-Hant,普通班車,,,通常便
+trips,trip_headsign,zh-Hant,末班車,,,最終便
+trips,trip_headsign,zh-Hant,首班車・下一班車,,,始発・次発便
+trips,trip_headsign,zh-Hans,首班车,,,始発便
+trips,trip_headsign,zh-Hans,次班车,,,次発便
+trips,trip_headsign,zh-Hans,常规班次,,,通常便
+trips,trip_headsign,zh-Hans,末班车,,,最終便
+trips,trip_headsign,zh-Hans,首班车・次班车,,,始発・次発便
+trips,trip_headsign,ko,첫차,,,始発便
+trips,trip_headsign,ko,다음차,,,次発便
+trips,trip_headsign,ko,일반편,,,通常便
+trips,trip_headsign,ko,막차,,,最終便
+trips,trip_headsign,ko,첫차・다음차,,,始発・次発便

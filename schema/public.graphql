@@ -90,6 +90,7 @@ type TtsSegment {
 type Query {
 	station(id: Int!, transportType: TransportType): Station
 	stations(ids: [Int!]!, transportType: TransportType): [Station!]!
+	nearbyBusStops(latitude: Float!, longitude: Float!): [Station!]!
 	stationsNearby(latitude: Float!, longitude: Float!, limit: Int, transportType: TransportType): [Station!]!
 	stationsByName(name: String!, limit: Int, fromStationGroupId: Int, transportType: TransportType): [Station!]!
 	stationGroupStations(groupId: Int!, transportType: TransportType): [Station!]!
@@ -132,6 +133,7 @@ type Station {
 	nameChinese: String
 	nameKorean: String
 	threeLetterCode: String
+	platformCode: String
 	prefectureId: Int
 	postalCode: String
 	address: String
@@ -163,6 +165,7 @@ type StationNested {
 	nameChinese: String
 	nameKorean: String
 	threeLetterCode: String
+	platformCode: String
 	prefectureId: Int
 	postalCode: String
 	address: String

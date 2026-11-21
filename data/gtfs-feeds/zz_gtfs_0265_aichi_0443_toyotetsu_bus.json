@@ -1,0 +1,15 @@
+{
+  "name": "豊鉄バス",
+  "url": "https://loc.bus-vision.jp/gtfs/toyotetsu/gtfsFeed",
+  "source": "https://bus-viewer.jp/toyotetsu/view/opendataToyotetsu.html",
+  "license": "CC BY 4.0",
+  "company_cd": 326,
+  "company": {
+    "name": "豊鉄バス",
+    "name_full": "豊鉄バス株式会社",
+    "kana": "トヨテツバス",
+    "english": "Toyotetsu Bus",
+    "url": "https://www.toyotetsu.jp/"
+  },
+  "allow_routes_without_trips": true
+}

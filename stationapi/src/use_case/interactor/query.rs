@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Maximum distance in meters to search for nearby bus stops from a rail station
 const NEARBY_BUS_STOP_RADIUS_METERS: f64 = 300.0;
+const NEARBY_RAIL_STATION_RADIUS_METERS: f64 = 300.0;
 
 /// Check if a station's transport type matches the filter
 fn matches_transport_filter(station_type: TransportType, filter: TransportTypeFilter) -> bool {
@@ -51,6 +52,36 @@ use crate::{
 };
 use async_trait::async_trait;
 
+/// 同じ駅でも種別変更の前後は別の SST 行。駅 ID だけで引くと片側の種別を失う。
+struct StationTrainTypes<'a> {
+    by_row: HashMap<i32, &'a TrainType>,
+    by_station: HashMap<i32, &'a TrainType>,
+}
+
+impl<'a> StationTrainTypes<'a> {
+    fn new(types: &'a [TrainType]) -> Self {
+        Self {
+            by_row: types
+                .iter()
+                .filter_map(|tt| tt.id.map(|id| (id, tt)))
+                .collect(),
+            by_station: types
+                .iter()
+                .filter_map(|tt| tt.station_cd.map(|id| (id, tt)))
+                .collect(),
+        }
+    }
+
+    fn get(&self, station: &Station) -> Option<&'a TrainType> {
+        match station.sst_id {
+            // 通過行などが取得対象外なら、同じ駅の別の停車行へ置き換えない。
+            Some(id) => self.by_row.get(&id),
+            None => self.by_station.get(&station.station_cd),
+        }
+        .copied()
+    }
+}
+
 #[derive(Clone)]
 pub struct QueryInteractor<SR, LR, TR, CR> {
     pub station_repository: SR,
@@ -92,6 +123,8 @@ where
     ) -> Result<Vec<Station>, UseCaseError> {
         let mut stations = self
             .enriched_stations_by_id_vec(station_ids, transport_type)
+            .await?;
+        self.add_nearby_rail_transfers(&mut stations, transport_type)
             .await?;
         // 並びは指定された ID の順 (repository がそう返し、付帯情報の付与も
         // 並びを変えない)。ディープリンクで経路の駅を ID の順に渡すクライアントは、
@@ -149,6 +182,23 @@ where
 
         Ok(lines)
     }
+    async fn get_nearby_bus_stops(
+        &self,
+        latitude: f64,
+        longitude: f64,
+    ) -> Result<Vec<Station>, UseCaseError> {
+        let hits = self
+            .get_bus_stops_near_stations(
+                &[(0, latitude, longitude)],
+                u32::MAX,
+                NEARBY_BUS_STOP_RADIUS_METERS,
+            )
+            .await?;
+        let stops = hits.into_iter().map(|(_, stop)| stop).collect();
+        self.update_station_vec_with_attributes(stops, None, TransportTypeFilter::Bus, true)
+            .await
+    }
+
     async fn get_stations_by_coordinates(
         &self,
         latitude: f64,
@@ -206,6 +256,8 @@ where
                 transport_type,
                 false,
             )
+            .await?;
+        self.add_nearby_rail_transfers(&mut stations, transport_type)
             .await?;
         self.attach_track_distances(&mut stations).await?;
 
@@ -327,6 +379,8 @@ where
                 false,
             )
             .await?;
+        self.add_nearby_rail_transfers(&mut stations, transport_type)
+            .await?;
         self.attach_track_distances(&mut stations).await?;
 
         Ok(stations)
@@ -357,33 +411,26 @@ where
             .train_type_repository
             .get_by_line_group_id_vec(line_group_ids)
             .await?;
-        let train_type_map: std::collections::HashMap<i32, &TrainType> = train_types
-            .iter()
-            .filter_map(|tt| tt.station_cd.map(|cd| (cd, tt)))
-            .collect();
+        let train_type_map = StationTrainTypes::new(&train_types);
 
         for station in stations.iter_mut() {
-            station.train_type = train_type_map
-                .get(&station.station_cd)
-                .copied()
-                .cloned()
-                .map(Box::new);
+            station.train_type = train_type_map.get(station).cloned().map(Box::new);
             if let Some(ref mut line) = station.line {
                 if let Some(ref mut nested_station) = line.station {
-                    nested_station.train_type = train_type_map
-                        .get(&nested_station.station_cd)
-                        .copied()
-                        .cloned()
-                        .map(Box::new);
+                    nested_station.train_type = if nested_station.station_cd == station.station_cd {
+                        station.train_type.clone()
+                    } else {
+                        train_type_map.get(nested_station).cloned().map(Box::new)
+                    };
                 }
             }
             for line in station.lines.iter_mut() {
                 if let Some(ref mut nested_station) = line.station {
-                    nested_station.train_type = train_type_map
-                        .get(&nested_station.station_cd)
-                        .copied()
-                        .cloned()
-                        .map(Box::new);
+                    nested_station.train_type = if nested_station.station_cd == station.station_cd {
+                        station.train_type.clone()
+                    } else {
+                        train_type_map.get(nested_station).cloned().map(Box::new)
+                    };
                 }
             }
         }
@@ -853,12 +900,12 @@ where
 
         // Track seen line_group_cds to avoid duplicates
         let mut seen_line_group_cds = HashSet::new();
-        // Track seen (kind, stop signature) pairs to drop locally redundant train types.
+        // Track kind, stops, and the destination of directed bus patterns.
         // Two train types are redundant only when they share both the same `kind` and the
         // same stops across the segment. A local and a limited express that happen to stop
         // at the same stations have different kinds and are still distinct services, so
         // both are kept.
-        let mut seen_segment_signatures: HashSet<(Option<i32>, Vec<i32>)> = HashSet::new();
+        let mut seen_segment_signatures = HashSet::new();
 
         for mut train_type in train_types {
             let Some(lgc) = train_type.line_group_cd else {
@@ -869,11 +916,30 @@ where
             }
             // Skip train types whose stops within the requested segment are identical to a
             // train type of the same kind we've already emitted.
-            if let Some(group_stops) = stops_by_line_group.get(&lgc) {
-                if let Some(signature) = segment_stop_signature(group_stops, from_g_cd, to_g_cd) {
-                    if !seen_segment_signatures.insert((train_type.kind, signature)) {
-                        continue;
-                    }
+            let group_stops = stops_by_line_group.get(&lgc).map(Vec::as_slice);
+            let directed_bus = train_type.kind == Some(model::TrainTypeKind::BusRoute as i32)
+                && matches!(
+                    train_type
+                        .direction
+                        .and_then(|value| model::TrainDirection::try_from(value).ok()),
+                    Some(model::TrainDirection::Inbound | model::TrainDirection::Outbound)
+                );
+            let (destination, signature) = if directed_bus {
+                let Some(signature) = group_stops
+                    .and_then(|stops| forward_bus_segment_signature(stops, from_g_cd, to_g_cd))
+                else {
+                    continue;
+                };
+                (Some(train_type.type_name.clone()), Some(signature))
+            } else {
+                (
+                    None,
+                    group_stops.and_then(|stops| segment_stop_signature(stops, from_g_cd, to_g_cd)),
+                )
+            };
+            if let Some(signature) = signature {
+                if !seen_segment_signatures.insert((train_type.kind, destination, signature)) {
+                    continue;
                 }
             }
 
@@ -1496,6 +1562,70 @@ where
         Ok(result)
     }
 
+    /// 走行画面に渡すバス停へ、のりばごとの座標から鉄道の乗換候補を付ける。
+    async fn add_nearby_rail_transfers(
+        &self,
+        stations: &mut [Station],
+        transport_type: TransportTypeFilter,
+    ) -> Result<(), UseCaseError> {
+        if transport_type != TransportTypeFilter::RailAndBus {
+            return Ok(());
+        }
+
+        let mut seen_stops = HashSet::new();
+        let coords: Vec<_> = stations
+            .iter()
+            .filter(|stop| {
+                stop.transport_type == TransportType::Bus && seen_stops.insert(stop.station_cd)
+            })
+            .map(|stop| (stop.station_cd, stop.lat, stop.lon))
+            .collect();
+        if coords.is_empty() {
+            return Ok(());
+        }
+
+        let candidates = self
+            .station_repository
+            .get_rail_stations_near_bus_stops(&coords, NEARBY_RAIL_STATION_RADIUS_METERS)
+            .await?;
+        if candidates.is_empty() {
+            return Ok(());
+        }
+        let mut company_ids: Vec<u32> = candidates
+            .values()
+            .flatten()
+            .filter_map(|station| station.company_cd.map(|id| id as u32))
+            .collect();
+        company_ids.sort_unstable();
+        company_ids.dedup();
+        let companies: HashMap<_, _> = self
+            .find_company_by_id_vec(&company_ids)
+            .await?
+            .into_iter()
+            .map(|company| (company.company_cd, company))
+            .collect();
+
+        for stop in stations {
+            let Some(nearby_stations) = candidates.get(&stop.station_cd) else {
+                continue;
+            };
+            let mut seen_lines: HashSet<_> = stop.lines.iter().map(|line| line.line_cd).collect();
+            for station in nearby_stations {
+                if seen_lines.insert(station.line_cd) {
+                    let mut line = self.extract_line_from_station(station);
+                    line.line_symbols = self.get_line_symbols(&line);
+                    line.company = companies.get(&line.company_cd).cloned();
+                    let mut station = station.clone();
+                    station.station_numbers = self.get_station_numbers(&station);
+                    line.station = Some(station);
+                    stop.lines.push(line);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// 駅と接続路線に表示用の属性を補い、自路線では元の停車位置を保持する。
     async fn update_station_vec_with_attributes(
         &self,
         stations: Vec<Station>,
@@ -1570,6 +1700,8 @@ where
         // When skip_types_join is true, skip the expensive train-type lookups
         // (used by the lineListStations query).
         // Also batch-fetch bus stop candidates in parallel.
+        // 半径内の候補をすべて取得する。停留所は路線ごとの行なので、固定件数で
+        // 打ち切ると同じバス停グループの一部路線だけ station が欠落する。
         let (stations_by_group_ids, lines, bus_candidates_flat) = if skip_types_join {
             if let Some(prefetched) = prefetched_group_stations {
                 // Group stations already fetched by expanded primary query
@@ -1577,7 +1709,7 @@ where
                     self.get_lines_by_station_group_id_vec_no_types(&station_group_ids),
                     self.get_bus_stops_near_stations(
                         &unique_bus_coords,
-                        50,
+                        u32::MAX,
                         bus_search_radius_meters
                     ),
                 )?;
@@ -1588,7 +1720,7 @@ where
                     self.get_lines_by_station_group_id_vec_no_types(&station_group_ids),
                     self.get_bus_stops_near_stations(
                         &unique_bus_coords,
-                        50,
+                        u32::MAX,
                         bus_search_radius_meters
                     ),
                 )?
@@ -1599,7 +1731,7 @@ where
                 self.get_lines_by_station_group_id_vec(&station_group_ids),
             )?;
             let bus = self
-                .get_bus_stops_near_stations(&unique_bus_coords, 50, bus_search_radius_meters)
+                .get_bus_stops_near_stations(&unique_bus_coords, u32::MAX, bus_search_radius_meters)
                 .await?;
             (s, l, bus)
         };
@@ -1615,10 +1747,10 @@ where
         }
 
         // Collect all bus station group IDs for batch bus lines fetch.
-        // 候補は駅グループの代表座標で引いた最寄り N 件なので、実際に採用される
+        // 候補は駅グループの代表座標の検索半径内にある全件で、実際に採用される
         // のは各駅の座標から NEARBY_BUS_STOP_RADIUS_METERS 以内のものだけ。
         // ここで先に絞らないと、採用されないバス停の駅グループぶんまで路線を
-        // 引くことになり、経路が長いほど無駄が (駅数 × N) で効く。
+        // 引くことになり、経路が長いほど無駄が増える。
         // 採否の判定は下の駅ごとのループと同じ式を使う。
         let mut all_bus_station_group_ids: Vec<u32> = stations
             .iter()
@@ -1689,10 +1821,13 @@ where
             }
         }
 
-        // Build HashMap for O(1) train_type lookup by station_cd
-        let train_type_map: std::collections::HashMap<i32, &TrainType> = train_types
+        // SST 行を優先して O(1) で種別を取得する。
+        let train_type_map = StationTrainTypes::new(&train_types);
+
+        // 同一系統・グループに複数のポールがあっても、自路線は駅IDで特定する。
+        let station_lookup_by_id: std::collections::HashMap<i32, &Station> = stations_by_group_ids
             .iter()
-            .filter_map(|tt| tt.station_cd.map(|cd| (cd, tt)))
+            .map(|s| (s.station_cd, s))
             .collect();
 
         // Build lookup map for stations_by_group_ids: (line_cd, station_g_cd) -> Station
@@ -1717,12 +1852,7 @@ where
 
             let station_numbers: Vec<StationNumber> = self.get_station_numbers(station);
             station.station_numbers = station_numbers;
-            if let Some(tt) = train_type_map
-                .get(&station.station_cd)
-                .copied()
-                .cloned()
-                .map(Box::new)
-            {
+            if let Some(tt) = train_type_map.get(station).cloned().map(Box::new) {
                 station.train_type = Some(tt);
             }
 
@@ -1817,20 +1947,31 @@ where
             for line in station_lines.iter_mut() {
                 line.company = company_map.get(&line.company_cd).cloned();
                 line.line_symbols = self.get_line_symbols(line);
-                if let Some(station_ref) = station_lookup.get(&(line.line_cd, station.station_g_cd))
-                {
-                    let mut station_copy = (*station_ref).clone();
+                // SST 行のある自路線は停車順上の出現を保持し、なければ駅IDで引く。
+                let same_line_station = if line.line_cd != station.line_cd {
+                    None
+                } else if station.sst_id.is_some() {
+                    station.line.as_ref().and_then(|line| line.station.as_ref())
+                } else {
+                    station_lookup_by_id.get(&station.station_cd).copied()
+                };
+                let station_ref = same_line_station.or_else(|| {
+                    station_lookup
+                        .get(&(line.line_cd, station.station_g_cd))
+                        .copied()
+                });
+                if let Some(station_ref) = station_ref {
+                    let mut station_copy = station_ref.clone();
                     let station_numbers: Vec<StationNumber> =
                         self.get_station_numbers(&station_copy);
                     station_copy.station_numbers = station_numbers;
-                    if let Some(tt) = train_type_map
-                        .get(&station_copy.station_cd)
-                        .copied()
-                        .cloned()
-                        .map(Box::new)
+                    if station_copy.station_cd == station.station_cd {
+                        station_copy.train_type = station.train_type.clone();
+                    } else if let Some(tt) =
+                        train_type_map.get(&station_copy).cloned().map(Box::new)
                     {
                         station_copy.train_type = Some(tt);
-                    };
+                    }
                     line.station = Some(station_copy);
                 }
             }
@@ -1937,6 +2078,7 @@ where
             station_number3: row.station_number3.clone(),
             station_number4: row.station_number4.clone(),
             three_letter_code: row.three_letter_code.clone(),
+            platform_code: row.platform_code.clone(),
             line_cd: row.line_cd,
             line: Some(Box::new(extracted_line.clone())),
             lines: vec![],
@@ -2226,6 +2368,27 @@ fn segment_stop_signature(
     Some(signature)
 }
 
+/// A directed bus pattern serves the segment only when boarding precedes alighting.
+fn forward_bus_segment_signature(
+    stops: &[&Station],
+    from_g_cd: i32,
+    to_g_cd: i32,
+) -> Option<Vec<i32>> {
+    let from = stops
+        .iter()
+        .position(|s| s.station_g_cd == from_g_cd && s.pass != Some(1))?;
+    let to = stops[from + 1..]
+        .iter()
+        .position(|s| s.station_g_cd == to_g_cd && s.pass != Some(1))?;
+    Some(
+        stops[from..=from + 1 + to]
+            .iter()
+            .filter(|s| s.pass != Some(1))
+            .map(|s| s.station_g_cd)
+            .collect(),
+    )
+}
+
 /// Calculate the distance between two points on Earth using the Haversine formula.
 /// Returns the distance in meters. Delegates to the shared domain implementation to
 /// avoid duplicating the formula.
@@ -2260,6 +2423,7 @@ mod tests {
             station_number3: None,
             station_number4: None,
             three_letter_code: None,
+            platform_code: None,
             line_cd,
             line: None,
             lines: vec![],
@@ -2405,6 +2569,24 @@ mod tests {
         let mut station = create_test_station(station_g_cd, station_g_cd, 1, Some(line_group_cd));
         station.pass = pass;
         station
+    }
+
+    #[test]
+    fn directed_bus_patterns_match_only_their_boarding_order() {
+        let ishiyama = create_stop(1, 100, Some(0));
+        let rokku_minami = create_stop(2, 100, Some(0));
+        let to_makomanai = [&ishiyama, &rokku_minami];
+        let to_ishiyama = [&rokku_minami, &ishiyama];
+        assert_eq!(
+            forward_bus_segment_signature(&to_makomanai, 1, 2),
+            Some(vec![1, 2])
+        );
+        assert_eq!(forward_bus_segment_signature(&to_ishiyama, 1, 2), None);
+        assert_eq!(
+            forward_bus_segment_signature(&to_ishiyama, 2, 1),
+            Some(vec![2, 1])
+        );
+        assert_eq!(segment_stop_signature(&to_ishiyama, 1, 2), Some(vec![1, 2]));
     }
 
     #[test]
@@ -3156,45 +3338,45 @@ mod tests {
         /// 都庁前は環状部始端(9930100)と放射部側(9930101)の2レコード。
         fn oedo_stops() -> Vec<Station> {
             let data: Vec<(i32, f64, f64)> = vec![
-                (9930100, 35.690551, 139.69257),             // 都庁前(A)
-                (9930102, 35.693315, 139.699155),            // 新宿西口
-                (9930103, 35.69792, 139.707549),             // 東新宿
-                (9930104, 35.699218, 139.718184),            // 若松河田
-                (9930105, 35.699518, 139.725027),            // 牛込柳町
-                (9930106, 35.700851, 139.735802),            // 牛込神楽坂
-                (9930107, 35.702927, 139.744999),            // 飯田橋
-                (9930108, 35.709598, 139.75325),             // 春日
-                (9930109, 35.707462, 139.760095),            // 本郷三丁目
-                (9930110, 35.707893, 139.774332),            // 上野御徒町
-                (9930111, 35.707045, 139.781958),            // 新御徒町
-                (9930112, 35.703236, 139.790931),            // 蔵前
-                (9930113, 35.696881, 139.797421),            // 両国
-                (9930114, 35.68796, 139.797042),             // 森下
-                (9930115, 35.682105, 139.798851),            // 清澄白河
-                (9930116, 35.671851, 139.796209),            // 門前仲町
-                (9930117, 35.664871, 139.784233),            // 月島
-                (9930118, 35.658507, 139.776442),            // 勝どき
-                (9930119, 35.664895, 139.766915),            // 築地市場
-                (9930120, 35.663703, 139.760642),            // 汐留
-                (9930121, 35.656785, 139.75466),             // 大門
-                (9930122, 35.655007, 139.743642),            // 赤羽橋
-                (9930123, 35.656503, 139.736116),            // 麻布十番
-                (9930124, 35.663921, 139.731567),            // 六本木
-                (9930125, 35.672929, 139.72396),             // 青山一丁目
-                (9930126, 35.679831, 139.714932),            // 国立競技場
-                (9930127, 35.683218, 139.701666),            // 代々木
-                (9930128, 35.68869, 139.698812),             // 新宿
-                (9930101, 35.690551, 139.69257),             // 都庁前(B)
-                (9930129, 35.689798, 139.684304),            // 西新宿五丁目
-                (9930130, 35.69709, 139.682279),             // 中野坂上
-                (9930131, 35.706891, 139.682987),            // 東中野
-                (9930132, 35.714035, 139.686356),            // 中井
-                (9930133, 35.723608, 139.683303),            // 落合南長崎
-                (9930134, 35.732538, 139.670653),            // 新江古田
-                (9930135, 35.737404, 139.65477),             // 練馬
-                (9930136, 35.742567043044, 139.64894845621), // 豊島園
-                (9930137, 35.751452, 139.640236),            // 練馬春日町
-                (9930138, 35.758526, 139.628603),            // 光が丘
+                (9930100, 35.690551, 139.69257),    // 都庁前(A)
+                (9930102, 35.693315, 139.699155),   // 新宿西口
+                (9930103, 35.69792, 139.707549),    // 東新宿
+                (9930104, 35.699218, 139.718184),   // 若松河田
+                (9930105, 35.699518, 139.725027),   // 牛込柳町
+                (9930106, 35.700851, 139.735802),   // 牛込神楽坂
+                (9930107, 35.702927, 139.744999),   // 飯田橋
+                (9930108, 35.709598, 139.75325),    // 春日
+                (9930109, 35.707462, 139.760095),   // 本郷三丁目
+                (9930110, 35.707893, 139.774332),   // 上野御徒町
+                (9930111, 35.707045, 139.781958),   // 新御徒町
+                (9930112, 35.703236, 139.790931),   // 蔵前
+                (9930113, 35.696881, 139.797421),   // 両国
+                (9930114, 35.68796, 139.797042),    // 森下
+                (9930115, 35.682105, 139.798851),   // 清澄白河
+                (9930116, 35.671851, 139.796209),   // 門前仲町
+                (9930117, 35.664871, 139.784233),   // 月島
+                (9930118, 35.658507, 139.776442),   // 勝どき
+                (9930119, 35.664895, 139.766915),   // 築地市場
+                (9930120, 35.663703, 139.760642),   // 汐留
+                (9930121, 35.656785, 139.75466),    // 大門
+                (9930122, 35.655007, 139.743642),   // 赤羽橋
+                (9930123, 35.656503, 139.736116),   // 麻布十番
+                (9930124, 35.663921, 139.731567),   // 六本木
+                (9930125, 35.672929, 139.72396),    // 青山一丁目
+                (9930126, 35.679831, 139.714932),   // 国立競技場
+                (9930127, 35.683218, 139.701666),   // 代々木
+                (9930128, 35.68869, 139.698812),    // 新宿
+                (9930101, 35.690551, 139.69257),    // 都庁前(B)
+                (9930129, 35.689798, 139.684304),   // 西新宿五丁目
+                (9930130, 35.69709, 139.682279),    // 中野坂上
+                (9930131, 35.706891, 139.682987),   // 東中野
+                (9930132, 35.714035, 139.686356),   // 中井
+                (9930133, 35.723608, 139.683303),   // 落合南長崎
+                (9930134, 35.732538, 139.670653),   // 新江古田
+                (9930135, 35.737404, 139.65477),    // 練馬
+                (9930136, 35.7416331, 139.6491014), // 豊島園
+                (9930137, 35.751452, 139.640236),   // 練馬春日町
+                (9930138, 35.758526, 139.628603),   // 光が丘
             ];
             data.iter()
                 .enumerate()
@@ -3667,6 +3849,103 @@ mod tests {
         // get_station_numbers tests
         // ========================================
 
+        // Exercise the canonical CSVs through the same numbering/symbol helpers used
+        // when enriching both the current station and its transfer lines (#1654).
+        #[test]
+        fn test_issue_1654_canonical_line_symbols_and_station_numbers() {
+            fn records(data: &str) -> Vec<std::collections::HashMap<String, String>> {
+                let mut reader = csv::Reader::from_reader(data.as_bytes());
+                let headers = reader.headers().unwrap().clone();
+                reader
+                    .records()
+                    .map(|row| {
+                        let row = row.unwrap();
+                        headers
+                            .iter()
+                            .zip(row.iter())
+                            .map(|(key, value)| (key.to_string(), value.to_string()))
+                            .collect()
+                    })
+                    .collect()
+            }
+            let lines = records(include_str!("../../../../data/2!lines.csv"));
+            let stations = records(include_str!("../../../../data/3!stations.csv"));
+            let interactor = create_interactor();
+            for (line_cd, expected_symbol, expected_shape) in [
+                (30016, "KG", "HALF_SQUARE"),
+                (28010, "F", "ROUND"),
+                (99303, "I", "ROUND"),
+                (11320, "JJ", "SQUARE"),
+                (99907, "N", "ROUND"),
+                (23001, "KS", "KEISEI"),
+                (11313, "JB", "SQUARE"),
+            ] {
+                let row = lines
+                    .iter()
+                    .find(|r| r["line_cd"] == line_cd.to_string())
+                    .unwrap();
+                let mut line = create_test_line(line_cd);
+                line.line_symbol1 = Some(row["line_symbol1"].clone());
+                line.line_symbol1_color = Some(row["line_symbol1_color"].clone());
+                line.line_symbol1_shape = Some(row["line_symbol1_shape"].clone());
+                let symbols = interactor.get_line_symbols(&line);
+                assert_eq!(symbols[0].symbol, expected_symbol, "line {line_cd}");
+                assert_eq!(symbols[0].shape, expected_shape, "line {line_cd}");
+            }
+            for (station_cd, expected) in [
+                (3001601, "IY-17"),
+                (3001602, "KG-01"),
+                (3001618, "NH-60"),
+                (1132004, "JJ-04"),
+                (1132005, "JJ-05"),
+                (9990718, "N-18"),
+                (9990503, "K-11"),
+                (1190231, "JA-00"),
+                (1190301, "JB-00"),
+                (1190812, "JC-00"),
+                (1190230, "JA-01"),
+                (1190302, "JB-01"),
+                (1190811, "JC-01"),
+            ] {
+                let row = stations
+                    .iter()
+                    .find(|r| r["station_cd"] == station_cd.to_string())
+                    .unwrap();
+                let line = lines
+                    .iter()
+                    .find(|l| l["line_cd"] == row["line_cd"])
+                    .unwrap();
+                let mut station = create_test_station(
+                    station_cd,
+                    row["station_g_cd"].parse().unwrap(),
+                    row["line_cd"].parse().unwrap(),
+                    None,
+                );
+                let optional = |row: &std::collections::HashMap<String, String>, key: &str| {
+                    let value = &row[key];
+                    (!value.is_empty()).then(|| value.clone())
+                };
+                station.station_number1 = optional(row, "station_number1");
+                station.station_number2 = optional(row, "station_number2");
+                station.station_number3 = optional(row, "station_number3");
+                station.station_number4 = optional(row, "station_number4");
+                station.line_symbol1 = optional(line, "line_symbol1");
+                station.line_symbol2 = optional(line, "line_symbol2");
+                station.line_symbol3 = optional(line, "line_symbol3");
+                station.line_symbol4 = optional(line, "line_symbol4");
+                station.line_symbol1_color = optional(line, "line_symbol1_color");
+                station.line_symbol1_shape = optional(line, "line_symbol1_shape");
+                let numbers = interactor.get_station_numbers(&station);
+                assert_eq!(numbers.len(), 1, "station {station_cd}");
+                assert_eq!(numbers[0].station_number, expected, "station {station_cd}");
+                if matches!(station_cd, 1190231 | 1190301 | 1190812) {
+                    assert_eq!(numbers[0].line_symbol, line["line_symbol1"]);
+                    assert_eq!(numbers[0].line_symbol_shape, line["line_symbol1_shape"]);
+                    assert_eq!(numbers[0].line_symbol_color, line["line_symbol1_color"]);
+                }
+            }
+        }
+
         #[test]
         fn test_get_station_numbers_single_number() {
             let interactor = create_interactor();
@@ -3850,6 +4129,7 @@ mod tests {
             stations_by_group: Vec<Station>,
             bus_stops: Vec<Station>,
             stations_by_line_group: Vec<Station>,
+            nearby_rail_stations: HashMap<i32, Vec<Station>>,
             /// get_track_distances がどの組にも返す長さ
             track_distance: Option<f64>,
         }
@@ -3860,6 +4140,7 @@ mod tests {
                     stations_by_group,
                     bus_stops,
                     stations_by_line_group: vec![],
+                    nearby_rail_stations: HashMap::new(),
                     track_distance: None,
                 }
             }
@@ -3897,6 +4178,18 @@ mod tests {
                 pairs: &[(u32, u32)],
             ) -> Result<Vec<Option<f64>>, DomainError> {
                 Ok(vec![self.track_distance; pairs.len()])
+            }
+            async fn get_rail_stations_near_bus_stops(
+                &self,
+                coords: &[(i32, f64, f64)],
+                _: f64,
+            ) -> Result<HashMap<i32, Vec<Station>>, DomainError> {
+                Ok(coords
+                    .iter()
+                    .filter_map(|&(id, _, _)| {
+                        Some((id, self.nearby_rail_stations.get(&id)?.clone()))
+                    })
+                    .collect())
             }
             async fn find_by_id(&self, _: u32) -> Result<Option<Station>, DomainError> {
                 Ok(None)
@@ -3996,7 +4289,7 @@ mod tests {
                             Some(TransportType::Bus),
                         )
                         .await?;
-                    for stop in stops {
+                    for stop in stops.into_iter().take(limit_per_station as usize) {
                         result.push((source_g_cd, stop));
                     }
                 }
@@ -4011,8 +4304,13 @@ mod tests {
             ) -> Result<Vec<Station>, DomainError> {
                 Ok(vec![])
             }
-            async fn get_by_line_group_id(&self, _: u32) -> Result<Vec<Station>, DomainError> {
-                Ok(vec![])
+            async fn get_by_line_group_id(&self, id: u32) -> Result<Vec<Station>, DomainError> {
+                Ok(self
+                    .stations_by_line_group
+                    .iter()
+                    .filter(|station| station.line_group_cd == Some(id as i32))
+                    .cloned()
+                    .collect())
             }
             async fn get_by_line_group_id_vec(
                 &self,
@@ -4371,6 +4669,51 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn bus_route_includes_rail_transfers_for_the_matching_platform() {
+            let mut stop = create_bus_stop(200, 35.0, 139.0, 20);
+            stop.line_group_cd = Some(20);
+            let mut other_platform = create_bus_stop(201, 35.001, 139.0, 20);
+            other_platform.station_g_cd = stop.station_g_cd;
+            other_platform.line_group_cd = stop.line_group_cd;
+            let mut rail_station = create_test_station(300, 300, 30, None);
+            rail_station.company_cd = Some(1);
+            rail_station.line_symbol1 = Some("JY".to_string());
+            rail_station.station_number1 = Some("01".to_string());
+            let mut interactor = create_configurable_interactor(
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+                vec![create_test_company(1, "JR東日本")],
+            );
+            interactor.station_repository.stations_by_line_group =
+                vec![stop.clone(), other_platform];
+            interactor
+                .station_repository
+                .nearby_rail_stations
+                .insert(stop.station_cd, vec![rail_station]);
+
+            let stations = interactor
+                .get_stations_by_line_group_id(20, TransportTypeFilter::RailAndBus)
+                .await
+                .unwrap();
+            let line = &stations[0].lines[0];
+            assert_eq!(line.line_cd, 30);
+            assert_eq!(line.company.as_ref().unwrap().company_cd, 1);
+            let destination = line.station.as_ref().unwrap();
+            assert_eq!(destination.station_cd, 300);
+            assert_eq!(destination.station_numbers[0].station_number, "JY-01");
+            assert!(stations[1].lines.is_empty());
+
+            let bus_only = interactor
+                .get_stations_by_line_group_id(20, TransportTypeFilter::Bus)
+                .await
+                .unwrap();
+            assert_eq!(bus_only.len(), 2);
+            assert!(bus_only.iter().all(|station| station.lines.is_empty()));
+        }
+
+        #[tokio::test]
         async fn test_update_station_vec_with_attributes_enriches_company_info() {
             // Create test data
             let company1 = create_test_company(1, "JR東日本");
@@ -4466,6 +4809,188 @@ mod tests {
             let train_type_result = station_result.train_type.as_ref().unwrap();
             assert_eq!(train_type_result.type_name, "快速");
             assert_eq!(train_type_result.station_cd, Some(101));
+        }
+
+        // 系統1035の品川は同一station_cdで急行→特急の2行を持つ。
+        // 並びを逆転して羽田空港方面へ走っても両側の種別を失わないこと。
+        #[tokio::test]
+        async fn junction_train_types_preserve_each_occurrence() {
+            for multiple_groups in [false, true] {
+                for reverse in [false, true] {
+                    let mut express = create_test_train_type_for_station(2700102, "急行");
+                    express.id = Some(1);
+                    express.type_cd = Some(310);
+                    express.line_group_cd = Some(1035);
+                    let mut limited = express.clone();
+                    limited.id = Some(2);
+                    limited.type_cd = Some(306);
+                    limited.type_name = "特急".to_string();
+                    let mut other_group = express.clone();
+                    other_group.id = Some(3);
+                    other_group.line_group_cd = Some(2000);
+                    let mut types = vec![express, limited];
+                    if multiple_groups {
+                        types.push(other_group);
+                    }
+                    let mut stations: Vec<Station> = types
+                        .iter()
+                        .map(|tt| {
+                            let mut station =
+                                create_test_station(2700102, 1130103, 27001, tt.line_group_cd);
+                            station.station_name = "品川".to_string();
+                            station.sst_id = tt.id;
+                            station.type_cd = tt.type_cd;
+                            station
+                        })
+                        .collect();
+                    if reverse {
+                        stations.reverse();
+                    }
+                    let expected: Vec<_> = stations.iter().map(|s| s.sst_id).collect();
+                    let interactor = QueryInteractor {
+                        station_repository: ConfigurableMockStationRepository::new(
+                            stations.clone(),
+                            vec![],
+                        )
+                        .with_line_group_stations(stations.clone()),
+                        line_repository: ConfigurableMockLineRepository::new(vec![
+                            create_test_line_for_station_group(27001, 1130103),
+                        ]),
+                        train_type_repository: ConfigurableMockTrainTypeRepository::new(types),
+                        company_repository: ConfigurableMockCompanyRepository::new(vec![]),
+                    };
+                    let result = if multiple_groups {
+                        interactor
+                            .get_stations_by_line_group_id_vec(
+                                &[1035, 2000],
+                                TransportTypeFilter::Rail,
+                            )
+                            .await
+                            .unwrap()
+                    } else {
+                        interactor
+                            .update_station_vec_with_attributes(
+                                stations,
+                                Some(1035),
+                                TransportTypeFilter::Rail,
+                                false,
+                            )
+                            .await
+                            .unwrap()
+                    };
+                    assert_eq!(result.len(), expected.len());
+                    for (station, id) in result.iter().zip(expected) {
+                        assert_eq!(station.train_type.as_ref().unwrap().id, id);
+                        assert_eq!(
+                            station.train_type.as_ref().unwrap().type_cd,
+                            station.type_cd
+                        );
+                        let nested = station.line.as_ref().unwrap().station.as_ref().unwrap();
+                        assert_eq!(nested.train_type.as_ref().unwrap().id, id);
+                        assert_eq!(nested.sst_id, station.sst_id);
+                        assert_eq!(nested.type_cd, station.type_cd);
+                        assert_eq!(nested.line_group_cd, station.line_group_cd);
+                        let nested = station.lines[0].station.as_ref().unwrap();
+                        assert_eq!(nested.train_type.as_ref().unwrap().id, id);
+                        assert_eq!(nested.sst_id, station.sst_id);
+                        assert_eq!(nested.type_cd, station.type_cd);
+                        assert_eq!(nested.line_group_cd, station.line_group_cd);
+                    }
+                }
+            }
+        }
+
+        /// 同一系統・グループでも、自路線のネスト駅は元のポールを参照する。
+        #[tokio::test]
+        async fn own_line_nested_station_keeps_each_bus_platform() {
+            let mut first = create_test_station(101, 1001, 100, None);
+            first.transport_type = TransportType::Bus;
+            first.platform_code = Some("1".into());
+            let mut second = first.clone();
+            second.station_cd = 102;
+            second.platform_code = Some("2".into());
+            let stations = vec![first, second];
+            let mut line = create_test_line_for_station_group(100, 1001);
+            line.transport_type = TransportType::Bus;
+            let interactor = QueryInteractor {
+                station_repository: ConfigurableMockStationRepository::new(
+                    stations.clone(),
+                    vec![],
+                ),
+                line_repository: ConfigurableMockLineRepository::new(vec![line]),
+                train_type_repository: ConfigurableMockTrainTypeRepository::new(vec![]),
+                company_repository: ConfigurableMockCompanyRepository::new(vec![]),
+            };
+            let result = interactor
+                .update_station_vec_with_attributes(stations, None, TransportTypeFilter::Bus, false)
+                .await
+                .unwrap();
+
+            assert_eq!(result.len(), 2);
+            for (station, code) in result.iter().zip(["1", "2"]) {
+                let nested = station.lines[0].station.as_ref().unwrap();
+                assert_eq!(nested.station_cd, station.station_cd);
+                assert_eq!(nested.platform_code.as_deref(), Some(code));
+            }
+        }
+
+        #[tokio::test]
+        async fn other_line_nested_station_uses_its_sst_row() {
+            for (sst_id, expected_id) in [(Some(1), Some(1)), (Some(99), None), (None, Some(2))] {
+                let parent = create_test_station(101, 1001, 100, Some(1000));
+                let mut other = create_test_station(201, 1001, 200, Some(1000));
+                other.sst_id = sst_id;
+                let mut first = create_test_train_type_for_station(201, "急行");
+                first.id = Some(1);
+                let mut last = first.clone();
+                last.id = Some(2);
+                last.type_name = "特急".to_string();
+                let interactor = QueryInteractor {
+                    station_repository: ConfigurableMockStationRepository::new(
+                        vec![parent.clone(), other],
+                        vec![],
+                    ),
+                    line_repository: ConfigurableMockLineRepository::new(vec![
+                        create_test_line_for_station_group(100, 1001),
+                        create_test_line_for_station_group(200, 1001),
+                    ]),
+                    train_type_repository: ConfigurableMockTrainTypeRepository::new(vec![
+                        first, last,
+                    ]),
+                    company_repository: ConfigurableMockCompanyRepository::new(vec![]),
+                };
+                let result = interactor
+                    .update_station_vec_with_attributes(
+                        vec![parent],
+                        Some(1000),
+                        TransportTypeFilter::Rail,
+                        false,
+                    )
+                    .await
+                    .unwrap();
+                let nested = result[0]
+                    .lines
+                    .iter()
+                    .find(|line| line.line_cd == 200)
+                    .unwrap()
+                    .station
+                    .as_ref()
+                    .unwrap();
+                assert_eq!(nested.sst_id, sst_id);
+                assert_eq!(nested.train_type.as_ref().and_then(|tt| tt.id), expected_id);
+            }
+        }
+
+        #[test]
+        fn train_type_lookup_does_not_replace_a_missing_row_with_another_occurrence() {
+            let tt = create_test_train_type_for_station(101, "急行");
+            let types = vec![tt];
+            let lookup = StationTrainTypes::new(&types);
+            let mut station = create_test_station(101, 1001, 100, Some(1000));
+            // 行IDのない従来の駅データでは駅IDによる補完を維持する。
+            assert!(lookup.get(&station).is_some());
+            station.sst_id = Some(-1);
+            assert!(lookup.get(&station).is_none());
         }
 
         #[tokio::test]
@@ -4570,6 +5095,73 @@ mod tests {
                 has_bus_line,
                 "Rail station should have nearby bus routes added when transport_type is RailAndBus"
             );
+        }
+
+        #[tokio::test]
+        async fn nearby_bus_routes_keep_stations_beyond_fifty_candidates() {
+            for (skip_types_join, prefetched) in [(false, false), (true, false), (true, true)] {
+                let rail = create_test_station(101, 1001, 100, None);
+                let mut stops = Vec::new();
+                let mut lines = vec![create_test_line_for_station_group(100, 1001)];
+                for i in 0..60 {
+                    let mut stop = create_bus_stop(200 + i, rail.lat, rail.lon, 500 + i);
+                    stop.station_g_cd = 200;
+                    stop.platform_code = Some("7".to_string());
+                    let mut line = create_test_line_for_station_group(500 + i, 200);
+                    line.transport_type = TransportType::Bus;
+                    stops.push(stop);
+                    lines.push(line);
+                }
+                // 同じグループの路線は、対応する停留所が距離外でも従来どおり一覧に残します。
+                let mut outside_line = create_test_line_for_station_group(999, 200);
+                outside_line.transport_type = TransportType::Bus;
+                lines.push(outside_line);
+                // 候補順の先頭を選ぶ既存動作を維持し、ここでは距離順を再計算しません。
+                stops[0].lat += 0.001;
+                let mut later_stop = stops[0].clone();
+                later_stop.station_cd = 9999;
+                later_stop.lat = rail.lat;
+                stops.push(later_stop);
+                let mut outside_stop = create_bus_stop(9998, rail.lat + 0.01, rail.lon, 999);
+                outside_stop.station_g_cd = 200;
+                stops.push(outside_stop);
+                let interactor = create_configurable_interactor(
+                    vec![rail.clone()],
+                    stops,
+                    lines,
+                    vec![],
+                    vec![],
+                );
+                let prefetched_stations = prefetched.then(|| vec![rail.clone()]);
+                let result = interactor
+                    .update_station_vec_with_attributes_inner(
+                        vec![rail],
+                        None,
+                        TransportTypeFilter::RailAndBus,
+                        skip_types_join,
+                        prefetched_stations,
+                    )
+                    .await
+                    .unwrap();
+                let buses: Vec<_> = result[0]
+                    .lines
+                    .iter()
+                    .filter(|line| line.transport_type == TransportType::Bus)
+                    .collect();
+                assert_eq!(buses.len(), 61);
+                assert_eq!(buses[60].line_cd, 999);
+                assert!(buses[60].station.is_none());
+                for (i, line) in buses.iter().take(60).enumerate() {
+                    assert_eq!(line.line_cd, 500 + i as i32);
+                    let stop = line
+                        .station
+                        .as_ref()
+                        .expect("every bus route must be selectable");
+                    assert_eq!(stop.line_cd, line.line_cd);
+                    assert_eq!(stop.station_cd, 200 + i as i32);
+                    assert_eq!(stop.platform_code.as_deref(), Some("7"));
+                }
+            }
         }
 
         #[tokio::test]

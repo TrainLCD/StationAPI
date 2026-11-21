@@ -277,6 +277,7 @@ pub struct Station {
     pub name_chinese: Option<String>,
     pub name_korean: Option<String>,
     pub three_letter_code: Option<String>,
+    pub platform_code: Option<String>,
     pub lines: Vec<Line>,
     pub line: Option<Box<Line>>,
     pub prefecture_id: u32,

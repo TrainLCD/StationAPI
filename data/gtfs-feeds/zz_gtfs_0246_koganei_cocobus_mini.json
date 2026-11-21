@@ -1,0 +1,14 @@
+{
+  "name": "小金井市コミュニティバス「CoCoバス・ミニ」(野川・七軒家循環)",
+  "url": "https://api.odpt.org/api/v4/files/odpt/TsukubaKankouKotsu/CoCoBusNogawa.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/tsukuba_kankou_kotsu_co_co_bus_nogawa",
+  "license": "Public Transportation Open Data Basic License",
+  "company": {
+    "name": "つくば観光交通",
+    "name_full": "つくば観光交通株式会社",
+    "kana": "ツクバカンコウコウツウ",
+    "english": "Tsukuba Kanko Kotsu",
+    "url": "https://www.tukuba-taxi.com/company.php"
+  },
+  "company_cd": 281
+}

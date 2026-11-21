@@ -1,0 +1,13 @@
+{
+  "name": "横浜市南区三春台・清水ケ丘地区「おおたループバス」",
+  "url": "https://www.city.yokohama.lg.jp/kurashi/machizukuri-kankyo/kotsu/chiikikokyo/huyasu/odekake/torikumitiku/ootaloopbus.files/ootaloop.zip",
+  "source": "https://www.city.yokohama.lg.jp/kurashi/machizukuri-kankyo/kotsu/chiikikokyo/huyasu/odekake/torikumitiku/ootaloopbus.html",
+  "license": "CC BY 4.0",
+  "company_cd": 316,
+  "company": {
+    "name": "横浜市",
+    "kana": "ヨコハマシ",
+    "english": "Yokohama City",
+    "url": "https://www.city.yokohama.lg.jp/"
+  }
+}

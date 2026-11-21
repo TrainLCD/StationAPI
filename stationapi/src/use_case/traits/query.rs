@@ -34,6 +34,11 @@ pub trait QueryUseCase: Send + Sync + 'static {
         &self,
         station_group_id_vec: &[u32],
     ) -> Result<Vec<Station>, UseCaseError>;
+    async fn get_nearby_bus_stops(
+        &self,
+        latitude: f64,
+        longitude: f64,
+    ) -> Result<Vec<Station>, UseCaseError>;
     async fn get_stations_by_coordinates(
         &self,
         latitude: f64,

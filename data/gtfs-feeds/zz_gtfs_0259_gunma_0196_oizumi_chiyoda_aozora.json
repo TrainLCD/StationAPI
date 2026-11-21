@@ -1,0 +1,13 @@
+{
+  "name": "大泉町・千代田町広域公共バス あおぞら",
+  "url": "https://api.gtfs-data.jp/v2/organizations/oizumitown/feeds/kouikikoukyoubasuaozora/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=oizumitown*kouikikoukyoubasuaozora",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "大泉町",
+    "kana": "オオイズミマチ",
+    "english": "Oizumi Town",
+    "url": "https://www.town.oizumi.gunma.jp/"
+  },
+  "company_cd": 305
+}

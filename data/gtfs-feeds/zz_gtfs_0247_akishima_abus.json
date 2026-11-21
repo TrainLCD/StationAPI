@@ -1,0 +1,13 @@
+{
+  "name": "昭島市コミュニティバス「Aバス」",
+  "url": "https://api.gtfs-data.jp/v2/organizations/akishimacity/feeds/Abus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=akishimacity*Abus",
+  "license": "CC0 1.0",
+  "company": {
+    "name": "昭島市",
+    "kana": "アキシマシ",
+    "english": "Akishima City",
+    "url": "https://www.city.akishima.lg.jp/kurashi/bus/1002242/1002244.html"
+  },
+  "company_cd": 282
+}

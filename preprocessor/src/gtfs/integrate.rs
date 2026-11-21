@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use stationapi::domain::arrival_estimation::haversine_distance;
 use stationapi::domain::romaji::strip_macrons;
+use stationapi::model::TrainDirection;
 
 use super::model::{GtfsData, Stop};
 use anyhow::Result;
@@ -54,12 +55,25 @@ pub fn integrate(dataset: &mut Dataset, gtfs: &GtfsData) -> Result<()> {
 
 /// gtfs_routes を lines へ。
 fn routes_to_lines(dataset: &mut Dataset, gtfs: &GtfsData, codes: &mut BusCodes) -> Result<()> {
+    let served_routes: HashSet<&str> = gtfs
+        .trips
+        .iter()
+        .map(|trip| trip.route_id.as_str())
+        .collect();
     let mut added = 0usize;
     for route in &gtfs.routes {
-        // 接頭辞から事業者を引けない系統は取り込まない。
-        let Some(company_cd) = company_cd_for_gtfs_route(&route.route_id) else {
+        // 路線単位の事業者指定を優先し、それがなければ接頭辞で引く。
+        let Some(company_cd) = route
+            .company_cd
+            .or_else(|| company_cd_for_gtfs_route(&route.route_id))
+        else {
             continue;
         };
+        if route.route_id.starts_with("nagoya_city_bus:")
+            && !served_routes.contains(route.route_id.as_str())
+        {
+            continue;
+        }
         let line_cd = codes.line_cd(&route.route_id)?;
         let line_name = route
             .route_short_name
@@ -88,18 +102,25 @@ fn routes_to_lines(dataset: &mut Dataset, gtfs: &GtfsData, codes: &mut BusCodes)
             "line_name",
             text(line_name.clone()),
         );
-        set(
-            &dataset.lines,
-            &mut row,
-            "line_name_k",
-            text(line_name.clone()),
-        );
+        let feed_id = route.route_id.split_once(':').map_or("", |(id, _)| id);
+        let search_name = if super::registered::is_registered(feed_id) {
+            stationapi::domain::normalize::normalize_for_search(&line_name)
+        } else {
+            line_name.clone()
+        };
+        set(&dataset.lines, &mut row, "line_name_k", text(search_name));
         set(&dataset.lines, &mut row, "line_name_h", text(line_name));
         set(
             &dataset.lines,
             &mut row,
             "line_name_r",
-            text(route.route_long_name.clone().unwrap_or_default()),
+            text(
+                route
+                    .route_long_name_r
+                    .clone()
+                    .or_else(|| route.route_long_name.clone())
+                    .unwrap_or_default(),
+            ),
         );
         set(&dataset.lines, &mut row, "line_color_c", text(line_color));
         set(&dataset.lines, &mut row, "line_type", int(route.route_type));
@@ -540,6 +561,50 @@ fn trip_is_better(candidate: &TripRank, current: &TripRank) -> bool {
         .is_lt()
 }
 
+/// 親停留所と系統の組ごとに、実際に停まる子停留所ののりばを調べる。
+/// コードが欠けているか異なるコードが混ざる場合は、単一の番号を返せない。
+fn child_platform_codes(gtfs: &GtfsData) -> HashMap<(&str, &str), Option<&str>> {
+    let children: HashMap<_, _> = gtfs
+        .stops
+        .iter()
+        .filter_map(|stop| {
+            Some((
+                stop.stop_id.as_str(),
+                (
+                    stop.parent_station.as_deref()?,
+                    stop.platform_code.as_deref(),
+                ),
+            ))
+        })
+        .collect();
+    if !children.values().any(|(_, code)| code.is_some()) {
+        return HashMap::new();
+    }
+
+    let route_by_trip: HashMap<_, _> = gtfs
+        .trips
+        .iter()
+        .map(|trip| (trip.trip_id.as_str(), trip.route_id.as_str()))
+        .collect();
+    let mut codes = HashMap::new();
+    for time in &gtfs.stop_times {
+        if let (Some(&(parent, code)), Some(&route)) = (
+            children.get(time.stop_id.as_str()),
+            route_by_trip.get(time.trip_id.as_str()),
+        ) {
+            codes
+                .entry((parent, route))
+                .and_modify(|previous| {
+                    if *previous != code {
+                        *previous = None;
+                    }
+                })
+                .or_insert(code);
+        }
+    }
+    codes
+}
+
 /// 停留所を stations へ。物理停留所 1 件につき、通る系統の数だけ行を作る。
 fn stops_to_stations(
     dataset: &mut Dataset,
@@ -562,6 +627,12 @@ fn stops_to_stations(
         .collect();
 
     let group_ids = build_station_g_cd_map(&stops, &parent_ids);
+    let child_platform_codes = child_platform_codes(gtfs);
+    let prefectures = stops
+        .iter()
+        .any(|stop| super::prefecture::uses_coordinates(&stop.stop_id))
+        .then(super::prefecture::Prefectures::load)
+        .transpose()?;
     let groups = group_ids.values().copied().collect::<HashSet<_>>().len();
     info!("バス停 {} 件を {groups} グループにまとめた", stops.len());
 
@@ -583,6 +654,24 @@ fn stops_to_stations(
             .map(hiragana_to_katakana)
             .unwrap_or_else(|| stop.stop_name.clone());
 
+        let pref_cd = if super::prefecture::uses_coordinates(&stop.stop_id) {
+            prefectures
+                .as_ref()
+                .and_then(|index| index.code_at(stop.stop_lon, stop.stop_lat))
+                .unwrap_or(0)
+        } else if stop.stop_id.starts_with("hokkaido_chuo:")
+            || stop.stop_id.starts_with("hokkaido_express:")
+            || stop.stop_id.starts_with("jotetsu:")
+        {
+            1
+        } else if stop.stop_id.starts_with("nagoya_srt:")
+            || stop.stop_id.starts_with("nagoya_city_bus:")
+        {
+            23
+        } else {
+            13
+        };
+
         for (route_id, stop_sequence) in routes {
             let station_cd = codes.station_cd(&stop.stop_id, route_id)?;
             let line_cd = codes.line_cd(route_id)?;
@@ -596,8 +685,20 @@ fn stops_to_stations(
             set(t, &mut row, "station_name_rn", station_name_rn.clone());
             set(t, &mut row, "station_name_zh", stop.stop_name_zh.clone());
             set(t, &mut row, "station_name_ko", stop.stop_name_ko.clone());
+            let platform_code = stop.platform_code.as_deref().or_else(|| {
+                child_platform_codes
+                    .get(&(stop.stop_id.as_str(), route_id.as_str()))
+                    .copied()
+                    .flatten()
+            });
+            set(
+                t,
+                &mut row,
+                "platform_code",
+                platform_code.map(str::to_string),
+            );
             set(t, &mut row, "line_cd", int(line_cd));
-            set(t, &mut row, "pref_cd", int(13));
+            set(t, &mut row, "pref_cd", int(pref_cd));
             set(t, &mut row, "post", text(""));
             set(t, &mut row, "address", text(""));
             set(t, &mut row, "lon", text(stop.stop_lon.to_string()));
@@ -764,7 +865,8 @@ fn trip_variations_to_types(
         let mut parents: Vec<&str> = times.iter().filter_map(parent_of_time).collect();
         parents.sort();
         parents.dedup();
-        let stop_set_key = if parents.is_empty() {
+        let feed_id = route_id.split_once(':').map_or("", |(id, _)| id);
+        let stop_set_key = if parents.is_empty() || super::feed::uses_stop_order_patterns(feed_id) {
             None
         } else {
             Some(parents.join("|"))
@@ -772,6 +874,18 @@ fn trip_variations_to_types(
 
         let first_parent = first.and_then(parent_of_time);
         let last_parent = last.and_then(parent_of_time);
+
+        let first_stop_name = first.and_then(|time| name_of(&time.stop_id));
+        let last_stop_name = last.and_then(|time| name_of(&time.stop_id));
+        // 市バスの循環便は同じ停留所でも、始発と終点のポール ID が異なる。
+        let is_loop = first_parent.is_some() && first_parent == last_parent
+            || super::registered::is_registered(feed_id)
+                && first
+                    .zip(last)
+                    .is_some_and(|(first, last)| first.stop_id == last.stop_id)
+            || route_id.starts_with("nagoya_city_bus:")
+                && first_stop_name.is_some()
+                && first_stop_name == last_stop_name;
 
         variations.push(Variation {
             route_id,
@@ -784,19 +898,34 @@ fn trip_variations_to_types(
             route_long_name_r: route.route_long_name_r.as_deref(),
             route_color: route.route_color.as_deref(),
             stop_count: times.len(),
-            first_stop_name: first.and_then(|time| name_of(&time.stop_id)),
+            first_stop_name,
             first_stop_name_r: first.and_then(|time| roman_of(&time.stop_id)),
-            last_stop_name: last.and_then(|time| name_of(&time.stop_id)),
+            last_stop_name,
             last_stop_name_r: last.and_then(|time| roman_of(&time.stop_id)),
-            is_loop: first_parent.is_some() && first_parent == last_parent,
+            is_loop,
             stop_set_key,
         });
     }
 
     // 停留所数の多い shape が接尾辞なしの名前を取れるよう、この順で並べる。
+    // フィードを追加した順に採番し、ハッシュ衝突時にも既存 ID を維持する。
+    let feed_order = |route_id: &str| match route_id.split_once(':').map(|(id, _)| id) {
+        Some("nagoya_city_bus") => 1,
+        Some("hokkaido_chuo") => 2,
+        Some("hokkaido_express") => 3,
+        Some("jotetsu") => 4,
+        Some("ward_chiyoda") => 5,
+        Some("ward_tokyo_bunkyo") => 9,
+        Some(id) if super::registered::is_registered(id) => 10,
+        Some("west_odakyu") => 6,
+        Some("west_tokyo_nishi") => 7,
+        Some("ward_minato") => 8,
+        _ => 0,
+    };
     variations.sort_by(|a, b| {
-        a.route_id
-            .cmp(b.route_id)
+        feed_order(a.route_id)
+            .cmp(&feed_order(b.route_id))
+            .then(a.route_id.cmp(b.route_id))
             .then(b.stop_count.cmp(&a.stop_count))
             .then(a.shape_id.cmp(b.shape_id))
     });
@@ -842,8 +971,17 @@ fn trip_variations_to_types(
         let line_group_cd = codes.line_group_cd(variation.route_id, variation.shape_id)?;
 
         let is_bidirectional = directions[index].len() > 1;
-        let direction = if is_bidirectional {
-            0 // 上下がまとまったので Both
+        let feed_id = variation.route_id.split_once(':').map_or("", |(id, _)| id);
+        let uses_stop_order = super::feed::uses_stop_order_patterns(feed_id);
+        let direction = if is_bidirectional || (uses_stop_order && variation.is_loop) {
+            TrainDirection::Both as i32
+        } else if uses_stop_order {
+            // GTFS の direction_id=0 は片方向。API の Both とは区別する。
+            if variation.direction_id == Some(1) {
+                TrainDirection::Inbound as i32
+            } else {
+                TrainDirection::Outbound as i32
+            }
         } else {
             variation.direction_id.unwrap_or(0)
         };
@@ -1088,6 +1226,10 @@ fn build_type_name(
     }
 
     match (variation.is_loop, first_stop, headsign) {
+        // 市バスの行先には公式の経由地が含まれる。
+        (true, _, Some(head)) if variation.route_id.starts_with("nagoya_city_bus:") => {
+            format!("{head} (循環)")
+        }
         (true, _, Some(head)) => loop_name(head),
         (true, Some(first), None) => loop_name(first),
         (false, Some(first), Some(head)) if first != head => format!("{first} → {head}"),
@@ -1114,6 +1256,10 @@ fn build_type_name_roman(
         let first_r = variation.first_stop_name_r.filter(|s| !s.is_empty());
         match (japanese, variation.last_stop_name, last_r) {
             (Some(head), Some(last), Some(roman)) if head == last => Some(roman),
+            // 市バスの行先には経由地の注記が付くため、終点の公式英語名を使う。
+            (_, _, Some(roman)) if variation.route_id.starts_with("nagoya_city_bus:") => {
+                Some(roman)
+            }
             _ => {
                 if variation.is_loop && japanese.is_some() {
                     // 循環は始発 == 終点なので、始発のローマ字で代用できる。
@@ -1162,4 +1308,58 @@ fn build_type_name_roman(
 /// 列名を指定して 1 セルを埋める。
 fn set(table: &crate::table::Table, row: &mut [Cell], column: &str, value: Cell) {
     row[table.col(column)] = value;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gtfs::model::{StopTime, Trip};
+
+    /// 停車実績を系統ごとに集計し、複数候補や不明なコードからは番号を選ばない。
+    #[test]
+    fn child_platform_codes_require_agreement_on_the_route() {
+        let mut gtfs = GtfsData::default();
+        gtfs.stops = [("a", Some("1")), ("b", Some("2")), ("c", None)]
+            .into_iter()
+            .map(|(id, code)| Stop {
+                stop_id: id.into(),
+                stop_name: "新橋駅前".into(),
+                stop_name_k: None,
+                stop_name_r: None,
+                stop_name_zh: None,
+                stop_name_ko: None,
+                stop_lat: 35.0,
+                stop_lon: 139.0,
+                platform_code: code.map(str::to_string),
+                parent_station: Some("parent".into()),
+            })
+            .collect();
+        for (route, visits) in [
+            ("route1", &["a", "a"][..]),
+            ("route2", &["b"][..]),
+            ("multiple", &["a", "b", "a"][..]),
+            ("unknown", &["c", "a"][..]),
+        ] {
+            gtfs.trips.push(Trip {
+                trip_id: route.into(),
+                route_id: route.into(),
+                trip_headsign: None,
+                direction_id: None,
+                shape_id: None,
+            });
+            for (i, stop_id) in visits.iter().enumerate() {
+                gtfs.stop_times.push(StopTime {
+                    trip_id: route.into(),
+                    stop_id: (*stop_id).into(),
+                    stop_sequence: i as i32 + 1,
+                    shape_dist_traveled: None,
+                });
+            }
+        }
+        let codes = child_platform_codes(&gtfs);
+        assert_eq!(codes[&("parent", "route1")], Some("1"));
+        assert_eq!(codes[&("parent", "route2")], Some("2"));
+        assert_eq!(codes[&("parent", "multiple")], None);
+        assert_eq!(codes[&("parent", "unknown")], None);
+    }
 }

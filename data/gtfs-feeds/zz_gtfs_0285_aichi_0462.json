@@ -1,0 +1,13 @@
+{
+  "name": "長久手市 N-バス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/nagakutecity/feeds/communitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=nagakutecity*communitybus",
+  "license": "CC BY 4.0",
+  "company_cd": 346,
+  "company": {
+    "name": "長久手市",
+    "kana": "ナガクテシ",
+    "english": "Nagakute City",
+    "url": "https://www.city.nagakute.lg.jp/kurashi_tetsuzuki/kokyokotsu/1/21391.html"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "神津島村営バス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/kozushimavillage/feeds/kozushimavillagebus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=kozushimavillage*kozushimavillagebus",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "神津島村",
+    "kana": "コウヅシマムラ",
+    "english": "Kozushima Village",
+    "url": "https://www.vill.kouzushima.tokyo.jp/"
+  },
+  "company_cd": 293
+}

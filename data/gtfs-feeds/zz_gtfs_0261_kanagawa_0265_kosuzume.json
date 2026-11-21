@@ -1,0 +1,13 @@
+{
+  "name": "横浜市地域交通サポート事業 戸塚区小雀地区「こすずめ号」",
+  "url": "https://www.city.yokohama.lg.jp/kurashi/machizukuri-kankyo/kotsu/chiikikokyo/huyasu/odekake/torikumitiku/kosuzume-bus.files/0064_20260513.zip",
+  "source": "https://data.city.yokohama.lg.jp/dataset/toshi_kosuzume-bus",
+  "license": "CC BY 4.0",
+  "company_cd": 316,
+  "company": {
+    "name": "横浜市",
+    "kana": "ヨコハマシ",
+    "english": "Yokohama City",
+    "url": "https://www.city.yokohama.lg.jp/"
+  }
+}

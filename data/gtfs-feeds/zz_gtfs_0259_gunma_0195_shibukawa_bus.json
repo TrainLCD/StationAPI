@@ -1,0 +1,14 @@
+{
+  "name": "渋川市内バス路線（日本中央交通運行路線）",
+  "url": "https://www.city.shibukawa.lg.jp/manage/contents/upload/69c9b5a58fb3c.zip",
+  "source": "https://www.city.shibukawa.lg.jp/kurashi/000054/000055/p011310.html",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "日本中央交通",
+    "name_full": "日本中央交通株式会社",
+    "kana": "ニホンチュウオウコウツウ",
+    "english": "Nippon Chuo Kotsu",
+    "url": "https://www.nck-taxi.jp/"
+  },
+  "company_cd": 304
+}

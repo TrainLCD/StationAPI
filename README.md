@@ -34,6 +34,34 @@ This project includes a comprehensive dataset of Japanese railway information in
   (https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-2025.html) を加工して作成
 - Bus stops and routes are derived from the GTFS and ODPT feeds listed in
   `preprocessor/src/gtfs/feed.rs` and `preprocessor/src/gtfs/odpt.rs`.
+- Nagoya City Bus routes and stops use the Transportation Bureau, City of Nagoya
+  [GTFS-JP dataset (2026-03-28)](https://data.bodik.jp/dataset/231002_7109030000_bus-gtfs-jp/resource/125a1d12-7df6-489c-abde-911856e05d1b),
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), processed for TrainLCD.
+- Hokkaido Chuo Bus routes and stops use the [GTFS feed published on HODA](https://ckan.hoda.jp/dataset/gtfs-data/resource/dbadfccc-670e-49b9-be77-c3f346ee3160)
+  (Jorudan, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), processed for TrainLCD.
+- Hokkaido express bus routes and stops use the [Highway Express Bus GTFS feed published on HODA](https://ckan.hoda.jp/dataset/gtfs-data/resource/ccfd2358-c804-4cfe-b4fe-278c3f035c64)
+  (Jorudan, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), processed for TrainLCD.
+- Jotetsu Bus routes and stops use the [GTFS feed published on HODA](https://ckan.hoda.jp/dataset/gtfs-data/resource/fef98fef-6fe2-472f-bde3-9d4f0a509a4a)
+  (Jorudan, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), processed for TrainLCD.
+- Chiyoda Kazaguruma routes and stops use the [GTFS feed from Hitachi Automobile Transportation](https://ckan.odpt.org/dataset/hitachi_automobile_transportation_chiyoda_alllines)
+  ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), processed for TrainLCD.
+- Bunkyo B-guru routes and stops use the [GTFS feed from Hitachi Automobile Transportation](https://ckan.odpt.org/dataset/hitachi_automobile_transportation_all_lines)
+  ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), processed for TrainLCD.
+- Nagoya City SRT bus routes and stops use the Nagoya City Housing and City Planning
+  Bureau GTFS (2026-09-11), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/),
+  [source](https://ckan.odpt.org/dataset/nagoya_housing_city_planning_bureau_nagoya_srt_all_lines/resource/a7588aea-27fd-4962-b39a-912209f19a1b), processed for TrainLCD.
+- Odakyu Bus routes and stops use the [GTFS feed from Odakyu Bus Co., Ltd.](https://ckan.odpt.org/dataset/odakyu_bus_aii_lines)
+  ([Public Transportation Open Data Basic License](https://developer.odpt.org/terms/data_basic_license.html)), processed for TrainLCD.
+- Nishi Tokyo Bus routes and stops use the [GTFS feed from Nishi Tokyo Bus Co., Ltd.](https://ckan.odpt.org/dataset/nishi_tokyo_bus_nt_bus)
+  ([Public Transportation Open Data Basic License](https://developer.odpt.org/terms/data_basic_license.html)), processed for TrainLCD.
+- Minato Chiibus routes and stops use the [GTFS feed from Fuji Express](https://bus.fujikyu.co.jp/rosen/gtfs/)
+  ([CC BY](https://search.ckan.jp/datasets/catalog.data.metro.tokyo.lg.jp__dataset:t131032d0000000243)), processed for TrainLCD.
+- Limon Bus (Shinki Kanko): [source and attribution](data/gtfs-feeds/zz_gtfs_0262_osaka_0535_limonbus.md), CC BY 4.0.
+- Daito City community buses and shared taxis: [source and attribution](data/gtfs-feeds/zz_gtfs_0263_osaka_extra_daito.md), CC BY 4.0. See the [Osaka coverage audit](docs/osaka-gtfs-audit.md) for additional candidates and access requirements.
+- Fujimino City publishes the Fujimin-go GTFS. See its [source, terms of use, and processing notice](data/gtfs-feeds/zz_gtfs_0314_saitama_0205_fujimino.md).
+- TrainLCD processes the additional bus GTFS feeds into StationAPI routes, stops, and operating patterns. Each [feed registration](data/gtfs-feeds/) identifies the source dataset and its terms of use.
+- Gunma GTFS stop prefectures are assigned using [prefecture boundaries derived by Kyodo News](https://github.com/kyodo-official/japan-choropleth/tree/eccecca8f37d0569e13b56f62d71b137c75ea2f5)
+  from the MLIT [2025 administrative area dataset](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2025.html) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
 - Some of the reference travel times in `travel_times/cases.csv` are derived from
   the Toei Subway GTFS (Bureau of Transportation, Tokyo Metropolitan Government,
   CC BY 4.0) and from the Tokyo Metro, Metropolitan Intercity Railway (Tsukuba

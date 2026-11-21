@@ -19,7 +19,7 @@ fn records(filename: &str) -> Vec<StringRecord> {
 #[test]
 fn funabashi_section_express_keeps_all_twelve_stations_and_six_stops() {
     let rows = records("5!station_station_types.csv");
-    let pattern: Vec<_> = rows.iter().filter(|r| &r[3] == "1205").collect();
+    let pattern: Vec<_> = rows.iter().filter(|r| &r[3] == "1208").collect();
     assert_eq!(
         pattern
             .iter()
@@ -29,7 +29,7 @@ fn funabashi_section_express_keeps_all_twelve_stations_and_six_stops() {
     );
     let stops = [2100424, 2100428, 2100430, 2100433, 2100434, 2100435];
     for row in pattern {
-        assert_eq!(&row[2], "559");
+        assert_eq!(&row[2], "563");
         assert_eq!(
             row[4].parse::<u32>().unwrap(),
             u32::from(!stops.contains(&row[1].parse().unwrap()))
@@ -40,13 +40,13 @@ fn funabashi_section_express_keeps_all_twelve_stations_and_six_stops() {
 #[test]
 fn weekday_morning_direction_and_timetable_rule_do_not_affect_shared_type() {
     let types = records("4!types.csv");
-    let matches: Vec<_> = types.iter().filter(|r| &r[1] == "559").collect();
+    let matches: Vec<_> = types.iter().filter(|r| &r[1] == "563").collect();
     assert_eq!(matches.len(), 1);
     assert_eq!(&matches[0][2], "区間急行(船橋方面)");
     assert_eq!(&matches[0][8], "2");
     assert_eq!(&matches[0][9], "3");
     assert!(
-        service_rule(Some(559), Some(1205))
+        service_rule(Some(563), Some(1208))
             .unwrap()
             .requires_timetable
     );

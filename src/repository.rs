@@ -464,6 +464,36 @@ impl StationRepository for MemStationRepository {
         Ok(out)
     }
 
+    async fn get_rail_stations_near_bus_stops(
+        &self,
+        coords: &[(i32, f64, f64)],
+        radius_meters: f64,
+    ) -> Result<HashMap<i32, Vec<Station>>, DomainError> {
+        let radius_km = radius_meters / 1000.0;
+        let mut stations_by_stop = HashMap::new();
+        for &(stop_cd, lat, lon) in coords {
+            let mut seen_lines = HashSet::new();
+            let stations: Vec<_> =
+                index::within_radius(lat, lon, radius_km, TransportType::Rail as i32)
+                    .into_iter()
+                    .filter_map(|(record, _)| {
+                        let line = active_line(record.line_cd)?;
+                        if !seen_lines.insert(line.line_cd) {
+                            return None;
+                        }
+                        let mut station = record.to_entity(Some(line));
+                        station.line_group_cd = index::first_line_group_cd(record.station_cd);
+                        station.has_train_types = station.line_group_cd.is_some();
+                        Some(station)
+                    })
+                    .collect();
+            if !stations.is_empty() {
+                stations_by_stop.insert(stop_cd, stations);
+            }
+        }
+        Ok(stations_by_stop)
+    }
+
     /// 1. その路線 (station_id 指定時はその駅) に紐づく系統を priority 降順で 1 件選ぶ。
     ///    候補の無い新幹線は、停車する種別のうち types.id が最も若いものの系統を選ぶ
     /// 2. その系統の停車駅を sst.id 順で返す
@@ -1192,11 +1222,34 @@ impl TrainTypeRepository for MemTrainTypeRepository {
     }
 
     async fn get_by_station_id(&self, station_id: u32) -> Result<Vec<TrainType>, DomainError> {
-        let mut out: Vec<TrainType> = index::sst_by_station(station_id as i32)
-            .filter(|sst| sst_is_stop(sst))
-            .filter_map(|sst| index::type_by_cd(sst.type_cd).map(|ty| build_train_type(sst, ty)))
-            .collect();
+        let types_at = |id| {
+            index::sst_by_station(id)
+                .filter(|sst| sst_is_stop(sst))
+                .filter_map(|sst| {
+                    index::type_by_cd(sst.type_cd).map(|ty| build_train_type(sst, ty))
+                })
+        };
+        let station_id = station_id as i32;
+        let mut out: Vec<TrainType> = types_at(station_id).collect();
         out.sort_by_key(|t| t.id.unwrap_or(0));
+
+        // 市バスは方向ごとにポール ID が異なる。同じ系統・停留所にある
+        // 別のポールから乗れる便も選べるようにし、現在のポールの便を先に返す。
+        if let Some(stop) = index::station_by_cd(station_id)
+            .filter(|stop| active_line(stop.line_cd).is_some_and(|line| line.company_cd == 257))
+        {
+            let mut seen: HashSet<_> = out.iter().map(|kind| kind.line_group_cd).collect();
+            let mut other_poles: Vec<_> = index::stations_by_group(stop.station_g_cd)
+                .filter(|pole| pole.line_cd == stop.line_cd && pole.station_cd != station_id)
+                .flat_map(|pole| types_at(pole.station_cd))
+                .collect();
+            other_poles.sort_by_key(|t| t.id.unwrap_or(0));
+            out.extend(
+                other_poles
+                    .into_iter()
+                    .filter(|kind| seen.insert(kind.line_group_cd)),
+            );
+        }
         Ok(out)
     }
 
@@ -1266,6 +1319,157 @@ mod tests {
     const SHIBUYA: u32 = 1130205;
     const MITAKA: u32 = 1131105;
     const NAKA_MEGURO: u32 = 2600103;
+
+    /// 2026-03-14 改正で五位堂は朝の大阪方面・夕方以降の下り特急のみ停車。
+    /// 全列車停車や、ひのとりまで停車する扱いにしない。
+    #[test]
+    fn goido_limited_express_is_a_partial_stop_but_hinotori_passes() {
+        for (group, type_cd, pass, condition) in [
+            (332, 306, 5, StopCondition::PartialStop),
+            (335, 512, 1, StopCondition::Not),
+        ] {
+            let stations = block_on(MemStationRepository.get_by_line_group_id(group)).unwrap();
+            let goido = stations
+                .iter()
+                .find(|station| station.station_cd == 3100521)
+                .expect("五位堂が系統から欠落しています");
+            assert_eq!(goido.type_cd, Some(type_cd));
+            assert_eq!(goido.pass, Some(pass));
+            assert_eq!(goido.stop_condition, condition);
+        }
+    }
+
+    #[test]
+    fn goido_offers_limited_express_but_not_hinotori() {
+        let types = block_on(MemTrainTypeRepository.get_by_station_id(3100521)).unwrap();
+        assert!(types
+            .iter()
+            .any(|ty| ty.type_cd == Some(306) && ty.line_group_cd == Some(332)));
+        assert!(!types.iter().any(|ty| ty.type_cd == Some(512)));
+    }
+
+    #[test]
+    fn nearby_rail_transfers_keep_the_closest_station_per_line_within_the_radius() {
+        let tokyo = index::station_by_cd(TOKYO as i32).unwrap();
+        let coords = [(1, tokyo.lat, tokyo.lon), (2, 0.0, 0.0)];
+        let candidates =
+            block_on(MemStationRepository.get_rail_stations_near_bus_stops(&coords, 300.0))
+                .unwrap();
+        let stations = &candidates[&1];
+        assert_eq!(stations[0].station_cd, TOKYO as i32);
+        assert!(!candidates.contains_key(&2));
+        assert!(stations.iter().all(|station| {
+            station.transport_type == TransportType::Rail
+                && index::haversine_km(tokyo.lat, tokyo.lon, station.lat, station.lon) <= 0.3
+        }));
+
+        // 半径を広げて同じ路線の別駅も入る場合でも、東京駅を優先する。
+        let candidates =
+            block_on(MemStationRepository.get_rail_stations_near_bus_stops(&coords[..1], 3000.0))
+                .unwrap();
+        let on_tokyo_line: Vec<_> = candidates[&1]
+            .iter()
+            .filter(|station| station.line_cd == tokyo.line_cd)
+            .map(|station| station.station_cd)
+            .collect();
+        assert_eq!(on_tokyo_line, vec![TOKYO as i32]);
+    }
+
+    /// C−758の名古屋駅を、出発時ののりばの順に返す。
+    #[test]
+    #[ignore = "requires generated bus data; run by build_worker.yml"]
+    fn c758_graphql_keeps_the_platform_codes_in_stop_order() {
+        let schema = crate::graphql::build_schema(crate::interactor());
+        let result = block_on(
+            schema.execute("{ lineGroupStations(lineGroupId: 152672049) { name platformCode } }"),
+        );
+        assert!(result.errors.is_empty(), "{:?}", result.errors);
+        let data = result.data.into_json().unwrap();
+        let stops = data["lineGroupStations"].as_array().unwrap();
+        assert!(stops.len() >= 3, "C−758の停車データが不足しています");
+        assert_eq!(
+            stops[0],
+            serde_json::json!({ "name": "名古屋駅", "platformCode": "9" })
+        );
+        assert_eq!(
+            stops[1],
+            serde_json::json!({ "name": "名古屋駅", "platformCode": "21" })
+        );
+        assert_eq!(stops[2]["name"], "柳橋西");
+    }
+
+    #[test]
+    fn jotetsu_route_types_keep_the_headsign_for_the_requested_direction() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+
+        let Some(line) = index::lines().iter().find(|line| {
+            line.company_cd == 267 && line.line_name == "１２真駒内駅～３条５～石山六区"
+        }) else {
+            // 生成済み GTFS が無い場合は正本 CSV だけでテストする。
+            return;
+        };
+        let group = |name: &str| {
+            index::stations_by_line(line.line_cd)
+                .find(|station| station.name == name)
+                .unwrap()
+                .station_g_cd as u32
+        };
+        let ishiyama = group("石山六区");
+        let rokku_minami = group("六区南");
+        let interactor = crate::interactor();
+        for (from, to, expected) in [
+            (ishiyama, rokku_minami, "石山六区 → 真駒内駅"),
+            (rokku_minami, ishiyama, "真駒内駅 → 石山六区"),
+        ] {
+            let names: Vec<_> =
+                block_on(interactor.get_train_types(from, to, Some(line.line_cd as u32)))
+                    .unwrap()
+                    .into_iter()
+                    .map(|kind| kind.type_name)
+                    .collect();
+            assert_eq!(names, [expected]);
+        }
+    }
+
+    #[test]
+    fn nagoya_city_bus_offers_both_directions_from_the_same_stop() {
+        use stationapi::use_case::traits::query::QueryUseCase;
+
+        let Some(line) = index::lines()
+            .iter()
+            .find(|line| line.company_cd == 257 && line.line_name == "ゆとりーとライン")
+        else {
+            // 生成済み GTFS が無いときは、鉄道の正本 CSV だけでテストが動く。
+            return;
+        };
+        let boarding_pole = index::stations_by_line(line.line_cd)
+            .find(|stop| stop.name == "大曽根" && stop.lat == 35.191716)
+            .unwrap();
+        let interactor = crate::interactor();
+        let types =
+            block_on(interactor.get_train_types_by_station_id(boarding_pole.station_cd as u32))
+                .unwrap();
+        assert_eq!(
+            types.first().unwrap().station_cd,
+            Some(boarding_pole.station_cd)
+        );
+        assert!(types
+            .iter()
+            .any(|kind| kind.type_name.starts_with("大曽根 → 高蔵寺")));
+        let inbound = types
+            .iter()
+            .find(|kind| kind.type_name.starts_with("高蔵寺 → 大曽根"))
+            .unwrap();
+        let stops: Vec<_> = index::sst_by_group(inbound.line_group_cd.unwrap())
+            .map(|row| index::station_by_cd(row.station_cd).unwrap())
+            .collect();
+        assert_eq!(stops.first().unwrap().name, "高蔵寺");
+        assert!(stops.iter().any(|stop| stop.name == "小幡緑地"));
+        let last = stops.last().unwrap();
+        assert_eq!(last.name, "大曽根");
+        assert_ne!(last.station_cd, boarding_pole.station_cd);
+        assert_eq!(last.station_g_cd, boarding_pole.station_g_cd);
+    }
 
     /// S-TRAIN や快速で探索した時分を、アプリが既定で選ぶ各停の時分として
     /// 順位付けしない。都庁前で 1 回乗り換える経路を先頭にする。

@@ -10,16 +10,119 @@ use zip::ZipArchive;
 use crate::{info, warn};
 
 #[derive(Clone, Copy)]
-pub struct GtfsFeed {
+pub struct GtfsFeed<'a> {
     /// ID の前置に使う。フィードをまたいだ ID の衝突を防ぐ。
-    pub id: &'static str,
-    pub name: &'static str,
-    pub path: &'static str,
-    pub url: &'static str,
+    pub id: &'a str,
+    pub name: &'a str,
+    pub path: &'a str,
+    pub url: &'a str,
     pub requires_consumer_key: bool,
 }
 
-pub const GTFS_FEEDS: &[GtfsFeed] = &[
+pub const NAGOYA_CITY_BUS: GtfsFeed<'static> = GtfsFeed {
+    id: "nagoya_city_bus",
+    name: "名古屋市バス",
+    path: "data/NagoyaCityBus-GTFS",
+    url: "https://data.bodik.jp/dataset/c5794008-8053-42ab-99b9-ee7f6fdf9a9e/resource/125a1d12-7df6-489c-abde-911856e05d1b/download/20260328_bus-gtfs-jp.zip",
+    requires_consumer_key: false,
+};
+
+pub const HOKKAIDO_CHUO_BUS: GtfsFeed<'static> = GtfsFeed {
+    id: "hokkaido_chuo",
+    name: "北海道中央バス",
+    path: "data/HokkaidoChuoBus-GTFS",
+    url: "https://ckan.hoda.jp/dataset/24d1dd70-5395-4d6b-b41f-0d83e8eabdb9/resource/dbadfccc-670e-49b9-be77-c3f346ee3160/download/hokkaido_chuo.zip",
+    requires_consumer_key: false,
+};
+
+pub const HOKKAIDO_EXPRESS_BUS: GtfsFeed<'static> = GtfsFeed {
+    id: "hokkaido_express",
+    name: "北海道高速バス",
+    path: "data/HokkaidoExpressBus-GTFS",
+    url: "https://ckan.hoda.jp/dataset/24d1dd70-5395-4d6b-b41f-0d83e8eabdb9/resource/ccfd2358-c804-4cfe-b4fe-278c3f035c64/download/hokkaido-express_bus.zip",
+    requires_consumer_key: false,
+};
+
+pub const JOTETSU_BUS: GtfsFeed<'static> = GtfsFeed {
+    id: "jotetsu",
+    name: "じょうてつバス",
+    path: "data/JotetsuBus-GTFS",
+    url: "https://ckan.hoda.jp/dataset/24d1dd70-5395-4d6b-b41f-0d83e8eabdb9/resource/fef98fef-6fe2-472f-bde3-9d4f0a509a4a/download/joutetsu.zip",
+    requires_consumer_key: false,
+};
+
+pub const CHIYODA_KAZAGURUMA: GtfsFeed<'static> = GtfsFeed {
+    id: "ward_chiyoda",
+    name: "千代田区地域福祉交通「風ぐるま」",
+    path: "data/ChiyodaKazaguruma-GTFS",
+    url: "https://api-public.odpt.org/api/v4/files/odpt/HitachiAutomobileTransportation/Chiyoda_ALLLINES.zip?date=current",
+    requires_consumer_key: false,
+};
+
+pub const BUNKYO_BGURU: GtfsFeed<'static> = GtfsFeed {
+    id: "ward_tokyo_bunkyo",
+    name: "文京区「Bーぐる」",
+    path: "data/BunkyoBguru-GTFS",
+    url: "https://api-public.odpt.org/api/v4/files/odpt/HitachiAutomobileTransportation/AllLines.zip?date=current",
+    requires_consumer_key: false,
+};
+
+pub const ODAKYU_BUS: GtfsFeed<'static> = GtfsFeed {
+    id: "west_odakyu",
+    name: "小田急バス",
+    path: "data/OdakyuBus-GTFS",
+    url: "https://api.odpt.org/api/v4/files/odpt/OdakyuBus/AIILines.zip?date=current",
+    requires_consumer_key: true,
+};
+
+pub const NISHI_TOKYO_BUS: GtfsFeed<'static> = GtfsFeed {
+    id: "west_tokyo_nishi",
+    name: "西東京バス",
+    path: "data/NishiTokyoBus-GTFS",
+    url: "https://api.odpt.org/api/v4/files/odpt/NishiTokyoBus/NTBus.zip?date=current",
+    requires_consumer_key: true,
+};
+
+pub const MINATO_CHIIBUS: GtfsFeed<'static> = GtfsFeed {
+    id: "ward_minato",
+    name: "港区「ちぃばす」",
+    path: "data/MinatoChiibus-GTFS",
+    url: "https://gtfs-jp.buskita.com/fxc/gtfs.zip",
+    requires_consumer_key: false,
+};
+
+pub(super) fn hokkaido_express_company_cd(agency_id: &str) -> Option<i32> {
+    match agency_id {
+        "4430001050451" => Some(258), // 北海道中央バス
+        "7430001025970" => Some(259), // JR北海道バス
+        "8450001008147" => Some(260), // 宗谷バス
+        "8450001002208" => Some(261), // 道北バス
+        "8460001000078" => Some(262), // 阿寒バス
+        "2450001009068" => Some(263), // 沿岸バス
+        "9430001021456" => Some(264), // 北海道バス
+        "9430001033740" => Some(265), // 北都交通
+        "5460301003048" => Some(266), // 網走バス
+        _ => None,
+    }
+}
+
+/// 便ごとの停車順を使って運行パターンを区別するフィードを判定する。
+pub(super) fn uses_stop_order_patterns(feed_id: &str) -> bool {
+    super::registered::is_registered(feed_id)
+        || [
+            HOKKAIDO_CHUO_BUS.id,
+            HOKKAIDO_EXPRESS_BUS.id,
+            JOTETSU_BUS.id,
+            CHIYODA_KAZAGURUMA.id,
+            BUNKYO_BGURU.id,
+            ODAKYU_BUS.id,
+            NISHI_TOKYO_BUS.id,
+            MINATO_CHIIBUS.id,
+        ]
+        .contains(&feed_id)
+}
+
+pub const GTFS_FEEDS: &[GtfsFeed<'static>] = &[
     GtfsFeed {
         id: "toei",
         name: "都営バス",
@@ -64,6 +167,13 @@ pub const GTFS_FEEDS: &[GtfsFeed] = &[
         url: "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=current",
         requires_consumer_key: true,
     },
+    GtfsFeed {
+        id: "nagoya_srt",
+        name: "名古屋市SRT",
+        path: "data/NagoyaSRT-GTFS",
+        url: "https://api-public.odpt.org/api/v4/files/odpt/NagoyaHousingCityPlanningBureau/NagoyaSRT_AllLines.zip?date=20260911",
+        requires_consumer_key: false,
+    },
 ];
 
 /// ID をフィードで名前空間化する。
@@ -93,6 +203,11 @@ fn download_url(feed: &GtfsFeed) -> Result<String> {
 /// 途中で失敗したら展開先を消す。中途半端なディレクトリを次回の実行が
 /// 正常なフィードと見なしてしまうため。
 pub fn download(feed: &GtfsFeed) -> Result<()> {
+    if std::env::var("REJECTED_SAITAMA_GTFS")
+        .is_ok_and(|ids| ids.split(',').any(|id| id == feed.id))
+    {
+        bail!("{} の ZIP はこのビルドで検証エラーになった", feed.name);
+    }
     let path = Path::new(feed.path);
     if path.exists() {
         info!("{} は取得済みなのでダウンロードを省略する", feed.name);
@@ -113,11 +228,24 @@ pub fn download(feed: &GtfsFeed) -> Result<()> {
 }
 
 fn download_and_extract(feed: &GtfsFeed, path: &Path) -> Result<()> {
-    info!("{} を ODPT から取得する", feed.name);
+    info!("{} の GTFS を取得する", feed.name);
 
     // `without_url()` で URL を落とす。付けたままだと acl:consumerKey が
     // エラーメッセージ経由でログへ出る。
-    let response = reqwest::blocking::get(download_url(feed)?).map_err(|e| e.without_url())?;
+    let url = download_url(feed)?;
+    // 埼玉県の配布サーバーは User-Agent のないリクエストを HTTP 403 で拒否する。
+    let response = if feed.url.starts_with("https://opendata.pref.saitama.lg.jp/") {
+        reqwest::blocking::Client::new()
+            .get(url)
+            .header(
+                reqwest::header::USER_AGENT,
+                "TrainLCD/StationAPI (GTFS data importer)",
+            )
+            .send()
+    } else {
+        reqwest::blocking::get(url)
+    }
+    .map_err(|e| e.without_url())?;
     if !response.status().is_success() {
         bail!("{} の取得に失敗: HTTP {}", feed.name, response.status());
     }

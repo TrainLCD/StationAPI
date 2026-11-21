@@ -1,0 +1,14 @@
+{
+  "name": "群馬バス",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/GunmaBus/AllLines.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/gunma_bus_all_lines",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "群馬バス",
+    "name_full": "株式会社群馬バス",
+    "kana": "グンマバス",
+    "english": "Gunma Bus",
+    "url": "https://www.gunbus.co.jp/"
+  },
+  "company_cd": 310
+}

@@ -1,0 +1,13 @@
+{
+  "name": "立川市民バス「くるりんバス」",
+  "url": "https://api.gtfs-data.jp/v2/organizations/tachikawacity/feeds/kururinbus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=tachikawacity*kururinbus",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "立川市",
+    "kana": "タチカワシ",
+    "english": "Tachikawa City",
+    "url": "https://www.city.tachikawa.lg.jp/kotsutaisaku/kururinnsaihenn.html"
+  },
+  "company_cd": 285
+}
