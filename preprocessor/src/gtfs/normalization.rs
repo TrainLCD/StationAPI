@@ -40,7 +40,10 @@ fn unpack_asaka(directory: &Path) -> Result<()> {
         "stop_times.txt",
         "translations.txt",
     ] {
-        let mut entry = archive.by_name(name)?;
+        let mut entry = match archive.by_name(name) {
+            Err(zip::result::ZipError::FileNotFound) if name == "translations.txt" => continue,
+            result => result?,
+        };
         let mut output = fs::File::create(directory.join(name))?;
         std::io::copy(&mut entry, &mut output)?;
     }
