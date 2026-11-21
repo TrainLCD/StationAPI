@@ -97,6 +97,13 @@ if __name__ == "__main__":
             try:
                 stage(registration, url, resource)
             except (OSError, ValueError, KeyError, BadZipFile, HTTPException) as error:
+                # The Rust importer trusts an existing cache directory. Discard the old
+                # edition after a failed refresh so it will retry the publisher URL.
+                destination = CACHE / registration.stem
+                if destination.is_symlink():
+                    destination.unlink()
+                elif destination.exists():
+                    shutil.rmtree(destination)
                 if os.environ.get("STRICT") == "true":
                     raise
                 # No partial feed was staged. The normal importer can still try the live URL.
