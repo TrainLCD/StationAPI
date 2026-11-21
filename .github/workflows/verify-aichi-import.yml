@@ -38,7 +38,10 @@ jobs:
               try:
                   assert f["name"]+" の GTFS を取り込んだ" in log,"feed skipped"
                   own=[r for r in lines if r["company_cd"]==str(f["company_cd"])]
-                  assert own,"no lines"
+                  with open("data/gtfs-cache/"+path.stem+"/routes.txt", encoding="utf-8-sig") as f_routes:
+                      names={r.get("route_short_name") or r.get("route_long_name") for r in csv.DictReader(f_routes)}
+                  own=[r for r in own if r["line_name"] in names]
+                  assert own,"no lines for this feed"
                   for r in own:
                       lid=int(r["line_cd"])
                       matches=query('linesByName(name:'+json.dumps(r["line_name"],ensure_ascii=False)+',limit:100){id}')
@@ -48,7 +51,7 @@ jobs:
                           if stop["prefectureId"]!=23: continue
                           hits=query('stationsByName(name:'+json.dumps(stop["name"],ensure_ascii=False)+',transportType:Bus,limit:100){id name}')
                           patterns=query('stationTrainTypes(stationId:'+str(stop["id"])+'){name groupId}')
-                          if hits and patterns: break
+                          if any(h["name"]==stop["name"] for h in hits) and patterns: break
                       else: continue
                       print("RESULT",json.dumps([id,len(own),r["line_name"],stop["name"],len(patterns)],ensure_ascii=False),flush=True)
                       break
