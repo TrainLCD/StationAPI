@@ -92,7 +92,7 @@ jobs:
           import csv, json, urllib.request
           def query(q):
               data = json.dumps({"query": "{ " + q + " }"}).encode()
-              request = urllib.request.Request("http://127.0.0.1:8791/graphql", data, {"Content-Type": "application/json"})
+              request = urllib.request.Request("http://127.0.0.1:8791/", data, {"Content-Type": "application/json"})
               result = json.load(urllib.request.urlopen(request))
               assert not result.get("errors"), result
               return next(iter(result["data"].values()))
