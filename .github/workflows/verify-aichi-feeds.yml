@@ -1,7 +1,7 @@
 name: Verify Aichi feeds
 on:
-  push:
-    branches: [feature/aichi-feed-audit-1798]
+  pull_request:
+    paths: [.github/workflows/verify-aichi-feeds.yml]
 permissions: {}
 jobs:
   feeds:
