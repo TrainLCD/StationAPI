@@ -1,0 +1,13 @@
+{
+  "name": "秩父市営バス",
+  "url": "https://opendata.pref.saitama.lg.jp/resource_download/8489",
+  "source": "https://opendata.pref.saitama.lg.jp/datasets/279",
+  "license": "CC BY 4.0",
+  "company_cd": 615,
+  "company": {
+    "name": "秩父市",
+    "kana": "チチブシ",
+    "english": "Chichibu City",
+    "url": "https://opendata.pref.saitama.lg.jp/datasets/279"
+  }
+}
