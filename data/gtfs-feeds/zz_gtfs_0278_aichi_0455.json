@@ -1,0 +1,13 @@
+{
+  "name": "くるりんばす(日進市巡回バス)",
+  "url": "https://api.gtfs-data.jp/v2/organizations/nisshincity/feeds/communitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?&agencyId=nisshincity",
+  "license": "CC BY 4.0",
+  "company_cd": 339,
+  "company": {
+    "name": "日進市",
+    "kana": "ニッシンシ",
+    "english": "Nisshin City",
+    "url": "https://www.city.nisshin.lg.jp/department/seikatu/ido/1/"
+  }
+}
