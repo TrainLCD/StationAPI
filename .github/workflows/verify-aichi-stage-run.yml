@@ -1,0 +1,12 @@
+name: Locate Aichi staging deployment
+on: [push]
+permissions:
+  actions: read
+jobs:
+  locate:
+    if: github.ref_name == 'feature/aichi-stage-verification-1798'
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api 'repos/TrainLCD/StationAPI/actions/workflows/deploy_staging.yml/runs?branch=dev&per_page=5' --jq '.workflow_runs[] | [.id,.head_sha,.status,.conclusion] | @tsv'
