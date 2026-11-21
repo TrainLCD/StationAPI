@@ -489,3 +489,38 @@ mod kominato_tests {
             .all(|r| cell_i32(r, type_col) == Some(100) && cell_i32(r, pass_col) == Some(0)));
     }
 }
+
+#[cfg(test)]
+mod minamiaso_tests {
+    use super::*;
+
+    #[test]
+    fn minamiaso_preserves_the_default_local_group_after_preprocessing() {
+        let data = Path::new(env!("CARGO_MANIFEST_DIR")).join("../data");
+        let mut dataset = Dataset::load(&data).unwrap();
+        dataset.generate_virtual_local_rail_services().unwrap();
+        let group = dataset.sst.col("line_group_cd");
+        let station = dataset.sst.col("station_cd");
+        let ty = dataset.sst.col("type_cd");
+        let pass = dataset.sst.col("pass");
+        let local: Vec<_> = dataset
+            .sst
+            .rows()
+            .iter()
+            .filter(|row| cell_i32(row, group) == Some(1_000_099_919))
+            .collect();
+        assert_eq!(
+            local
+                .iter()
+                .map(|row| cell_i32(row, station).unwrap())
+                .collect::<Vec<_>>(),
+            [
+                9991901, 9991902, 9991903, 9991904, 9991905, 9991906, 9991907, 9991910, 9991908,
+                9991909,
+            ]
+        );
+        assert!(local
+            .iter()
+            .all(|row| cell_i32(row, ty) == Some(100) && cell_i32(row, pass) == Some(0)));
+    }
+}
