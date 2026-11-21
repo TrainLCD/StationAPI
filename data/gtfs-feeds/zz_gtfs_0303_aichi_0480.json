@@ -1,0 +1,13 @@
+{
+  "name": "豊橋市地域生活バス",
+  "url": "https://loc.bus-vision.jp/gtfs_v2/toyohashishi/gtfsFeed",
+  "source": "https://bus-viewer.jp/toyotetsu/view/opendataToyotetsu.html",
+  "license": "CC BY 4.0",
+  "company_cd": 364,
+  "company": {
+    "name": "豊橋市",
+    "kana": "トヨハシシ",
+    "english": "Toyohashi City",
+    "url": "http://www.city.toyohashi.lg.jp/10273.htm"
+  }
+}
