@@ -1,7 +1,6 @@
 name: Check Toyotetsu GTFS
 on:
-  push:
-    branches: [feature/gtfs-aichi-0443-toyotetsu]
+  pull_request:
     paths: [.github/workflows/check-toyotetsu.yml]
 permissions: {}
 jobs:
