@@ -1,0 +1,13 @@
+{
+  "name": "横須賀市コミュニティバス「ハマちゃんバス」",
+  "url": "https://api.gtfs-data.jp/v2/organizations/yokosukacity/feeds/hamachanbus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=yokosukacity*hamachanbus",
+  "license": "CC BY 4.0",
+  "company_cd": 319,
+  "company": {
+    "name": "横須賀市",
+    "kana": "ヨコスカシ",
+    "english": "Yokosuka City",
+    "url": "https://www.city.yokosuka.kanagawa.jp/"
+  }
+}

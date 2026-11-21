@@ -1,0 +1,13 @@
+{
+  "name": "小笠原村営バス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/ogasawaravillage/feeds/o/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=ogasawaravillage*o",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "小笠原村",
+    "kana": "オガサワラムラ",
+    "english": "Ogasawara Village",
+    "url": "https://www.vill.ogasawara.tokyo.jp/bus/"
+  },
+  "company_cd": 292
+}

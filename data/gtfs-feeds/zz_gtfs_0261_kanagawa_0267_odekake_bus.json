@@ -1,0 +1,13 @@
+{
+  "name": "横浜市旭区今宿地区「おでかけバス」",
+  "url": "https://www.city.yokohama.lg.jp/kurashi/machizukuri-kankyo/kotsu/chiikikokyo/huyasu/odekake/torikumitiku/odekake_bus.files/0050_20260226.zip",
+  "source": "https://www.city.yokohama.lg.jp/kurashi/machizukuri-kankyo/kotsu/chiikikokyo/huyasu/odekake/torikumitiku/odekake_bus.html",
+  "license": "CC BY 4.0",
+  "company_cd": 316,
+  "company": {
+    "name": "横浜市",
+    "kana": "ヨコハマシ",
+    "english": "Yokohama City",
+    "url": "https://www.city.yokohama.lg.jp/"
+  }
+}

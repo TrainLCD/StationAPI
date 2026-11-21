@@ -17,7 +17,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 | `head` | カレントブランチ（`git rev-parse --abbrev-ref HEAD`）。出力が `HEAD`（detached HEAD）のとき、または `base` と同じブランチのときは自動選択せず、手順 1 で切り出す |
 | `title` | 下の「タイトル推論ルール」参照 |
 | `summary` | 空なら「概要」「変更内容」本文はテンプレのコメントのみ残す |
-| `related_issue` | **ユーザー入力を最優先**。指定が `#N`（数値のみ）なら `Closes #N`、`Closes #N` / `Fixes #N` / `Refs #N` 形式ならその接頭語を保って出力。`related_issue` が空のときに限り、コミット件名から `Closes #N` / `Fixes #N` / `Refs #N` を抽出（接頭語を維持。`#N` 単体表記なら `Closes` を補う）。両方とも見つからなければ節のコメントのみ |
+| `related_issue` | 入力は省略可能ですが、Issueの紐づけは必須です。未指定なら「Issueの確定」の手順で既存Issueを検索し、該当するものがなければ起票してください。 |
 | `skip_checks` | `false`（PR本文「テスト」節のチェック欄 3 項目を ON）。`true` なら全 OFF。**本文表示のみを制御するフラグで、Step 1 の `cargo fmt` / `clippy` / `test` の実際の実行は保証しない**（実行可否は「コードに変更があるか」で決める）。**Step 1 で `cargo` チェックを実行していない（=コード／データ変更なし）ケースでは、`skip_checks` の値に関わらず 3 項目すべて OFF にする** |
 | `labels` | 文字列配列、または未指定。**通常は未指定で OK**（`.github/workflows/pr_labeler.yml` がブランチ名と変更ファイルから自動付与する）。手動指定が必要な場合は `gh pr create --label <name>` で渡す（作成後に `gh pr edit --add-label` すると `pull_request: opened` トリガのワークフローに間に合わないため、必ず `gh pr create` 時に渡す） |
 
@@ -38,6 +38,17 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
 - `gh` CLI が認証済みで、Python 3 がある（`prepare.py` は標準ライブラリしか使わない）。
 - `head` ブランチが origin に push 済み。未 push の場合はユーザーに push の可否を確認する（勝手に push しない）。未 push かどうかは `prepare.py` がローカルと origin の commit ID を突き合わせて検出する。
 - **ref の検証・解決、差分の取得、変更の種類の判定は `prepare.py` に任せ、シェルで書き直さない。** `prepare.py` は git と gh をシェルを通さずに起動する。そのため `'` / `$( )` / `;` を含む ref 名が実行されることも、zsh が `"$BASE_REF:refs/..."` の `:r` を修飾子として展開して ref を壊すこともない。スキル本文に位置引数（`$` と数字）を書くと、Claude Code がスキルを読み込む時点で呼び出し時の引数に置き換えるので、シェル断片でも使わない。
+
+## Issueの確定（新規作成・更新とも必須）
+
+本文を組み立てる前に、少なくとも1件の対応するIssueを確定してください。ドキュメント・依存更新・リリース・canaryも対象です。
+
+1. 指定された `related_issue`、既存PR本文、コミット件名の参照を候補として、Issueの実在と本文を確認してください。番号だけで同じ件と判断しないでください。
+2. 対応するIssueが確定していなければ、問題・変更目的・対象機能を手掛かりに既存Issueを検索してください。openだけでなくclosedも確認し、同じ件があれば他リポジトリのIssueも再利用してください。
+3. 該当するIssueがない場合だけ、目的・対応範囲・完了条件を記載して起票し、`@TinyKitten` にアサインしてください。PR作成依頼に伴うこの起票は追加確認なしで進めてください。検索・取得が失敗した場合は「該当なし」とみなさず、エラーを報告してください。
+4. PRでIssueの対応が完了する場合は `Closes #123`、部分対応や閉じない参照は `Refs #123` としてください。番号だけの入力に無条件でClosesを補わないでください。他リポジトリは `Closes TrainLCD/Repository#123` または `Refs TrainLCD/Repository#123` としてください。明示された接頭語と実際の完了範囲が矛盾する場合は確認してください。
+5. 「関連Issue」節を空欄・コメントのみ・「なし」のまま公開しないでください。更新時も不足を補い、既存の有効な参照と説明は維持してください。重複はリポジトリ名とIssue番号の組で判定してください。
+6. リリース・canaryでは含まれる変更のIssueを再利用できます。未完了のIssueを閉じないでください。作成・更新後はPR本文を再取得し、確定した参照が残っていることを確認してください。
 
 ## 手順
 
@@ -125,7 +136,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    - 「テスト」節:
      - **判定基準: `code_changed` が false なら Step 1 の `cargo` チェックを省略したとみなし、3 項目すべて OFF**（`skip_checks` より優先）。本文末尾に「省略: コード変更なし」等の短い注記を残す。
      - 上記に該当しない場合は `skip_checks` が真なら 3 項目すべて OFF、偽なら 3 項目すべて ON。テキストはテンプレのまま（`make fmt` / `make clippy` / `make test`）。
-   - 「関連Issue」節: `related_issue` が指定されていればユーザー入力を最優先で出力（`#N` のみなら `Closes #N`、`Closes/Fixes/Refs #N` 形式なら接頭語を維持）。空のときに限りコミット件名から `Closes/Fixes/Refs #N` を抽出。どちらも無ければコメントのみ。
+   - 「関連Issue」節: 「Issueの確定」で検証した参照を必ず出力してください。完了時はCloses、部分対応はRefsとし、空欄・コメントのみにはしないでください。
    - 「スクリーンショット」節: 常にコメントのみ（API レスポンスの diff など必要なら呼び出し側が後から編集する前提）。
 
    **更新モード**（既存 PR の本文を再生成）
@@ -138,7 +149,7 @@ description: Create a GitHub pull request for TrainLCD StationAPI that conforms 
    | 変更の種類 | **常に手順 3 の結果で上書き**（機械的判定）。 |
    | 変更内容 | 冒頭の箇条書きブロック（`-` で始まる連続行）を最新差分で再生成。その下に人間が書いた散文があれば残す。 |
    | テスト | **新規作成モードと同じルールで上書き**（`code_changed` が false なら `skip_checks` に関わらず 3 項目すべて OFF にして省略の注記を残し、それ以外は `skip_checks` に従う）。 |
-   | 関連Issue | 既存内容を尊重。コミット件名に `Closes/Fixes/Refs #N` があり、かつ既存本文中に同じ Issue 番号 `#N` を指す表現が存在しない場合のみ追記（重複は作らない。比較時は `Closes` / `closes` / `Fixes` / `fixes` / `Refs` / `refs` を同一視し、空白・記号差は無視して `#N` 単位で照合）。 |
+   | 関連Issue | 「Issueの確定」を実施し、既存の有効な参照と説明を維持して不足分を補ってください。リポジトリ名とIssue番号の組で重複を避けてください。 |
    | スクリーンショット | 既存内容を尊重。自動では触らない。 |
 
    差し替え後の本文と既存本文の差分をユーザーに提示し、承認を得てから手順 5 へ進む。自動上書き節で人間の手入れらしき痕跡（テンプレのコメント以外の文章）がある場合は、どう扱うかをユーザーに確認する。

@@ -1,0 +1,18 @@
+{
+  "name": "日本中央バス",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/NipponChuoBus/Maebashi_Area.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/nippon_chuo_bus_maebashi_area",
+  "license": "CC BY 4.0",
+  "excluded_route_ids": [
+    "群馬～仙台線_A",
+    "東京・さいたま・群馬～富山・金沢線_A"
+  ],
+  "company": {
+    "name": "日本中央バス",
+    "name_full": "日本中央バス株式会社",
+    "kana": "ニッポンチュウオウバス",
+    "english": "Nippon Chuo Bus",
+    "url": "https://ncb.jp/"
+  },
+  "company_cd": 309
+}

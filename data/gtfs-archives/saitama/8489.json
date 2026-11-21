@@ -1,0 +1,11 @@
+{
+  "source": "https://opendata.pref.saitama.lg.jp/resource_download/8489",
+  "catalog": "112071_279_pdl",
+  "updated": "2026-03-25T00:00:00",
+  "sha256": "f1051b9b4b7a5570aa920753ff532fabf61b7c60991686a5762cbe958ad8904d",
+  "publisher": "秩父市",
+  "license": "公共データ利用規約第1.0版（PDL1.0）",
+  "source_page": "https://opendata.pref.saitama.lg.jp/resources/8489",
+  "retrieved": "2026-11-21",
+  "notice": "配布元のZIPを改変せず収録。TrainLCDが系統・停留所・運行パターンのデータに加工して使用。"
+}

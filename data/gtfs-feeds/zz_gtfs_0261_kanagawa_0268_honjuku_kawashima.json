@@ -1,0 +1,13 @@
+{
+  "name": "横浜市旭区本宿東部・川島町西地区「小型バス」",
+  "url": "https://www.city.yokohama.lg.jp/kurashi/machizukuri-kankyo/kotsu/chiikikokyo/huyasu/odekake/torikumitiku/ainoritaxi.files/0103_20260226.zip",
+  "source": "https://www.city.yokohama.lg.jp/kurashi/machizukuri-kankyo/kotsu/chiikikokyo/huyasu/odekake/torikumitiku/ainoritaxi.html",
+  "license": "CC BY 4.0",
+  "company_cd": 316,
+  "company": {
+    "name": "横浜市",
+    "kana": "ヨコハマシ",
+    "english": "Yokohama City",
+    "url": "https://www.city.yokohama.lg.jp/"
+  }
+}

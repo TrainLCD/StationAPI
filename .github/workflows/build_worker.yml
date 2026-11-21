@@ -79,6 +79,10 @@ jobs:
       - name: Check travel times against the benchmark
         run: cargo test -p stationapi-worker travel_times
 
+      # 公開GTFSから生成したデータで、のりば番号と停車順をGraphQL経由で検証する。
+      - name: Check C-758 stop order and platform codes
+        run: cargo test -p stationapi-worker c758_graphql_keeps_the_platform_codes_in_stop_order -- --ignored
+
       - uses: actions/upload-artifact@v4
         with:
           name: worker-build

@@ -1,0 +1,14 @@
+{
+  "name": "知多バス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/chitabus/feeds/chitabus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=chitabus*chitabus",
+  "license": "CC BY 4.0",
+  "company_cd": 329,
+  "company": {
+    "name": "知多乗合",
+    "kana": "チタノリアイ",
+    "english": "Chita Noriai",
+    "url": "https://www.chitabus.co.jp/",
+    "name_full": "知多乗合株式会社"
+  }
+}

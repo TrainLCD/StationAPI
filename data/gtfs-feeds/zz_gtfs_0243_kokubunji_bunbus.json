@@ -1,0 +1,13 @@
+{
+  "name": "国分寺市地域バス「ぶんバス」",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/KokubunjiCity/kokubunji_city_bunbus.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/kokubunji_city_kokubunji_city_bunbus",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "国分寺市",
+    "kana": "コクブンジシ",
+    "english": "Kokubunji City",
+    "url": "https://www.city.kokubunji.tokyo.jp/kurashi/koutsuu/bus/index.html"
+  },
+  "company_cd": 278
+}

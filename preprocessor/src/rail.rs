@@ -69,6 +69,7 @@ pub const STATION_COLUMNS: &[&str] = &[
     "station_number3",
     "station_number4",
     "three_letter_code",
+    "platform_code",
     "line_cd",
     "pref_cd",
     "post",
@@ -454,5 +455,37 @@ pub fn assign_serial(table: &mut Table, column: &str) {
     let idx = table.col(column);
     for (i, row) in table.rows_mut().iter_mut().enumerate() {
         row[idx] = Some((i + 1).to_string());
+    }
+}
+
+#[cfg(test)]
+mod kominato_tests {
+    use super::*;
+
+    #[test]
+    fn torokko_addition_preserves_generated_local_service() {
+        let data = Path::new(env!("CARGO_MANIFEST_DIR")).join("../data");
+        let mut dataset = Dataset::load(&data).unwrap();
+        dataset.generate_virtual_local_rail_services().unwrap();
+        let group_col = dataset.sst.col("line_group_cd");
+        let station_col = dataset.sst.col("station_cd");
+        let type_col = dataset.sst.col("type_cd");
+        let pass_col = dataset.sst.col("pass");
+        let local: Vec<_> = dataset
+            .sst
+            .rows()
+            .iter()
+            .filter(|r| cell_i32(r, group_col) == Some(1000099325))
+            .collect();
+        assert_eq!(
+            local
+                .iter()
+                .map(|r| cell_i32(r, station_col).unwrap())
+                .collect::<Vec<_>>(),
+            (9932501..=9932518).collect::<Vec<_>>()
+        );
+        assert!(local
+            .iter()
+            .all(|r| cell_i32(r, type_col) == Some(100) && cell_i32(r, pass_col) == Some(0)));
     }
 }

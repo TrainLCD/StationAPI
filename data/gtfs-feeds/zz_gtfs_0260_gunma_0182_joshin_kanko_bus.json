@@ -1,0 +1,14 @@
+{
+  "name": "上信観光バス",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/JoshinKankoBus/AllLines.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/joshin_kanko_bus_all_lines",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "上信観光バス",
+    "name_full": "株式会社上信観光バス",
+    "kana": "ジョウシンカンコウバス",
+    "english": "Joshin Bus",
+    "url": "https://www.jkb.co.jp/"
+  },
+  "company_cd": 313
+}

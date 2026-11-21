@@ -1,0 +1,13 @@
+{
+  "name": "寒川町コミュニティバス「もくせい号」南ルート",
+  "url": "https://api.gtfs-data.jp/v2/organizations/samukawatown/feeds/mokusei-go_southroute/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=samukawatown*mokusei-go_southroute",
+  "license": "CC BY 4.0",
+  "company_cd": 322,
+  "company": {
+    "name": "寒川町",
+    "kana": "サムカワマチ",
+    "english": "Samukawa Town",
+    "url": "https://www.town.samukawa.kanagawa.jp/"
+  }
+}

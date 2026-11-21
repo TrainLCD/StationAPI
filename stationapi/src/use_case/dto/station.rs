@@ -31,6 +31,7 @@ impl From<Station> for ModelStation {
             name_chinese: station.station_name_zh,
             name_korean: station.station_name_ko,
             three_letter_code: station.three_letter_code,
+            platform_code: station.platform_code,
             lines: station.lines.into_iter().map(|line| line.into()).collect(),
             line: station.line.map(|line| Box::new((*line).into())),
             prefecture_id: station.pref_cd as u32,

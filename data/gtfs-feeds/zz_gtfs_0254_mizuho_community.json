@@ -1,0 +1,13 @@
+{
+  "name": "瑞穂町コミュニティバス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/mizuhotown/feeds/communitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=mizuhotown*communitybus",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "瑞穂町",
+    "kana": "ミズホマチ",
+    "english": "Mizuho Town",
+    "url": "https://www.town.mizuho.tokyo.jp/kankyo/004/010/index.html"
+  },
+  "company_cd": 289
+}

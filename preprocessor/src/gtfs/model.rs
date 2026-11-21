@@ -12,10 +12,11 @@ use crate::warn;
 #[derive(Debug, Clone)]
 pub struct Route {
     pub route_id: String,
+    /// 複数事業者を含む GTFS で routes.txt の agency_id から引いたコード。
+    pub company_cd: Option<i32>,
     pub route_short_name: Option<String>,
     pub route_long_name: Option<String>,
-    /// GTFS フィードには英語名の列が無く、東急 ODPT からも入らないため常に `None`。
-    /// 種別名のローマ字化で参照されるので、列としては残してある。
+    /// GTFS の translations.txt に収録された英語表示名。
     pub route_long_name_r: Option<String>,
     pub route_type: i32,
     pub route_color: Option<String>,
@@ -31,6 +32,7 @@ pub struct Stop {
     pub stop_name_ko: Option<String>,
     pub stop_lat: f64,
     pub stop_lon: f64,
+    pub platform_code: Option<String>,
     /// 空文字は取り込み時に `None` へ寄せる。親子関係を持つフィードだけが値を持つ。
     pub parent_station: Option<String>,
 }
@@ -59,6 +61,13 @@ pub struct StopTime {
     pub shape_dist_traveled: Option<f64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PushStopTimeResult {
+    Inserted,
+    InvalidReference,
+    Duplicate,
+}
+
 /// 取り込んだ GTFS 一式。行の並びは取り込み順を保つ。
 #[derive(Default)]
 pub struct GtfsData {
@@ -75,10 +84,98 @@ pub struct GtfsData {
 }
 
 impl GtfsData {
+    /// 指定した路線・便・停車時刻と、運行パターンに使われなくなった停留所を除外する。
+    pub(super) fn exclude_routes(&mut self, excluded: &HashSet<String>) {
+        if self.route_ids.is_disjoint(excluded) {
+            return;
+        }
+        let previously_used: HashSet<_> = self
+            .stops_with_parents(self.stop_times.iter().map(|time| time.stop_id.as_str()))
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+        self.routes
+            .retain(|route| !excluded.contains(&route.route_id));
+        self.route_ids.retain(|id| !excluded.contains(id));
+        self.trips.retain(|trip| {
+            if excluded.contains(&trip.route_id) {
+                self.trip_ids.remove(&trip.trip_id);
+                false
+            } else {
+                true
+            }
+        });
+        self.stop_times
+            .retain(|time| self.trip_ids.contains(&time.trip_id));
+        self.stop_time_keys
+            .retain(|(trip_id, _)| self.trip_ids.contains(trip_id));
+
+        let still_used =
+            self.stops_with_parents(self.stop_times.iter().map(|time| time.stop_id.as_str()));
+        let retained = self.stops.iter().filter_map(|stop| {
+            let id = stop.stop_id.as_str();
+            (still_used.contains(id) || !previously_used.contains(id)).then_some(id)
+        });
+        let retained: HashSet<_> = self
+            .stops_with_parents(retained)
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+        self.stops.retain(|stop| retained.contains(&stop.stop_id));
+        self.stop_ids.retain(|id| retained.contains(id));
+    }
+
+    fn stops_with_parents<'a>(&'a self, ids: impl Iterator<Item = &'a str>) -> HashSet<&'a str> {
+        let parents = self.parent_stop_ids();
+        let mut retained = HashSet::new();
+        for mut id in ids {
+            while retained.insert(id) {
+                let Some(&parent) = parents.get(id) else {
+                    break;
+                };
+                id = parent;
+            }
+        }
+        retained
+    }
+
+    /// 検証済みのフィードを取り込み順の末尾に追加する。
+    pub(super) fn append_feed(&mut self, feed: Self) {
+        for route in feed.routes {
+            self.push_route(route);
+        }
+        for stop in feed.stops {
+            self.push_stop(stop);
+        }
+        for trip in feed.trips {
+            self.push_trip(trip);
+        }
+        for time in feed.stop_times {
+            self.push_stop_time(time);
+        }
+    }
+
     pub fn push_route(&mut self, route: Route) {
         if self.route_ids.insert(route.route_id.clone()) {
             self.routes.push(route);
         }
+    }
+
+    /// 便が設定されていない路線を停車順の検証前に外す。
+    pub(super) fn drop_routes_without_trips(&mut self) {
+        let routes_with_trips: HashSet<_> = self
+            .trips
+            .iter()
+            .map(|trip| trip.route_id.as_str())
+            .collect();
+        self.routes.retain(|route| {
+            if routes_with_trips.contains(route.route_id.as_str()) {
+                return true;
+            }
+            self.route_ids.remove(&route.route_id);
+            crate::info!("便のない路線 {} を取り込みから外した", route.route_id);
+            false
+        });
     }
 
     pub fn push_stop(&mut self, stop: Stop) {
@@ -101,16 +198,19 @@ impl GtfsData {
         }
     }
 
-    /// 参照先の trip / stop が無い行は取り込まない (外部キー相当)。
-    pub fn push_stop_time(&mut self, stop_time: StopTime) {
+    /// 参照先の trip / stop が無い行と、便内で停車順が重複する行は取り込まない。
+    pub fn push_stop_time(&mut self, stop_time: StopTime) -> PushStopTimeResult {
         if !self.trip_ids.contains(&stop_time.trip_id)
             || !self.stop_ids.contains(&stop_time.stop_id)
         {
-            return;
+            return PushStopTimeResult::InvalidReference;
         }
         let key = (stop_time.trip_id.clone(), stop_time.stop_sequence);
         if self.stop_time_keys.insert(key) {
             self.stop_times.push(stop_time);
+            PushStopTimeResult::Inserted
+        } else {
+            PushStopTimeResult::Duplicate
         }
     }
 
@@ -153,15 +253,19 @@ impl GtfsData {
 
     /// trip_id -> stop_sequence 昇順の stop_times。
     pub fn stop_times_by_trip(&self) -> HashMap<&str, Vec<&StopTime>> {
-        let mut map: HashMap<&str, Vec<&StopTime>> = HashMap::new();
-        for stop_time in &self.stop_times {
-            map.entry(stop_time.trip_id.as_str())
-                .or_default()
-                .push(stop_time);
-        }
-        for times in map.values_mut() {
-            times.sort_by_key(|time| time.stop_sequence);
-        }
-        map
+        index_stop_times_by_trip(&self.stop_times)
     }
+}
+
+pub(super) fn index_stop_times_by_trip(stop_times: &[StopTime]) -> HashMap<&str, Vec<&StopTime>> {
+    let mut map: HashMap<&str, Vec<&StopTime>> = HashMap::new();
+    for stop_time in stop_times {
+        map.entry(stop_time.trip_id.as_str())
+            .or_default()
+            .push(stop_time);
+    }
+    for times in map.values_mut() {
+        times.sort_by_key(|time| time.stop_sequence);
+    }
+    map
 }

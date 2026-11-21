@@ -1,0 +1,13 @@
+{
+  "name": "みなかみ町営バス",
+  "url": "https://www.town.minakami.gunma.jp/politics/06gyousei/koutsuu/files/GTFS20251210.zip",
+  "source": "https://www.town.minakami.gunma.jp/politics/06gyousei/koutsuu/2023-0412-1627-26.html",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "みなかみ町",
+    "kana": "ミナカミマチ",
+    "english": "Minakami Town",
+    "url": "https://www.town.minakami.gunma.jp/"
+  },
+  "company_cd": 298
+}

@@ -138,6 +138,18 @@ impl QueryRoot {
         Ok(stations_to_gql(found))
     }
 
+    async fn nearby_bus_stops(
+        &self,
+        ctx: &Context<'_>,
+        latitude: f64,
+        longitude: f64,
+    ) -> GqlResult<Vec<Station>> {
+        let stops = use_case(ctx)
+            .get_nearby_bus_stops(latitude, longitude)
+            .await?;
+        Ok(stations_to_gql(stops))
+    }
+
     async fn stations_nearby(
         &self,
         ctx: &Context<'_>,

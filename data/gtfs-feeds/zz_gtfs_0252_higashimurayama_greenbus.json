@@ -1,0 +1,13 @@
+{
+  "name": "東村山市コミュニティバス「グリーンバス」",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/HigashiMurayamaCity/Alllines.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/higashi_murayama_city_alllines",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "東村山市",
+    "kana": "ヒガシムラヤマシ",
+    "english": "Higashimurayama City",
+    "url": "https://www.city.higashimurayama.tokyo.jp/kurashi/sumai/bus/"
+  },
+  "company_cd": 287
+}

@@ -1,0 +1,14 @@
+{
+  "name": "高崎市「よしいバス」",
+  "url": "https://api-public.odpt.org/api/v4/files/odpt/TakasakiCity/yosiibus.zip?date=current",
+  "source": "https://ckan.odpt.org/dataset/takasaki_city_yosiibus",
+  "license": "CC BY 4.0",
+  "company": {
+    "name": "西毛交通",
+    "name_full": "西毛交通株式会社",
+    "kana": "セイモウコウツウ",
+    "english": "Seimo Kotsu",
+    "url": "https://yoshii.nolbe.net/buslocation/"
+  },
+  "company_cd": 314
+}
