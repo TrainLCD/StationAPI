@@ -1,0 +1,13 @@
+{
+  "name": "蒲郡市コミュニティバス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/gamagoricity/feeds/communitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=gamagoricity*communitybus",
+  "license": "CC BY 4.0",
+  "company_cd": 367,
+  "company": {
+    "name": "愛知県蒲郡市",
+    "kana": "アイチケンガマゴオリシ",
+    "english": "Gamagori City",
+    "url": "https://www.city.gamagori.lg.jp/unit/kotsu/communitybus.html"
+  }
+}
