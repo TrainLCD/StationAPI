@@ -1,0 +1,13 @@
+{
+  "name": "熊谷市ゆうゆうバス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/kumagayacity/feeds/yuuyuubus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=kumagayacity*yuuyuubus",
+  "license": "CC BY 4.0",
+  "company_cd": 610,
+  "company": {
+    "name": "熊谷市",
+    "kana": "クマガヤシ",
+    "english": "Kumagaya City",
+    "url": "https://gtfs-data.jp/search?target_feed=kumagayacity*yuuyuubus"
+  }
+}
