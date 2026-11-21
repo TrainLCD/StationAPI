@@ -1,8 +1,8 @@
 {
   "name": "杉戸町内巡回バス「あいあい号」",
   "url": "https://opendata.pref.saitama.lg.jp/resource_download/3750",
-  "source": "https://opendata.pref.saitama.lg.jp/datasets/733",
-  "license": "CC BY 4.0",
+  "source": "https://opendata.pref.saitama.lg.jp/resources/3750",
+  "license": "公共データ利用規約第1.0版（PDL1.0）",
   "company_cd": 609,
   "company": {
     "name": "杉戸町",
