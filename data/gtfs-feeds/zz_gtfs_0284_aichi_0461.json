@@ -1,0 +1,13 @@
+{
+  "name": "豊明市 ひまわりバス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/toyoakecity/feeds/himawaribus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=toyoakecity*himawaribus",
+  "license": "CC0",
+  "company_cd": 345,
+  "company": {
+    "name": "豊明市ひまわりバス",
+    "kana": "トヨアケシヒマワリバス",
+    "english": "Toyoake City Himawari Bus",
+    "url": "https://www.city.toyoake.lg.jp/3650.htm"
+  }
+}
