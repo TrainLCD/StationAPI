@@ -90,6 +90,7 @@ type TtsSegment {
 type Query {
 	station(id: Int!, transportType: TransportType): Station
 	stations(ids: [Int!]!, transportType: TransportType): [Station!]!
+	nearbyBusStops(latitude: Float!, longitude: Float!): [Station!]!
 	stationsNearby(latitude: Float!, longitude: Float!, limit: Int, transportType: TransportType): [Station!]!
 	stationsByName(name: String!, limit: Int, fromStationGroupId: Int, transportType: TransportType): [Station!]!
 	stationGroupStations(groupId: Int!, transportType: TransportType): [Station!]!
