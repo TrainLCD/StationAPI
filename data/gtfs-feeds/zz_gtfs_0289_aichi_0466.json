@@ -1,0 +1,13 @@
+{
+  "name": "東海市循環バス「らんらんバス」",
+  "url": "https://api.gtfs-data.jp/v2/organizations/tokaicity/feeds/tokai-ranranbus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=tokaicity*tokai-ranranbus",
+  "license": "CC BY 4.0",
+  "company_cd": 350,
+  "company": {
+    "name": "東海市",
+    "kana": "トウカイシ",
+    "english": "Tokai City",
+    "url": "http://www.city.tokai.aichi.jp/7118.htm"
+  }
+}
