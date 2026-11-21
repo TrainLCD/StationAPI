@@ -3,14 +3,16 @@ import csv
 import hashlib
 import io
 import json
+import os
 import shutil
 import tempfile
 from datetime import datetime
+from http.client import HTTPException
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-from zipfile import ZipFile
+from zipfile import BadZipFile, ZipFile
 from zoneinfo import ZoneInfo
 
 PORTAL = "https://opendata.pref.saitama.lg.jp/resource_download/"
@@ -92,4 +94,10 @@ if __name__ == "__main__":
         url = json.loads(registration.read_text(encoding="utf-8"))["url"]
         resource = url.removeprefix(PORTAL)
         if url.startswith(PORTAL) and resource.isascii() and resource.isdigit():
-            stage(registration, url, resource)
+            try:
+                stage(registration, url, resource)
+            except (OSError, ValueError, KeyError, BadZipFile, HTTPException) as error:
+                if os.environ.get("STRICT") == "true":
+                    raise
+                # No partial feed was staged. The normal importer can still try the live URL.
+                print(f"::warning::{registration.stem}: {type(error).__name__}: GTFS preparation failed")
