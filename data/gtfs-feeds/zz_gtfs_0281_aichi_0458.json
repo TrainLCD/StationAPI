@@ -1,0 +1,13 @@
+{
+  "name": "春日井市 かすがいシティバス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/kasugaicity/feeds/kasugaicitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=kasugaicity*kasugaicitybus",
+  "license": "CC0",
+  "company_cd": 342,
+  "company": {
+    "name": "春日井市",
+    "kana": "カスガイシ",
+    "english": "Kasugai City",
+    "url": "https://www.city.kasugai.lg.jp/kurashi/1003481/bus/index.html"
+  }
+}

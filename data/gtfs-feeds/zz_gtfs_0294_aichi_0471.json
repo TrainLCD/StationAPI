@@ -1,0 +1,13 @@
+{
+  "name": "豊田市 とよたおいでんバス(基幹バス)",
+  "url": "https://api.gtfs-data.jp/v2/organizations/toyotacity/feeds/kikanbus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?agencyId=toyotacity",
+  "license": "CC BY 4.0",
+  "company_cd": 355,
+  "company": {
+    "name": "豊田市",
+    "kana": "トヨタシ",
+    "english": "Toyota City",
+    "url": "https://www.city.toyota.aichi.jp/kurashi/koutsu/bus/index.html"
+  }
+}
