@@ -1,0 +1,13 @@
+{
+  "name": "春日部市コミュニティバス「春バス」",
+  "url": "https://opendata.pref.saitama.lg.jp/resource_download/6515",
+  "source": "https://opendata.pref.saitama.lg.jp/resources/6515",
+  "license": "公共データ利用規約第1.0版（PDL1.0）",
+  "company_cd": 607,
+  "company": {
+    "name": "春日部市",
+    "kana": "カスカベシ",
+    "english": "Kasukabe City",
+    "url": "https://opendata.pref.saitama.lg.jp/datasets/2143"
+  }
+}

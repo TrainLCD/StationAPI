@@ -1,0 +1,13 @@
+{
+  "name": "碧南市 くるくるバス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/hekinancity/feeds/kurukuru-bus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=hekinancity*kurukuru-bus",
+  "license": "CC BY 4.0",
+  "company_cd": 362,
+  "company": {
+    "name": "碧南市",
+    "kana": "ヘキナンシ",
+    "english": "Hekinan City",
+    "url": "https://www.city.hekinan.lg.jp/soshiki/keizai_kankyo/shoko/1_6/index.html"
+  }
+}

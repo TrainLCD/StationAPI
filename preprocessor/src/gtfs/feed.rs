@@ -203,6 +203,11 @@ fn download_url(feed: &GtfsFeed) -> Result<String> {
 /// 途中で失敗したら展開先を消す。中途半端なディレクトリを次回の実行が
 /// 正常なフィードと見なしてしまうため。
 pub fn download(feed: &GtfsFeed) -> Result<()> {
+    if std::env::var("REJECTED_SAITAMA_GTFS")
+        .is_ok_and(|ids| ids.split(',').any(|id| id == feed.id))
+    {
+        bail!("{} の ZIP はこのビルドで検証エラーになった", feed.name);
+    }
     let path = Path::new(feed.path);
     if path.exists() {
         info!("{} は取得済みなのでダウンロードを省略する", feed.name);
@@ -227,7 +232,20 @@ fn download_and_extract(feed: &GtfsFeed, path: &Path) -> Result<()> {
 
     // `without_url()` で URL を落とす。付けたままだと acl:consumerKey が
     // エラーメッセージ経由でログへ出る。
-    let response = reqwest::blocking::get(download_url(feed)?).map_err(|e| e.without_url())?;
+    let url = download_url(feed)?;
+    // 埼玉県の配布サーバーは User-Agent のないリクエストを HTTP 403 で拒否する。
+    let response = if feed.url.starts_with("https://opendata.pref.saitama.lg.jp/") {
+        reqwest::blocking::Client::new()
+            .get(url)
+            .header(
+                reqwest::header::USER_AGENT,
+                "TrainLCD/StationAPI (GTFS data importer)",
+            )
+            .send()
+    } else {
+        reqwest::blocking::get(url)
+    }
+    .map_err(|e| e.without_url())?;
     if !response.status().is_success() {
         bail!("{} の取得に失敗: HTTP {}", feed.name, response.status());
     }
