@@ -1,0 +1,13 @@
+{
+  "name": "あおい交通",
+  "url": "https://api.gtfs-data.jp/v2/organizations/aoi-komaki/feeds/aoikotsu/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?agencyId=aoi-komaki",
+  "license": "CC BY 4.0",
+  "company_cd": 328,
+  "company": {
+    "name": "あおい交通",
+    "kana": "アオイコウツウ",
+    "english": "Aoi Kotsu",
+    "url": "https://aoi-komaki.jp/bus"
+  }
+}
