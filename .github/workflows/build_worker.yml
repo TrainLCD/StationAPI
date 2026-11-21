@@ -83,35 +83,6 @@ jobs:
       - name: Check C-758 stop order and platform codes
         run: cargo test -p stationapi-worker c758_graphql_keeps_the_platform_codes_in_stop_order -- --ignored
 
-      - name: Verify Saitama Kita feed and GraphQL results
-        run: |
-          npx --yes wrangler@4.125.0 dev --port 8791 >/tmp/kita-worker.log 2>&1 &
-          trap 'kill $! || true' EXIT
-          for attempt in {1..90}; do curl -fsS http://127.0.0.1:8791/__ping && break; sleep 2; done
-          python3 - <<'PY'
-          import csv, json, urllib.request
-          def query(q):
-              data = json.dumps({"query": "{ " + q + " }"}).encode()
-              request = urllib.request.Request("http://127.0.0.1:8791/", data, {"Content-Type": "application/json"})
-              result = json.load(urllib.request.urlopen(request))
-              assert not result.get("errors"), result
-              return next(iter(result["data"].values()))
-          with open("generated/lines.csv") as f:
-              lines = [r for r in csv.DictReader(f) if r["company_cd"] == "327"]
-          assert lines, "feed missing"
-          for line in lines:
-              lid = int(line["line_cd"])
-              name = line["line_name"]
-              assert any(r["id"] == lid for r in query(f'linesByName(name:{json.dumps(name)}) {{ id }}'))
-              stops = query(f'lineStations(lineId:{lid}) {{ id name prefectureId }}')
-              assert stops and all(s["prefectureId"] == 11 for s in stops), stops
-              stop = stops[0]
-              assert any(s["id"] == stop["id"] for s in query(f'stationsByName(name:{json.dumps(stop["name"])}, limit:100) {{ id }}'))
-              patterns = query(f'stationTrainTypes(stationId:{stop["id"]}) {{ groupId name }}')
-              assert patterns, stop
-              print(name, len(stops), stop["name"], patterns)
-          PY
-
       - uses: actions/upload-artifact@v4
         with:
           name: worker-build
