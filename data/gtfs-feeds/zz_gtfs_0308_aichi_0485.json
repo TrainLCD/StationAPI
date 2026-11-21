@@ -1,0 +1,13 @@
+{
+  "name": "おでかけ北設(設楽町・東栄町・豊根村)",
+  "url": "https://api.gtfs-data.jp/v2/organizations/kitashitara/feeds/odekakehokusetsu/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=kitashitara*odekakehokusetsu",
+  "license": "CC BY 4.0",
+  "company_cd": 369,
+  "company": {
+    "name": "北設楽郡公共交通活性化協議会",
+    "kana": "キタシタラグンコウキョウコウツウカッセイカキョウギカイ",
+    "english": "Kitashitara District Public Transport Revitalization Council",
+    "url": "https://www.odekake-hokusetsu.jp/"
+  }
+}

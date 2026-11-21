@@ -1,0 +1,13 @@
+{
+  "name": "安城市 あんくるバス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/anjocity/feeds/AnkuruBus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=anjocity*AnkuruBus",
+  "license": "CC BY 4.0",
+  "company_cd": 360,
+  "company": {
+    "name": "安城市",
+    "kana": "アンジョウシ",
+    "english": "Anjo City",
+    "url": "https://www.city.anjo.aichi.jp/kurasu/dorokotsu/ankurubus/ankuru4.html"
+  }
+}
