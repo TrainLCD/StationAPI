@@ -1,0 +1,13 @@
+{
+  "name": "岡崎市コミュニティバス（額田地域コミュニティ交通）",
+  "url": "https://data.bodik.jp/dataset/841d7eb3-82db-45d2-9497-7409cf7bf63d/resource/53b81773-a28b-4ab4-8253-80095f19bb5d/download",
+  "source": "https://data.bodik.jp/dataset/232025_gtfs",
+  "license": "CC BY 4.0",
+  "company_cd": 358,
+  "company": {
+    "name": "岡崎市",
+    "kana": "オカザキシ",
+    "english": "Okazaki City",
+    "url": "https://www.city.okazaki.lg.jp/1100/1184/1173/index.html"
+  }
+}

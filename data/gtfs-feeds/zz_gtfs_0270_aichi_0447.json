@@ -1,0 +1,13 @@
+{
+  "name": "あま市巡回バス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/amacity/feeds/amashijunkaibasu/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?target_feed=amacity*amashijunkaibasu",
+  "license": "CC BY 4.0",
+  "company_cd": 331,
+  "company": {
+    "name": "あま市",
+    "kana": "アマシ",
+    "english": "Ama City",
+    "url": "https://www.city.ama.aichi.jp/kurashi/kotsu/koutuu/1002512.html"
+  }
+}
