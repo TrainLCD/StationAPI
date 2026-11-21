@@ -1,0 +1,13 @@
+{
+  "name": "豊山町 とよやまタウンバス",
+  "url": "https://api.gtfs-data.jp/v2/organizations/toyoyamatown/feeds/communitybus/files/feed.zip",
+  "source": "https://gtfs-data.jp/search?agencyId=toyoyamatown",
+  "license": "CC BY 4.0",
+  "company_cd": 338,
+  "company": {
+    "name": "豊山町",
+    "kana": "トヨヤマチョウ",
+    "english": "Toyoyama Town",
+    "url": "https://www.town.toyoyama.lg.jp/kurashi/koutu/"
+  }
+}
