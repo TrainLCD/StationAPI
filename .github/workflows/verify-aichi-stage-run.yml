@@ -1,12 +1,29 @@
-name: Locate Aichi staging deployment
+name: Verify Aichi staging deployment
 on: [pull_request]
 permissions:
   actions: read
 jobs:
-  locate:
+  verify:
     if: github.head_ref == 'feature/aichi-stage-verification-1798'
     runs-on: ubuntu-latest
     steps:
-      - env:
+      - name: Wait for the final Aichi staging deployment
+        env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api 'repos/TrainLCD/StationAPI/actions/workflows/deploy_staging.yml/runs?branch=dev&per_page=5' --jq '.workflow_runs[] | [.id,.head_sha,.status,.conclusion] | @tsv'
+          RUN_ID: "44879373418"
+          EXPECTED_SHA: "de2ff6dbe1ab8b81517051ffab74ec5d3b016133"
+        run: |
+          for attempt in {1..90}; do
+            read -r sha status conclusion < <(
+              gh api "repos/TrainLCD/StationAPI/actions/runs/$RUN_ID"                 --jq '[.head_sha, .status, (.conclusion // "")] | @tsv'
+            )
+            echo "run=$RUN_ID sha=$sha status=$status conclusion=$conclusion"
+            test "$sha" = "$EXPECTED_SHA"
+            if test "$status" = completed; then
+              test "$conclusion" = success
+              exit
+            fi
+            sleep 10
+          done
+          echo "::error::staging deployment did not complete in 15 minutes"
+          exit 1
