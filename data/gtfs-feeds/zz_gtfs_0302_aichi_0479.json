@@ -2,7 +2,7 @@
   "name": "西尾市 六万石くるりんバス",
   "url": "https://api.gtfs-data.jp/v2/organizations/nishiocity/feeds/rokumangokukururinbus/files/feed.zip",
   "source": "https://gtfs-data.jp/search?pref=%E6%84%9B%E7%9F%A5%E7%9C%8C&target_feed=nishiocity*rokumangokukururinbus",
-  "license": "CC BY 4.0",
+  "license": "CC0 1.0",
   "company_cd": 363,
   "company": {
     "name": "愛知県西尾市",
