@@ -59,6 +59,8 @@ runs:
 
     - name: Fetch registered Saitama Open Data GTFS
       shell: bash
+      env:
+        STRICT: ${{ inputs.fail-on-missing-bus-feeds }}
       run: python3 preprocessor/scripts/prepare_saitama_gtfs.py
 
     # data/*.csv をそのまま Worker へ渡すと本番と挙動が変わる。列車種別を
