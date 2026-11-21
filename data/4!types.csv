@@ -338,3 +338,4 @@ DEFAULT,562,特急(三崎口方面),トッキュウ,Limited Express(for Misakigu
 DEFAULT,563,区間急行(船橋方面),クカンキュウコウ,Section Express(for Funabashi),区间快速(船桥方向),구간급행(후나바시 방면),#FF99FF,2,3,0,東武野田線・2026-11-21改正・平日朝のみ,COMPLETE
 DEFAULT,565,臨時特急(近鉄名古屋方面),リンジトッキュウ,Special Limited Express (for Kintetsu-Nagoya),临时特快(近铁名古屋方向),임시 특급(긴테쓰나고야 방면),#DC143C,1,4,0,2026-11-21～23および12-20のみ・鳥羽14:44発近鉄名古屋行,COMPLETE
 DEFAULT,566,臨時特急(松阪方面),リンジトッキュウ,Special Limited Express (for Matsusaka),临时特快(松阪方向),임시 특급(마쓰사카 방면),#DC143C,2,4,0,2026-12-20のみ・近鉄名古屋6:05発松阪行,COMPLETE
+DEFAULT,567,普通(JR豊肥本線直通),フツウ,Local (Through Service to JR Hohi Main Line),普通（直通JR丰肥本线）,보통(JR 호히 본선 직통),#1F63C6,0,0,0,肥後大津～高森・朝2往復の普通直通,COMPLETE

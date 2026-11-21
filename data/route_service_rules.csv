@@ -37,3 +37,4 @@ type_cd,line_group_id,requires_timetable,boarding_wait_seconds,source,type_name,
 563,1208,true,,https://www.tobu.co.jp/file.jsp?id=128563,区間急行(船橋方面),2026-11-21改正・平日朝5本・柏から船橋への片方向,2026-11-21
 565,1210,true,,https://www.kintetsu.co.jp/railway/Dia/dia_limited_express_20261020.html,臨時特急(近鉄名古屋方面),2026-11-21～23および12-20のみ・鳥羽14:44発近鉄名古屋行・久居通過,2026-11-22
 566,1211,true,,https://www.kintetsu.co.jp/railway/Dia/dia_mie_matsusaka_marathon_20261119.html,臨時特急(松阪方面),2026-12-20のみ・近鉄名古屋6:05発松阪行・久居通過,2026-11-22
+567,1212,true,,https://www.mt-torokko.com/information/timetable/,普通(JR豊肥本線直通),JR肥後大津～南阿蘇鉄道高森の朝2往復に限定,2026-11-22
