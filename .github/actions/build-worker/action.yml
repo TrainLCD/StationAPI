@@ -57,60 +57,9 @@ runs:
         path: data/N02-25
         key: n02-25
 
-    # 埼玉県の配布ZIPは公式サイトから毎回取得する。署名付き転送先はログに出さない。
     - name: Fetch registered Saitama Open Data GTFS
-      shell: python
-      run: |
-        import hashlib
-        import json
-        import shutil
-        import tempfile
-        from pathlib import Path
-        from urllib.request import Request, urlopen
-        from zipfile import ZipFile
-
-        REGISTRY = Path("data/gtfs-feeds")
-        CACHE = Path("data/gtfs-cache")
-        PORTAL = "https://opendata.pref.saitama.lg.jp/resource_download/"
-        REQUIRED = {"routes.txt", "stops.txt", "trips.txt", "stop_times.txt"}
-
-
-        def fetch(registration, url):
-            CACHE.mkdir(parents=True, exist_ok=True)
-            destination = CACHE / registration.stem
-            if destination.exists():
-                if not all((destination / name).is_file() for name in REQUIRED):
-                    raise ValueError(f"Incomplete GTFS cache at {destination}")
-                return
-            request = Request(url, headers={"User-Agent": "TrainLCD/StationAPI (GTFS data importer)"})
-            with tempfile.TemporaryDirectory(dir=CACHE) as staging:
-                archive = Path(staging) / "feed.zip"
-                with urlopen(request, timeout=60) as response, archive.open("wb") as output:
-                    shutil.copyfileobj(response, output)
-                extracted = Path(staging) / "extracted"
-                extracted.mkdir()
-                with ZipFile(archive) as feed:
-                    # The source publishes flat GTFS ZIPs. Keep only top-level GTFS text files.
-                    members = [
-                        member for member in feed.infolist()
-                        if Path(member.filename).name == member.filename
-                        and member.filename.endswith(".txt")
-                    ]
-                    names = {m.filename for m in members}
-                    if len(names) != len(members) or not REQUIRED <= names:
-                        raise ValueError(f"Invalid GTFS archive for {registration.stem}")
-                    for member in members:
-                        with feed.open(member) as source, (extracted / member.filename).open("xb") as output:
-                            shutil.copyfileobj(source, output)
-                extracted.rename(destination)
-                print(f"{registration.stem} {url} SHA-256 {hashlib.sha256(archive.read_bytes()).hexdigest()}")
-
-
-        if __name__ == "__main__":
-            for registration in sorted(REGISTRY.glob("*.json")):
-                url = json.loads(registration.read_text(encoding="utf-8"))["url"]
-                if url.startswith(PORTAL) and url.removeprefix(PORTAL).isdigit():
-                    fetch(registration, url)
+      shell: bash
+      run: python3 preprocessor/scripts/prepare_saitama_gtfs.py
 
     # data/*.csv をそのまま Worker へ渡すと本番と挙動が変わる。列車種別を
     # 持たない路線には各駅停車の系統を補う必要があり (約2,400行)、バス停と
