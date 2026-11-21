@@ -1,8 +1,8 @@
 {
   "name": "秩父市営バス",
   "url": "https://opendata.pref.saitama.lg.jp/resource_download/8489",
-  "source": "https://opendata.pref.saitama.lg.jp/datasets/279",
-  "license": "CC BY 4.0",
+  "source": "https://opendata.pref.saitama.lg.jp/resources/8489",
+  "license": "公共データ利用規約第1.0版（PDL1.0）",
   "company_cd": 615,
   "company": {
     "name": "秩父市",
