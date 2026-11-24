@@ -152,3 +152,34 @@ mod route_metadata_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod iwamotocho_graphql_tests {
+    use std::future::Future;
+
+    #[test]
+    fn shinjuku_express_stops_at_iwamotocho_in_both_directions() {
+        let schema = crate::graphql::build_schema(crate::interactor());
+        let future = schema.execute(
+            r"{
+                outbound: lineGroupStations(lineGroupId: 251) { id stopCondition }
+                inbound: lineGroupStations(lineGroupId: 285) { id stopCondition }
+                local: lineGroupStations(lineGroupId: 87) { id stopCondition }
+            }",
+        );
+        let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+        let result = match std::pin::pin!(future).poll(&mut context) {
+            std::task::Poll::Ready(value) => value,
+            _ => panic!("in-memory execution must complete"),
+        };
+        assert!(result.errors.is_empty(), "{:?}", result.errors);
+        let data = result.data.into_json().unwrap();
+        for (group, expected) in [("outbound", "Not"), ("inbound", "Not"), ("local", "All")] {
+            let rows = data[group].as_array().unwrap();
+            for (id, condition) in [(9930407, expected), (9930408, "All"), (9930409, "All")] {
+                let station = rows.iter().find(|row| row["id"] == id).unwrap();
+                assert_eq!(station["stopCondition"], condition, "{group}: {id}");
+            }
+        }
+    }
+}
