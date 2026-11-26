@@ -138,3 +138,24 @@ PDFに記載された運転日のうち、この高滝発着の適用範囲は20
 
 `cargo test -p data_validator --test minamiaso_through` で停車順・駅グループ・運行制約、
 `cargo test -p stationapi-preprocessor minamiaso` で各停生成時のIDと停車順の維持を検証する。
+
+## 山陽新幹線 ひかり798号（2026-11-21確認）
+
+[JR西日本の列車別時刻表](https://timetable.jr-odekake.net/train-timetable/373151?date=20261129)の
+ひかり798号（9798A）は、博多100319・小倉100318・広島100312・三原100310・福山100308・岡山100306に停車する。
+新下関・厚狭・新山口・徳山・新岩国・東広島・新尾道・新倉敷は通過する。
+通常のひかり（種別2・系統2）では、このうち6駅が停車扱いになるため代用しない。
+
+公表済みの対象日は以下のとおり。すべて同じ停車パターンを使う。
+
+- 2026年11月29日：[JR西日本の秋の臨時列車追加発表](https://www.westjr.co.jp/press/article/2026/09/18/items/260918_00_press_shinkansenrinji.pdf)
+- 2026年12月5日・6日：[JR西日本の冬の臨時列車発表](https://www.westjr.co.jp/press/article/2026/10/22/items/261022_00_press_rinjiressha.pdf)（PDF 3ページ）
+- 2026年12月26日・27日、2027年1月16日・17日、2月6日・7日：[JR西日本の冬の臨時列車追加発表](https://www.westjr.co.jp/press/article/2026/11/19/items/261119_00_press_sanyoushinkansen_rinji.pdf)
+
+種別563・系統1208の専用パターンとして追加し、山陽新幹線の既存駅順（岡山→博多）で14駅を保持する。
+運転はその逆順の上り（博多→岡山）のみなのでdirection=1。通常のひかりの種別・系統は維持する。
+該当系統だけに `requires_timetable=true` を設定し、日時なしの自動探索・到達判定には採用しない。
+指定日は出典と適用範囲の記録であり、手動の種別選択を日付で切り替えたり、期間終了時に自動で非表示にしたりはしない。
+
+`cargo test -p data_validator --test hikari_798` は専用種別・全14駅順・停車/通過・運行制約と、
+通常ひかりの山陽区間の停車パターンが維持されていることを検証する。
